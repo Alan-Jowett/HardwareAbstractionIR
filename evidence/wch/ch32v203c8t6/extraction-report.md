@@ -32,7 +32,7 @@
 
 | Subsystem | Components discovered |
 | --- | --- |
-| CPU / core | QingKe V4B core, PFIC, SDI debug interface |
+| CPU / core | QingKe V4B core, PFIC, debug interface (SWDIO/SWCLK) |
 | Memory | 64KB code flash, 64KB flash boot alias at `0x00000000`, 20KB SRAM |
 | Timers | TIM1, TIM2, TIM3, TIM4 |
 | Serial | USART1, USART2, USART3, UART4, SPI1, SPI2, I2C1, I2C2 |
