@@ -48,7 +48,9 @@ This separation keeps the raw evidence, semantic model, normalization logic, and
 
 ## IR Schema
 
-At a high level, HAIR describes hardware as a graph of typed semantic objects. Common object categories include:
+At a high level, HAIR describes hardware as a graph of typed semantic objects. A HAIR document represents **one concrete device variant**, with optional imports for shared family- or subsystem-level definitions.
+
+Common object categories include:
 
 - `Device`
 - `Peripheral`
@@ -66,6 +68,25 @@ Each object is expected to carry enough metadata to support:
 2. Cross-vendor normalization
 3. Deterministic downstream generation
 4. Automated validation
+
+### Schema layout
+
+The repository now includes a layered JSON Schema set under `schema\`:
+
+| File | Role |
+| --- | --- |
+| `schema/hair.json` | Top-level HAIR document schema |
+| `schema/common.json` | Shared primitive types and reusable helpers |
+| `schema/provenance.json` | Sources, evidence, reviews, and per-entity provenance |
+| `schema/structure.json` | Devices, peripherals, registers, fields, interrupts, memory regions |
+| `schema/semantics.json` | Behaviors, operations, state machines, semantic relationships |
+| `schema/physical.json` | Clocks, timing, pins, packages, power/reset domains, electrical constraints |
+| `schema/normalization.json` | Canonical mappings, naming rules, vendor quirks |
+| `schema/validation.json` | Validation rules and profiles |
+| `schema/profiles/mcu.json` | Optional MCU/SoC interpretation layer for canonical block classes and topology |
+| `schema/evidence-manifest.json` | Input manifest schema for extraction workflows |
+
+The core HAIR document can optionally include `profiles.mcuSoc` to classify common embedded concepts such as GPIO ports, timer classes, interrupt controllers, GPIO matrices, IO muxes, flash controllers, and other SoC infrastructure blocks.
 
 ## Provenance and Auditability
 
@@ -91,6 +112,36 @@ HAIR is intended to support spec-driven, LLM-mediated extraction from multiple s
 - Human annotations
 
 The extraction process produces structured HAIR IR blocks together with provenance, making it possible to iteratively refine device models without losing traceability.
+
+### Evidence-first workflow
+
+HAIR extraction is driven by an explicit evidence manifest rather than an implicit pile of source files.
+
+An evidence manifest:
+
+- targets exactly one MCU or SoC variant
+- lists the approved source materials to use
+- distinguishes local files from remote URIs
+- provides an auditable starting point for extraction
+
+This keeps extraction reproducible and makes it easier to challenge, review, and regenerate device descriptions later.
+
+## Repository workflows
+
+The repository includes agent skills under `.github\skills\` that formalize the current workflow:
+
+| Skill | Purpose |
+| --- | --- |
+| `find-mcu-sources` | Discover and review authoritative source materials, then author an evidence manifest |
+| `extract` | Build a HAIR document from an evidence manifest using phased extraction and adversarial review |
+| `maintain` / `evolve` | Support ongoing schema and repository maintenance workflows |
+
+The extraction flow is intentionally conservative:
+
+1. identify one exact target variant
+2. assemble an explicit evidence manifest
+3. extract a draft HAIR model with provenance
+4. adversarially challenge claims before treating the result as final
 
 ## Normalization Rules
 
@@ -146,6 +197,8 @@ generate    Produce SVDs, PACs, HALs, simulators, and docs
 diff        Compare IR revisions or vendor updates
 ```
 
+In practice, the current repository is centered on the **schema and extraction workflow** rather than a finished CLI implementation.
+
 ## Example Devices
 
 Reference device models are expected to include:
@@ -153,9 +206,16 @@ Reference device models are expected to include:
 - CH32V203
 - STM32F4
 - RP2040
-- ESP32
+- ESP32 / ESP32-C3
 
 Additional MCU families can be added as extraction pipelines mature.
+
+## Documentation
+
+The main human-oriented design references are:
+
+- `docs/schema.md` — overview of the full layered schema
+- `docs/mcu-profile.md` — explanation of the MCU/SoC profile layer
 
 ## Project Philosophy
 
@@ -192,6 +252,7 @@ Especially valuable contributions include:
 Likely areas of growth for the project include:
 
 - Expanding the core HAIR schema
+- Refining the MCU/SoC profile layer for common hardware patterns
 - Maturing extraction pipelines for more vendors and device families
 - Improving normalization across peripheral families
 - Strengthening validation and cross-vendor consistency checks
