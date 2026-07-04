@@ -1,0 +1,55 @@
+{
+  "documentKind": "hair-evidence-manifest",
+  "schemaVersion": "0.1.0",
+  "targetDevice": {
+    "id": "CH32V203C8T6",
+    "name": "CH32V203C8T6",
+    "vendor": "WCH",
+    "family": "CH32V203",
+    "variant": "C8T6",
+    "package": "LQFP48",
+    "architecture": "QingKe V4B",
+    "notes": "Exact target variant selected by the user. WCH appears to publish family-level documentation for CH32V20x/30x rather than a C8T6-only datasheet/reference manual."
+  },
+  "sources": [
+    {
+      "id": "wch-ch32v20x-30x-datasheet",
+      "kind": "datasheet",
+      "uri": "https://www.wch-ic.com/downloads/CH32V20x_30xDS0_PDF.html",
+      "notes": "Official WCH family datasheet for CH32V20x/30x devices. Primary source for device identity, package/pinout, electrical and feature coverage for CH32V203C8T6."
+    },
+    {
+      "id": "wch-ch32fv2x-v3x-rm",
+      "kind": "reference-manual",
+      "uri": "https://www.wch-ic.com/downloads/CH32FV2x_V3xRM_PDF.html",
+      "notes": "Official WCH family reference manual covering CH32V2x/V3x peripherals and registers. Primary source for register structure, fields, clocks, resets, and peripheral semantics."
+    },
+    {
+      "id": "openwch-ch32v20x-sdk",
+      "kind": "sdk",
+      "uri": "https://github.com/openwch/ch32v20x/tree/804daf39a21af99be64c5abe0ea4bdaf361eb2e4",
+      "version": "804daf39a21af99be64c5abe0ea4bdaf361eb2e4",
+      "notes": "Official openwch repository with SDK material, examples, headers, startup code, and package-specific project assets for CH32V20x family devices."
+    }
+    {
+      "id": "openwch-ch32v20x-header",
+      "kind": "vendor-header",
+      "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h",
+      "version": "V1.0.1",
+      "notes": "Official WCH peripheral access header. The CH32V20x_D6 grouping explicitly includes CH32V203C8 and is useful for IRQ names, peripheral types, and register definitions."
+    },
+    {
+      "id": "openwch-ch32v20x-startup-d6",
+      "kind": "source-code",
+      "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Startup/startup_ch32v20x_D6.S",
+      "version": "V1.0.2",
+      "notes": "Official WCH startup file for the D6 subset that includes CH32V203C8. Useful to cross-check exception and interrupt vector ordering."
+    }
+    {
+      "id": "qingke-v4-processor-manual",
+      "kind": "other",
+      "uri": "https://www.wch-ic.com/downloads/QingKeV4_Processor_Manual_PDF.html",
+      "notes": "Official architecture-level processor manual referenced by the openwch datasheet README. Useful for core and exception behavior not fully explained in the device-family manuals."
+    }
+  ]
+}
