@@ -93,6 +93,7 @@ HAIR repository context:
 - `README.md`
 - `docs/schema.md`
 - `docs/mcu-profile.md`
+- `schema/common.json`
 - `schema/hair.json`
 - `schema/evidence-manifest.json`
 - `schema/provenance.json`
@@ -155,11 +156,13 @@ Grounding rules:
 
 ### Critical Rule
 
-Do **not** proceed to Phase 2 until you have presented the extraction
-plan and either:
+Present the extraction plan before proceeding. If there are no blocking
+clarification questions, continue automatically into Phase 2. Stop only
+when:
 
-- the user approves it, or
-- the user answers any blocking clarification questions.
+- the manifest is invalid,
+- a blocking ambiguity is detected, or
+- the user interrupts or redirects the workflow.
 
 If the manifest is invalid, missing required sources, or names multiple
 device variants ambiguously, stop here.
@@ -241,8 +244,10 @@ In parallel with the JSON draft, build a Markdown discovery report with:
 2. source inventory
 3. major hardware areas discovered
 4. component inventory by subsystem
-5. open conflicts and ambiguities
-6. coverage statement
+5. an epistemic claims ledger classifying material conclusions as
+   `[KNOWN]`, `[INFERRED]`, or `[ASSUMPTION]`
+6. open conflicts and ambiguities
+7. coverage statement
 
 #### 2.7 Blocking ambiguity policy
 
@@ -342,7 +347,8 @@ Final output requirements:
 
 - The HAIR JSON must match the local schema set.
 - Every material entity must have grounded provenance.
-- The report must make clear which claims were known vs. inferred.
+- The report must make clear which material claims were `[KNOWN]`,
+  `[INFERRED]`, or `[ASSUMPTION]`.
 - If full-device coverage could not be established, do not present the
   output as complete.
 
@@ -368,6 +374,8 @@ Use this structure:
 
 ## Component Inventory
 
+## Epistemic Claims Ledger
+
 ## Conflicts and Clarification Questions
 
 ## Rejected Candidate Claims
@@ -378,6 +386,12 @@ Use this structure:
 ```
 
 If a section is empty, write `None identified.`
+
+In `## Epistemic Claims Ledger`, include a table with:
+
+- claim or entity
+- label: `[KNOWN]`, `[INFERRED]`, or `[ASSUMPTION]`
+- supporting evidence or reason for the label
 
 ## Non-Goals
 
