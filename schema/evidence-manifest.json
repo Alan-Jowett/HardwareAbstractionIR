@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hair.dev/schema/evidence-manifest.json",
+  "title": "HAIR Evidence Manifest",
+  "description": "Input manifest for HAIR extraction workflows. Describes one target MCU or SoC variant and the evidence sources that may be used to construct a HAIR document for it.",
+  "type": "object",
+  "$defs": {
+    "sourceKind": {
+      "type": "string",
+      "enum": [
+        "datasheet",
+        "reference-manual",
+        "vendor-header",
+        "svd",
+        "atdf",
+        "ip-xact",
+        "systemrdl",
+        "hal",
+        "sdk",
+        "source-code",
+        "errata",
+        "reverse-engineering",
+        "test",
+        "human-annotation",
+        "generated",
+        "other"
+      ]
+    },
+    "manifestSource": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "common.json#/$defs/identifier"
+        },
+        "kind": {
+          "$ref": "#/$defs/sourceKind"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uri": {
+          "$ref": "common.json#/$defs/uri"
+        },
+        "version": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "path"
+          ]
+        },
+        {
+          "required": [
+            "uri"
+          ]
+        }
+      ]
+    }
+  },
+  "properties": {
+    "documentKind": {
+      "const": "hair-evidence-manifest"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "targetDevice": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "common.json#/$defs/identifier"
+        },
+        "name": {
+          "$ref": "common.json#/$defs/nonEmptyString"
+        },
+        "vendor": {
+          "$ref": "common.json#/$defs/nonEmptyString"
+        },
+        "family": {
+          "type": "string"
+        },
+        "variant": {
+          "type": "string"
+        },
+        "package": {
+          "type": "string"
+        },
+        "architecture": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "vendor"
+      ],
+      "additionalProperties": false
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/manifestSource"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "documentKind",
+    "schemaVersion",
+    "targetDevice",
+    "sources"
+  ],
+  "additionalProperties": false
+}

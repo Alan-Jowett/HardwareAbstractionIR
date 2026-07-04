@@ -60,6 +60,22 @@ The importing document remains the definition of one concrete device variant, bu
 
 ## Schema files
 
+## `schema/evidence-manifest.json`
+
+This schema defines an **input manifest for extraction workflows**. It
+is not itself a HAIR document; it is the structured source list that
+drives creation of a HAIR document.
+
+It includes:
+
+- `documentKind`: fixed to `hair-evidence-manifest`
+- `schemaVersion`: version of the manifest schema
+- `targetDevice`: identity for the single MCU or SoC variant being extracted
+- `sources`: the evidence set, with source kind plus either a local path or URI
+
+The goal is to give extractors a deterministic, auditable starting point:
+one target device and an explicit list of allowed source materials.
+
 ## `schema/common.json`
 
 Shared primitive and utility types used across the rest of the schema set.
