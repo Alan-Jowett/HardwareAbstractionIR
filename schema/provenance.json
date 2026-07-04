@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hair.dev/schema/provenance.json",
+  "title": "HAIR Provenance Layer",
+  "type": "object",
+  "properties": {
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sourceArtifact"
+      },
+      "uniqueItems": true
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidenceRecord"
+      },
+      "uniqueItems": true
+    },
+    "reviews": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/reviewRecord"
+      },
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "sources",
+    "evidence"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "sourceArtifact": {
+      "allOf": [
+        {
+          "$ref": "common.json#/$defs/namedEntity"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "datasheet",
+                "reference-manual",
+                "vendor-header",
+                "svd",
+                "atdf",
+                "ip-xact",
+                "systemrdl",
+                "hal",
+                "sdk",
+                "errata",
+                "reverse-engineering",
+                "test",
+                "human-annotation",
+                "generated",
+                "other"
+              ]
+            },
+            "uri": {
+              "$ref": "common.json#/$defs/uri"
+            },
+            "path": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "publisher": {
+              "type": "string"
+            },
+            "hash": {
+              "type": "string"
+            },
+            "license": {
+              "type": "string"
+            },
+            "publishedAt": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "sourceLocator": {
+      "type": "object",
+      "properties": {
+        "section": {
+          "type": "string"
+        },
+        "pageStart": {
+          "$ref": "common.json#/$defs/positiveInteger"
+        },
+        "pageEnd": {
+          "$ref": "common.json#/$defs/positiveInteger"
+        },
+        "lineStart": {
+          "$ref": "common.json#/$defs/positiveInteger"
+        },
+        "lineEnd": {
+          "$ref": "common.json#/$defs/positiveInteger"
+        },
+        "registerPath": {
+          "type": "string"
+        },
+        "fragment": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "evidenceRecord": {
+      "allOf": [
+        {
+          "$ref": "common.json#/$defs/namedEntity"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "sourceRef": {
+              "$ref": "common.json#/$defs/sourceRef"
+            },
+            "locator": {
+              "$ref": "#/$defs/sourceLocator"
+            },
+            "excerpt": {
+              "type": "string"
+            },
+            "normalizedClaim": {
+              "type": "string"
+            },
+            "extractionMethod": {
+              "type": "string",
+              "enum": [
+                "manual",
+                "parser",
+                "llm",
+                "imported",
+                "inferred",
+                "reverse-engineered"
+              ]
+            },
+            "capturedAt": {
+              "$ref": "common.json#/$defs/timestamp"
+            },
+            "capturedBy": {
+              "$ref": "common.json#/$defs/contact"
+            },
+            "confidence": {
+              "$ref": "common.json#/$defs/confidence"
+            }
+          },
+          "required": [
+            "sourceRef",
+            "normalizedClaim"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "reviewRecord": {
+      "allOf": [
+        {
+          "$ref": "common.json#/$defs/namedEntity"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "evidenceRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/evidenceRef"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "reviewer": {
+              "$ref": "common.json#/$defs/contact"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "accepted",
+                "rejected",
+                "needs-review",
+                "superseded"
+              ]
+            },
+            "reviewedAt": {
+              "$ref": "common.json#/$defs/timestamp"
+            },
+            "notes": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "evidenceRefs",
+            "status"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "provenanceRecord": {
+      "type": "object",
+      "properties": {
+        "sourceRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "common.json#/$defs/sourceRef"
+          },
+          "uniqueItems": true
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "common.json#/$defs/evidenceRef"
+          },
+          "uniqueItems": true
+        },
+        "reviewRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "common.json#/$defs/reviewRef"
+          },
+          "uniqueItems": true
+        },
+        "derivedFromRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "asserted",
+            "imported",
+            "inferred",
+            "verified",
+            "disputed",
+            "deprecated"
+          ]
+        },
+        "confidence": {
+          "$ref": "common.json#/$defs/confidence"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

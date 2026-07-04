@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hair.dev/schema/normalization.json",
+  "title": "HAIR Normalization Layer",
+  "type": "object",
+  "properties": {
+    "peripheralFamilies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/peripheralFamily"
+      },
+      "uniqueItems": true
+    },
+    "mappings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/normalizedMapping"
+      },
+      "uniqueItems": true
+    },
+    "namingRules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/namingRule"
+      },
+      "uniqueItems": true
+    },
+    "vendorQuirks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/vendorQuirk"
+      },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "entityBase": {
+      "allOf": [
+        {
+          "$ref": "common.json#/$defs/namedEntity"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "provenance": {
+              "$ref": "provenance.json#/$defs/provenanceRecord"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "peripheralFamily": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "category": {
+              "type": "string",
+              "enum": [
+                "gpio",
+                "uart",
+                "usart",
+                "spi",
+                "i2c",
+                "timer",
+                "pwm",
+                "adc",
+                "dac",
+                "dma",
+                "rtc",
+                "watchdog",
+                "usb",
+                "ethernet",
+                "custom"
+              ]
+            },
+            "canonicalRoles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "category"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "normalizedMapping": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "targetRef": {
+              "$ref": "common.json#/$defs/entityRef"
+            },
+            "canonicalName": {
+              "$ref": "common.json#/$defs/nonEmptyString"
+            },
+            "peripheralFamilyRef": {
+              "$ref": "common.json#/$defs/entityRef"
+            },
+            "semanticRoles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "vendorNames": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/nonEmptyString"
+              },
+              "uniqueItems": true
+            },
+            "normalizedPath": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "targetRef",
+            "canonicalName"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "namingRule": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "scope": {
+              "type": "string",
+              "enum": [
+                "device",
+                "peripheral",
+                "register",
+                "field"
+              ]
+            },
+            "match": {
+              "$ref": "common.json#/$defs/expression"
+            },
+            "replacement": {
+              "$ref": "common.json#/$defs/nonEmptyString"
+            }
+          },
+          "required": [
+            "scope",
+            "match",
+            "replacement"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "vendorQuirk": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "vendor": {
+              "$ref": "common.json#/$defs/nonEmptyString"
+            },
+            "targetRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "naming",
+                "layout",
+                "reset-value",
+                "alternate-function",
+                "clocking",
+                "interrupt-model",
+                "documentation-bug",
+                "custom"
+              ]
+            },
+            "impact": {
+              "type": "string"
+            },
+            "normalizationStrategy": {
+              "type": "string"
+            },
+            "workaround": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "vendor",
+            "kind"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,627 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hair.dev/schema/structure.json",
+  "title": "HAIR Structural Layer",
+  "type": "object",
+  "properties": {
+    "architectures": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/architectureProfile"
+      },
+      "uniqueItems": true
+    },
+    "deviceFamilies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/deviceFamily"
+      },
+      "uniqueItems": true
+    },
+    "peripheralTemplates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/peripheral"
+      },
+      "uniqueItems": true
+    },
+    "sharedRefs": {
+      "type": "array",
+      "items": {
+        "$ref": "common.json#/$defs/entityRef"
+      },
+      "uniqueItems": true
+    },
+    "device": {
+      "$ref": "#/$defs/device"
+    }
+  },
+  "required": [
+    "device"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "entityBase": {
+      "allOf": [
+        {
+          "$ref": "common.json#/$defs/namedEntity"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "provenance": {
+              "$ref": "provenance.json#/$defs/provenanceRecord"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "accessMode": {
+      "type": "string",
+      "enum": [
+        "read-only",
+        "write-only",
+        "read-write",
+        "write-once",
+        "read-write-once",
+        "read-clear",
+        "read-set",
+        "write-clear",
+        "write-set",
+        "custom"
+      ]
+    },
+    "endianness": {
+      "type": "string",
+      "enum": [
+        "little",
+        "big",
+        "selectable",
+        "other"
+      ]
+    },
+    "architectureProfile": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "isa": {
+              "type": "string"
+            },
+            "coreFamily": {
+              "type": "string"
+            },
+            "endianness": {
+              "$ref": "#/$defs/endianness"
+            },
+            "addressUnitBits": {
+              "$ref": "common.json#/$defs/positiveInteger"
+            },
+            "dataBusWidthBits": {
+              "$ref": "common.json#/$defs/positiveInteger"
+            },
+            "features": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "isa"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "cpuModel": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "endianness": {
+          "$ref": "#/$defs/endianness"
+        },
+        "featureFlags": {
+          "type": "object",
+          "properties": {
+            "mpuPresent": {
+              "type": "boolean"
+            },
+            "fpuPresent": {
+              "type": "boolean"
+            },
+            "fpuDoublePrecision": {
+              "type": "boolean"
+            },
+            "dspPresent": {
+              "type": "boolean"
+            },
+            "icachePresent": {
+              "type": "boolean"
+            },
+            "dcachePresent": {
+              "type": "boolean"
+            },
+            "itcmPresent": {
+              "type": "boolean"
+            },
+            "dtcmPresent": {
+              "type": "boolean"
+            },
+            "vtorPresent": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "interruptPriorityBits": {
+          "$ref": "common.json#/$defs/nonNegativeInteger"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "deviceFamily": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "vendor": {
+              "type": "string"
+            },
+            "vendorId": {
+              "$ref": "common.json#/$defs/identifier"
+            },
+            "series": {
+              "type": "string"
+            },
+            "architectureRef": {
+              "$ref": "common.json#/$defs/entityRef"
+            },
+            "deviceRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "vendor"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "memoryRegion": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "flash",
+                "rom",
+                "ram",
+                "eeprom",
+                "mmio",
+                "otp",
+                "cache",
+                "tcm",
+                "other"
+              ]
+            },
+            "baseAddress": {
+              "$ref": "common.json#/$defs/address"
+            },
+            "sizeBytes": {
+              "$ref": "common.json#/$defs/positiveInteger"
+            },
+            "access": {
+              "$ref": "#/$defs/accessMode"
+            },
+            "executable": {
+              "type": "boolean"
+            },
+            "volatile": {
+              "type": "boolean"
+            },
+            "addressSpace": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "baseAddress",
+            "sizeBytes"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "addressBlock": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "offsetBytes": {
+          "$ref": "common.json#/$defs/nonNegativeInteger"
+        },
+        "sizeBytes": {
+          "$ref": "common.json#/$defs/positiveInteger"
+        },
+        "usage": {
+          "type": "string",
+          "enum": [
+            "registers",
+            "buffer",
+            "reserved",
+            "other"
+          ]
+        },
+        "protection": {
+          "type": "string",
+          "enum": [
+            "secure",
+            "non-secure",
+            "privileged",
+            "unprivileged",
+            "mixed",
+            "other"
+          ]
+        }
+      },
+      "required": [
+        "offsetBytes",
+        "sizeBytes",
+        "usage"
+      ],
+      "additionalProperties": false
+    },
+    "enumeratedValue": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "common.json#/$defs/nonEmptyString"
+        },
+        "value": {
+          "$ref": "common.json#/$defs/valueLiteral"
+        },
+        "description": {
+          "type": "string"
+        },
+        "isDefault": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "enumeratedSet": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "usage": {
+              "type": "string",
+              "enum": [
+                "read",
+                "write",
+                "read-write"
+              ]
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/enumeratedValue"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "values"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "field": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "bitRange": {
+              "$ref": "common.json#/$defs/bitRange"
+            },
+            "access": {
+              "$ref": "#/$defs/accessMode"
+            },
+            "array": {
+              "$ref": "common.json#/$defs/arrayShape"
+            },
+            "enumeratedSets": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/enumeratedSet"
+              }
+            },
+            "resetValue": {
+              "$ref": "common.json#/$defs/valueLiteral"
+            },
+            "reserved": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "bitRange"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "register": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "register"
+            },
+            "offsetBytes": {
+              "$ref": "common.json#/$defs/nonNegativeInteger"
+            },
+            "widthBits": {
+              "$ref": "common.json#/$defs/positiveInteger"
+            },
+            "access": {
+              "$ref": "#/$defs/accessMode"
+            },
+            "resetValue": {
+              "$ref": "common.json#/$defs/valueLiteral"
+            },
+            "resetMask": {
+              "$ref": "common.json#/$defs/valueLiteral"
+            },
+            "dataType": {
+              "type": "string"
+            },
+            "array": {
+              "$ref": "common.json#/$defs/arrayShape"
+            },
+            "alternateOfRef": {
+              "$ref": "common.json#/$defs/entityRef"
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/field"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "offsetBytes",
+            "widthBits"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "registerCluster": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "cluster"
+            },
+            "offsetBytes": {
+              "$ref": "common.json#/$defs/nonNegativeInteger"
+            },
+            "array": {
+              "$ref": "common.json#/$defs/arrayShape"
+            },
+            "members": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/registerBlockMember"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "kind",
+            "offsetBytes",
+            "members"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "registerBlockMember": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/register"
+        },
+        {
+          "$ref": "#/$defs/registerCluster"
+        }
+      ]
+    },
+    "interrupt": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "number": {
+              "type": "integer"
+            },
+            "controllerRef": {
+              "$ref": "common.json#/$defs/entityRef"
+            },
+            "priorityModel": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "number"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "peripheral": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "peripheral"
+            },
+            "type": {
+              "type": "string"
+            },
+            "groupName": {
+              "type": "string"
+            },
+            "derivedFromRef": {
+              "$ref": "common.json#/$defs/entityRef"
+            },
+            "baseAddress": {
+              "$ref": "common.json#/$defs/address"
+            },
+            "addressBlocks": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/addressBlock"
+              }
+            },
+            "interruptRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "registers": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/registerBlockMember"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "type"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "device": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "vendor": {
+              "$ref": "common.json#/$defs/nonEmptyString"
+            },
+            "vendorId": {
+              "$ref": "common.json#/$defs/identifier"
+            },
+            "familyRef": {
+              "$ref": "common.json#/$defs/entityRef"
+            },
+            "architectureRef": {
+              "$ref": "common.json#/$defs/entityRef"
+            },
+            "cpu": {
+              "$ref": "#/$defs/cpuModel"
+            },
+            "variants": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/nonEmptyString"
+              },
+              "uniqueItems": true
+            },
+            "extendsRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "memoryMap": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/memoryRegion"
+              }
+            },
+            "interrupts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/interrupt"
+              }
+            },
+            "peripherals": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/peripheral"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "vendor",
+            "peripherals"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

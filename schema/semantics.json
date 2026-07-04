@@ -1,0 +1,424 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hair.dev/schema/semantics.json",
+  "title": "HAIR Semantic Layer",
+  "type": "object",
+  "properties": {
+    "behaviors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/behavior"
+      },
+      "uniqueItems": true
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/operation"
+      },
+      "uniqueItems": true
+    },
+    "stateMachines": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/stateMachine"
+      },
+      "uniqueItems": true
+    },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/semanticRelationship"
+      },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "entityBase": {
+      "allOf": [
+        {
+          "$ref": "common.json#/$defs/namedEntity"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "provenance": {
+              "$ref": "provenance.json#/$defs/provenanceRecord"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "predicate": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "field-value",
+            "register-value",
+            "clock-enabled",
+            "reset-released",
+            "interrupt-disabled",
+            "mode-selected",
+            "custom"
+          ]
+        },
+        "targetRef": {
+          "$ref": "common.json#/$defs/entityRef"
+        },
+        "expression": {
+          "$ref": "common.json#/$defs/expression"
+        },
+        "expectedValue": {
+          "$ref": "common.json#/$defs/valueLiteral"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "sideEffect": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "self-clear",
+            "self-set",
+            "toggle",
+            "latch-on-read",
+            "starts-hardware",
+            "stops-hardware",
+            "raises-interrupt",
+            "triggers-dma",
+            "changes-clock",
+            "resets-peer",
+            "updates-status",
+            "external",
+            "custom"
+          ]
+        },
+        "targetRef": {
+          "$ref": "common.json#/$defs/entityRef"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "behavior": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "targetRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "category": {
+              "type": "string",
+              "enum": [
+                "status",
+                "control",
+                "data",
+                "clocking",
+                "reset",
+                "interrupt",
+                "dma",
+                "security",
+                "power",
+                "configuration",
+                "custom"
+              ]
+            },
+            "intent": {
+              "$ref": "common.json#/$defs/nonEmptyString"
+            },
+            "preconditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/predicate"
+              }
+            },
+            "postconditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/predicate"
+              }
+            },
+            "sideEffects": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/sideEffect"
+              }
+            },
+            "relatedRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "targetRefs",
+            "category",
+            "intent"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "operationStep": {
+      "type": "object",
+      "properties": {
+        "index": {
+          "$ref": "common.json#/$defs/nonNegativeInteger"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "read",
+            "write",
+            "poll",
+            "wait",
+            "assert",
+            "callout",
+            "custom"
+          ]
+        },
+        "targetRef": {
+          "$ref": "common.json#/$defs/entityRef"
+        },
+        "expression": {
+          "$ref": "common.json#/$defs/expression"
+        },
+        "value": {
+          "$ref": "common.json#/$defs/valueLiteral"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "index",
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "operation": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "initialization",
+                "configuration",
+                "transaction",
+                "interrupt-service",
+                "mode-transition",
+                "reset-sequence",
+                "unlock-sequence",
+                "custom"
+              ]
+            },
+            "targetRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/operationStep"
+              },
+              "minItems": 1
+            },
+            "preconditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/predicate"
+              }
+            },
+            "postconditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/predicate"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "targetRefs",
+            "steps"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "state": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "common.json#/$defs/nonEmptyString"
+        },
+        "description": {
+          "type": "string"
+        },
+        "invariants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/predicate"
+          }
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "transition": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "$ref": "common.json#/$defs/nonEmptyString"
+        },
+        "to": {
+          "$ref": "common.json#/$defs/nonEmptyString"
+        },
+        "trigger": {
+          "type": "string"
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/predicate"
+          }
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sideEffect"
+          }
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "stateMachine": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "targetRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "initialState": {
+              "type": "string"
+            },
+            "states": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/state"
+              },
+              "minItems": 1
+            },
+            "transitions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/transition"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "targetRefs",
+            "states",
+            "transitions"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "semanticRelationship": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "depends-on",
+                "enables",
+                "gates",
+                "resets",
+                "triggers",
+                "feeds",
+                "mirrors",
+                "aliases",
+                "conflicts-with",
+                "shares-resource-with",
+                "custom"
+              ]
+            },
+            "sourceRef": {
+              "$ref": "common.json#/$defs/entityRef"
+            },
+            "targetRef": {
+              "$ref": "common.json#/$defs/entityRef"
+            },
+            "description": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "sourceRef",
+            "targetRef"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

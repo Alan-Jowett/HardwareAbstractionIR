@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hair.dev/schema/hair.json",
+  "title": "HAIR Document",
+  "type": "object",
+  "$defs": {
+    "importedDocument": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "common.json#/$defs/identifier"
+        },
+        "uri": {
+          "$ref": "common.json#/$defs/uri"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "device-family",
+            "peripheral-library",
+            "register-block",
+            "pinout",
+            "clock-model",
+            "fragment",
+            "other"
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean",
+          "default": true
+        },
+        "includeRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "uri",
+        "kind"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "description": "A HAIR document describing exactly one concrete device variant, optionally composed from shared imported HAIR sub-documents.",
+  "properties": {
+    "documentKind": {
+      "const": "hair"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "common.json#/$defs/identifier"
+        },
+        "role": {
+          "const": "device-variant"
+        },
+        "title": {
+          "$ref": "common.json#/$defs/nonEmptyString"
+        },
+        "version": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "license": {
+          "type": "string"
+        },
+        "createdAt": {
+          "$ref": "common.json#/$defs/timestamp"
+        },
+        "updatedAt": {
+          "$ref": "common.json#/$defs/timestamp"
+        },
+        "authors": {
+          "type": "array",
+          "items": {
+            "$ref": "common.json#/$defs/contact"
+          },
+          "uniqueItems": true
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "common.json#/$defs/tag"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "title",
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "imports": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/importedDocument"
+      },
+      "uniqueItems": true
+    },
+    "provenance": {
+      "$ref": "provenance.json"
+    },
+    "structure": {
+      "$ref": "structure.json"
+    },
+    "semantics": {
+      "$ref": "semantics.json"
+    },
+    "physical": {
+      "$ref": "physical.json"
+    },
+    "normalization": {
+      "$ref": "normalization.json"
+    },
+    "validation": {
+      "$ref": "validation.json"
+    }
+  },
+  "required": [
+    "documentKind",
+    "schemaVersion",
+    "metadata",
+    "provenance",
+    "structure"
+  ],
+  "additionalProperties": false
+}

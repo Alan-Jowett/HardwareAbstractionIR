@@ -1,0 +1,273 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hair.dev/schema/common.json",
+  "title": "HAIR Common Types",
+  "type": "object",
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$"
+    },
+    "qualifiedIdentifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*(/[A-Za-z0-9_.:-]+)*$"
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "uri": {
+      "type": "string",
+      "format": "uri"
+    },
+    "tag": {
+      "type": "string",
+      "minLength": 1
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "entityRef": {
+      "$ref": "#/$defs/qualifiedIdentifier"
+    },
+    "sourceRef": {
+      "$ref": "#/$defs/identifier"
+    },
+    "evidenceRef": {
+      "$ref": "#/$defs/identifier"
+    },
+    "reviewRef": {
+      "$ref": "#/$defs/identifier"
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "address": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "bitIndex": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "bitWidth": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "bitRange": {
+      "type": "object",
+      "properties": {
+        "lsb": {
+          "$ref": "#/$defs/bitIndex"
+        },
+        "msb": {
+          "$ref": "#/$defs/bitIndex"
+        }
+      },
+      "required": [
+        "lsb",
+        "msb"
+      ],
+      "additionalProperties": false
+    },
+    "numericRange": {
+      "type": "object",
+      "properties": {
+        "minimum": {
+          "type": "number"
+        },
+        "maximum": {
+          "type": "number"
+        },
+        "inclusiveMinimum": {
+          "type": "boolean",
+          "default": true
+        },
+        "inclusiveMaximum": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "valueLiteral": {
+      "oneOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "boolean"
+        }
+      ]
+    },
+    "expression": {
+      "type": "object",
+      "properties": {
+        "language": {
+          "type": "string",
+          "enum": [
+            "plain",
+            "jsonata",
+            "jsonpath",
+            "cel",
+            "regex",
+            "markdown"
+          ]
+        },
+        "text": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      },
+      "required": [
+        "language",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "deprecation": {
+      "type": "object",
+      "properties": {
+        "since": {
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "replacedByRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "contact": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "organization": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "namedEntity": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          },
+          "uniqueItems": true
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tag"
+          },
+          "uniqueItems": true
+        },
+        "deprecated": {
+          "$ref": "#/$defs/deprecation"
+        },
+        "extensions": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "arrayAxis": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "count": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          },
+          "minItems": 1
+        },
+        "strideBits": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "strideBytes": {
+          "$ref": "#/$defs/positiveInteger"
+        }
+      },
+      "required": [
+        "name",
+        "count"
+      ],
+      "additionalProperties": false
+    },
+    "arrayShape": {
+      "type": "object",
+      "properties": {
+        "axes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/arrayAxis"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "axes"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,471 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hair.dev/schema/physical.json",
+  "title": "HAIR Physical Layer",
+  "type": "object",
+  "properties": {
+    "addressSpaces": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/addressSpace"
+      },
+      "uniqueItems": true
+    },
+    "clocks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/clockNode"
+      },
+      "uniqueItems": true
+    },
+    "timingConstraints": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/timingConstraint"
+      },
+      "uniqueItems": true
+    },
+    "powerDomains": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/powerDomain"
+      },
+      "uniqueItems": true
+    },
+    "resetDomains": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/resetDomain"
+      },
+      "uniqueItems": true
+    },
+    "pins": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/pin"
+      },
+      "uniqueItems": true
+    },
+    "packages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/package"
+      },
+      "uniqueItems": true
+    },
+    "electricalConstraints": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/electricalConstraint"
+      },
+      "uniqueItems": true
+    },
+    "interruptControllers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/interruptController"
+      },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "entityBase": {
+      "allOf": [
+        {
+          "$ref": "common.json#/$defs/namedEntity"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "provenance": {
+              "$ref": "provenance.json#/$defs/provenanceRecord"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "addressSpace": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "baseAddress": {
+              "$ref": "common.json#/$defs/address"
+            },
+            "sizeBytes": {
+              "$ref": "common.json#/$defs/positiveInteger"
+            },
+            "dataBusWidthBits": {
+              "$ref": "common.json#/$defs/positiveInteger"
+            }
+          },
+          "required": [
+            "baseAddress",
+            "sizeBytes"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "clockFrequency": {
+      "type": "object",
+      "properties": {
+        "nominalHz": {
+          "type": "number",
+          "minimum": 0
+        },
+        "minimumHz": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximumHz": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "clockNode": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "source",
+                "pll",
+                "divider",
+                "mux",
+                "gate",
+                "derived",
+                "domain"
+              ]
+            },
+            "targetRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "inputClockRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "frequency": {
+              "$ref": "#/$defs/clockFrequency"
+            },
+            "configRegisterRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "timingConstraint": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "targetRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "max-frequency",
+                "min-frequency",
+                "startup-delay",
+                "settling-time",
+                "pulse-width",
+                "latency",
+                "timeout",
+                "custom"
+              ]
+            },
+            "value": {
+              "type": "number",
+              "minimum": 0
+            },
+            "unit": {
+              "type": "string",
+              "enum": [
+                "Hz",
+                "kHz",
+                "MHz",
+                "ns",
+                "us",
+                "ms",
+                "cycles"
+              ]
+            },
+            "condition": {
+              "$ref": "common.json#/$defs/expression"
+            }
+          },
+          "required": [
+            "targetRefs",
+            "kind",
+            "value",
+            "unit"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "powerDomain": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "targetRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "voltageRangeVolts": {
+              "$ref": "common.json#/$defs/numericRange"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "resetDomain": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "targetRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "controllerRef": {
+              "$ref": "common.json#/$defs/entityRef"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "pinMode": {
+      "type": "string",
+      "enum": [
+        "input",
+        "output",
+        "analog",
+        "alternate-function",
+        "open-drain",
+        "open-source",
+        "bidirectional"
+      ]
+    },
+    "alternateFunction": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "common.json#/$defs/nonEmptyString"
+        },
+        "targetRef": {
+          "$ref": "common.json#/$defs/entityRef"
+        },
+        "signal": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "pin": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "port": {
+              "type": "string"
+            },
+            "index": {
+              "$ref": "common.json#/$defs/nonNegativeInteger"
+            },
+            "modes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/pinMode"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "alternateFunctions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/alternateFunction"
+              }
+            },
+            "powerDomainRef": {
+              "$ref": "common.json#/$defs/entityRef"
+            }
+          },
+          "required": [
+            "modes"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "packagePin": {
+      "type": "object",
+      "properties": {
+        "packagePad": {
+          "$ref": "common.json#/$defs/nonEmptyString"
+        },
+        "pinRef": {
+          "$ref": "common.json#/$defs/entityRef"
+        }
+      },
+      "required": [
+        "packagePad",
+        "pinRef"
+      ],
+      "additionalProperties": false
+    },
+    "package": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "packageType": {
+              "type": "string"
+            },
+            "pinMappings": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/packagePin"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "packageType",
+            "pinMappings"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "electricalConstraint": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "targetRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "drive-strength",
+                "pull-up",
+                "pull-down",
+                "slew-rate",
+                "input-threshold",
+                "voltage-range",
+                "current-limit",
+                "temperature-range",
+                "custom"
+              ]
+            },
+            "range": {
+              "$ref": "common.json#/$defs/numericRange"
+            },
+            "unit": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "targetRefs",
+            "kind"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "interruptController": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "targetRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "priorityBits": {
+              "$ref": "common.json#/$defs/nonNegativeInteger"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

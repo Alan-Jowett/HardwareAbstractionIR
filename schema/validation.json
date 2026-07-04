@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hair.dev/schema/validation.json",
+  "title": "HAIR Validation Layer",
+  "type": "object",
+  "properties": {
+    "rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/validationRule"
+      },
+      "uniqueItems": true
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/validationProfile"
+      },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "entityBase": {
+      "allOf": [
+        {
+          "$ref": "common.json#/$defs/namedEntity"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "provenance": {
+              "$ref": "provenance.json#/$defs/provenanceRecord"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "validationRule": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "appliesTo": {
+              "type": "string",
+              "enum": [
+                "document",
+                "device",
+                "peripheral",
+                "register",
+                "field",
+                "semantic",
+                "physical",
+                "normalization",
+                "provenance"
+              ]
+            },
+            "severity": {
+              "type": "string",
+              "enum": [
+                "error",
+                "warning",
+                "info"
+              ]
+            },
+            "selector": {
+              "$ref": "common.json#/$defs/expression"
+            },
+            "assertion": {
+              "$ref": "common.json#/$defs/expression"
+            },
+            "rationale": {
+              "type": "string"
+            },
+            "message": {
+              "$ref": "common.json#/$defs/nonEmptyString"
+            }
+          },
+          "required": [
+            "appliesTo",
+            "severity",
+            "assertion",
+            "message"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "validationProfile": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ruleRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "generatorTargets": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "svd",
+                  "pac",
+                  "hal",
+                  "docs",
+                  "simulator",
+                  "all"
+                ]
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "ruleRefs"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}
