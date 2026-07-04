@@ -198,6 +198,18 @@ Use code, datasheets, manuals, headers, SVDs, and related sources as
 cross-checks. When sources disagree, stop and ask rather than choosing
 silently.
 
+For default **full-device coverage**, register-bearing structural depth is
+mandatory, not optional:
+
+- A peripheral that exists only as a shell entity (for example with
+  `type`, `baseAddress`, and maybe `interruptRefs`) but without grounded
+  `registers[]`, clusters, fields, and enums is **incomplete**
+- If the evidence set supports peripheral discovery but you cannot finish
+  the register-model pass, treat that as a blocking extraction failure,
+  not a successful full-device draft
+- You may emit shell peripherals only when the user explicitly narrowed
+  scope away from register-level extraction
+
 #### 2.3 Semantic extraction
 
 Populate `semantics` only where the evidence supports it:
@@ -259,6 +271,9 @@ Stop and ask targeted clarification questions before continuing when:
   peripherals
 - the evidence suggests a block exists but does not support a precise
   model
+- a peripheral is present only as a shell and the register-model pass has
+  not populated `registers[]`, clusters, fields, and enums for the claimed
+  extraction scope
 
 ### Critical Rule
 
@@ -267,6 +282,11 @@ Do **not** proceed to Phase 3 until:
 - you have a complete **draft** HAIR JSON document,
 - you have a draft discovery report, and
 - all currently known blocking ambiguities have been surfaced to the user.
+
+For default full-device extraction, "complete draft" means the structural
+model includes grounded register-level content for the in-scope MMIO
+peripherals. A draft that stops at peripheral shells is not complete and
+must not advance.
 
 The only permitted outputs of this phase are the draft JSON, the draft
 report, and clarification questions. Do **not** claim final correctness
@@ -315,6 +335,16 @@ Run consistency checks across the JSON:
 - provenance references resolve to actual `sources[]` / `evidence[]`
 - optional sections are omitted rather than filled with unsupported data
 
+Run a **structural completeness gate** before allowing final emission:
+
+- if default full-device coverage was claimed, verify that the in-scope
+  MMIO peripherals are not shell-only placeholders
+- verify that register-bearing peripherals have grounded `registers[]`
+  content, with clusters / fields / enums where the evidence supports them
+- if the register pass was skipped, incomplete, or only partially
+  normalized, treat that as a blocker and stop instead of emitting final
+  deliverables
+
 If a material entry cannot survive falsification, remove it or stop and
 ask the user. Do not leave unsupported claims in the final JSON.
 
@@ -351,6 +381,8 @@ Final output requirements:
   `[INFERRED]`, or `[ASSUMPTION]`.
 - If full-device coverage could not be established, do not present the
   output as complete.
+- Do not present shell-only peripherals as satisfying the structural
+  extraction requirement for full-device coverage.
 
 ## Output Expectations
 
@@ -415,3 +447,5 @@ Before finalizing, verify:
 - [ ] The report lists major hardware areas and discovered components
 - [ ] Coverage states what was examined, excluded, and limited
 - [ ] No final HAIR JSON was emitted with unresolved blocking ambiguity
+- [ ] No final "full-device" result was emitted while register-level
+      extraction remained at peripheral-shell depth
