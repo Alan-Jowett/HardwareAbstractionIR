@@ -15,7 +15,6 @@
         "name": "CH32V203DS0.PDF",
         "kind": "datasheet",
         "uri": "https://www.wch-ic.com/download/file?id=354",
-        "path": "C:\\Users\\alanjo\\.copilot\\session-state\\4a46ffa4-89ff-4f91-b6ef-a71ec0ad702c\\files\\ch32v203c8t6\\CH32V203DS0-direct.pdf",
         "version": "3.0",
         "publisher": "WCH",
         "publishedAt": "2026-06-16"
@@ -25,7 +24,6 @@
         "name": "CH32FV2x_V3xRM.PDF",
         "kind": "reference-manual",
         "uri": "https://www.wch-ic.com/download/file?id=324",
-        "path": "C:\\Users\\alanjo\\.copilot\\session-state\\4a46ffa4-89ff-4f91-b6ef-a71ec0ad702c\\files\\ch32v203c8t6\\CH32FV2x_V3xRM.PDF",
         "version": "2.5",
         "publisher": "WCH",
         "publishedAt": "2026-03-23"
@@ -34,16 +32,15 @@
         "id": "openwch-ch32v20x-sdk",
         "name": "openwch/ch32v20x",
         "kind": "sdk",
-        "uri": "https://github.com/openwch/ch32v20x",
-        "path": "C:\\Users\\alanjo\\.copilot\\session-state\\4a46ffa4-89ff-4f91-b6ef-a71ec0ad702c\\files\\ch32v203c8t6\\openwch-ch32v20x",
+        "uri": "https://github.com/openwch/ch32v20x/tree/804daf39a21af99be64c5abe0ea4bdaf361eb2e4",
+        "version": "804daf39a21af99be64c5abe0ea4bdaf361eb2e4",
         "publisher": "WCH"
       },
       {
         "id": "openwch-ch32v20x-header",
         "name": "ch32v20x.h",
         "kind": "vendor-header",
-        "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/main/EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h",
-        "path": "X:\\openwch-ch32v20x\\EVT\\EXAM\\SRC\\Peripheral\\inc\\ch32v20x.h",
+        "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h",
         "version": "V1.0.1",
         "publisher": "WCH"
       },
@@ -51,8 +48,7 @@
         "id": "openwch-ch32v20x-startup-d6",
         "name": "startup_ch32v20x_D6.S",
         "kind": "other",
-        "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/main/EVT/EXAM/SRC/Startup/startup_ch32v20x_D6.S",
-        "path": "X:\\openwch-ch32v20x\\EVT\\EXAM\\SRC\\Startup\\startup_ch32v20x_D6.S",
+        "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Startup/startup_ch32v20x_D6.S",
         "version": "V1.0.2",
         "publisher": "WCH"
       },
@@ -61,7 +57,6 @@
         "name": "QingKeV4_Processor_Manual.PDF",
         "kind": "other",
         "uri": "https://www.wch-ic.com/download/file?id=367",
-        "path": "C:\\Users\\alanjo\\.copilot\\session-state\\4a46ffa4-89ff-4f91-b6ef-a71ec0ad702c\\files\\ch32v203c8t6\\QingKeV4_Processor_Manual.PDF",
         "version": "1.5",
         "publisher": "WCH",
         "publishedAt": "2025-08-15"
@@ -155,7 +150,7 @@
         "id": "e_linker_memory",
         "name": "C8T6 linker memory layout",
         "sourceRef": "openwch-ch32v20x-sdk",
-        "normalizedClaim": "The official CH32V203C8T6 example linker script configures 64KB flash at 0x00000000 and 20KB RAM at 0x20000000 for the D6 C8 group.",
+        "normalizedClaim": "The official CH32V203C8T6 example linker script places the 64KB flash application image at the 0x00000000 boot alias and 20KB RAM at 0x20000000 for the D6 C8 group.",
         "locator": {
           "fragment": "C++/Use MRS Create C++ project-example/CH32V203C8T6++/Ld/Link.ld"
         },
@@ -283,13 +278,11 @@
         "provenance": {
           "sourceRefs": [
             "wch-ch32v20x-30x-datasheet",
-            "qingke-v4-processor-manual",
-            "openwch-ch32v20x-sdk"
+            "qingke-v4-processor-manual"
           ],
           "evidenceRefs": [
             "e_architecture",
-            "e_core_manual",
-            "e_sdk_toolchain"
+            "e_core_manual"
           ],
           "status": "verified",
           "confidence": 0.9
@@ -347,15 +340,37 @@
           "volatile": false,
           "provenance": {
             "sourceRefs": [
+              "wch-ch32v20x-30x-datasheet"
+            ],
+            "evidenceRefs": [
+              "e_model_table",
+              "e_memory_map_figure"
+            ],
+            "status": "verified",
+            "confidence": 0.95
+          }
+        },
+        {
+          "id": "mem.flash-boot-alias",
+          "name": "Code flash boot alias",
+          "kind": "flash",
+          "baseAddress": 0,
+          "sizeBytes": 65536,
+          "access": "read-only",
+          "executable": true,
+          "volatile": false,
+          "provenance": {
+            "sourceRefs": [
               "wch-ch32v20x-30x-datasheet",
               "openwch-ch32v20x-sdk"
             ],
             "evidenceRefs": [
-              "e_model_table",
+              "e_memory_map_figure",
               "e_linker_memory"
             ],
             "status": "verified",
-            "confidence": 0.95
+            "confidence": 0.92,
+            "notes": "The datasheet maps the underlying code flash at 0x08000000 and describes the 0x00000000 region as a boot-time alias to flash or system memory depending on BOOT pins; the official linker script uses the flash alias at 0x00000000."
           }
         },
         {

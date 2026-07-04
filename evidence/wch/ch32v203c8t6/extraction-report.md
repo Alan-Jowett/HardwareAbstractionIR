@@ -10,14 +10,14 @@
 
 ## Source Inventory
 
-| Source ID | Kind | Local working copy | Notes |
+| Source ID | Kind | Authoritative reference | Notes |
 | --- | --- | --- | --- |
-| `wch-ch32v20x-30x-datasheet` | datasheet | `files/ch32v203c8t6/CH32V203DS0-direct.pdf` | Official CH32V203 datasheet v3.0; exact scope includes CH32V203C8T6. |
-| `wch-ch32fv2x-v3x-rm` | reference-manual | `files/ch32v203c8t6/CH32FV2x_V3xRM.PDF` | Official reference manual v2.5 for CH32V203C8T6-class devices. |
-| `openwch-ch32v20x-sdk` | sdk | `files/ch32v203c8t6/openwch-ch32v20x/` | Official SDK clone; used for linker, toolchain, and cross-check evidence. |
-| `openwch-ch32v20x-header` | vendor-header | `X:/openwch-ch32v20x/EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h` | Machine-readable peripheral and base-address source. |
-| `openwch-ch32v20x-startup-d6` | other | `X:/openwch-ch32v20x/EVT/EXAM/SRC/Startup/startup_ch32v20x_D6.S` | Confirms D6 vector ordering for CH32V203C8-class devices. |
-| `qingke-v4-processor-manual` | other | `files/ch32v203c8t6/QingKeV4_Processor_Manual.PDF` | Core-level ISA/context source. |
+| `wch-ch32v20x-30x-datasheet` | datasheet | `https://www.wch-ic.com/download/file?id=354` | Official CH32V203 datasheet v3.0; exact scope includes CH32V203C8T6. |
+| `wch-ch32fv2x-v3x-rm` | reference-manual | `https://www.wch-ic.com/download/file?id=324` | Official reference manual v2.5 for CH32V203C8T6-class devices. |
+| `openwch-ch32v20x-sdk` | sdk | `https://github.com/openwch/ch32v20x/tree/804daf39a21af99be64c5abe0ea4bdaf361eb2e4` | Official SDK snapshot used for linker, toolchain, and cross-check evidence. |
+| `openwch-ch32v20x-header` | vendor-header | `https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h` | Machine-readable peripheral and base-address source. |
+| `openwch-ch32v20x-startup-d6` | other | `https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Startup/startup_ch32v20x_D6.S` | Confirms D6 vector ordering for CH32V203C8-class devices. |
+| `qingke-v4-processor-manual` | other | `https://www.wch-ic.com/download/file?id=367` | Core-level ISA/context source. |
 
 ## Major Hardware Areas Discovered
 
@@ -33,7 +33,7 @@
 | Subsystem | Components discovered |
 | --- | --- |
 | CPU / core | QingKe V4B core, PFIC, SDI debug interface |
-| Memory | 64KB code flash, 20KB SRAM |
+| Memory | 64KB code flash, 64KB flash boot alias at `0x00000000`, 20KB SRAM |
 | Timers | TIM1, TIM2, TIM3, TIM4 |
 | Serial | USART1, USART2, USART3, UART4, SPI1, SPI2, I2C1, I2C2 |
 | Mixed-signal | ADC1, ADC2, OPA/CMP block |
