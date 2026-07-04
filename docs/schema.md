@@ -31,6 +31,7 @@ It defines a HAIR document with these main sections:
 - `physical`: clocks, pins, timing, electrical, and domain data
 - `normalization`: canonical names and vendor abstraction rules
 - `validation`: machine-readable validation rules and profiles
+- `profiles`: optional specialization layers built on top of the core schema
 
 ### One device per document
 
@@ -187,6 +188,27 @@ This is intended for checks such as:
 - consistent reset values
 - generation readiness for specific targets such as SVD, HALs, or docs
 
+## `schema/profiles/mcu.json`
+
+The MCU/SoC profile layer specializes the core HAIR model for common embedded hardware patterns.
+
+It adds canonical concepts for things like:
+
+- classic MCU peripheral classes
+- SoC infrastructure blocks
+- interrupt routing
+- GPIO matrix and IO mux behavior
+- clock/reset topology
+- memory views versus backing stores
+- low-power and security-control blocks
+
+This layer is especially useful when modeling both:
+
+1. simpler fixed-function MCUs such as CH32V203-class devices, and
+2. richer SoCs such as ESP32-C3-class devices
+
+The profile is optional and appears under `profiles.mcuSoc` in the top-level document.
+
 ## How the layers fit together
 
 The layers are meant to answer different questions:
@@ -200,6 +222,7 @@ The layers are meant to answer different questions:
 | `physical` | What timing, clocking, pin, and electrical facts constrain them? |
 | `normalization` | How do vendor-specific names map into canonical concepts? |
 | `validation` | What must be true before we trust or generate from the IR? |
+| `profiles.mcuSoc` | How should a device be interpreted as a canonical MCU/SoC architecture? |
 
 Together, these layers make HAIR a semantic IR rather than just a register dump.
 
@@ -215,6 +238,7 @@ In rough terms:
 - `physical` adds clocks, timing, pins, and electrical detail
 - `normalization` adds cross-vendor abstraction
 - `validation` adds explicit correctness rules
+- `profiles.mcuSoc` adds an opinionated MCU/SoC interpretation layer
 
 That means SVD export should be treated as a **lowering step** from HAIR, not as the shape that defines HAIR itself.
 
@@ -229,6 +253,7 @@ Open design areas include:
 - canonical path and naming conventions for cross-document references
 - stronger constraints for semantic expressions
 - profile-specific requirements for different generators
+- richer canonical vocabularies for MCU/SoC block classes
 
 Those can evolve without abandoning the current layered structure.
 
@@ -244,6 +269,7 @@ When adding to the schema:
 6. Put source traceability in `provenance.json`.
 7. Put machine-checkable requirements in `validation.json`.
 8. Keep `hair.json` focused on composition and the one-device-per-document model.
+9. Put canonical MCU/SoC interpretation rules in `schema/profiles/mcu.json`.
 
 ## Summary
 
@@ -260,3 +286,4 @@ Everything else exists to support that one device description:
 - physical data for real-world constraints
 - normalization for cross-vendor consistency
 - validation for trust and generator readiness
+- profiles for domain-specific interpretation layers

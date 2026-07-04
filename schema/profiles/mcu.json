@@ -1,0 +1,802 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hair.dev/schema/profiles/mcu.json",
+  "title": "HAIR MCU and SoC Profile Layer",
+  "description": "An opinionated profile layer for common MCU and SoC patterns such as canonical block classes, routing fabrics, interrupt topology, clock/reset topology, memory views, low-power domains, and security configuration blocks.",
+  "type": "object",
+  "properties": {
+    "profileKind": {
+      "const": "mcu-soc"
+    },
+    "deviceClass": {
+      "type": "string",
+      "enum": [
+        "mcu",
+        "wireless-mcu",
+        "mixed-signal-mcu",
+        "soc",
+        "wireless-soc",
+        "application-soc"
+      ]
+    },
+    "executionModel": {
+      "$ref": "#/$defs/executionModel"
+    },
+    "canonicalBlocks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/canonicalBlock"
+      },
+      "uniqueItems": true
+    },
+    "routingFabrics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/routingFabric"
+      },
+      "uniqueItems": true
+    },
+    "interruptTopology": {
+      "$ref": "#/$defs/interruptTopology"
+    },
+    "clockResetTopology": {
+      "$ref": "#/$defs/clockResetTopology"
+    },
+    "memoryTopology": {
+      "$ref": "#/$defs/memoryTopology"
+    },
+    "pinTopology": {
+      "$ref": "#/$defs/pinTopology"
+    },
+    "lowPowerTopology": {
+      "$ref": "#/$defs/lowPowerTopology"
+    },
+    "securityTopology": {
+      "$ref": "#/$defs/securityTopology"
+    },
+    "busTopology": {
+      "$ref": "#/$defs/busTopology"
+    }
+  },
+  "required": [
+    "profileKind",
+    "deviceClass",
+    "canonicalBlocks"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "entityBase": {
+      "allOf": [
+        {
+          "$ref": "../common.json#/$defs/namedEntity"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "provenance": {
+              "$ref": "../provenance.json#/$defs/provenanceRecord"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "blockClass": {
+      "type": "string",
+      "enum": [
+        "cpu-core",
+        "interrupt-controller",
+        "interrupt-matrix",
+        "clock-controller",
+        "reset-controller",
+        "system-controller",
+        "power-controller",
+        "rtc-controller",
+        "efuse-controller",
+        "otp-controller",
+        "flash-controller",
+        "cache-controller",
+        "mmu",
+        "gpio-port",
+        "gpio-matrix",
+        "io-mux",
+        "timer-basic",
+        "timer-general",
+        "timer-advanced",
+        "watchdog",
+        "uart",
+        "usart",
+        "spi",
+        "qspi",
+        "i2c",
+        "i2s",
+        "adc",
+        "dac",
+        "dma-controller",
+        "dma-mux",
+        "pwm",
+        "can",
+        "usb-device",
+        "usb-host",
+        "ethernet",
+        "rng",
+        "crypto",
+        "analog-front-end",
+        "memory-region",
+        "bus",
+        "custom"
+      ]
+    },
+    "canonicalBlock": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "targetRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "blockClass": {
+              "$ref": "#/$defs/blockClass"
+            },
+            "subclass": {
+              "type": "string"
+            },
+            "functionalDomain": {
+              "type": "string",
+              "enum": [
+                "compute",
+                "interrupt",
+                "clock-reset",
+                "memory",
+                "peripheral-io",
+                "analog",
+                "power",
+                "security",
+                "low-power",
+                "interconnect",
+                "mixed"
+              ]
+            },
+            "canonicalFamily": {
+              "type": "string"
+            },
+            "capabilities": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "parentBlockRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "childBlockRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "channelCount": {
+              "$ref": "../common.json#/$defs/nonNegativeInteger"
+            },
+            "counterCount": {
+              "$ref": "../common.json#/$defs/nonNegativeInteger"
+            },
+            "timerWidthBits": {
+              "$ref": "../common.json#/$defs/positiveInteger"
+            },
+            "gpioCount": {
+              "$ref": "../common.json#/$defs/nonNegativeInteger"
+            },
+            "dmaChannelCount": {
+              "$ref": "../common.json#/$defs/nonNegativeInteger"
+            },
+            "supportsRoutingMatrix": {
+              "type": "boolean"
+            },
+            "supportsAlternateFunctions": {
+              "type": "boolean"
+            },
+            "supportsSleepRetention": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "targetRef",
+            "blockClass"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "executionModel": {
+      "type": "object",
+      "properties": {
+        "cpuBlockRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "primaryInterruptControllerRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "debugBlockRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "timerBlockRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "cpuBlockRefs"
+      ],
+      "additionalProperties": false
+    },
+    "routeType": {
+      "type": "string",
+      "enum": [
+        "hardwired",
+        "selectable",
+        "matrix",
+        "muxed",
+        "gated",
+        "translated"
+      ]
+    },
+    "routingFabric": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "targetRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "gpio-matrix",
+                "io-mux",
+                "interrupt-matrix",
+                "dma-routing",
+                "clock-routing",
+                "signal-crossbar",
+                "fixed-routing"
+              ]
+            },
+            "sourceRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "sinkRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "routeType": {
+              "$ref": "#/$defs/routeType"
+            },
+            "controlRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "constraints": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "routeType"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "interruptSource": {
+      "type": "object",
+      "properties": {
+        "sourceRef": {
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "producerRef": {
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "peripheral",
+            "gpio",
+            "timer",
+            "rtc",
+            "dma",
+            "software",
+            "power",
+            "custom"
+          ]
+        }
+      },
+      "required": [
+        "sourceRef",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "interruptRoute": {
+      "type": "object",
+      "properties": {
+        "sourceRef": {
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "controllerRef": {
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "cpuTargetRef": {
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "lineIndex": {
+          "$ref": "../common.json#/$defs/nonNegativeInteger"
+        },
+        "routeType": {
+          "$ref": "#/$defs/routeType"
+        },
+        "controlRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "sourceRef",
+        "controllerRef",
+        "routeType"
+      ],
+      "additionalProperties": false
+    },
+    "interruptTopology": {
+      "type": "object",
+      "properties": {
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/interruptSource"
+          }
+        },
+        "routes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/interruptRoute"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "clockBinding": {
+      "type": "object",
+      "properties": {
+        "consumerRef": {
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "clockRef": {
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "controllerRef": {
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "bindingKind": {
+          "type": "string",
+          "enum": [
+            "direct",
+            "gated",
+            "selectable",
+            "divided",
+            "pll-derived",
+            "rtc-domain"
+          ]
+        },
+        "controlRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "consumerRef",
+        "clockRef",
+        "bindingKind"
+      ],
+      "additionalProperties": false
+    },
+    "resetBinding": {
+      "type": "object",
+      "properties": {
+        "targetRef": {
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "controllerRef": {
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "resetDomainRef": {
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "bindingKind": {
+          "type": "string",
+          "enum": [
+            "local",
+            "domain",
+            "power-on",
+            "deep-sleep",
+            "watchdog",
+            "software"
+          ]
+        },
+        "controlRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "targetRef",
+        "bindingKind"
+      ],
+      "additionalProperties": false
+    },
+    "clockResetTopology": {
+      "type": "object",
+      "properties": {
+        "clockControllerRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "resetControllerRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "clockBindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/clockBinding"
+          }
+        },
+        "resetBindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/resetBinding"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "memoryBackingStore": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "targetRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "flash",
+                "rom",
+                "sram",
+                "psram",
+                "efuse",
+                "otp",
+                "cache-ram",
+                "register-space",
+                "other"
+              ]
+            },
+            "sizeBytes": {
+              "$ref": "../common.json#/$defs/positiveInteger"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "memoryView": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "regionRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "backingStoreRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "translationKind": {
+              "type": "string",
+              "enum": [
+                "none",
+                "fixed-alias",
+                "cache",
+                "mmu",
+                "remapped"
+              ]
+            },
+            "executable": {
+              "type": "boolean"
+            },
+            "cacheable": {
+              "type": "boolean"
+            },
+            "aliasOfRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            }
+          },
+          "required": [
+            "translationKind"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "memoryTopology": {
+      "type": "object",
+      "properties": {
+        "backingStores": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/memoryBackingStore"
+          }
+        },
+        "views": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/memoryView"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "pinTopology": {
+      "type": "object",
+      "properties": {
+        "padRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "gpioPortRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "ioMuxRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "gpioMatrixRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "sleepState": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "../common.json#/$defs/nonEmptyString"
+        },
+        "controllerRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "wakeSourceRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "retainedBlockRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "lowPowerTopology": {
+      "type": "object",
+      "properties": {
+        "controllerRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "domainRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "sleepStates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sleepState"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "securityTopology": {
+      "type": "object",
+      "properties": {
+        "efuseRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "otpRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "keyStoreRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "secureBootRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "flashEncryptionRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "bus": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "apb",
+                "ahb",
+                "axi",
+                "peripheral",
+                "rtc-fast",
+                "rtc-slow",
+                "internal",
+                "custom"
+              ]
+            },
+            "targetRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "masterRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "slaveRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "busTopology": {
+      "type": "object",
+      "properties": {
+        "buses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/bus"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

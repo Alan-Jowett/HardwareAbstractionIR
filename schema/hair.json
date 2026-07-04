@@ -131,6 +131,15 @@
     },
     "validation": {
       "$ref": "validation.json"
+    },
+    "profiles": {
+      "type": "object",
+      "properties": {
+        "mcuSoc": {
+          "$ref": "profiles/mcu.json"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [
