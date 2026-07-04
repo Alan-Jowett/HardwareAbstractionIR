@@ -1,0 +1,3315 @@
+{
+  "documentKind": "hair",
+  "schemaVersion": "0.1.0",
+  "metadata": {
+    "id": "wch.ch32v203c8t6",
+    "role": "device-variant",
+    "title": "WCH CH32V203C8T6",
+    "version": "0.1.0",
+    "description": "Draft HAIR extraction for the WCH CH32V203C8T6 using official WCH datasheet/reference manuals and the official openwch SDK."
+  },
+  "provenance": {
+    "sources": [
+      {
+        "id": "wch-ch32v20x-30x-datasheet",
+        "name": "CH32V203DS0.PDF",
+        "kind": "datasheet",
+        "uri": "https://www.wch-ic.com/download/file?id=354",
+        "version": "3.0",
+        "publisher": "WCH",
+        "publishedAt": "2026-06-16"
+      },
+      {
+        "id": "wch-ch32fv2x-v3x-rm",
+        "name": "CH32FV2x_V3xRM.PDF",
+        "kind": "reference-manual",
+        "uri": "https://www.wch-ic.com/download/file?id=324",
+        "version": "2.5",
+        "publisher": "WCH",
+        "publishedAt": "2026-03-23"
+      },
+      {
+        "id": "openwch-ch32v20x-sdk",
+        "name": "openwch/ch32v20x",
+        "kind": "sdk",
+        "uri": "https://github.com/openwch/ch32v20x/tree/804daf39a21af99be64c5abe0ea4bdaf361eb2e4",
+        "version": "804daf39a21af99be64c5abe0ea4bdaf361eb2e4",
+        "publisher": "WCH"
+      },
+      {
+        "id": "openwch-ch32v20x-header",
+        "name": "ch32v20x.h",
+        "kind": "vendor-header",
+        "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h",
+        "version": "V1.0.1",
+        "publisher": "WCH"
+      },
+      {
+        "id": "openwch-ch32v20x-startup-d6",
+        "name": "startup_ch32v20x_D6.S",
+        "kind": "other",
+        "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Startup/startup_ch32v20x_D6.S",
+        "version": "V1.0.2",
+        "publisher": "WCH"
+      },
+      {
+        "id": "qingke-v4-processor-manual",
+        "name": "QingKeV4_Processor_Manual.PDF",
+        "kind": "other",
+        "uri": "https://www.wch-ic.com/download/file?id=367",
+        "version": "1.5",
+        "publisher": "WCH",
+        "publishedAt": "2025-08-15"
+      }
+    ],
+    "evidence": [
+      {
+        "id": "e_scope_metadata",
+        "name": "Datasheet scope metadata",
+        "sourceRef": "wch-ch32v20x-30x-datasheet",
+        "normalizedClaim": "The official WCH CH32V203DS0 datasheet v3.0 explicitly covers CH32V203C8T6.",
+        "locator": {
+          "fragment": "download/file?id=354 metadata"
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.99
+      },
+      {
+        "id": "e_model_table",
+        "name": "Model comparison table",
+        "sourceRef": "wch-ch32v20x-30x-datasheet",
+        "normalizedClaim": "CH32V203C8x6 devices provide 64KB flash, 20KB SRAM, 37 GPIOs, 4 USART/UART, 2 SPI, 2 I2C, 1 CAN, 2 ADC/TKey units, and 2 OPA/CMP units.",
+        "locator": {
+          "pageStart": 7,
+          "pageEnd": 7
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.97
+      },
+      {
+        "id": "e_architecture",
+        "name": "Architecture overview",
+        "sourceRef": "wch-ch32v20x-30x-datasheet",
+        "normalizedClaim": "CH32V203 is based on the QingKe V4B 32-bit RISC-V core and supports up to 144MHz system frequency.",
+        "locator": {
+          "pageStart": 1,
+          "pageEnd": 1
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.97
+      },
+      {
+        "id": "e_clock_power",
+        "name": "Clock and supply facts",
+        "sourceRef": "wch-ch32v20x-30x-datasheet",
+        "normalizedClaim": "The device uses 2.4V to 3.6V system supply, built-in 8MHz HSI RC, built-in 40KHz LSI RC, external 3MHz to 25MHz HSE, external 32.768KHz LSE, and PLL-derived SYSCLK up to 144MHz.",
+        "locator": {
+          "pageStart": 1,
+          "pageEnd": 1
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.94
+      },
+      {
+        "id": "e_memory_map_figure",
+        "name": "Memory map figure",
+        "sourceRef": "wch-ch32v20x-30x-datasheet",
+        "normalizedClaim": "The family memory map places SRAM at 0x20000000, APB/AHB peripheral space at 0x40000000, and USBFS at 0x50000000.",
+        "locator": {
+          "pageStart": 9,
+          "pageEnd": 9
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.9
+      },
+      {
+        "id": "e_package_ordering",
+        "name": "Package and ordering table",
+        "sourceRef": "wch-ch32v20x-30x-datasheet",
+        "normalizedClaim": "CH32V203C8T6 is offered in the LQFP48 7x7mm package with 0.5mm pin pitch.",
+        "locator": {
+          "pageStart": 59,
+          "pageEnd": 59
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.97
+      },
+      {
+        "id": "e_pin_notes",
+        "name": "C8T6 OSC pin note",
+        "sourceRef": "wch-ch32v20x-30x-datasheet",
+        "normalizedClaim": "For CH32V203C8T6, pins 5 and 6 default to OSC_IN and OSC_OUT after reset and can be remapped to PD0 and PD1 by software.",
+        "locator": {
+          "pageStart": 35,
+          "pageEnd": 35
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.92
+      },
+      {
+        "id": "e_linker_memory",
+        "name": "C8T6 linker memory layout",
+        "sourceRef": "openwch-ch32v20x-sdk",
+        "normalizedClaim": "The official CH32V203C8T6 example linker script places the 64KB flash application image at the 0x00000000 boot alias and 20KB RAM at 0x20000000 for the D6 C8 group.",
+        "locator": {
+          "fragment": "C++/Use MRS Create C++ project-example/CH32V203C8T6++/Ld/Link.ld"
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.95
+      },
+      {
+        "id": "e_header_d6_group",
+        "name": "Header D6 grouping",
+        "sourceRef": "openwch-ch32v20x-header",
+        "normalizedClaim": "The official header maps CH32V20x_D6 to CH32V203C6 and CH32V203C8 class parts, including CH32V203C8T6.",
+        "locator": {
+          "fragment": "EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h",
+          "lineStart": 19,
+          "lineEnd": 24
+        },
+        "extractionMethod": "imported",
+        "confidence": 0.96
+      },
+      {
+        "id": "e_header_base_addresses",
+        "name": "Peripheral base macros",
+        "sourceRef": "openwch-ch32v20x-header",
+        "normalizedClaim": "The official header defines the CH32V20x D6 peripheral base addresses used for the structural peripheral map.",
+        "locator": {
+          "fragment": "EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h",
+          "lineStart": 879,
+          "lineEnd": 926
+        },
+        "extractionMethod": "parser",
+        "confidence": 0.96
+      },
+      {
+        "id": "e_header_irqs",
+        "name": "IRQ enumeration",
+        "sourceRef": "openwch-ch32v20x-header",
+        "normalizedClaim": "The official header enumerates the CH32V20x_D6 interrupt identifiers used by the C8T6 variant.",
+        "locator": {
+          "fragment": "EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h",
+          "lineStart": 112,
+          "lineEnd": 115
+        },
+        "extractionMethod": "imported",
+        "confidence": 0.92
+      },
+      {
+        "id": "e_startup_vector",
+        "name": "Startup vector table",
+        "sourceRef": "openwch-ch32v20x-startup-d6",
+        "normalizedClaim": "The official D6 startup file defines the C8T6-class external interrupt vector ordering from WWDG through DMA1_Channel8.",
+        "locator": {
+          "fragment": "EVT/EXAM/SRC/Startup/startup_ch32v20x_D6.S",
+          "lineStart": 40,
+          "lineEnd": 87
+        },
+        "extractionMethod": "imported",
+        "confidence": 0.98
+      },
+      {
+        "id": "e_rm_overview",
+        "name": "Reference manual overview",
+        "sourceRef": "wch-ch32fv2x-v3x-rm",
+        "normalizedClaim": "The CH32FV2x_V3xRM reference manual is the official register and peripheral manual for CH32V203C8T6-class devices.",
+        "locator": {
+          "pageStart": 1,
+          "pageEnd": 3
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.95
+      },
+      {
+        "id": "e_core_manual",
+        "name": "QingKe V4 processor scope",
+        "sourceRef": "qingke-v4-processor-manual",
+        "normalizedClaim": "The QingKe V4 processor manual covers V4A/V4B/V4C/V4F cores and provides ISA-level details for the CH32V203C8T6 QingKe V4B core.",
+        "locator": {
+          "pageStart": 1,
+          "pageEnd": 1
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.9
+      },
+      {
+        "id": "e_sdk_toolchain",
+        "name": "SDK compiler architecture flags",
+        "sourceRef": "openwch-ch32v20x-sdk",
+        "normalizedClaim": "The official CH32V203C8T6 example build compiles for -march=rv32imacxw and -mabi=ilp32, with no floating-point ISA extension enabled.",
+        "locator": {
+          "fragment": "C++/Use MRS Create C++ project-example/CH32V203C8T6++/obj/Core/subdir.mk",
+          "lineStart": 18,
+          "lineEnd": 18
+        },
+        "extractionMethod": "imported",
+        "confidence": 0.9
+      },
+      {
+        "id": "e_pin_table_lqfp48",
+        "name": "LQFP48 pin definition table",
+        "sourceRef": "wch-ch32v20x-30x-datasheet",
+        "normalizedClaim": "Table 3-1-1 defines the CH32V203 LQFP48 package pad assignments, default functions, and alternate/remap functions used for the CH32V203C8T6 pin model.",
+        "locator": {
+          "pageStart": 23,
+          "pageEnd": 26
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.97
+      }
+    ]
+  },
+  "structure": {
+    "architectures": [
+      {
+        "id": "arch.qingke-v4b",
+        "name": "QingKe V4B",
+        "isa": "RV32IMACXW",
+        "coreFamily": "QingKe V4B",
+        "endianness": "little",
+        "addressUnitBits": 8,
+        "dataBusWidthBits": 32,
+        "features": [
+          "fast programmable interrupt controller",
+          "hardware interrupt stack",
+          "branch prediction"
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet",
+            "qingke-v4-processor-manual",
+            "openwch-ch32v20x-sdk"
+          ],
+          "evidenceRefs": [
+            "e_architecture",
+            "e_core_manual",
+            "e_sdk_toolchain"
+          ],
+          "status": "verified",
+          "confidence": 0.9
+        }
+      }
+    ],
+    "deviceFamilies": [
+      {
+        "id": "family.ch32v203",
+        "name": "CH32V203",
+        "vendor": "WCH",
+        "series": "CH32V203",
+        "architectureRef": "arch.qingke-v4b",
+        "deviceRefs": [
+          "device.ch32v203c8t6"
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_scope_metadata"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      }
+    ],
+    "device": {
+      "id": "device.ch32v203c8t6",
+      "name": "CH32V203C8T6",
+      "vendor": "WCH",
+      "familyRef": "family.ch32v203",
+      "architectureRef": "arch.qingke-v4b",
+      "cpu": {
+        "name": "QingKe V4B",
+        "endianness": "little",
+        "featureFlags": {
+          "mpuPresent": false,
+          "fpuPresent": false
+        }
+      },
+      "variants": [
+        "C8T6"
+      ],
+      "memoryMap": [
+        {
+          "id": "mem.flash",
+          "name": "Code flash",
+          "kind": "flash",
+          "baseAddress": 134217728,
+          "sizeBytes": 65536,
+          "access": "read-only",
+          "executable": true,
+          "volatile": false,
+          "provenance": {
+            "sourceRefs": [
+              "wch-ch32v20x-30x-datasheet"
+            ],
+            "evidenceRefs": [
+              "e_model_table",
+              "e_memory_map_figure"
+            ],
+            "status": "verified",
+            "confidence": 0.95
+          }
+        },
+        {
+          "id": "mem.flash-boot-alias",
+          "name": "Code flash boot alias",
+          "kind": "flash",
+          "baseAddress": 0,
+          "sizeBytes": 65536,
+          "access": "read-only",
+          "executable": true,
+          "volatile": false,
+          "provenance": {
+            "sourceRefs": [
+              "wch-ch32v20x-30x-datasheet",
+              "openwch-ch32v20x-sdk"
+            ],
+            "evidenceRefs": [
+              "e_memory_map_figure",
+              "e_linker_memory"
+            ],
+            "status": "verified",
+            "confidence": 0.92,
+            "notes": "The datasheet maps the underlying code flash at 0x08000000 and describes the 0x00000000 region as a boot-time alias to flash or system memory depending on BOOT pins; the official linker script uses the flash alias at 0x00000000."
+          }
+        },
+        {
+          "id": "mem.sram",
+          "name": "SRAM",
+          "kind": "ram",
+          "baseAddress": 536870912,
+          "sizeBytes": 20480,
+          "access": "read-write",
+          "executable": false,
+          "volatile": true,
+          "provenance": {
+            "sourceRefs": [
+              "wch-ch32v20x-30x-datasheet",
+              "openwch-ch32v20x-sdk"
+            ],
+            "evidenceRefs": [
+              "e_model_table",
+              "e_linker_memory"
+            ],
+            "status": "verified",
+            "confidence": 0.95
+          }
+        },
+        {
+          "id": "mem.usbfs-mmio",
+          "name": "USBFS MMIO window",
+          "kind": "mmio",
+          "baseAddress": 1342177280,
+          "sizeBytes": 1024,
+          "access": "read-write",
+          "executable": false,
+          "volatile": true,
+          "provenance": {
+            "sourceRefs": [
+              "wch-ch32v20x-30x-datasheet",
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_memory_map_figure",
+              "e_header_base_addresses"
+            ],
+            "status": "verified",
+            "confidence": 0.9
+          }
+        }
+      ],
+      "interrupts": [
+        {
+          "id": "int.wwdg",
+          "name": "WWDG",
+          "number": 16,
+          "description": "Window Watchdog",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.pvd",
+          "name": "PVD",
+          "number": 17,
+          "description": "PVD through EXTI Line detect",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.tamper",
+          "name": "TAMPER",
+          "number": 18,
+          "description": "TAMPER",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.rtc",
+          "name": "RTC",
+          "number": 19,
+          "description": "RTC",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.flash",
+          "name": "FLASH",
+          "number": 20,
+          "description": "Flash",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.rcc",
+          "name": "RCC",
+          "number": 21,
+          "description": "RCC",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.exti0",
+          "name": "EXTI0",
+          "number": 22,
+          "description": "EXTI Line 0",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.exti1",
+          "name": "EXTI1",
+          "number": 23,
+          "description": "EXTI Line 1",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.exti2",
+          "name": "EXTI2",
+          "number": 24,
+          "description": "EXTI Line 2",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.exti3",
+          "name": "EXTI3",
+          "number": 25,
+          "description": "EXTI Line 3",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.exti4",
+          "name": "EXTI4",
+          "number": 26,
+          "description": "EXTI Line 4",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.dma1channel1",
+          "name": "DMA1_Channel1",
+          "number": 27,
+          "description": "DMA1 Channel 1",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.dma1channel2",
+          "name": "DMA1_Channel2",
+          "number": 28,
+          "description": "DMA1 Channel 2",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.dma1channel3",
+          "name": "DMA1_Channel3",
+          "number": 29,
+          "description": "DMA1 Channel 3",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.dma1channel4",
+          "name": "DMA1_Channel4",
+          "number": 30,
+          "description": "DMA1 Channel 4",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.dma1channel5",
+          "name": "DMA1_Channel5",
+          "number": 31,
+          "description": "DMA1 Channel 5",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.dma1channel6",
+          "name": "DMA1_Channel6",
+          "number": 32,
+          "description": "DMA1 Channel 6",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.dma1channel7",
+          "name": "DMA1_Channel7",
+          "number": 33,
+          "description": "DMA1 Channel 7",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.adc12",
+          "name": "ADC1_2",
+          "number": 34,
+          "description": "ADC1_2",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.usbhpcan1tx",
+          "name": "USB_HP_CAN1_TX",
+          "number": 35,
+          "description": "USB HP and CAN1 TX",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.usblpcan1rx0",
+          "name": "USB_LP_CAN1_RX0",
+          "number": 36,
+          "description": "USB LP and CAN1RX0",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.can1rx1",
+          "name": "CAN1_RX1",
+          "number": 37,
+          "description": "CAN1 RX1",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.can1sce",
+          "name": "CAN1_SCE",
+          "number": 38,
+          "description": "CAN1 SCE",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.exti95",
+          "name": "EXTI9_5",
+          "number": 39,
+          "description": "EXTI Line 9..5",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.tim1brk",
+          "name": "TIM1_BRK",
+          "number": 40,
+          "description": "TIM1 Break",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.tim1up",
+          "name": "TIM1_UP",
+          "number": 41,
+          "description": "TIM1 Update",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.tim1trgcom",
+          "name": "TIM1_TRG_COM",
+          "number": 42,
+          "description": "TIM1 Trigger and Commutation",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.tim1cc",
+          "name": "TIM1_CC",
+          "number": 43,
+          "description": "TIM1 Capture Compare",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.tim2",
+          "name": "TIM2",
+          "number": 44,
+          "description": "TIM2",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.tim3",
+          "name": "TIM3",
+          "number": 45,
+          "description": "TIM3",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.tim4",
+          "name": "TIM4",
+          "number": 46,
+          "description": "TIM4",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.i2c1ev",
+          "name": "I2C1_EV",
+          "number": 47,
+          "description": "I2C1 Event",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.i2c1er",
+          "name": "I2C1_ER",
+          "number": 48,
+          "description": "I2C1 Error",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.i2c2ev",
+          "name": "I2C2_EV",
+          "number": 49,
+          "description": "I2C2 Event",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.i2c2er",
+          "name": "I2C2_ER",
+          "number": 50,
+          "description": "I2C2 Error",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.spi1",
+          "name": "SPI1",
+          "number": 51,
+          "description": "SPI1",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.spi2",
+          "name": "SPI2",
+          "number": 52,
+          "description": "SPI2",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.usart1",
+          "name": "USART1",
+          "number": 53,
+          "description": "USART1",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.usart2",
+          "name": "USART2",
+          "number": 54,
+          "description": "USART2",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.usart3",
+          "name": "USART3",
+          "number": 55,
+          "description": "USART3",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.exti1510",
+          "name": "EXTI15_10",
+          "number": 56,
+          "description": "EXTI Line 15..10",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.rtcalarm",
+          "name": "RTCAlarm",
+          "number": 57,
+          "description": "RTC Alarm through EXTI Line",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.usbwakeup",
+          "name": "USBWakeUp",
+          "number": 58,
+          "description": "USB Wake up from suspend",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.usbfs",
+          "name": "USBFS",
+          "number": 59,
+          "description": "USBFS Break",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.usbfswakeup",
+          "name": "USBFSWakeUp",
+          "number": 60,
+          "description": "USBFS Wake up from suspend",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.uart4",
+          "name": "UART4",
+          "number": 61,
+          "description": "UART4",
+          "controllerRef": "ic.pfic"
+        },
+        {
+          "id": "int.dma1channel8",
+          "name": "DMA1_Channel8",
+          "number": 62,
+          "description": "DMA1 Channel8",
+          "controllerRef": "ic.pfic"
+        }
+      ],
+      "peripherals": [
+        {
+          "id": "periph.tim2",
+          "name": "TIM2",
+          "description": "General-purpose timer 2",
+          "kind": "peripheral",
+          "type": "TIM",
+          "baseAddress": 1073741824,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.tim2"
+          ]
+        },
+        {
+          "id": "periph.tim3",
+          "name": "TIM3",
+          "description": "General-purpose timer 3",
+          "kind": "peripheral",
+          "type": "TIM",
+          "baseAddress": 1073742848,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.tim3"
+          ]
+        },
+        {
+          "id": "periph.tim4",
+          "name": "TIM4",
+          "description": "General-purpose timer 4",
+          "kind": "peripheral",
+          "type": "TIM",
+          "baseAddress": 1073743872,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.tim4"
+          ]
+        },
+        {
+          "id": "periph.rtc",
+          "name": "RTC",
+          "description": "Real-time clock",
+          "kind": "peripheral",
+          "type": "RTC",
+          "baseAddress": 1073752064,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.rtc",
+            "int.rtcalarm"
+          ]
+        },
+        {
+          "id": "periph.wwdg",
+          "name": "WWDG",
+          "description": "Window watchdog",
+          "kind": "peripheral",
+          "type": "WWDG",
+          "baseAddress": 1073753088,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          }
+        },
+        {
+          "id": "periph.iwdg",
+          "name": "IWDG",
+          "description": "Independent watchdog",
+          "kind": "peripheral",
+          "type": "IWDG",
+          "baseAddress": 1073754112,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          }
+        },
+        {
+          "id": "periph.spi2",
+          "name": "SPI2",
+          "description": "SPI controller 2",
+          "kind": "peripheral",
+          "type": "SPI",
+          "baseAddress": 1073756160,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.spi2"
+          ]
+        },
+        {
+          "id": "periph.usart2",
+          "name": "USART2",
+          "description": "USART controller 2",
+          "kind": "peripheral",
+          "type": "USART",
+          "baseAddress": 1073759232,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.usart2"
+          ]
+        },
+        {
+          "id": "periph.usart3",
+          "name": "USART3",
+          "description": "USART controller 3",
+          "kind": "peripheral",
+          "type": "USART",
+          "baseAddress": 1073760256,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.usart3"
+          ]
+        },
+        {
+          "id": "periph.uart4",
+          "name": "UART4",
+          "description": "UART4 controller",
+          "kind": "peripheral",
+          "type": "USART",
+          "baseAddress": 1073761280,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.uart4"
+          ]
+        },
+        {
+          "id": "periph.i2c1",
+          "name": "I2C1",
+          "description": "I2C controller 1",
+          "kind": "peripheral",
+          "type": "I2C",
+          "baseAddress": 1073763328,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.i2c1ev",
+            "int.i2c1er"
+          ]
+        },
+        {
+          "id": "periph.i2c2",
+          "name": "I2C2",
+          "description": "I2C controller 2",
+          "kind": "peripheral",
+          "type": "I2C",
+          "baseAddress": 1073764352,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.i2c2ev",
+            "int.i2c2er"
+          ]
+        },
+        {
+          "id": "periph.can1",
+          "name": "CAN1",
+          "description": "bxCAN controller",
+          "kind": "peripheral",
+          "type": "CAN",
+          "baseAddress": 1073767424,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.usbhpcan1tx",
+            "int.usblpcan1rx0",
+            "int.can1rx1",
+            "int.can1sce"
+          ]
+        },
+        {
+          "id": "periph.bkp",
+          "name": "BKP",
+          "description": "Backup register block",
+          "kind": "peripheral",
+          "type": "BKP",
+          "baseAddress": 1073769472,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.tamper",
+            "int.rtc",
+            "int.rtcalarm"
+          ]
+        },
+        {
+          "id": "periph.pwr",
+          "name": "PWR",
+          "description": "Power control block",
+          "kind": "peripheral",
+          "type": "PWR",
+          "baseAddress": 1073770496,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.pvd"
+          ]
+        },
+        {
+          "id": "periph.afio",
+          "name": "AFIO",
+          "description": "Alternate-function and pin remap controller",
+          "kind": "peripheral",
+          "type": "AFIO",
+          "baseAddress": 1073807360,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          }
+        },
+        {
+          "id": "periph.exti",
+          "name": "EXTI",
+          "description": "External interrupt/event controller",
+          "kind": "peripheral",
+          "type": "EXTI",
+          "baseAddress": 1073808384,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.exti0",
+            "int.exti1",
+            "int.exti2",
+            "int.exti3",
+            "int.exti4",
+            "int.exti95",
+            "int.exti1510"
+          ]
+        },
+        {
+          "id": "periph.gpioa",
+          "name": "GPIOA",
+          "description": "GPIO port A",
+          "kind": "peripheral",
+          "type": "GPIO",
+          "baseAddress": 1073809408,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          }
+        },
+        {
+          "id": "periph.gpiob",
+          "name": "GPIOB",
+          "description": "GPIO port B",
+          "kind": "peripheral",
+          "type": "GPIO",
+          "baseAddress": 1073810432,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          }
+        },
+        {
+          "id": "periph.gpioc",
+          "name": "GPIOC",
+          "description": "GPIO port C",
+          "kind": "peripheral",
+          "type": "GPIO",
+          "baseAddress": 1073811456,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          }
+        },
+        {
+          "id": "periph.gpiod",
+          "name": "GPIOD",
+          "description": "GPIO port D",
+          "kind": "peripheral",
+          "type": "GPIO",
+          "baseAddress": 1073812480,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          }
+        },
+        {
+          "id": "periph.adc1",
+          "name": "ADC1",
+          "description": "12-bit ADC unit 1 / TouchKey block",
+          "kind": "peripheral",
+          "type": "ADC",
+          "baseAddress": 1073816576,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.adc12"
+          ]
+        },
+        {
+          "id": "periph.adc2",
+          "name": "ADC2",
+          "description": "12-bit ADC unit 2 / TouchKey block",
+          "kind": "peripheral",
+          "type": "ADC",
+          "baseAddress": 1073817600,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.adc12"
+          ]
+        },
+        {
+          "id": "periph.tim1",
+          "name": "TIM1",
+          "description": "Advanced-control timer 1",
+          "kind": "peripheral",
+          "type": "TIM",
+          "baseAddress": 1073818624,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.tim1brk",
+            "int.tim1up",
+            "int.tim1trgcom",
+            "int.tim1cc"
+          ]
+        },
+        {
+          "id": "periph.spi1",
+          "name": "SPI1",
+          "description": "SPI controller 1",
+          "kind": "peripheral",
+          "type": "SPI",
+          "baseAddress": 1073819648,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.spi1"
+          ]
+        },
+        {
+          "id": "periph.usart1",
+          "name": "USART1",
+          "description": "USART controller 1",
+          "kind": "peripheral",
+          "type": "USART",
+          "baseAddress": 1073821696,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.usart1"
+          ]
+        },
+        {
+          "id": "periph.dma1",
+          "name": "DMA1",
+          "description": "General-purpose DMA controller",
+          "kind": "peripheral",
+          "type": "DMA",
+          "baseAddress": 1073872896,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.dma1channel1",
+            "int.dma1channel2",
+            "int.dma1channel3",
+            "int.dma1channel4",
+            "int.dma1channel5",
+            "int.dma1channel6",
+            "int.dma1channel7",
+            "int.dma1channel8"
+          ]
+        },
+        {
+          "id": "periph.rcc",
+          "name": "RCC",
+          "description": "Reset and clock control block",
+          "kind": "peripheral",
+          "type": "RCC",
+          "baseAddress": 1073876992,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.rcc"
+          ]
+        },
+        {
+          "id": "periph.flash",
+          "name": "FLASH",
+          "description": "Flash interface controller",
+          "kind": "peripheral",
+          "type": "FLASH",
+          "baseAddress": 1073881088,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.flash"
+          ]
+        },
+        {
+          "id": "periph.crc",
+          "name": "CRC",
+          "description": "CRC calculation unit",
+          "kind": "peripheral",
+          "type": "CRC",
+          "baseAddress": 1073885184,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          }
+        },
+        {
+          "id": "periph.opa",
+          "name": "OPA",
+          "description": "Dual operational-amplifier / comparator block",
+          "kind": "peripheral",
+          "type": "OPA",
+          "baseAddress": 1073887236,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          }
+        },
+        {
+          "id": "periph.usbfsd",
+          "name": "USBFSD",
+          "description": "USB full-speed device interface",
+          "kind": "peripheral",
+          "type": "USBFSD",
+          "baseAddress": 1342177280,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.usblpcan1rx0",
+            "int.usbwakeup"
+          ]
+        },
+        {
+          "id": "periph.usbfsh",
+          "name": "USBFSH",
+          "description": "USB full-speed host/device interface",
+          "kind": "peripheral",
+          "type": "USBFSH",
+          "baseAddress": 1342177280,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses"
+            ],
+            "status": "imported",
+            "confidence": 0.96
+          },
+          "interruptRefs": [
+            "int.usbfs",
+            "int.usbfswakeup"
+          ]
+        }
+      ],
+      "provenance": {
+        "sourceRefs": [
+          "wch-ch32v20x-30x-datasheet",
+          "openwch-ch32v20x-sdk",
+          "openwch-ch32v20x-header",
+          "openwch-ch32v20x-startup-d6"
+        ],
+        "evidenceRefs": [
+          "e_scope_metadata",
+          "e_model_table",
+          "e_linker_memory",
+          "e_header_d6_group",
+          "e_header_base_addresses",
+          "e_startup_vector"
+        ],
+        "status": "verified",
+        "confidence": 0.95
+      }
+    }
+  },
+  "physical": {
+    "clocks": [
+      {
+        "id": "clk.hsi",
+        "name": "HSI RC",
+        "kind": "source",
+        "frequency": {
+          "nominalHz": 8000000
+        },
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_clock_power"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "clk.hse",
+        "name": "HSE oscillator",
+        "kind": "source",
+        "frequency": {
+          "minimumHz": 3000000,
+          "maximumHz": 25000000
+        },
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_clock_power"
+          ],
+          "status": "verified",
+          "confidence": 0.9
+        }
+      },
+      {
+        "id": "clk.lsi",
+        "name": "LSI RC",
+        "kind": "source",
+        "frequency": {
+          "nominalHz": 40000
+        },
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_clock_power"
+          ],
+          "status": "verified",
+          "confidence": 0.9
+        }
+      },
+      {
+        "id": "clk.lse",
+        "name": "LSE oscillator",
+        "kind": "source",
+        "frequency": {
+          "nominalHz": 32768
+        },
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_clock_power"
+          ],
+          "status": "verified",
+          "confidence": 0.9
+        }
+      },
+      {
+        "id": "clk.pll",
+        "name": "PLL",
+        "kind": "pll",
+        "inputClockRefs": [
+          "clk.hsi",
+          "clk.hse"
+        ],
+        "frequency": {
+          "maximumHz": 144000000
+        },
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_clock_power"
+          ],
+          "status": "verified",
+          "confidence": 0.85
+        }
+      },
+      {
+        "id": "clk.sysclk",
+        "name": "SYSCLK",
+        "kind": "domain",
+        "inputClockRefs": [
+          "clk.hsi",
+          "clk.hse",
+          "clk.pll"
+        ],
+        "targetRefs": [
+          "device.ch32v203c8t6"
+        ],
+        "frequency": {
+          "maximumHz": 144000000
+        },
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_architecture"
+          ],
+          "status": "verified",
+          "confidence": 0.85
+        }
+      }
+    ],
+    "timingConstraints": [
+      {
+        "id": "tc.sysclk-max",
+        "name": "Maximum SYSCLK",
+        "targetRefs": [
+          "device.ch32v203c8t6"
+        ],
+        "kind": "max-frequency",
+        "value": 144,
+        "unit": "MHz",
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_architecture"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      }
+    ],
+    "powerDomains": [
+      {
+        "id": "pd.main",
+        "name": "Main VDD/VIO domain",
+        "targetRefs": [
+          "device.ch32v203c8t6"
+        ],
+        "voltageRangeVolts": {
+          "minimum": 2.4,
+          "maximum": 3.6
+        },
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_clock_power"
+          ],
+          "status": "verified",
+          "confidence": 0.92
+        }
+      }
+    ],
+    "interruptControllers": [
+      {
+        "id": "ic.pfic",
+        "name": "PFIC",
+        "description": "Fast programmable interrupt controller integrated with the QingKe V4B core.",
+        "targetRefs": [
+          "device.ch32v203c8t6"
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet",
+            "qingke-v4-processor-manual"
+          ],
+          "evidenceRefs": [
+            "e_architecture",
+            "e_core_manual"
+          ],
+          "status": "verified",
+          "confidence": 0.88
+        }
+      }
+    ],
+    "pins": [
+      {
+        "id": "pin.vbat",
+        "name": "VBAT",
+        "description": "Backup supply pin.",
+        "modes": [
+          "analog"
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.vdd",
+        "name": "VDD",
+        "description": "Digital supply pin group used by pads labeled VDD, VDD_2, VDD_IO_1, and VDD_IO_3.",
+        "modes": [
+          "analog"
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.vss",
+        "name": "VSS",
+        "description": "Digital ground pin group used by pads labeled VSS, VSS_1, VSS_2, and VSS_3.",
+        "modes": [
+          "analog"
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.vdda",
+        "name": "VDDA",
+        "description": "Analog supply pin.",
+        "modes": [
+          "analog"
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.vssa",
+        "name": "VSSA",
+        "description": "Analog ground pin.",
+        "modes": [
+          "analog"
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.nrst",
+        "name": "NRST",
+        "description": "External reset pin.",
+        "modes": [
+          "input"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "NRST"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.boot0",
+        "name": "BOOT0",
+        "description": "Boot-configuration input pin.",
+        "modes": [
+          "input"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "BOOT0"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pc13",
+        "name": "PC13",
+        "port": "C",
+        "index": 13,
+        "description": "GPIO pin with TAMPER-RTC alternate function; output use is limited to 2MHz and light loads per datasheet note 3.",
+        "modes": [
+          "input",
+          "output",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "TAMPER-RTC"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pc14",
+        "name": "PC14",
+        "port": "C",
+        "index": 14,
+        "description": "GPIO/LSE input pin; when VBAT powers the backup domain, this pad is reserved for LSE use.",
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "OSC32_IN"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pc15",
+        "name": "PC15",
+        "port": "C",
+        "index": 15,
+        "description": "GPIO/LSE output pin; when VBAT powers the backup domain, this pad is reserved for LSE use.",
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "OSC32_OUT"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pd0",
+        "name": "PD0",
+        "port": "D",
+        "index": 0,
+        "description": "Defaults to OSC_IN after reset on CH32V203C8T6 and can be remapped to GPIO PD0 by software.",
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "OSC_IN"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48",
+            "e_pin_notes"
+          ],
+          "status": "verified",
+          "confidence": 0.96
+        }
+      },
+      {
+        "id": "pin.pd1",
+        "name": "PD1",
+        "port": "D",
+        "index": 1,
+        "description": "Defaults to OSC_OUT after reset on CH32V203C8T6 and can be remapped to GPIO PD1 by software.",
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "OSC_OUT"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48",
+            "e_pin_notes"
+          ],
+          "status": "verified",
+          "confidence": 0.96
+        }
+      },
+      {
+        "id": "pin.pa0",
+        "name": "PA0",
+        "port": "A",
+        "index": 0,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "WKUP"
+          },
+          {
+            "name": "USART2_CTS"
+          },
+          {
+            "name": "ADC_IN0"
+          },
+          {
+            "name": "TIM2_CH1"
+          },
+          {
+            "name": "TIM2_ETR"
+          },
+          {
+            "name": "TIM2_CH1_2"
+          },
+          {
+            "name": "TIM2_ETR_2"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pa1",
+        "name": "PA1",
+        "port": "A",
+        "index": 1,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "USART2_RTS"
+          },
+          {
+            "name": "ADC_IN1"
+          },
+          {
+            "name": "TIM2_CH2"
+          },
+          {
+            "name": "TIM2_CH2_2"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pa2",
+        "name": "PA2",
+        "port": "A",
+        "index": 2,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "USART2_TX"
+          },
+          {
+            "name": "ADC_IN2"
+          },
+          {
+            "name": "TIM2_CH3"
+          },
+          {
+            "name": "OPA2_OUT0"
+          },
+          {
+            "name": "TIM2_CH3_1"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pa3",
+        "name": "PA3",
+        "port": "A",
+        "index": 3,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "USART2_RX"
+          },
+          {
+            "name": "ADC_IN3"
+          },
+          {
+            "name": "TIM2_CH4"
+          },
+          {
+            "name": "OPA1_OUT0"
+          },
+          {
+            "name": "TIM2_CH4_1"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pa4",
+        "name": "PA4",
+        "port": "A",
+        "index": 4,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "SPI1_NSS"
+          },
+          {
+            "name": "USART2_CK"
+          },
+          {
+            "name": "ADC_IN4"
+          },
+          {
+            "name": "OPA2_OUT1"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pa5",
+        "name": "PA5",
+        "port": "A",
+        "index": 5,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "SPI1_SCK"
+          },
+          {
+            "name": "ADC_IN5"
+          },
+          {
+            "name": "OPA2_CH1N"
+          },
+          {
+            "name": "USART4_TX_1"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pa6",
+        "name": "PA6",
+        "port": "A",
+        "index": 6,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "SPI1_MISO"
+          },
+          {
+            "name": "ADC_IN6"
+          },
+          {
+            "name": "TIM3_CH1"
+          },
+          {
+            "name": "OPA1_CH1N"
+          },
+          {
+            "name": "TIM1_BKIN_1"
+          },
+          {
+            "name": "USART4_CK_1"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pa7",
+        "name": "PA7",
+        "port": "A",
+        "index": 7,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "SPI1_MOSI"
+          },
+          {
+            "name": "ADC_IN7"
+          },
+          {
+            "name": "TIM3_CH2"
+          },
+          {
+            "name": "OPA2_CH1P"
+          },
+          {
+            "name": "TIM1_CH1N_1"
+          },
+          {
+            "name": "USART4_CTS_1"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pb0",
+        "name": "PB0",
+        "port": "B",
+        "index": 0,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "ADC_IN8"
+          },
+          {
+            "name": "TIM3_CH3"
+          },
+          {
+            "name": "OPA1_CH1P"
+          },
+          {
+            "name": "USART4_TX"
+          },
+          {
+            "name": "TIM1_CH2N_1"
+          },
+          {
+            "name": "TIM3_CH3_2"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pb1",
+        "name": "PB1",
+        "port": "B",
+        "index": 1,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "ADC_IN9"
+          },
+          {
+            "name": "TIM3_CH4"
+          },
+          {
+            "name": "OPA1_OUT1"
+          },
+          {
+            "name": "USART4_RX"
+          },
+          {
+            "name": "TIM1_CH3N_1"
+          },
+          {
+            "name": "TIM3_CH4_2"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pb2",
+        "name": "PB2",
+        "port": "B",
+        "index": 2,
+        "modes": [
+          "input",
+          "output",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "BOOT1"
+          },
+          {
+            "name": "USART4_CK"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        },
+        "description": "PB2 is package-shared with BOOT1 and should be pulled down in low-power configurations when unused."
+      },
+      {
+        "id": "pin.pb10",
+        "name": "PB10",
+        "port": "B",
+        "index": 10,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "I2C2_SCL"
+          },
+          {
+            "name": "USART3_TX"
+          },
+          {
+            "name": "OPA2_CH0N"
+          },
+          {
+            "name": "TIM2_CH3_2"
+          },
+          {
+            "name": "TIM2_CH3_3"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pb11",
+        "name": "PB11",
+        "port": "B",
+        "index": 11,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "I2C2_SDA"
+          },
+          {
+            "name": "USART3_RX"
+          },
+          {
+            "name": "OPA1_CH0N"
+          },
+          {
+            "name": "TIM2_CH4_2"
+          },
+          {
+            "name": "TIM2_CH4_3"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pb12",
+        "name": "PB12",
+        "port": "B",
+        "index": 12,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "SPI2_NSS"
+          },
+          {
+            "name": "I2C2_SMBA"
+          },
+          {
+            "name": "USART3_CK"
+          },
+          {
+            "name": "TIM1_BKIN"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pb13",
+        "name": "PB13",
+        "port": "B",
+        "index": 13,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "SPI2_SCK"
+          },
+          {
+            "name": "USART3_CTS"
+          },
+          {
+            "name": "TIM1_CH1N"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pb14",
+        "name": "PB14",
+        "port": "B",
+        "index": 14,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "SPI2_MISO"
+          },
+          {
+            "name": "TIM1_CH2N"
+          },
+          {
+            "name": "USART3_RTS"
+          },
+          {
+            "name": "OPA2_CH0P"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pb15",
+        "name": "PB15",
+        "port": "B",
+        "index": 15,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "SPI2_MOSI"
+          },
+          {
+            "name": "TIM1_CH3N"
+          },
+          {
+            "name": "OPA1_CH0P"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pa8",
+        "name": "PA8",
+        "port": "A",
+        "index": 8,
+        "modes": [
+          "input",
+          "output",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "USART1_CK"
+          },
+          {
+            "name": "TIM1_CH1"
+          },
+          {
+            "name": "MCO"
+          },
+          {
+            "name": "USART1_CK_1"
+          },
+          {
+            "name": "TIM1_CH1_1"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pa9",
+        "name": "PA9",
+        "port": "A",
+        "index": 9,
+        "modes": [
+          "input",
+          "output",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "USART1_TX"
+          },
+          {
+            "name": "TIM1_CH2"
+          },
+          {
+            "name": "TIM1_CH2_1"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pa10",
+        "name": "PA10",
+        "port": "A",
+        "index": 10,
+        "modes": [
+          "input",
+          "output",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "USART1_RX"
+          },
+          {
+            "name": "TIM1_CH3"
+          },
+          {
+            "name": "TIM1_CH3_1"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pa11",
+        "name": "PA11",
+        "port": "A",
+        "index": 11,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "USART1_CTS"
+          },
+          {
+            "name": "USBDM"
+          },
+          {
+            "name": "CAN1_RX"
+          },
+          {
+            "name": "TIM1_CH4"
+          },
+          {
+            "name": "USART1_CTS_1"
+          },
+          {
+            "name": "TIM1_CH4_1"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pa12",
+        "name": "PA12",
+        "port": "A",
+        "index": 12,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "USART1_RTS"
+          },
+          {
+            "name": "USBDP"
+          },
+          {
+            "name": "CAN1_TX"
+          },
+          {
+            "name": "TIM1_ETR"
+          },
+          {
+            "name": "USART1_RTS_1"
+          },
+          {
+            "name": "TIM1_ETR_1"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pa13",
+        "name": "PA13",
+        "port": "A",
+        "index": 13,
+        "modes": [
+          "input",
+          "output",
+          "alternate-function",
+          "bidirectional"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "SWDIO"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pa14",
+        "name": "PA14",
+        "port": "A",
+        "index": 14,
+        "modes": [
+          "input",
+          "output",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "SWCLK"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pa15",
+        "name": "PA15",
+        "port": "A",
+        "index": 15,
+        "modes": [
+          "input",
+          "output",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "TIM2_CH1_1"
+          },
+          {
+            "name": "TIM2_ETR_1"
+          },
+          {
+            "name": "TIM2_CH1_3"
+          },
+          {
+            "name": "TIM2_ETR_3"
+          },
+          {
+            "name": "SPI1_NSS_1"
+          },
+          {
+            "name": "USART4_RTS_1"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pb3",
+        "name": "PB3",
+        "port": "B",
+        "index": 3,
+        "modes": [
+          "input",
+          "output",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "USART4_CTS"
+          },
+          {
+            "name": "TIM2_CH2_1"
+          },
+          {
+            "name": "TIM2_CH2_3"
+          },
+          {
+            "name": "SPI1_SCK_1"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pb4",
+        "name": "PB4",
+        "port": "B",
+        "index": 4,
+        "modes": [
+          "input",
+          "output",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "USART4_RTS"
+          },
+          {
+            "name": "TIM3_CH1_2"
+          },
+          {
+            "name": "SPI1_MISO_1"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pb5",
+        "name": "PB5",
+        "port": "B",
+        "index": 5,
+        "modes": [
+          "input",
+          "output",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "I2C1_SMBA"
+          },
+          {
+            "name": "TIM3_CH2_2"
+          },
+          {
+            "name": "SPI1_MOSI_1"
+          },
+          {
+            "name": "USART4_RX_1"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pb6",
+        "name": "PB6",
+        "port": "B",
+        "index": 6,
+        "modes": [
+          "input",
+          "output",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "I2C1_SCL"
+          },
+          {
+            "name": "TIM4_CH1"
+          },
+          {
+            "name": "USBFS_DM"
+          },
+          {
+            "name": "USART1_TX_1"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pb7",
+        "name": "PB7",
+        "port": "B",
+        "index": 7,
+        "modes": [
+          "input",
+          "output",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "I2C1_SDA"
+          },
+          {
+            "name": "TIM4_CH2"
+          },
+          {
+            "name": "USBFS_DP"
+          },
+          {
+            "name": "USART1_RX_1"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pb8",
+        "name": "PB8",
+        "port": "B",
+        "index": 8,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "TIM4_CH3"
+          },
+          {
+            "name": "I2C1_SCL_1"
+          },
+          {
+            "name": "CAN1_RX_2"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      },
+      {
+        "id": "pin.pb9",
+        "name": "PB9",
+        "port": "B",
+        "index": 9,
+        "modes": [
+          "input",
+          "output",
+          "analog",
+          "alternate-function"
+        ],
+        "alternateFunctions": [
+          {
+            "name": "TIM4_CH4"
+          },
+          {
+            "name": "I2C1_SDA_1"
+          },
+          {
+            "name": "CAN1_TX_2"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48"
+          ],
+          "status": "verified",
+          "confidence": 0.95
+        }
+      }
+    ],
+    "packages": [
+      {
+        "id": "pkg.lqfp48-7x7-0p5",
+        "name": "LQFP48",
+        "description": "7x7 mm LQFP48 package with 0.5 mm pitch used by CH32V203C8T6.",
+        "packageType": "LQFP48",
+        "pinMappings": [
+          {
+            "packagePad": "1 (VBAT)",
+            "pinRef": "pin.vbat"
+          },
+          {
+            "packagePad": "2 (PC13/TAMPER-RTC)",
+            "pinRef": "pin.pc13"
+          },
+          {
+            "packagePad": "3 (PC14/OSC32_IN)",
+            "pinRef": "pin.pc14"
+          },
+          {
+            "packagePad": "4 (PC15/OSC32_OUT)",
+            "pinRef": "pin.pc15"
+          },
+          {
+            "packagePad": "5 (OSC_IN / PD0)",
+            "pinRef": "pin.pd0"
+          },
+          {
+            "packagePad": "6 (OSC_OUT / PD1)",
+            "pinRef": "pin.pd1"
+          },
+          {
+            "packagePad": "7 (NRST)",
+            "pinRef": "pin.nrst"
+          },
+          {
+            "packagePad": "8 (VSSA)",
+            "pinRef": "pin.vssa"
+          },
+          {
+            "packagePad": "9 (VDDA)",
+            "pinRef": "pin.vdda"
+          },
+          {
+            "packagePad": "10 (PA0-WKUP)",
+            "pinRef": "pin.pa0"
+          },
+          {
+            "packagePad": "11 (PA1)",
+            "pinRef": "pin.pa1"
+          },
+          {
+            "packagePad": "12 (PA2)",
+            "pinRef": "pin.pa2"
+          },
+          {
+            "packagePad": "13 (PA3)",
+            "pinRef": "pin.pa3"
+          },
+          {
+            "packagePad": "14 (PA4)",
+            "pinRef": "pin.pa4"
+          },
+          {
+            "packagePad": "15 (PA5)",
+            "pinRef": "pin.pa5"
+          },
+          {
+            "packagePad": "16 (PA6)",
+            "pinRef": "pin.pa6"
+          },
+          {
+            "packagePad": "17 (PA7)",
+            "pinRef": "pin.pa7"
+          },
+          {
+            "packagePad": "18 (PB0)",
+            "pinRef": "pin.pb0"
+          },
+          {
+            "packagePad": "19 (PB1)",
+            "pinRef": "pin.pb1"
+          },
+          {
+            "packagePad": "20 (PB2/BOOT1)",
+            "pinRef": "pin.pb2"
+          },
+          {
+            "packagePad": "21 (PB10)",
+            "pinRef": "pin.pb10"
+          },
+          {
+            "packagePad": "22 (PB11)",
+            "pinRef": "pin.pb11"
+          },
+          {
+            "packagePad": "23 (VSS_1)",
+            "pinRef": "pin.vss"
+          },
+          {
+            "packagePad": "24 (VDD_IO_1)",
+            "pinRef": "pin.vdd"
+          },
+          {
+            "packagePad": "25 (PB12)",
+            "pinRef": "pin.pb12"
+          },
+          {
+            "packagePad": "26 (PB13)",
+            "pinRef": "pin.pb13"
+          },
+          {
+            "packagePad": "27 (PB14)",
+            "pinRef": "pin.pb14"
+          },
+          {
+            "packagePad": "28 (PB15)",
+            "pinRef": "pin.pb15"
+          },
+          {
+            "packagePad": "29 (PA8)",
+            "pinRef": "pin.pa8"
+          },
+          {
+            "packagePad": "30 (PA9)",
+            "pinRef": "pin.pa9"
+          },
+          {
+            "packagePad": "31 (PA10)",
+            "pinRef": "pin.pa10"
+          },
+          {
+            "packagePad": "32 (PA11)",
+            "pinRef": "pin.pa11"
+          },
+          {
+            "packagePad": "33 (PA12)",
+            "pinRef": "pin.pa12"
+          },
+          {
+            "packagePad": "34 (PA13)",
+            "pinRef": "pin.pa13"
+          },
+          {
+            "packagePad": "35 (VSS_2)",
+            "pinRef": "pin.vss"
+          },
+          {
+            "packagePad": "36 (VDD_2)",
+            "pinRef": "pin.vdd"
+          },
+          {
+            "packagePad": "37 (PA14)",
+            "pinRef": "pin.pa14"
+          },
+          {
+            "packagePad": "38 (PA15)",
+            "pinRef": "pin.pa15"
+          },
+          {
+            "packagePad": "39 (PB3)",
+            "pinRef": "pin.pb3"
+          },
+          {
+            "packagePad": "40 (PB4)",
+            "pinRef": "pin.pb4"
+          },
+          {
+            "packagePad": "41 (PB5)",
+            "pinRef": "pin.pb5"
+          },
+          {
+            "packagePad": "42 (PB6)",
+            "pinRef": "pin.pb6"
+          },
+          {
+            "packagePad": "43 (PB7)",
+            "pinRef": "pin.pb7"
+          },
+          {
+            "packagePad": "44 (BOOT0)",
+            "pinRef": "pin.boot0"
+          },
+          {
+            "packagePad": "45 (PB8)",
+            "pinRef": "pin.pb8"
+          },
+          {
+            "packagePad": "46 (PB9)",
+            "pinRef": "pin.pb9"
+          },
+          {
+            "packagePad": "47 (VSS_3)",
+            "pinRef": "pin.vss"
+          },
+          {
+            "packagePad": "48 (VDD_IO_3)",
+            "pinRef": "pin.vdd"
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32v20x-30x-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_pin_table_lqfp48",
+            "e_package_ordering"
+          ],
+          "status": "verified",
+          "confidence": 0.97
+        }
+      }
+    ]
+  }
+}
