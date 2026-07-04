@@ -265,7 +265,7 @@
       {
         "id": "arch.qingke-v4b",
         "name": "QingKe V4B",
-        "isa": "RV32IMAC",
+        "isa": "RV32IMACXW",
         "coreFamily": "QingKe V4B",
         "endianness": "little",
         "addressUnitBits": 8,
@@ -278,11 +278,13 @@
         "provenance": {
           "sourceRefs": [
             "wch-ch32v20x-30x-datasheet",
-            "qingke-v4-processor-manual"
+            "qingke-v4-processor-manual",
+            "openwch-ch32v20x-sdk"
           ],
           "evidenceRefs": [
             "e_architecture",
-            "e_core_manual"
+            "e_core_manual",
+            "e_sdk_toolchain"
           ],
           "status": "verified",
           "confidence": 0.9

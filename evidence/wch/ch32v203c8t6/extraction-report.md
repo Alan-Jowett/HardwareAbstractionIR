@@ -4,7 +4,7 @@
 
 - **Target:** WCH CH32V203C8T6
 - **Family:** CH32V203
-- **Architecture:** QingKe V4B / 32-bit RISC-V
+- **Architecture:** QingKe V4B / RV32IMACXW
 - **Package:** LQFP48 (7x7 mm, 0.5 mm pitch)
 - **Status:** Draft extraction now includes grounded device identity, memory, interrupts, major peripherals, clocks/power, and a normalized LQFP48 pin/package model.
 
@@ -48,6 +48,7 @@
 | CH32V203C8T6 is in scope of CH32V203DS0 v3.0 | [KNOWN] | WCH file metadata id 354 and datasheet scope coverage explicitly include CH32V203C8T6. |
 | The exact variant has 64KB flash and 20KB SRAM | [KNOWN] | Datasheet model table page 7 and official C8T6 linker script agree. |
 | The D6 interrupt numbering in the draft is correct for C8T6 | [KNOWN] | D6 startup vector file provides the exact interrupt ordering used in the draft. |
+| The extracted ISA should include the vendor `XW` extension | [KNOWN] | The official CH32V203C8T6 SDK build uses `-march=rv32imacxw`, so the architecture record models `RV32IMACXW`. |
 | OPA/CMP hardware exists on CH32V203C8T6 | [KNOWN] | Datasheet model table lists 2 OPA/CMP units for C8x6, and the header provides the OPA MMIO base. |
 | The LQFP48 pad map in the draft matches the vendor pin-definition table | [KNOWN] | Datasheet table 3-1-1 pages 23-26 and package table page 59. |
 | Pads 5 and 6 should be modeled as PD0/PD1 with reset-default oscillator roles on C8T6 | [KNOWN] | Datasheet note 4 on page 35 explicitly states the C8T6-specific reset behavior and remap. |
