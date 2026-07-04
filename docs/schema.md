@@ -273,6 +273,8 @@ Open design areas include:
 
 Those can evolve without abandoning the current layered structure.
 
+For the initial CLI, `hair validate` is limited to schema conformance against `schema/hair.json` and the layered subschemas. The declarative `validation` layer remains the place to model richer invariants and generator preconditions, but executing those rules is future tooling work.
+
 ## Practical authoring guidance
 
 When adding to the schema:
