@@ -693,8 +693,7 @@ struct Device {
     vendor: String,
     #[serde(default)]
     architecture_ref: Option<String>,
-    #[serde(default)]
-    cpu: Option<CpuModel>,
+    cpu: CpuModel,
     #[serde(default)]
     interrupts: Vec<Interrupt>,
     peripherals: Vec<Peripheral>,
@@ -704,8 +703,32 @@ struct Device {
 #[serde(rename_all = "camelCase")]
 struct CpuModel {
     name: String,
+    revision: String,
+    endianness: String,
+    interrupt_priority_bits: u32,
+    feature_flags: CpuFeatureFlags,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CpuFeatureFlags {
+    mpu_present: bool,
+    fpu_present: bool,
+    vendor_system_timer_config: bool,
     #[serde(default)]
-    interrupt_priority_bits: Option<u32>,
+    fpu_double_precision: Option<bool>,
+    #[serde(default)]
+    dsp_present: Option<bool>,
+    #[serde(default)]
+    icache_present: Option<bool>,
+    #[serde(default)]
+    dcache_present: Option<bool>,
+    #[serde(default)]
+    itcm_present: Option<bool>,
+    #[serde(default)]
+    dtcm_present: Option<bool>,
+    #[serde(default)]
+    vtor_present: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -895,14 +918,53 @@ fn generate_svd(document: &HairDocument) -> Result<String> {
     write_text_element(&mut xml, "addressUnitBits", &address_unit_bits.to_string());
     write_text_element(&mut xml, "width", &width_bits.to_string());
 
-    if let Some(cpu) = &document.structure.device.cpu {
-        xml.start_element("cpu");
-        write_text_element(&mut xml, "name", &cpu.name);
-        if let Some(bits) = cpu.interrupt_priority_bits {
-            write_text_element(&mut xml, "nvicPrioBits", &bits.to_string());
-        }
-        xml.end_element();
+    let cpu = &document.structure.device.cpu;
+    xml.start_element("cpu");
+    write_text_element(&mut xml, "name", &cpu.name);
+    write_text_element(&mut xml, "revision", &cpu.revision);
+    write_text_element(&mut xml, "endian", &svd_endian(&cpu.endianness)?);
+    write_text_element(
+        &mut xml,
+        "mpuPresent",
+        &cpu.feature_flags.mpu_present.to_string(),
+    );
+    write_text_element(
+        &mut xml,
+        "fpuPresent",
+        &cpu.feature_flags.fpu_present.to_string(),
+    );
+    if let Some(fpu_double_precision) = cpu.feature_flags.fpu_double_precision {
+        write_text_element(&mut xml, "fpuDP", &fpu_double_precision.to_string());
     }
+    if let Some(dsp_present) = cpu.feature_flags.dsp_present {
+        write_text_element(&mut xml, "dspPresent", &dsp_present.to_string());
+    }
+    if let Some(icache_present) = cpu.feature_flags.icache_present {
+        write_text_element(&mut xml, "icachePresent", &icache_present.to_string());
+    }
+    if let Some(dcache_present) = cpu.feature_flags.dcache_present {
+        write_text_element(&mut xml, "dcachePresent", &dcache_present.to_string());
+    }
+    if let Some(itcm_present) = cpu.feature_flags.itcm_present {
+        write_text_element(&mut xml, "itcmPresent", &itcm_present.to_string());
+    }
+    if let Some(dtcm_present) = cpu.feature_flags.dtcm_present {
+        write_text_element(&mut xml, "dtcmPresent", &dtcm_present.to_string());
+    }
+    if let Some(vtor_present) = cpu.feature_flags.vtor_present {
+        write_text_element(&mut xml, "vtorPresent", &vtor_present.to_string());
+    }
+    write_text_element(
+        &mut xml,
+        "nvicPrioBits",
+        &cpu.interrupt_priority_bits.to_string(),
+    );
+    write_text_element(
+        &mut xml,
+        "vendorSystickConfig",
+        &cpu.feature_flags.vendor_system_timer_config.to_string(),
+    );
+    xml.end_element();
 
     xml.start_element("peripherals");
     for peripheral in &document.structure.device.peripherals {
@@ -1152,6 +1214,16 @@ fn format_hex(value: u64) -> String {
     format!("0x{value:X}")
 }
 
+fn svd_endian(endianness: &str) -> Result<String> {
+    let mapped = match endianness {
+        "little" => "little",
+        "big" => "big",
+        "selectable" => "selectable",
+        unsupported => bail!("endianness {unsupported} is not supported by SVD generation"),
+    };
+    Ok(mapped.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1214,6 +1286,17 @@ mod tests {
                     "name": "TEST123",
                     "vendor": "TestVendor",
                     "architectureRef": "arch.test",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
                     "interrupts": [
                         {
                             "id": "int.timer",
@@ -1258,6 +1341,7 @@ mod tests {
         let svd = generate_svd(&document).expect("svd generation");
         assert!(svd.contains("<device"));
         assert!(svd.contains("<name>TEST123</name>"));
+        assert!(svd.contains("<cpu><name>QingKe V4B</name><revision>V4B</revision><endian>little</endian><mpuPresent>false</mpuPresent><fpuPresent>false</fpuPresent><nvicPrioBits>4</nvicPrioBits><vendorSystickConfig>true</vendorSystickConfig></cpu>"));
         assert!(svd.contains("<baseAddress>0x40000000</baseAddress>"));
         assert!(svd.contains("<name>CTRL</name>"));
         assert!(svd.contains("<name>ENABLE</name>"));

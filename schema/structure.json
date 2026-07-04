@@ -163,6 +163,9 @@
             },
             "vtorPresent": {
               "type": "boolean"
+            },
+            "vendorSystemTimerConfig": {
+              "type": "boolean"
             }
           },
           "required": [
@@ -629,6 +632,7 @@
           },
           "required": [
             "vendor",
+            "cpu",
             "peripherals"
           ],
           "additionalProperties": false

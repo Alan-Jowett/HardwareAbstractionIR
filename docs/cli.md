@@ -41,6 +41,7 @@ First-cut behavior:
 - require one HAIR JSON input document
 - emit one SVD document to stdout by default or to `--output`
 - map the HAIR device, peripherals, interrupts, registers, fields, enumerated values, reset values, and access metadata when those concepts are representable in SVD
+- emit a complete CMSIS-SVD CPU block, including revision, endianness, MPU/FPU flags, interrupt priority bits, and the HAIR `vendorSystemTimerConfig` flag mapped to SVD `vendorSystickConfig`
 - fail explicitly when SVD-required data is missing or when a structure that must appear in the SVD cannot be lowered safely
 
 First-cut exclusions:
@@ -86,3 +87,5 @@ The CLI is defined by the repository schema and documentation rather than by ad 
 - `diff` compares HAIR documents as repository artifacts; it does not redefine HAIR semantics.
 
 The `validation` layer in HAIR remains important, but the first CLI cut only enforces schema conformance. Executing declarative validation rules is future work.
+
+Because `generate svd` now depends on CPU metadata that CMSIS-SVD requires, compliant HAIR device documents must include `structure.device.cpu.revision`, `structure.device.cpu.endianness`, `structure.device.cpu.interruptPriorityBits`, and `structure.device.cpu.featureFlags.{mpuPresent,fpuPresent,vendorSystemTimerConfig}`.

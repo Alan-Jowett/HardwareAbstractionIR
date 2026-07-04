@@ -35,13 +35,13 @@
 
 | Subsystem | Components discovered |
 | --- | --- |
-| CPU / core | QingKe V4B core, PFIC, debug interface |
-| Memory | 64KB code flash, 64KB boot alias, 20KB SRAM |
+| CPU / core | QingKe V4B core, PFIC, vendor system timer, debug interface (SWDIO/SWCLK) |
+| Memory | 64KB code flash, 64KB flash boot alias at `0x00000000`, 20KB SRAM |
 | Timers | TIM1 advanced-control timer; TIM2, TIM3, TIM4 general-purpose timers |
 | Serial / comms | USART1/2/3, UART4, SPI1/2, I2C1/2, bxCAN1 |
-| Mixed-signal | ADC1, ADC2, OPA control block |
+| Mixed-signal | ADC1, ADC2, OPA/CMP control block |
 | System / infra | RCC, DMA1 with 8 channels, AFIO, EXTI, BKP, PWR, FLASH, CRC, RTC, IWDG, WWDG |
-| GPIO | GPIOA, GPIOB, GPIOC, GPIOD |
+| GPIO / package | GPIOA, GPIOB, GPIOC, GPIOD, plus LQFP48 package supply, boot, reset, and debug pads |
 | USB | USBFS device register view and USBFS host/device register view at the shared USBFS base |
 
 ## Metadata Coverage and Gaps
@@ -80,6 +80,13 @@
 
 | Claim or entity | Label | Supporting evidence or reason |
 | --- | --- | --- |
+| CH32V203C8T6 is in scope of CH32V203DS0 v3.0 | [KNOWN] | WCH file metadata id 354 and datasheet scope coverage explicitly include CH32V203C8T6. |
+| The exact variant has 64KB flash and 20KB SRAM | [KNOWN] | Datasheet model table page 7 and official C8T6 linker script agree. |
+| The D6 interrupt numbering in the draft is correct for C8T6 | [KNOWN] | D6 startup vector file provides the exact interrupt ordering used in the draft. |
+| The extracted ISA should include the vendor `XW` extension | [KNOWN] | The official CH32V203C8T6 SDK build uses `-march=rv32imacxw`, so the architecture record models `RV32IMACXW`. |
+| The device CPU revision identifier should be modeled as `V4B` | [KNOWN] | The datasheet and QingKe core manual both identify the CPU as the QingKe V4B core, which is the best grounded revision/variant identifier currently exposed by the authoritative sources. |
+| The PFIC implements four interrupt priority bits | [KNOWN] | The official `core_riscv.h` priority API documents bit7 plus bits6-bit4 as active priority bits. |
+| The device uses vendor system-timer configuration | [KNOWN] | The official core support header defines a vendor SysTick block at `0xE000F000`, and the official CH32V203C8T6 debug support code configures it directly for delays. |
 | Peripheral register shells were replaced with concrete register-bearing blocks for all currently modeled MMIO peripherals. | [KNOWN] | Header register structs plus the updated HAIR `registers[]` content for every peripheral. |
 | Header struct extent is sufficient to model one register-bearing address block per in-scope peripheral. | [KNOWN] | The vendor header typedefs include ordered members, reserved padding, nested mailbox/filter structs, and array stride information that bound each recovered peripheral window. |
 | Register access metadata can be modeled as header-level `read-write` for the recovered peripheral members. | [KNOWN] | `core_riscv.h` defines `__IO` as read/write, and the recovered peripheral register structs use `__IO`-qualified members. |
@@ -90,7 +97,12 @@
 | CAN1 implements 28 filter banks through F27R2. | [KNOWN] | RM CAN filter tables pages 430-432. |
 | USBFS register presence is defensible, but USB bitfields remain intentionally omitted. | [KNOWN] | Header USB struct layouts provide offsets; community USB metadata could not be mapped into the current dual-overlay model without ambiguity. |
 | CAN filter-bank fields beyond bank 13 reuse the bank-0 bit pattern shape. | [INFERRED] | RM shows the repeated F14R1..F27R2 registers exist; header bank-0 field macros establish the 32-bit FB0..FB31 pattern. |
-| Per-channel OPA1/OPA2 semantics are fully modeled. | [ASSUMPTION] | Not claimed; only the header-backed shared OPA control register block is modeled structurally. |
+| OPA/CMP hardware exists on CH32V203C8T6 | [KNOWN] | Datasheet model table lists 2 OPA/CMP units for C8x6, and the header provides the OPA MMIO base. |
+| The LQFP48 pad map in the draft matches the vendor pin-definition table | [KNOWN] | Datasheet table 3-1-1 pages 23-26 and package table page 59. |
+| Pads 5 and 6 should be modeled as PD0/PD1 with reset-default oscillator roles on C8T6 | [KNOWN] | Datasheet note 4 on page 35 explicitly states the C8T6-specific reset behavior and remap. |
+| FPU support is intentionally omitted from the draft | [KNOWN] | The datasheet feature list conflicts with QingKe V4B naming and the official example build flags, so the draft keeps no positive FPU claim. |
+| Per-channel OPA1/OPA2 semantics are fully modeled. | [ASSUMPTION] | Not claimed; only the header-backed shared OPA/CMP control register block is modeled structurally. |
+| Exhaustive register-field coverage is complete | [ASSUMPTION] | Not claimed; machine-readable SVD data is absent and field-level extraction has not yet been normalized. |
 
 ## Conflicts and Clarification Questions
 

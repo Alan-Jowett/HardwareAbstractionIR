@@ -173,6 +173,8 @@ HAIR supports deterministic generation of downstream artifacts, including:
 
 Generators consume HAIR IR blocks and produce reproducible outputs from the same normalized source model.
 
+For SVD generation, HAIR device documents are expected to carry explicit CPU metadata rather than relying on generator defaults. That includes CPU revision, endianness, interrupt priority width, and core feature flags such as MPU/FPU presence and vendor system-timer configuration.
+
 ## Validation
 
 The HAIR model is intended to validate against a set of invariants before generation, including:

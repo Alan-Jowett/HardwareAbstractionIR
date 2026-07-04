@@ -263,6 +263,32 @@
         "confidence": 0.9
       },
       {
+        "id": "e_core_priority_bits",
+        "name": "PFIC priority bit layout",
+        "sourceRef": "openwch-ch32v20x-sdk",
+        "normalizedClaim": "The CH32V20x core header documents interrupt priority using bit7 as pre-emption priority and bits6-bit4 as subpriority, implying four implemented interrupt priority bits.",
+        "locator": {
+          "fragment": "C++/Use MRS Create C++ project-example/CH32V203C8T6++/Core/core_riscv.h",
+          "lineStart": 259,
+          "lineEnd": 271
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.88
+      },
+      {
+        "id": "e_core_vendor_systick",
+        "name": "Vendor system timer block",
+        "sourceRef": "openwch-ch32v20x-sdk",
+        "normalizedClaim": "The CH32V20x core support code exposes a vendor-defined SysTick register block at 0xE000F000 and the official CH32V203C8T6 debug support code configures it directly for delay timing, so the device uses vendor system-timer configuration rather than a CMSIS-standard SysTick abstraction.",
+        "locator": {
+          "fragment": "C++/Use MRS Create C++ project-example/CH32V203C8T6++/Core/core_riscv.h and Debug/debug.c",
+          "lineStart": 102,
+          "lineEnd": 118
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.86
+      },
+      {
         "id": "e_pin_table_lqfp48",
         "name": "LQFP48 pin definition table",
         "sourceRef": "wch-ch32v20x-30x-datasheet",
@@ -437,7 +463,9 @@
           "evidenceRefs": [
             "e_architecture",
             "e_core_manual",
-            "e_sdk_toolchain"
+            "e_sdk_toolchain",
+            "e_core_priority_bits",
+            "e_core_vendor_systick"
           ],
           "status": "verified",
           "confidence": 0.9

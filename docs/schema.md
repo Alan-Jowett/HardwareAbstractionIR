@@ -125,6 +125,8 @@ It currently includes:
 
 This is the layer that most directly overlaps with CMSIS-SVD and similar register-description formats.
 
+The structural `device.cpu` model is also where HAIR carries generator-critical CPU metadata. Compliant device documents now require CPU revision, endianness, interrupt priority width, and core feature flags including `vendorSystemTimerConfig`, so downstream SVD generation does not have to invent missing CPU facts.
+
 ### Important structural rule
 
 `structure.device` is the concrete hardware variant described by the current document.
