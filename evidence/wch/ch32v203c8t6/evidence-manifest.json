@@ -27,23 +27,24 @@
     {
       "id": "openwch-ch32v20x-sdk",
       "kind": "sdk",
-      "uri": "https://github.com/openwch/ch32v20x",
+      "uri": "https://github.com/openwch/ch32v20x/tree/804daf39a21af99be64c5abe0ea4bdaf361eb2e4",
+      "version": "804daf39a21af99be64c5abe0ea4bdaf361eb2e4",
       "notes": "Official openwch repository with SDK material, examples, headers, startup code, and package-specific project assets for CH32V20x family devices."
-    },
+    }
     {
       "id": "openwch-ch32v20x-header",
       "kind": "vendor-header",
-      "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/main/EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h",
+      "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h",
       "version": "V1.0.1",
       "notes": "Official WCH peripheral access header. The CH32V20x_D6 grouping explicitly includes CH32V203C8 and is useful for IRQ names, peripheral types, and register definitions."
     },
     {
       "id": "openwch-ch32v20x-startup-d6",
       "kind": "source-code",
-      "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/main/EVT/EXAM/SRC/Startup/startup_ch32v20x_D6.S",
+      "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Startup/startup_ch32v20x_D6.S",
       "version": "V1.0.2",
       "notes": "Official WCH startup file for the D6 subset that includes CH32V203C8. Useful to cross-check exception and interrupt vector ordering."
-    },
+    }
     {
       "id": "qingke-v4-processor-manual",
       "kind": "other",
