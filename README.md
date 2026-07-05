@@ -134,6 +134,7 @@ The repository includes agent skills under `.github\skills\` that formalize the 
 | --- | --- |
 | `find-mcu-sources` | Discover and review authoritative source materials, then author an evidence manifest |
 | `extract` | Build a HAIR document from an evidence manifest using phased extraction and adversarial review |
+| `audit` | Adversarially audit an existing HAIR document against its approved evidence and completeness requirements before downstream generation |
 | `maintain` / `evolve` | Support ongoing schema and repository maintenance workflows |
 
 The extraction flow is intentionally conservative:
@@ -141,7 +142,8 @@ The extraction flow is intentionally conservative:
 1. identify one exact target variant
 2. assemble an explicit evidence manifest
 3. extract a draft HAIR model with provenance
-4. adversarially challenge claims before treating the result as final
+4. audit the extracted HAIR model against the approved evidence and full-device completeness expectations
+5. adversarially challenge claims before treating the result as final
 
 ## Normalization Rules
 
