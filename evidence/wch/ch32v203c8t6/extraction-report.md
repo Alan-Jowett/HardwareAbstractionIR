@@ -6,7 +6,7 @@
 - **Family:** CH32V203 / CH32V20x_D6
 - **Architecture:** QingKe V4B / RV32IMACXW
 - **Package:** LQFP48 (7x7 mm, 0.5 mm pitch)
-- **Status:** Rerun completed with full register-bearing structural depth across the in-scope MMIO peripherals, official-source-backed peripheral address-block coverage and register-level access metadata, and conservative community metadata enrichment. This pass now includes both exact-match imports and safe manual alias/template reconciliation for the timer, CAN, ADC, AFIO, and DMA cases that the prior audit flagged at register level. Remaining incompleteness is now concentrated in field-level topology/name drift, USB overlay mapping, reset masks, enumerated values, and missing cluster prose.
+- **Status:** Rerun completed with full register-bearing structural depth across the in-scope MMIO peripherals, official-source-backed peripheral address-block coverage and register-level access metadata, and conservative community metadata enrichment. This pass now includes the earlier exact-match imports, safe manual alias/template reconciliation for the timer, CAN, ADC, AFIO, and DMA cases, and an additional cleanup pass for timer input-field prose, BKP backup-data field prose, SPI I2S configuration register prose, selected CAN status fields, and clustered CAN reset values. Remaining incompleteness is now concentrated in field-level topology/name drift, USB overlay mapping, reset masks, enumerated values, and missing cluster prose.
 
 ## Source Inventory
 
@@ -53,17 +53,17 @@
 | Peripheral descriptions | Extracted for all modeled peripherals. | Existing HAIR peripheral descriptions grounded by the approved header/datasheet-backed extraction pass. |
 | Peripheral address-block coverage | Extracted for all modeled peripherals as a single `registers` block spanning the recovered register window. | Vendor header struct/member order, reserved padding, nested mailbox/filter structs, and array strides (`e_header_register_window_extents`). |
 | Register access modes | Extracted for all recovered peripheral registers as header-level `read-write`. | `core_riscv.h` defines `__IO` as read/write, and the modeled peripheral members are `__IO`-qualified (`e_core_io_qualifiers` plus `e_header_register_typedefs`). |
-| Register descriptions | Extracted for all community-supported register templates that map cleanly into the current HAIR topology, including the earlier exact matches plus the timer/CAN/ADC/AFIO/DMA alias cases. | Community `CH32V203xx.svd`, gated by exact peripheral/register overlap first and then by conservative manual alias/template normalization, with `CH32V203C8T6.yaml` used to defend exact-variant fit (`e_ch32rs_ch32v203xx_svd_metadata`, `e_ch32rs_ch32v203c8t6_yaml_variant`). |
-| Register reset values | Extracted on 303 exact-matched registers. | Community `CH32V203xx.svd`, reused only on exact structural matches and now accepted by the corrected `common.valueLiteral` schema (`e_ch32rs_ch32v203xx_svd_metadata`). |
-| Field descriptions | Expanded beyond the earlier exact matches to include the safe timer alias cases plus CAN mailbox/filter and DMA channel template members. | Community `CH32V203xx.svd`, reused only where register/template identity and bit ranges could be defended without reshaping the official-source-derived model (`e_ch32rs_ch32v203xx_svd_metadata`). |
-| Field access modes | Expanded where the newly imported alias/template fields carried explicit community access metadata. | Community `CH32V203xx.svd` field annotations, imported only where the matched or normalized field record carried explicit access metadata (`e_ch32rs_ch32v203xx_svd_metadata`). |
+| Register descriptions | Extracted on 337 / 403 modeled registers, including all community-supported register templates that map cleanly into the current HAIR topology. | Community `CH32V203xx.svd`, gated by exact peripheral/register overlap first and then by conservative manual alias/template normalization, with `CH32V203C8T6.yaml` used to defend exact-variant fit (`e_ch32rs_ch32v203xx_svd_metadata`, `e_ch32rs_ch32v203c8t6_yaml_variant`). |
+| Register reset values | Extracted on 313 / 403 modeled registers. | Community `CH32V203xx.svd`, reused only on exact structural matches or defensible clustered-template reuse and now accepted by the corrected `common.valueLiteral` schema (`e_ch32rs_ch32v203xx_svd_metadata`). |
+| Field descriptions | Expanded to 1854 / 2275 modeled fields, including the safe timer alias cases, BKP backup-data fields, selected CAN status bits, and CAN mailbox/filter and DMA channel template members. | Community `CH32V203xx.svd`, reused only where register/template identity and bit ranges could be defended without reshaping the official-source-derived model (`e_ch32rs_ch32v203xx_svd_metadata`). |
+| Field access modes | Expanded to 285 / 2275 modeled fields. | Community `CH32V203xx.svd` field annotations, imported only where the matched or normalized field record carried explicit access metadata (`e_ch32rs_ch32v203xx_svd_metadata`). |
 
 ### Metadata present in approved evidence but not extracted
 
 | Metadata class | Status | Reason |
 | --- | --- | --- |
 | Additional community register metadata on unmapped overlay-only blocks | Still not imported for the USB overlays and `FLASH.ACTLR`. | The community USB decomposition (`USBD` / `USBFS`) and the family-SVD `FLASH.ACTLR` record still do not map cleanly into the current official-source-derived topology without broader restructuring. |
-| Additional community field metadata on structurally divergent or aggregate-modeled fields | Still partially omitted. | The remaining gaps are now concentrated in field-level topology/name drift such as CAN aggregate-vs-bit-per-filter modeling, timer GP-vs-advanced alias drift, and some RTC/I2C/BKP naming differences. |
+| Additional community field metadata on structurally divergent or aggregate-modeled fields | Still partially omitted. | The remaining gaps are now concentrated in field-level topology/name drift such as CAN aggregate-vs-bit-per-filter modeling, USB overlay decomposition, and a smaller set of RTC/I2C/BKP naming differences that would require reshaping rather than conservative enrichment. |
 | USB community metadata | Not imported. | The current HAIR intentionally models separate `USBFSD` and `USBFSH` overlays at the shared base address, while the community sources use different USB decomposition (`USBD` / `USBFS`). No unambiguous 1:1 mapping was applied automatically. |
 
 ### Metadata not confidently recoverable from approved evidence examined in this rerun
@@ -75,6 +75,20 @@
 | Remaining field access modes | Partially recovered only. | The community SVD carries explicit field-level access for only a subset of fields, so even after the alias/template import pass the document still lacks a complete field-level permission model. |
 | Field enumerated values | Not recovered. | The approved community SVD provided no enumerated-value tables for the matched fields. |
 | USB field metadata | Not recovered. | The official sources grounded USB register presence and offsets, but the community USB metadata could not be mapped into the current dual-overlay HAIR model without extra manual adjudication. |
+
+## Normalization and Completeness Matrix
+
+| Approved source | Metadata class | Present in evidence | Extracted | Normalization required | Remaining unresolved inventory | Root cause |
+| --- | --- | --- | --- | --- | --- | --- |
+| `openwch-ch32v20x-header` + `core_riscv.h` | Peripheral windows and register access | Yes | Yes | No | None identified. | None. |
+| `wch-ch32fv2x-v3x-rm` | Timer/CAN topology corrections | Yes | Yes | Yes | None identified for the challenged TIM1/TIM2-4 and CAN filter-bank depth cases. | None after RM adjudication. |
+| `ch32-rs-ch32v203xx-svd` + `ch32-rs-ch32v203c8t6-yaml` | Register descriptions | Yes | Mostly | Yes | No remaining normalized register-description gaps after the final timer-input / SPI I2S cleanup pass. | None for conservative exact/alias/template matches. |
+| `ch32-rs-ch32v203xx-svd` + `ch32-rs-ch32v203c8t6-yaml` | Register reset values | Yes | Mostly | Yes | 60 remaining normalized gaps, concentrated in structurally divergent or overlay-only families rather than exact/template matches. | Normalization mismatch / representational difference. |
+| `ch32-rs-ch32v203xx-svd` + `ch32-rs-ch32v203c8t6-yaml` | Field descriptions | Yes | Partially | Yes | 474 remaining normalized gaps, led by CAN bit-per-filter families plus USB/RTC/I2C/BKP naming drift. | Normalization mismatch / representational difference. |
+| `ch32-rs-ch32v203xx-svd` + `ch32-rs-ch32v203c8t6-yaml` | Field access modes | Yes | Partially | Yes | 98 remaining normalized gaps after the selected CAN status-field import. | Normalization mismatch / representational difference plus partial source sparsity. |
+| `ch32-rs-ch32v203xx-svd` | Register reset masks | No reliable overlap layer | No | N/A | Whole metadata class remains absent. | Unsupported by approved evidence. |
+| `ch32-rs-ch32v203xx-svd` | Field enumerated values | No reliable overlap layer | No | N/A | Whole metadata class remains absent. | Unsupported by approved evidence. |
+| `ch32-rs-ch32v203xx-svd` + official USB overlays | USB register/field prose | Partially | Partially | Yes | `USBFSD` / `USBFSH` do not map 1:1 onto community `USBD` / `USBFS`. | Representational difference preserved by user-directed topology boundary. |
 
 ## Epistemic Claims Ledger
 
@@ -102,7 +116,7 @@
 | Pads 5 and 6 should be modeled as PD0/PD1 with reset-default oscillator roles on C8T6 | [KNOWN] | Datasheet note 4 on page 35 explicitly states the C8T6-specific reset behavior and remap. |
 | FPU support is intentionally omitted from the draft | [KNOWN] | The datasheet feature list conflicts with QingKe V4B naming and the official example build flags, so the draft keeps no positive FPU claim. |
 | Per-channel OPA1/OPA2 semantics are fully modeled. | [ASSUMPTION] | Not claimed; only the header-backed shared OPA/CMP control register block is modeled structurally. |
-| Exhaustive register-field coverage is complete | [ASSUMPTION] | Not claimed; machine-readable SVD data is absent and field-level extraction has not yet been normalized. |
+| Exhaustive register-field coverage is complete | [ASSUMPTION] | Not claimed; the normalization pass still leaves explicit representational-difference and unsupported-evidence gaps. |
 
 ## Conflicts and Clarification Questions
 
@@ -111,7 +125,7 @@
 - **Resolved ambiguity:** USBFS device and host/device views share the same base address. The rerun keeps both logical register views because the header defines two distinct typed overlays on `USBFS_BASE`.
 - **Resolved metadata gap:** the header/core access-layer sources are sufficient to recover one register-bearing address block per modeled peripheral and header-level register access as `read-write`, even though they do not expose richer field-level or side-effect-specific access semantics.
 - **Resolved community-source policy question:** the community SVD and YAML were used only as metadata enrichers on exact structural matches. Unmatched or structurally divergent community records were left unimported rather than silently remapped into the official-source-derived model.
-- **Clarification questions:** None identified for this rerun.
+- **Resolved scope boundary:** preserve the current official-source-derived topology rather than reshaping CAN or USB blocks purely to chase closer community-SVD completeness, so the remaining topology-dependent deltas stay explicitly documented instead of being force-imported.
 
 ## Rejected Candidate Claims
 
@@ -124,12 +138,20 @@
 | Community SVD metadata can be used to rename or reshape the official-source-derived register topology. | Rejected: the community sources were approved only as metadata gap-fillers, so this pass reused them only on exact structural matches and left divergent names or layouts untouched. | `e_ch32rs_ch32v203xx_svd_metadata` plus the unchanged official-source-derived register layout. |
 | All remaining metadata gaps can be filled automatically from the community sources. | Rejected: several remaining gaps are caused by topology/name drift, ambiguous USB overlay mapping, or the absence of reset masks/enums in the community SVD itself. | Exact-match overlap results and the remaining unmatched register/field sets. |
 
+## Unresolved Differences Inventory
+
+- **CAN filter-control bit families:** `CAN1.FMCFGR.FBM0..FBM13`, `CAN1.FSCFGR.FSC0..FSC13`, `CAN1.FAFIFOR.FFA0..FFA13`, and related per-filter control bits still differ because the community SVD models individual bits while the current HAIR keeps aggregate field groupings from the official-source-derived topology; this difference is intentionally preserved.
+- **USB overlay decomposition:** community `USBD` / `USBFS` register and field prose still does not map conservatively into the current `USBFSD` / `USBFSH` overlay split at the shared USBFS base; this difference is intentionally preserved.
+- **FLASH control extras:** `FLASH.ACTLR` still exists in the community family SVD without a cleanly justified import path into the current official-source-derived CH32V203C8T6 model.
+- **Residual naming-drift field prose/access cases:** a smaller tail of RTC/I2C/BKP field metadata remains unmatched after conservative normalization because the family/community names do not cleanly align with the current official-source-derived field identities.
+- **Whole-class gaps:** cluster descriptions, register reset masks, and field enumerated values remain absent because the approved evidence examined in this rerun did not supply a reliable importable layer for those metadata classes.
+
 ## Coverage
 
 - **Examined**: manifest, HAIR schemas/docs, current HAIR/report, vendor header struct and bit-definition sections, `core_riscv.h` access-qualifier definitions, RM timer pages 237-254, RM CAN pages 430-432, community `CH32V203xx.svd`, community `CH32V203C8T6.yaml`, and prior datasheet/startup/core-manual evidence already embedded in the document.
 - **Method**: manifest validation, targeted header parsing, access-qualifier review, selective RM falsification for ambiguous blocks, derivedFrom-aware exact-match overlap analysis against the community SVD, script-assisted `hair.json` rewrite, and metadata-gap classification against the updated extract skill requirements.
 - **Excluded**: community metadata that still requires field-topology reshaping, speculative USB view remapping, uninspected RM prose/table sections outside the timer/CAN challenge set, speculative reset masks/semantics not efficiently grounded, and unverified per-lot optional timer AUX behavior.
-- **Limitations**: the rerun now recovers the defensible register-level alias/template cases from the approved community SVD, but still leaves field-level aggregate/split mismatches and USB overlay ambiguities absent where import would require topology edits or unsupported assumptions.
+- **Limitations**: the rerun now recovers the defensible register-level alias/template cases plus several additional field-level prose and reset-value fixes from the approved community SVD, but still leaves aggregate/split field mismatches and USB overlay ambiguities absent where import would require topology edits or unsupported assumptions.
 
 ## Limitations
 
@@ -137,4 +159,4 @@
 - OPA is structurally modeled as the shared header-backed control block at `OPA_BASE`; the current rerun does not split that block into separate OPA1/OPA2 semantic subdevices.
 - Register access metadata is still modeled primarily at the vendor-header qualifier level (`__IO` => `read-write`); the community SVD adds explicit field-access annotations only for a subset of fields, so richer side-effect-specific access remains incomplete.
 - Reset masks and enumerated values remain absent because the approved community SVD did not provide a reliable importable layer for those metadata classes.
-- The remaining gaps are now mostly field-topology reconciliation problems (especially CAN aggregate-vs-per-bit modeling) plus the still-ambiguous USB overlay mapping and `FLASH.ACTLR`.
+- The remaining gaps are now mostly field-topology reconciliation problems (especially CAN aggregate-vs-per-bit modeling), the still-ambiguous USB overlay mapping, and `FLASH.ACTLR`.
