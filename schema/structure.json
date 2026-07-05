@@ -140,6 +140,9 @@
             "fpuPresent": {
               "type": "boolean"
             },
+            "vendorSystemTimerConfig": {
+              "type": "boolean"
+            },
             "fpuDoublePrecision": {
               "type": "boolean"
             },
@@ -162,6 +165,11 @@
               "type": "boolean"
             }
           },
+          "required": [
+            "mpuPresent",
+            "fpuPresent",
+            "vendorSystemTimerConfig"
+          ],
           "additionalProperties": false
         },
         "interruptPriorityBits": {
@@ -169,7 +177,11 @@
         }
       },
       "required": [
-        "name"
+        "name",
+        "revision",
+        "endianness",
+        "featureFlags",
+        "interruptPriorityBits"
       ],
       "additionalProperties": false
     },

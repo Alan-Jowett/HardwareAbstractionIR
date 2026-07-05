@@ -102,7 +102,7 @@
       "additionalProperties": false
     },
     "valueLiteral": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "integer"
         },
