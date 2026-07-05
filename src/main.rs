@@ -1,5 +1,6 @@
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 use std::sync::Mutex;
@@ -12,23 +13,44 @@ use serde_json::{Map, Value};
 use url::Url;
 use xmlwriter::{Options as XmlOptions, XmlWriter};
 
-fn main() {
+fn main() -> process::ExitCode {
     let cli = Cli::parse();
     match run(cli) {
-        Ok(outcome) => {
-            if !outcome.stdout.is_empty() {
-                println!("{}", outcome.stdout);
-            }
-            if !outcome.stderr.is_empty() {
-                eprintln!("{}", outcome.stderr);
-            }
-            process::exit(outcome.exit_code);
-        }
+        Ok(outcome) => emit_outcome(&outcome).unwrap_or_else(report_output_error),
         Err(error) => {
             eprintln!("{error:#}");
-            process::exit(2);
+            process::ExitCode::from(2)
         }
     }
+}
+
+fn emit_outcome(outcome: &CommandOutcome) -> io::Result<process::ExitCode> {
+    let mut stdout = io::stdout().lock();
+    let mut stderr = io::stderr().lock();
+
+    write_outcome(&mut stdout, &mut stderr, outcome)
+}
+
+fn write_outcome(
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+    outcome: &CommandOutcome,
+) -> io::Result<process::ExitCode> {
+    if !outcome.stdout.is_empty() {
+        stdout.write_all(outcome.stdout.as_bytes())?;
+        stdout.flush()?;
+    }
+    if !outcome.stderr.is_empty() {
+        stderr.write_all(outcome.stderr.as_bytes())?;
+        stderr.flush()?;
+    }
+
+    Ok(process::ExitCode::from(outcome.exit_code as u8))
+}
+
+fn report_output_error(error: io::Error) -> process::ExitCode {
+    eprintln!("failed to write command output: {error}");
+    process::ExitCode::from(2)
 }
 
 fn run(cli: Cli) -> Result<CommandOutcome> {
@@ -537,7 +559,13 @@ fn load_diff_operand(repo_root: &Path, operand: &str) -> Result<Value> {
         serde_json::from_slice(&output.stdout)
             .with_context(|| format!("parsing JSON from git selector {operand}"))
     } else {
-        load_json_file(Path::new(operand))
+        let path = Path::new(operand);
+        let resolved = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            repo_root.join(path)
+        };
+        load_json_file(&resolved)
     }
 }
 
@@ -1289,7 +1317,6 @@ fn svd_endian(endianness: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write as _;
     use tempfile::{NamedTempFile, tempdir};
 
     #[test]
@@ -1414,6 +1441,38 @@ mod tests {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let error = load_diff_operand(&repo_root, "git:HEAD").expect_err("selector should fail");
         assert!(error.to_string().contains("git selector"));
+    }
+
+    #[test]
+    fn loads_relative_diff_operand_from_repo_root() {
+        let temp = tempdir().expect("temp dir");
+        let repo_root = temp.path().join("repo");
+        fs::create_dir_all(repo_root.join("docs")).expect("docs dir");
+        fs::write(
+            repo_root.join("docs").join("left.json"),
+            r#"{"metadata":{"version":"0.1.0"}}"#,
+        )
+        .expect("json file");
+
+        let value = load_diff_operand(&repo_root, "docs/left.json").expect("load diff operand");
+        assert_eq!(value["metadata"]["version"], "0.1.0");
+    }
+
+    #[test]
+    fn write_outcome_preserves_exact_output_without_extra_newline() {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let outcome = CommandOutcome {
+            exit_code: 1,
+            stdout: "line one\nline two".to_string(),
+            stderr: "warn".to_string(),
+        };
+
+        let exit_code = write_outcome(&mut stdout, &mut stderr, &outcome).expect("write output");
+
+        assert_eq!(stdout, b"line one\nline two");
+        assert_eq!(stderr, b"warn");
+        assert_eq!(exit_code, process::ExitCode::from(1));
     }
 
     #[test]
