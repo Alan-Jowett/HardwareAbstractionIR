@@ -41,7 +41,7 @@
 
 1. **No shell-only MMIO peripherals were found.** All 33 modeled peripherals carry `registers[]`; none are placeholder shells.
 2. **Peripheral-level structure is broadly complete for the approved scope.** All 33 peripherals have descriptions and address blocks.
-3. **Register-bearing depth is present across the modeled device.** The HAIR contains 403 registers and 2168 fields, with timer/CAN adjudication notes carried in provenance.
+3. **Register-bearing depth is present across the modeled device.** The HAIR contains 403 registers and 2268 fields, with timer/CAN adjudication notes carried in provenance.
 4. **Cluster-level prose is absent.** The document contains 4 register clusters (`CAN1.TxMailBox`, `CAN1.FIFOMailBox`, `CAN1.FilterRegister`, `DMA1.Channel`) and 0 cluster descriptions.
 5. **Physical supporting structure is present.** The physical layer includes 6 clocks, 1 timing constraint, 1 power domain, 1 interrupt controller, 44 pins, and 1 package.
 
