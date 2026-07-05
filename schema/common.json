@@ -192,7 +192,8 @@
           "$ref": "#/$defs/nonEmptyString"
         },
         "displayName": {
-          "type": "string"
+          "type": "string",
+          "description": "Optional human-facing or vendor-facing label when the machine-stable entity name needs to stay distinct, such as alternate register overlay views that share one vendor register title."
         },
         "description": {
           "type": "string"

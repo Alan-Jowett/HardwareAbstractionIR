@@ -240,11 +240,21 @@ challenge whether the apparent gap is really caused by:
 - array/template-vs-expanded register modeling
 - aggregate-field-vs-per-bit-field modeling
 - overlay/decomposition differences for shared address regions
+- same-offset alternate-register views such as input/output interpretations
+  of one vendor register location
 - family-vs-variant naming drift
 
 If a conservative normalization can align the records without inventing
 facts or silently reshaping the official-source-derived topology, you
 must do that work before classifying the metadata as omitted.
+
+When the evidence shows that one register location has multiple
+mode-dependent field layouts, model that explicitly as **alternate
+register views** rather than flattening the fields into one register.
+Use separate `register` objects with aligned offset/width/access/reset
+semantics, preserve the shared vendor-facing label with `displayName`
+when needed, and link the alternate view back to the canonical/base view
+with `alternateOfRef`.
 
 #### 2.3 Semantic extraction
 
@@ -337,6 +347,9 @@ Stop and ask targeted clarification questions before continuing when:
 - approved evidence appears to disagree only because of alias, array,
   cluster, aggregate-field, or overlay modeling differences that you
   have not yet normalized and compared
+- approved evidence shows multiple same-offset register interpretations,
+  but the draft still flattens them into one register instead of using
+  explicit alternate-register views
 
 ### Critical Rule
 
@@ -440,6 +453,9 @@ Run consistency checks across the JSON:
 - profile references resolve to extracted entities
 - provenance references resolve to actual `sources[]` / `evidence[]`
 - optional sections are omitted rather than filled with unsupported data
+- any same-offset alternate-register views preserve aligned
+  offset/width/access/reset semantics and use `alternateOfRef` rather
+  than flattening incompatible field layouts into one register
 
 Run a **structural + metadata completeness gate** before allowing final
 emission:
@@ -456,6 +472,9 @@ emission:
 - explicitly investigate whether any apparent sparsity disappears after
   conservative normalization of aliases, arrays, clusters, aggregate
   fields, or overlays
+- explicitly investigate whether any register-level overlay evidence
+  should be represented as alternate-register views with
+  `alternateOfRef` rather than as one flattened register
 - if the register pass was skipped, incomplete, or only partially
   normalized, treat that as a blocker and stop instead of emitting final
   deliverables

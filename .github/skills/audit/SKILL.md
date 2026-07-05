@@ -242,11 +242,19 @@ is really caused by:
 - array/template-vs-expanded register modeling
 - aggregate-field-vs-per-bit-field modeling
 - overlay/decomposition differences for shared address regions
+- same-offset alternate-register views such as input/output
+  interpretations of one vendor register location
 - family-vs-variant naming drift
 
 If the omission disappears after conservative normalization, do not file
 it as a missing-data finding; classify it as a representational
 difference instead.
+
+When the approved evidence shows that one register location has multiple
+mode-dependent field layouts, explicitly test whether the HAIR should
+use **alternate register views**. A model that flattens incompatible
+input/output field layouts into one register must be challenged rather
+than silently treated as acceptable sparsity.
 
 #### 2.4 Cross-layer and generation-readiness audit
 
@@ -364,6 +372,8 @@ Run consistency checks across the audit:
 - unsupported claims are not being treated as mere limitations
 - completeness gaps are not being mislabeled as harmless sparsity
 - evidence-supported metadata omissions are not being normalized away
+- evidence-supported alternate-register overlays are not being flattened
+  into one register without challenge
 - representational differences are not being mislabeled as extraction
   omissions or generator bugs
 - root-cause classifications are evidence-based rather than speculative
@@ -382,6 +392,9 @@ PASS-WITH-LIMITATIONS conclusion:
 - explicitly investigate whether remaining differences are eliminated by
   conservative normalization of aliases, arrays, clusters, aggregate
   fields, or overlays before treating them as true omissions
+- explicitly investigate whether same-offset register-layout differences
+  should instead be modeled as alternate-register views using
+  `alternateOfRef`
 - if evidence-supported structure or metadata was omitted, treat that as a
   blocking audit failure for complete full-device claims
 

@@ -141,6 +141,27 @@ This distinction matters for generation readiness. A PAC or SVD that loses a rea
 
 The structural `device.cpu` model is also where HAIR carries generator-critical CPU metadata. Compliant device documents now require CPU revision, endianness, interrupt priority width, and core feature flags including `vendorSystemTimerConfig`, so downstream SVD generation does not have to invent missing CPU facts.
 
+### Register overlays and alternate views
+
+HAIR supports **same-offset alternate register views** through `register.alternateOfRef`.
+
+Use this when one logical register location can be interpreted in more than one mode, for example:
+
+- timer capture/compare mode registers with distinct input and output field layouts
+- other register overlays where the address, width, and access mode stay the same but the exposed field meaning changes
+
+The intended contract is:
+
+1. represent each view as its own `register` object
+2. keep the overlaid registers in the same peripheral or cluster scope
+3. keep `offsetBytes`, `widthBits`, access mode, reset metadata, and any array shape aligned across the overlaid views
+4. point each alternate view back to the canonical/base view with `alternateOfRef`
+5. give each view a distinct `name` for machine-facing generation, and use `displayName` when you need to preserve the shared vendor-facing label
+
+This distinction matters for SVD lowering. A downstream generator may need distinct register identities such as `CHCTLR1_Output` and `CHCTLR1_Input` while still preserving the fact that both describe the same underlying vendor register location `CHCTLR1`.
+
+This contract is intentionally narrower than every possible same-address modeling case. In particular, **peripheral-level shared-base overlays** such as two typed peripheral views at one base address are not implicitly modeled by `alternateOfRef`; they remain a separate topology question that tooling must handle explicitly rather than by reusing the register-overlay rule silently.
+
 ### Important structural rule
 
 `structure.device` is the concrete hardware variant described by the current document.

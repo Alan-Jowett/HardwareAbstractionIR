@@ -12,7 +12,7 @@
 
 | Artifact | Path | Role | Target identity | Notes |
 | --- | --- | --- | --- | --- |
-| HAIR JSON | `evidence\wch\ch32v203c8t6\hair.json` | Audit target | `WCH CH32V203C8T6` | Schema-valid HAIR document. Contains 8 provenance sources, 27 evidence records, 33 peripherals, 403 registers, 2268 fields, 47 interrupts, and a populated physical layer. |
+| HAIR JSON | `evidence\wch\ch32v203c8t6\hair.json` | Audit target | `WCH CH32V203C8T6` | Schema-valid HAIR document. Contains 8 provenance sources, 27 evidence records, 33 peripherals, 411 registers, 2291 fields, 47 interrupts, and a populated physical layer. |
 | Evidence manifest | `evidence\wch\ch32v203c8t6\evidence-manifest.json` | Approved evidence scope | `WCH CH32V203C8T6` | Schema-valid manifest with 8 approved sources. Mixes official WCH family-level sources with explicitly approved community metadata gap-fillers. |
 | Source-discovery report | `evidence\wch\ch32v203c8t6\source-discovery.md` | Source-approval context | `WCH CH32V203C8T6` | Documents why the community SVD/YAML were approved only as auditable gap-fillers rather than silent replacements. |
 | Extraction report | `evidence\wch\ch32v203c8t6\extraction-report.md` | Claimed extraction status | `WCH CH32V203C8T6` | Useful as a claim set to challenge, but not treated as evidence by itself. |
@@ -41,7 +41,7 @@
 
 1. **No shell-only MMIO peripherals were found.** All 33 modeled peripherals carry `registers[]`; none are placeholder shells.
 2. **Peripheral-level structure is broadly complete for the approved scope.** All 33 peripherals have descriptions and address blocks.
-3. **Register-bearing depth is present across the modeled device.** The HAIR contains 403 registers and 2268 fields, with timer/CAN adjudication notes carried in provenance.
+3. **Register-bearing depth is present across the modeled device.** The HAIR contains 411 registers and 2291 fields, with timer/CAN adjudication notes carried in provenance and explicit timer alternate-register overlays for `CHCTLR1` / `CHCTLR2`.
 4. **Cluster-level prose is absent.** The document contains 4 register clusters (`CAN1.TxMailBox`, `CAN1.FIFOMailBox`, `CAN1.FilterRegister`, `DMA1.Channel`) and 0 cluster descriptions.
 5. **Physical supporting structure is present.** The physical layer includes 6 clocks, 1 timing constraint, 1 power domain, 1 interrupt controller, 44 pins, and 1 package.
 
@@ -53,11 +53,11 @@
 | --- | --- |
 | Peripheral descriptions | Present on 33 / 33 peripherals. |
 | Peripheral address-block coverage | Present on 33 / 33 peripherals. |
-| Register access modes | Present on 403 / 403 registers. |
-| Register descriptions | Present on 336 / 403 registers. The earlier timer/CAN/ADC/AFIO/DMA alias/template gaps were imported conservatively without reshaping the official-source-derived topology. |
-| Register reset values | Present on 303 / 403 registers. For exact community-SVD register matches, no additional reset values remain unimported. |
-| Field descriptions | Present on 1773 / 2268 fields. This now includes the safe alias/template import cases plus added CAN mailbox/filter and DMA channel template fields where the community SVD mapped cleanly. |
-| Field access modes | Present on 278 / 2268 fields. Field-level access coverage improved where the newly imported alias/template fields carried explicit community access annotations. |
+| Register access modes | Present on 411 / 411 registers. |
+| Register descriptions | Present on 345 / 411 registers. The earlier timer/CAN/ADC/AFIO/DMA alias/template gaps were imported conservatively without reshaping the official-source-derived topology, and the timer overlay views are now explicit. |
+| Register reset values | Present on 313 / 411 registers. For exact community-SVD register matches, no additional reset values remain unimported. |
+| Field descriptions | Present on 1870 / 2291 fields. This now includes the safe alias/template import cases, explicit timer overlay fields, and added CAN mailbox/filter and DMA channel template fields where the community SVD mapped cleanly. |
+| Field access modes | Present on 285 / 2291 fields. Field-level access coverage improved where the newly imported alias/template fields carried explicit community access annotations. |
 
 ### Metadata present in approved evidence but not extracted
 
@@ -72,8 +72,8 @@
 | Metadata class | Audit result |
 | --- | --- |
 | Cluster descriptions | Not confidently recoverable without further manual reconciliation. |
-| Register reset masks | 0 / 403 present; the approved community SVD does not provide a reliable importable reset-mask layer here. |
-| Remaining field access modes | 1990 / 2268 fields still lack field-level access semantics. Official sources examined so far do not provide a complete field-permission model, and the community SVD only annotates a subset. |
+| Register reset masks | 0 / 411 present; the approved community SVD does not provide a reliable importable reset-mask layer here. |
+| Remaining field access modes | 2006 / 2291 fields still lack field-level access semantics. Official sources examined so far do not provide a complete field-permission model, and the community SVD only annotates a subset. |
 | Field enumerated values | 0 enumerated sets present; the approved community SVD provides no enum tables for the matched fields. |
 
 ## Unsupported or Weakly Supported Claims
