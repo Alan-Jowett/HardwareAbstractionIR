@@ -1281,6 +1281,12 @@ fn write_register(
         write_text_element(xml, "description", description);
     }
     if let Some(alternate_of_ref) = &register.alternate_of_ref {
+        if alternate_of_ref == &register.id {
+            bail!(
+                "register {} references itself via alternateOfRef",
+                register.id
+            );
+        }
         let alternate_binding = register_names.get(alternate_of_ref).ok_or_else(|| {
             anyhow!(
                 "register {} references unknown alternateOfRef {}",
@@ -1964,6 +1970,61 @@ mod tests {
             error
                 .to_string()
                 .contains("references unknown alternateOfRef")
+        );
+    }
+
+    #[test]
+    fn generate_svd_rejects_self_referential_alternate_register() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "peripherals": [
+                        {
+                            "id": "periph.timer",
+                            "name": "TIMER",
+                            "type": "TIM",
+                            "baseAddress": 1073741824u64,
+                            "registers": [
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl",
+                                    "name": "CTRL",
+                                    "alternateOfRef": "reg.ctrl",
+                                    "offsetBytes": 0,
+                                    "widthBits": 32
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let error = generate_svd(&document).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("register reg.ctrl references itself via alternateOfRef")
         );
     }
 
