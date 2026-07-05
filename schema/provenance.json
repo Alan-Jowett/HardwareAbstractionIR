@@ -57,6 +57,7 @@
                 "test",
                 "human-annotation",
                 "generated",
+                "source-code",
                 "other"
               ]
             },
