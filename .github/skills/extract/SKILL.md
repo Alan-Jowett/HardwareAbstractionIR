@@ -231,6 +231,21 @@ If these metadata are present in approved evidence but absent from the
 draft, treat that as incompleteness to investigate rather than as an
 acceptable "minimal but complete" full-device result.
 
+Before classifying approved-source metadata as "missing" or "not
+extractable", run a **normalization and equivalence pass**. At minimum,
+challenge whether the apparent gap is really caused by:
+
+- alias names for the same register or field
+- cluster-vs-flat register modeling
+- array/template-vs-expanded register modeling
+- aggregate-field-vs-per-bit-field modeling
+- overlay/decomposition differences for shared address regions
+- family-vs-variant naming drift
+
+If a conservative normalization can align the records without inventing
+facts or silently reshaping the official-source-derived topology, you
+must do that work before classifying the metadata as omitted.
+
 #### 2.3 Semantic extraction
 
 Populate `semantics` only where the evidence supports it:
@@ -282,6 +297,28 @@ In parallel with the JSON draft, build a Markdown discovery report with:
 6. open conflicts and ambiguities
 7. coverage statement
 
+The draft report must also include:
+
+8. a **Normalization and Completeness Matrix**
+9. an **Unresolved Differences Inventory**
+
+In the Normalization and Completeness Matrix, record for each approved
+source and relevant metadata class:
+
+- whether the metadata is present in approved evidence
+- whether it was extracted
+- whether comparison required normalization
+- the count or explicit inventory of unresolved items
+- the root cause of each unresolved item:
+  - missing source evidence
+  - extraction omission
+  - normalization mismatch / representational difference
+  - generator limitation
+  - blocked pending clarification
+
+You must not leave any remaining difference in an implicit
+"uninvestigated" state.
+
 #### 2.7 Blocking ambiguity policy
 
 Stop and ask targeted clarification questions before continuing when:
@@ -297,6 +334,9 @@ Stop and ask targeted clarification questions before continuing when:
   extraction scope
 - approved evidence contains peripheral / register / cluster / field
   metadata needed for downstream generation, but the draft omits it
+- approved evidence appears to disagree only because of alias, array,
+  cluster, aggregate-field, or overlay modeling differences that you
+  have not yet normalized and compared
 
 ### Critical Rule
 
@@ -315,6 +355,13 @@ It also means the draft has attempted to capture evidence-supported
 descriptions, access modes, reset metadata, address-block coverage, and
 enumerated values for the in-scope model. A metadata-thin register model
 is not complete when approved evidence supports richer extraction.
+
+It also means you have explicitly enumerated every remaining unresolved
+gap rather than describing the remainder with vague buckets such as
+"structurally divergent cases remain" or "some metadata differs". The
+draft is incomplete if any evidence-backed remainder is still only
+described narratively without a concrete inventory or explicit
+normalization analysis.
 
 The only permitted outputs of this phase are the draft JSON, the draft
 report, and clarification questions. Do **not** claim final correctness
@@ -363,6 +410,28 @@ distinguishes:
 - metadata present in approved evidence but not extracted
 - metadata not confidently recoverable from approved evidence
 
+Maintain an **Unresolved Differences Inventory** in the report that lists
+every remaining unresolved block, cluster family, register family, field
+family, or reference-artifact delta after the normalization pass. Do not
+collapse materially different gaps into one catch-all sentence.
+
+Run a **translation-boundary check** before final emission:
+
+1. compare approved evidence to the HAIR draft after conservative
+   normalization
+2. if generation tooling exists, generate the downstream artifact and
+   compare:
+   - HAIR draft -> generated artifact
+   - generated artifact -> approved reference artifact when one exists
+3. classify each remaining difference as:
+   - missing in HAIR
+   - lost during generation
+   - representational difference only
+   - unsupported by approved evidence
+
+Do not describe the result as complete while these attribution steps are
+still undone.
+
 Run consistency checks across the JSON:
 
 - no overlapping or impossible memory ranges
@@ -384,6 +453,9 @@ emission:
 - explicitly investigate whether any remaining metadata sparsity is caused
   by missing source evidence, extraction omission, schema mismatch, or
   generator limitation
+- explicitly investigate whether any apparent sparsity disappears after
+  conservative normalization of aliases, arrays, clusters, aggregate
+  fields, or overlays
 - if the register pass was skipped, incomplete, or only partially
   normalized, treat that as a blocker and stop instead of emitting final
   deliverables
@@ -457,11 +529,15 @@ Use this structure:
 
 ## Metadata Coverage and Gaps
 
+## Normalization and Completeness Matrix
+
 ## Epistemic Claims Ledger
 
 ## Conflicts and Clarification Questions
 
 ## Rejected Candidate Claims
+
+## Unresolved Differences Inventory
 
 ## Coverage
 
@@ -475,6 +551,15 @@ In `## Metadata Coverage and Gaps`, explicitly distinguish:
 - metadata present in approved evidence and extracted
 - metadata present in approved evidence but not extracted
 - metadata not confidently recoverable from approved evidence
+
+In `## Normalization and Completeness Matrix`, record for each approved
+source and relevant metadata class whether normalization was required and
+which root cause explains every remaining difference.
+
+In `## Unresolved Differences Inventory`, enumerate the concrete
+peripherals, cluster families, register families, field families, or
+generated-artifact deltas that remain unresolved after the
+normalization-aware comparison.
 
 When relevant, call out at least these metadata classes:
 

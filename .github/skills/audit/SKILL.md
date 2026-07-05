@@ -233,6 +233,21 @@ Distinguish between:
 - metadata present in approved evidence but not extracted
 - metadata not confidently recoverable from approved evidence
 
+Before classifying approved-source metadata as omitted, run a
+**normalization-aware comparison** and challenge whether the apparent gap
+is really caused by:
+
+- alias names for the same register or field
+- cluster-vs-flat register modeling
+- array/template-vs-expanded register modeling
+- aggregate-field-vs-per-bit-field modeling
+- overlay/decomposition differences for shared address regions
+- family-vs-variant naming drift
+
+If the omission disappears after conservative normalization, do not file
+it as a missing-data finding; classify it as a representational
+difference instead.
+
 #### 2.4 Cross-layer and generation-readiness audit
 
 Try to prove that the HAIR document is not ready for downstream consumers
@@ -244,6 +259,23 @@ at the claimed level:
 - generation-critical sparsity is identified rather than ignored
 - validation/profile sections are only populated when supported
 
+Run a **translation-gap check** whenever generation tooling exists:
+
+1. compare approved evidence to the HAIR document after conservative
+   normalization
+2. generate the downstream artifact
+3. compare:
+   - HAIR -> generated artifact
+   - generated artifact -> approved reference artifact when one exists
+4. classify each remaining difference as:
+   - missing in HAIR
+   - lost during generation
+   - representational difference only
+   - unsupported by approved evidence
+
+Do not let the audit stop at "the generated artifact is thinner" without
+attributing which boundary introduced the loss.
+
 #### 2.5 Root-cause classification
 
 For every disproven claim, major gap, or weak spot, classify the likely
@@ -251,6 +283,7 @@ cause as one or more of:
 
 - missing source evidence
 - extraction omission
+- normalization mismatch / representational difference
 - schema mismatch
 - generator limitation
 - ambiguous evidence requiring manual adjudication
@@ -267,9 +300,11 @@ In parallel with the audit findings, build a Markdown report with:
 6. metadata coverage and gaps
 7. unsupported / weakly supported claims
 8. root-cause classification
-9. coverage statement
-10. limitations
-11. draft verdict
+9. normalization and translation attribution matrix
+10. unresolved differences inventory
+11. coverage statement
+12. limitations
+13. draft verdict
 
 ### Critical Rule
 
@@ -279,6 +314,9 @@ Do **not** proceed to Phase 3 until:
 - you have surfaced all currently known blocking gaps, and
 - you have explicitly classified metadata/support gaps rather than leaving
   them implicit.
+- you have explicitly attributed whether each major difference originates
+  in the source evidence, the HAIR extraction, normalization choices, or
+  downstream generation
 
 The only permitted outputs of this phase are the draft findings, the draft
 report, and blocking clarification questions. Do **not** claim final audit
@@ -326,6 +364,8 @@ Run consistency checks across the audit:
 - unsupported claims are not being treated as mere limitations
 - completeness gaps are not being mislabeled as harmless sparsity
 - evidence-supported metadata omissions are not being normalized away
+- representational differences are not being mislabeled as extraction
+  omissions or generator bugs
 - root-cause classifications are evidence-based rather than speculative
 - clean-looking areas were challenged, not merely sampled for confirmation
 
@@ -339,6 +379,9 @@ PASS-WITH-LIMITATIONS conclusion:
 - explicitly investigate whether remaining sparsity is caused by missing
   source evidence, extraction omission, schema mismatch, or generator
   limitation
+- explicitly investigate whether remaining differences are eliminated by
+  conservative normalization of aliases, arrays, clusters, aggregate
+  fields, or overlays before treating them as true omissions
 - if evidence-supported structure or metadata was omitted, treat that as a
   blocking audit failure for complete full-device claims
 
@@ -422,7 +465,11 @@ Use this structure:
 
 ## Root-Cause Classification
 
+## Normalization and Translation Attribution Matrix
+
 ## Rejected Candidate Findings
+
+## Unresolved Differences Inventory
 
 ## Coverage
 
@@ -462,9 +509,24 @@ more of:
 
 - missing source evidence
 - extraction omission
+- normalization mismatch / representational difference
 - schema mismatch
 - generator limitation
 - ambiguous evidence
+
+In `## Normalization and Translation Attribution Matrix`, record for each
+major difference:
+
+- the approved source or reference artifact involved
+- whether normalization was required for a fair comparison
+- whether the difference exists in HAIR, only in generation, or only in
+  representation
+- the final root-cause classification
+
+In `## Unresolved Differences Inventory`, enumerate the concrete
+peripherals, cluster families, register families, field families, or
+generated-artifact deltas that remain unresolved after the
+normalization-aware audit.
 
 ## Non-Goals
 
