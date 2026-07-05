@@ -1218,34 +1218,20 @@ fn assign_svd_interrupts<'a>(
 
 fn build_register_name_index(members: &[RegisterBlockMember]) -> Result<HashMap<String, String>> {
     let mut names = HashMap::new();
-    collect_register_names(members, &mut names)?;
-    Ok(names)
-}
-
-fn collect_register_names(
-    members: &[RegisterBlockMember],
-    names: &mut HashMap<String, String>,
-) -> Result<()> {
     for member in members {
-        match member {
-            RegisterBlockMember::Register(register) => {
-                if let Some(previous_name) =
-                    names.insert(register.id.clone(), register.name.clone())
-                {
-                    bail!(
-                        "duplicate register id {} for SVD generation (names: {} and {})",
-                        register.id,
-                        previous_name,
-                        register.name
-                    );
-                }
-            }
-            RegisterBlockMember::Cluster(cluster) => {
-                collect_register_names(&cluster.members, names)?
+        if let RegisterBlockMember::Register(register) = member {
+            let svd_name = svd_item_name(&register.name, register.array.as_ref())?;
+            if let Some(previous_name) = names.insert(register.id.clone(), svd_name) {
+                bail!(
+                    "duplicate register id {} for SVD generation (names: {} and {})",
+                    register.id,
+                    previous_name,
+                    register.name
+                );
             }
         }
     }
-    Ok(())
+    Ok(names)
 }
 
 fn write_register_member(
@@ -1316,8 +1302,9 @@ fn write_register(
 fn write_cluster(
     xml: &mut XmlWriter,
     cluster: &RegisterCluster,
-    register_names: &HashMap<String, String>,
+    _register_names: &HashMap<String, String>,
 ) -> Result<()> {
+    let register_names = build_register_name_index(&cluster.members)?;
     xml.start_element("cluster");
     write_array_shape(xml, &cluster.name, cluster.array.as_ref())?;
     if let Some(description) = &cluster.description {
@@ -1325,7 +1312,7 @@ fn write_cluster(
     }
     write_text_element(xml, "addressOffset", &format_hex(cluster.offset_bytes));
     for member in &cluster.members {
-        write_register_member(xml, member, register_names)?;
+        write_register_member(xml, member, &register_names)?;
     }
     xml.end_element();
     Ok(())
@@ -1393,10 +1380,9 @@ fn choose_enumerated_set(sets: &[EnumeratedSet]) -> Result<&EnumeratedSet> {
 }
 
 fn write_array_shape(xml: &mut XmlWriter, name: &str, array: Option<&ArrayShape>) -> Result<()> {
+    write_text_element(xml, "name", &svd_item_name(name, array)?);
     match array {
-        None => {
-            write_text_element(xml, "name", name);
-        }
+        None => {}
         Some(shape) => {
             if shape.axes.len() != 1 {
                 bail!("multi-axis arrays are not supported in first-cut SVD generation");
@@ -1405,7 +1391,6 @@ fn write_array_shape(xml: &mut XmlWriter, name: &str, array: Option<&ArrayShape>
             let stride_bytes = axis
                 .stride_bytes
                 .ok_or_else(|| anyhow!("arrayed item {} is missing strideBytes", name))?;
-            write_text_element(xml, "name", &format!("{name}%s"));
             write_text_element(xml, "dim", &axis.count.to_string());
             write_text_element(xml, "dimIncrement", &format_hex(stride_bytes));
             if !axis.labels.is_empty() {
@@ -1414,6 +1399,18 @@ fn write_array_shape(xml: &mut XmlWriter, name: &str, array: Option<&ArrayShape>
         }
     }
     Ok(())
+}
+
+fn svd_item_name(name: &str, array: Option<&ArrayShape>) -> Result<String> {
+    match array {
+        None => Ok(name.to_string()),
+        Some(shape) => {
+            if shape.axes.len() != 1 {
+                bail!("multi-axis arrays are not supported in first-cut SVD generation");
+            }
+            Ok(format!("{name}%s"))
+        }
+    }
 }
 
 fn write_text_element(xml: &mut XmlWriter, name: &str, value: &str) {
@@ -1768,6 +1765,85 @@ mod tests {
     }
 
     #[test]
+    fn generate_svd_uses_array_name_for_alternate_register_views() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "peripherals": [
+                        {
+                            "id": "periph.timer",
+                            "name": "TIMER",
+                            "type": "TIM",
+                            "baseAddress": 1073741824u64,
+                            "registers": [
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl.output",
+                                    "name": "CTRL_Output",
+                                    "displayName": "CTRL",
+                                    "offsetBytes": 0,
+                                    "widthBits": 32,
+                                    "array": {
+                                        "axes": [
+                                            {
+                                                "name": "channel",
+                                                "count": 2,
+                                                "strideBytes": 4
+                                            }
+                                        ]
+                                    }
+                                },
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl.input",
+                                    "name": "CTRL_Input",
+                                    "displayName": "CTRL",
+                                    "alternateOfRef": "reg.ctrl.output",
+                                    "offsetBytes": 0,
+                                    "widthBits": 32,
+                                    "array": {
+                                        "axes": [
+                                            {
+                                                "name": "channel",
+                                                "count": 2,
+                                                "strideBytes": 4
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let svd = generate_svd(&document).expect("svd generation");
+        assert!(svd.contains("<name>CTRL_Output%s</name>"));
+        assert!(svd.contains("<alternateRegister>CTRL_Output%s</alternateRegister>"));
+    }
+
+    #[test]
     fn generate_svd_rejects_unknown_alternate_register_reference() {
         let document: HairDocument = serde_json::from_value(serde_json::json!({
             "schemaVersion": "0.1.0",
@@ -1820,6 +1896,74 @@ mod tests {
                 .to_string()
                 .contains("references unknown alternateOfRef")
         );
+    }
+
+    #[test]
+    fn generate_svd_rejects_cross_scope_alternate_register_reference() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "peripherals": [
+                        {
+                            "id": "periph.timer",
+                            "name": "TIMER",
+                            "type": "TIM",
+                            "baseAddress": 1073741824u64,
+                            "registers": [
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl.output",
+                                    "name": "CTRL_Output",
+                                    "offsetBytes": 0,
+                                    "widthBits": 32
+                                },
+                                {
+                                    "kind": "cluster",
+                                    "id": "cluster.inner",
+                                    "name": "INNER",
+                                    "offsetBytes": 16,
+                                    "members": [
+                                        {
+                                            "kind": "register",
+                                            "id": "reg.inner.input",
+                                            "name": "INNER_Input",
+                                            "alternateOfRef": "reg.ctrl.output",
+                                            "offsetBytes": 0,
+                                            "widthBits": 32
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let error = generate_svd(&document).expect_err("generation should fail");
+        assert!(error.to_string().contains(
+            "register reg.inner.input references unknown alternateOfRef reg.ctrl.output"
+        ));
     }
 
     #[test]
