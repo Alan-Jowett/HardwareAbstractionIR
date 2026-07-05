@@ -1263,7 +1263,7 @@ fn write_register_member(
 ) -> Result<()> {
     match member {
         RegisterBlockMember::Register(register) => write_register(xml, register, register_names),
-        RegisterBlockMember::Cluster(cluster) => write_cluster(xml, cluster, register_names),
+        RegisterBlockMember::Cluster(cluster) => write_cluster(xml, cluster),
     }
 }
 
@@ -1322,11 +1322,7 @@ fn write_register(
     Ok(())
 }
 
-fn write_cluster(
-    xml: &mut XmlWriter,
-    cluster: &RegisterCluster,
-    _register_names: &HashMap<String, RegisterBinding>,
-) -> Result<()> {
+fn write_cluster(xml: &mut XmlWriter, cluster: &RegisterCluster) -> Result<()> {
     let register_names = build_register_name_index(&cluster.members)?;
     xml.start_element("cluster");
     write_array_shape(xml, &cluster.name, cluster.array.as_ref())?;
