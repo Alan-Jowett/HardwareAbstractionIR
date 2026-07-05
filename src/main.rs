@@ -937,6 +937,13 @@ fn generate_svd(document: &HairDocument) -> Result<String> {
         .iter()
         .map(|interrupt| (interrupt.id.as_str(), interrupt))
         .collect::<HashMap<_, _>>();
+    let peripherals = document
+        .structure
+        .device
+        .peripherals
+        .iter()
+        .map(|peripheral| (peripheral.id.as_str(), peripheral))
+        .collect::<HashMap<_, _>>();
 
     let mut xml = XmlWriter::new(XmlOptions {
         indent: xmlwriter::Indent::None,
@@ -1027,7 +1034,7 @@ fn generate_svd(document: &HairDocument) -> Result<String> {
 
     xml.start_element("peripherals");
     for peripheral in &document.structure.device.peripherals {
-        write_peripheral(&mut xml, peripheral, &interrupts)?;
+        write_peripheral(&mut xml, peripheral, &peripherals, &interrupts)?;
     }
     xml.end_element();
     xml.end_element();
@@ -1038,11 +1045,23 @@ fn generate_svd(document: &HairDocument) -> Result<String> {
 fn write_peripheral(
     xml: &mut XmlWriter,
     peripheral: &Peripheral,
+    peripherals: &HashMap<&str, &Peripheral>,
     interrupts: &HashMap<&str, &Interrupt>,
 ) -> Result<()> {
     xml.start_element("peripheral");
     if let Some(derived_from) = &peripheral.derived_from_ref {
-        xml.write_attribute("derivedFrom", derived_from);
+        let derived_peripheral =
+            peripherals
+                .get(derived_from.as_str())
+                .copied()
+                .ok_or_else(|| {
+                    anyhow!(
+                        "peripheral {} references unknown derivedFromRef {}",
+                        peripheral.id,
+                        derived_from
+                    )
+                })?;
+        xml.write_attribute("derivedFrom", &derived_peripheral.name);
     }
     write_text_element(xml, "name", &peripheral.name);
     if let Some(description) = &peripheral.description {
@@ -1434,6 +1453,77 @@ mod tests {
         assert!(svd.contains("<baseAddress>0x40000000</baseAddress>"));
         assert!(svd.contains("<name>CTRL</name>"));
         assert!(svd.contains("<name>ENABLE</name>"));
+    }
+
+    #[test]
+    fn generate_svd_resolves_peripheral_derived_from_ref_to_name() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "architectures": [
+                    {
+                        "id": "arch.test",
+                        "addressUnitBits": 8,
+                        "dataBusWidthBits": 32
+                    }
+                ],
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "architectureRef": "arch.test",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "peripherals": [
+                        {
+                            "id": "periph.base",
+                            "name": "BASE",
+                            "type": "Base",
+                            "baseAddress": 1073741824,
+                            "addressBlocks": [
+                                {
+                                    "offsetBytes": 0,
+                                    "sizeBytes": 4,
+                                    "usage": "registers"
+                                }
+                            ]
+                        },
+                        {
+                            "id": "periph.derived",
+                            "name": "DERIVED",
+                            "type": "Base",
+                            "derivedFromRef": "periph.base",
+                            "baseAddress": 1073745920,
+                            "addressBlocks": [
+                                {
+                                    "offsetBytes": 0,
+                                    "sizeBytes": 4,
+                                    "usage": "registers"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let svd = generate_svd(&document).expect("svd generation");
+        assert!(svd.contains(r#"<peripheral derivedFrom="BASE"><name>DERIVED</name>"#));
+        assert!(!svd.contains(r#"derivedFrom="periph.base""#));
     }
 
     #[test]
