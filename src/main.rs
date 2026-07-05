@@ -888,13 +888,13 @@ struct RegisterCluster {
     members: Vec<RegisterBlockMember>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ArrayShape {
     axes: Vec<ArrayAxis>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ArrayAxis {
     count: u32,
@@ -902,6 +902,17 @@ struct ArrayAxis {
     labels: Vec<String>,
     #[serde(default)]
     stride_bytes: Option<u64>,
+}
+
+#[derive(Debug)]
+struct RegisterBinding {
+    svd_name: String,
+    offset_bytes: u64,
+    width_bits: u32,
+    access: Option<String>,
+    reset_value: Option<Value>,
+    reset_mask: Option<Value>,
+    array: Option<ArrayShape>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1216,16 +1227,27 @@ fn assign_svd_interrupts<'a>(
     Ok(assigned)
 }
 
-fn build_register_name_index(members: &[RegisterBlockMember]) -> Result<HashMap<String, String>> {
+fn build_register_name_index(
+    members: &[RegisterBlockMember],
+) -> Result<HashMap<String, RegisterBinding>> {
     let mut names = HashMap::new();
     for member in members {
         if let RegisterBlockMember::Register(register) = member {
             let svd_name = svd_item_name(&register.name, register.array.as_ref())?;
-            if let Some(previous_name) = names.insert(register.id.clone(), svd_name.clone()) {
+            let binding = RegisterBinding {
+                svd_name: svd_name.clone(),
+                offset_bytes: register.offset_bytes,
+                width_bits: register.width_bits,
+                access: register.access.clone(),
+                reset_value: register.reset_value.clone(),
+                reset_mask: register.reset_mask.clone(),
+                array: register.array.clone(),
+            };
+            if let Some(previous_binding) = names.insert(register.id.clone(), binding) {
                 bail!(
                     "duplicate register id {} for SVD generation (names: {} and {})",
                     register.id,
-                    previous_name,
+                    previous_binding.svd_name,
                     svd_name
                 );
             }
@@ -1237,7 +1259,7 @@ fn build_register_name_index(members: &[RegisterBlockMember]) -> Result<HashMap<
 fn write_register_member(
     xml: &mut XmlWriter,
     member: &RegisterBlockMember,
-    register_names: &HashMap<String, String>,
+    register_names: &HashMap<String, RegisterBinding>,
 ) -> Result<()> {
     match member {
         RegisterBlockMember::Register(register) => write_register(xml, register, register_names),
@@ -1248,7 +1270,7 @@ fn write_register_member(
 fn write_register(
     xml: &mut XmlWriter,
     register: &Register,
-    register_names: &HashMap<String, String>,
+    register_names: &HashMap<String, RegisterBinding>,
 ) -> Result<()> {
     xml.start_element("register");
     write_array_shape(xml, &register.name, register.array.as_ref())?;
@@ -1259,14 +1281,15 @@ fn write_register(
         write_text_element(xml, "description", description);
     }
     if let Some(alternate_of_ref) = &register.alternate_of_ref {
-        let alternate_name = register_names.get(alternate_of_ref).ok_or_else(|| {
+        let alternate_binding = register_names.get(alternate_of_ref).ok_or_else(|| {
             anyhow!(
                 "register {} references unknown alternateOfRef {}",
                 register.id,
                 alternate_of_ref
             )
         })?;
-        write_text_element(xml, "alternateRegister", alternate_name);
+        validate_alternate_register_contract(register, alternate_of_ref, alternate_binding)?;
+        write_text_element(xml, "alternateRegister", &alternate_binding.svd_name);
     }
     write_text_element(xml, "addressOffset", &format_hex(register.offset_bytes));
     write_text_element(xml, "size", &register.width_bits.to_string());
@@ -1302,7 +1325,7 @@ fn write_register(
 fn write_cluster(
     xml: &mut XmlWriter,
     cluster: &RegisterCluster,
-    _register_names: &HashMap<String, String>,
+    _register_names: &HashMap<String, RegisterBinding>,
 ) -> Result<()> {
     let register_names = build_register_name_index(&cluster.members)?;
     xml.start_element("cluster");
@@ -1315,6 +1338,56 @@ fn write_cluster(
         write_register_member(xml, member, &register_names)?;
     }
     xml.end_element();
+    Ok(())
+}
+
+fn validate_alternate_register_contract(
+    register: &Register,
+    alternate_of_ref: &str,
+    alternate_binding: &RegisterBinding,
+) -> Result<()> {
+    if register.offset_bytes != alternate_binding.offset_bytes {
+        bail!(
+            "register {} references alternateOfRef {} with mismatched offsetBytes",
+            register.id,
+            alternate_of_ref
+        );
+    }
+    if register.width_bits != alternate_binding.width_bits {
+        bail!(
+            "register {} references alternateOfRef {} with mismatched widthBits",
+            register.id,
+            alternate_of_ref
+        );
+    }
+    if register.access != alternate_binding.access {
+        bail!(
+            "register {} references alternateOfRef {} with mismatched access",
+            register.id,
+            alternate_of_ref
+        );
+    }
+    if register.reset_value != alternate_binding.reset_value {
+        bail!(
+            "register {} references alternateOfRef {} with mismatched resetValue",
+            register.id,
+            alternate_of_ref
+        );
+    }
+    if register.reset_mask != alternate_binding.reset_mask {
+        bail!(
+            "register {} references alternateOfRef {} with mismatched resetMask",
+            register.id,
+            alternate_of_ref
+        );
+    }
+    if register.array != alternate_binding.array {
+        bail!(
+            "register {} references alternateOfRef {} with mismatched array shape",
+            register.id,
+            alternate_of_ref
+        );
+    }
     Ok(())
 }
 
@@ -1964,6 +2037,72 @@ mod tests {
         assert!(error.to_string().contains(
             "register reg.inner.input references unknown alternateOfRef reg.ctrl.output"
         ));
+    }
+
+    #[test]
+    fn generate_svd_rejects_incompatible_alternate_register_contract() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "peripherals": [
+                        {
+                            "id": "periph.timer",
+                            "name": "TIMER",
+                            "type": "TIM",
+                            "baseAddress": 1073741824u64,
+                            "registers": [
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl.output",
+                                    "name": "CTRL_Output",
+                                    "offsetBytes": 0,
+                                    "widthBits": 32,
+                                    "access": "read-write",
+                                    "resetValue": 0
+                                },
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl.input",
+                                    "name": "CTRL_Input",
+                                    "alternateOfRef": "reg.ctrl.output",
+                                    "offsetBytes": 0,
+                                    "widthBits": 16,
+                                    "access": "read-write",
+                                    "resetValue": 0
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let error = generate_svd(&document).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("references alternateOfRef reg.ctrl.output with mismatched widthBits")
+        );
     }
 
     #[test]
