@@ -1221,12 +1221,12 @@ fn build_register_name_index(members: &[RegisterBlockMember]) -> Result<HashMap<
     for member in members {
         if let RegisterBlockMember::Register(register) = member {
             let svd_name = svd_item_name(&register.name, register.array.as_ref())?;
-            if let Some(previous_name) = names.insert(register.id.clone(), svd_name) {
+            if let Some(previous_name) = names.insert(register.id.clone(), svd_name.clone()) {
                 bail!(
                     "duplicate register id {} for SVD generation (names: {} and {})",
                     register.id,
                     previous_name,
-                    register.name
+                    svd_name
                 );
             }
         }
