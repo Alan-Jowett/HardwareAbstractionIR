@@ -140,9 +140,6 @@
             "fpuPresent": {
               "type": "boolean"
             },
-            "vendorSystemTimerConfig": {
-              "type": "boolean"
-            },
             "fpuDoublePrecision": {
               "type": "boolean"
             },

@@ -80,9 +80,9 @@ struct CommandOutcome {
 }
 
 fn run_validate(input: &Path) -> Result<CommandOutcome> {
-    let repo_root = find_repo_root(&std::env::current_dir()?)?;
+    let schema_root = find_schema_root(&std::env::current_dir()?)?;
     let instance = load_json_file(input)?;
-    let validator = build_validator(&repo_root)?;
+    let validator = build_validator(&schema_root)?;
     match validator.validate(&instance) {
         Ok(()) => Ok(CommandOutcome {
             exit_code: 0,
@@ -130,7 +130,12 @@ fn run_generate_svd(input: &Path, output: Option<&Path>) -> Result<CommandOutcom
 }
 
 fn run_diff(left: &str, right: &str) -> Result<CommandOutcome> {
-    let repo_root = find_repo_root(&std::env::current_dir()?)?;
+    let current_dir = std::env::current_dir()?;
+    let repo_root = if is_git_selector(left) || is_git_selector(right) {
+        find_git_repo_root(&current_dir)?
+    } else {
+        current_dir
+    };
     let left_value = load_diff_operand(&repo_root, left)?;
     let right_value = load_diff_operand(&repo_root, right)?;
 
@@ -299,19 +304,26 @@ impl HairSchemaBundle {
     }
 
     fn load_document(&self, document_uri: &str) -> Result<Value> {
-        if let Some(value) = self.cache.lock().unwrap().get(document_uri).cloned() {
-            return Ok(value);
+        let cache_key = strip_fragment(document_uri).to_string();
+        {
+            let cache = self
+                .cache
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            if let Some(value) = cache.get(&cache_key).cloned() {
+                return Ok(value);
+            }
         }
 
-        let path = self.uri_to_path(document_uri)?;
+        let path = self.uri_to_path(&cache_key)?;
         let text =
             fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
         let value: Value =
             serde_json::from_str(&text).with_context(|| format!("parsing {}", path.display()))?;
         self.cache
             .lock()
-            .unwrap()
-            .insert(document_uri.to_string(), value.clone());
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .insert(cache_key, value.clone());
         Ok(value)
     }
 
@@ -362,9 +374,6 @@ impl HairSchemaBundle {
                 _ => {
                     if let Some(existing) = merged.get(key) {
                         if existing != value {
-                            if key == "type" && existing == "object" && value == "object" {
-                                continue;
-                            }
                             bail!("conflicting schema values for key {key}");
                         }
                     } else {
@@ -452,6 +461,10 @@ fn strip_fragment(uri: &str) -> &str {
     uri.split_once('#').map(|(head, _)| head).unwrap_or(uri)
 }
 
+fn is_git_selector(operand: &str) -> bool {
+    operand.starts_with("git:")
+}
+
 fn load_json_file(path: &Path) -> Result<Value> {
     let text = fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
     serde_json::from_str(&text).with_context(|| format!("parsing {}", path.display()))
@@ -462,13 +475,22 @@ fn load_hair_document(path: &Path) -> Result<HairDocument> {
     serde_json::from_str(&text).with_context(|| format!("parsing {}", path.display()))
 }
 
-fn find_repo_root(start: &Path) -> Result<PathBuf> {
+fn find_schema_root(start: &Path) -> Result<PathBuf> {
     for candidate in start.ancestors() {
-        if candidate.join(".git").exists() && candidate.join("schema").join("hair.json").exists() {
+        if candidate.join("schema").join("hair.json").exists() {
             return Ok(candidate.to_path_buf());
         }
     }
-    bail!("could not find repository root containing .git and schema\\hair.json")
+    bail!("could not find schema root containing schema/hair.json")
+}
+
+fn find_git_repo_root(start: &Path) -> Result<PathBuf> {
+    for candidate in start.ancestors() {
+        if candidate.join(".git").exists() {
+            return Ok(candidate.to_path_buf());
+        }
+    }
+    bail!("could not find git repository root containing .git")
 }
 
 fn collect_json_files(root: &Path) -> Result<Vec<PathBuf>> {
@@ -871,15 +893,7 @@ struct EnumeratedValue {
 }
 
 fn generate_svd(document: &HairDocument) -> Result<String> {
-    let architecture = document.structure.architectures.iter().find(|candidate| {
-        document
-            .structure
-            .device
-            .architecture_ref
-            .as_deref()
-            .map(|reference| reference == candidate.id)
-            .unwrap_or(false)
-    });
+    let architecture = resolve_architecture(document)?;
 
     let address_unit_bits = architecture
         .and_then(|architecture| architecture.address_unit_bits)
@@ -935,6 +949,23 @@ fn generate_svd(document: &HairDocument) -> Result<String> {
     );
     if let Some(fpu_double_precision) = cpu.feature_flags.fpu_double_precision {
         write_text_element(&mut xml, "fpuDP", &fpu_double_precision.to_string());
+    }
+
+    fn resolve_architecture(document: &HairDocument) -> Result<Option<&ArchitectureProfile>> {
+        if let Some(reference) = document.structure.device.architecture_ref.as_deref() {
+            return document
+                .structure
+                .architectures
+                .iter()
+                .find(|candidate| candidate.id == reference)
+                .map(Some)
+                .ok_or_else(|| anyhow!("device architectureRef {reference} did not match any structure.architectures entry"));
+        }
+
+        Ok(match document.structure.architectures.as_slice() {
+            [architecture] => Some(architecture),
+            _ => None,
+        })
     }
     if let Some(dsp_present) = cpu.feature_flags.dsp_present {
         write_text_element(&mut xml, "dspPresent", &dsp_present.to_string());
@@ -1192,8 +1223,39 @@ fn json_u64(value: &Value, context: &str) -> Result<u64> {
         Value::Number(number) => number
             .as_u64()
             .ok_or_else(|| anyhow!("{context} must be a non-negative integer")),
+        Value::String(text) => parse_u64_literal(text, context),
         _ => bail!("{context} must be a non-negative integer"),
     }
+}
+
+fn parse_u64_literal(text: &str, context: &str) -> Result<u64> {
+    let trimmed = text.trim();
+    let normalized = trimmed.replace('_', "");
+    let (radix, digits) = if let Some(hex) = normalized
+        .strip_prefix("0x")
+        .or_else(|| normalized.strip_prefix("0X"))
+    {
+        (16, hex)
+    } else if let Some(binary) = normalized
+        .strip_prefix("0b")
+        .or_else(|| normalized.strip_prefix("0B"))
+    {
+        (2, binary)
+    } else if let Some(octal) = normalized
+        .strip_prefix("0o")
+        .or_else(|| normalized.strip_prefix("0O"))
+    {
+        (8, octal)
+    } else {
+        (10, normalized.as_str())
+    };
+
+    if digits.is_empty() {
+        bail!("{context} must be a non-negative integer")
+    }
+
+    u64::from_str_radix(digits, radix)
+        .map_err(|_| anyhow!("{context} must be a non-negative integer"))
 }
 
 fn svd_access(access: &str) -> Result<String> {
@@ -1228,7 +1290,7 @@ fn svd_endian(endianness: &str) -> Result<String> {
 mod tests {
     use super::*;
     use std::io::Write as _;
-    use tempfile::NamedTempFile;
+    use tempfile::{NamedTempFile, tempdir};
 
     #[test]
     fn validates_the_reference_hair_document() {
@@ -1352,6 +1414,102 @@ mod tests {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let error = load_diff_operand(&repo_root, "git:HEAD").expect_err("selector should fail");
         assert!(error.to_string().contains("git selector"));
+    }
+
+    #[test]
+    fn finds_schema_root_without_git_metadata() {
+        let temp = tempdir().expect("temp dir");
+        let nested = temp.path().join("snapshot").join("subdir");
+        fs::create_dir_all(nested.join("schema")).expect("schema dir");
+        fs::write(nested.join("schema").join("hair.json"), "{}").expect("schema file");
+
+        let found = find_schema_root(&nested).expect("schema root");
+        assert_eq!(found, nested);
+    }
+
+    #[test]
+    fn caches_documents_by_fragment_stripped_uri() {
+        let temp = tempdir().expect("temp dir");
+        let schema_root = temp.path().join("schema");
+        fs::create_dir_all(&schema_root).expect("schema dir");
+        fs::write(
+            schema_root.join("common.json"),
+            r#"{"$id":"https://hair.dev/schema/common.json","type":"object"}"#,
+        )
+        .expect("schema file");
+
+        let bundle = HairSchemaBundle::new(schema_root);
+        bundle
+            .load_document("https://hair.dev/schema/common.json#/$defs/one")
+            .expect("first load");
+        bundle
+            .load_document("https://hair.dev/schema/common.json#/$defs/two")
+            .expect("second load");
+
+        let cache = bundle
+            .cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        assert_eq!(cache.len(), 1);
+        assert!(cache.contains_key("https://hair.dev/schema/common.json"));
+    }
+
+    #[test]
+    fn generate_svd_uses_single_architecture_when_reference_is_omitted() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "architectures": [
+                    {
+                        "id": "arch.test",
+                        "addressUnitBits": 16,
+                        "dataBusWidthBits": 64
+                    }
+                ],
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "peripherals": []
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let svd = generate_svd(&document).expect("svd generation");
+        assert!(svd.contains("<addressUnitBits>16</addressUnitBits>"));
+        assert!(svd.contains("<width>64</width>"));
+    }
+
+    #[test]
+    fn json_u64_accepts_string_literals() {
+        assert_eq!(
+            json_u64(&Value::String("0x10".to_string()), "test").unwrap(),
+            16
+        );
+        assert_eq!(
+            json_u64(&Value::String("42".to_string()), "test").unwrap(),
+            42
+        );
+        assert_eq!(
+            json_u64(&Value::String("0b1010".to_string()), "test").unwrap(),
+            10
+        );
     }
 
     #[test]
