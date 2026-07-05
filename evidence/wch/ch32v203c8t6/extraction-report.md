@@ -12,12 +12,12 @@
 
 | Source ID | Kind | Location | Version | Notes | Likely HAIR layers |
 | --- | --- | --- | --- | --- | --- |
-| `wch-ch32v20x-30x-datasheet` | datasheet | `https://www.wch-ic.com/download/file?id=354` | 3.0 | Exact-variant scope, memories, package, clocks, and pinout. | structure, physical |
-| `wch-ch32fv2x-v3x-rm` | reference-manual | `CH32FV2x_V3xRM.PDF` (local session copy + official URI) | 2.5 | Authoritative register tables and timer/CAN conflict resolution. | structure, semantics, physical |
+| `wch-ch32v20x-30x-datasheet` | datasheet | `https://www.wch-ic.com/downloads/CH32V20x_30xDS0_PDF.html` | 3.0 | Exact-variant scope, memories, package, clocks, and pinout. | structure, physical |
+| `wch-ch32fv2x-v3x-rm` | reference-manual | `https://www.wch-ic.com/downloads/CH32FV2x_V3xRM_PDF.html` | 2.5 | Authoritative register tables and timer/CAN conflict resolution. | structure, semantics, physical |
 | `openwch-ch32v20x-sdk` | sdk | `https://github.com/openwch/ch32v20x/tree/804daf39a21af99be64c5abe0ea4bdaf361eb2e4` | `804daf39a21af99be64c5abe0ea4bdaf361eb2e4` | Cross-check linker and build facts. | structure, physical |
-| `openwch-ch32v20x-header` | vendor-header | `ch32v20x.h` local session copy + official raw URI | V1.0.1 | Broad recovery source for register structs, offsets, and most field masks. | structure |
-| `openwch-ch32v20x-startup-d6` | other | official raw URI | V1.0.2 | D6 interrupt vector ordering cross-check. | structure |
-| `qingke-v4-processor-manual` | other | official URI | 1.5 | CPU ISA/core context. | structure |
+| `openwch-ch32v20x-header` | vendor-header | `https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h` | V1.0.1 | Broad recovery source for register structs, offsets, and most field masks. | structure |
+| `openwch-ch32v20x-startup-d6` | other | `https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Startup/startup_ch32v20x_D6.S` | V1.0.2 | D6 interrupt vector ordering cross-check. | structure |
+| `qingke-v4-processor-manual` | other | `https://www.wch-ic.com/downloads/QingKeV4_Processor_Manual_PDF.html` | 1.5 | CPU ISA/core context. | structure |
 
 ## Major Hardware Areas Discovered
 
