@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -966,6 +966,8 @@ fn generate_svd(document: &HairDocument) -> Result<String> {
         .iter()
         .map(|peripheral| (peripheral.id.as_str(), peripheral))
         .collect::<HashMap<_, _>>();
+    let peripheral_interrupts =
+        assign_svd_interrupts(&document.structure.device, &peripherals, &interrupts)?;
 
     let mut xml = XmlWriter::new(XmlOptions {
         indent: xmlwriter::Indent::None,
@@ -1056,7 +1058,15 @@ fn generate_svd(document: &HairDocument) -> Result<String> {
 
     xml.start_element("peripherals");
     for peripheral in &document.structure.device.peripherals {
-        write_peripheral(&mut xml, peripheral, &peripherals, &interrupts)?;
+        write_peripheral(
+            &mut xml,
+            peripheral,
+            &peripherals,
+            peripheral_interrupts
+                .get(peripheral.id.as_str())
+                .map(Vec::as_slice)
+                .unwrap_or(&[]),
+        )?;
     }
     xml.end_element();
     xml.end_element();
@@ -1068,7 +1078,7 @@ fn write_peripheral(
     xml: &mut XmlWriter,
     peripheral: &Peripheral,
     peripherals: &HashMap<&str, &Peripheral>,
-    interrupts: &HashMap<&str, &Interrupt>,
+    interrupts: &[&Interrupt],
 ) -> Result<()> {
     xml.start_element("peripheral");
     if let Some(derived_from) = &peripheral.derived_from_ref {
@@ -1106,17 +1116,7 @@ fn write_peripheral(
         xml.end_element();
     }
 
-    for interrupt_ref in &peripheral.interrupt_refs {
-        let interrupt = interrupts
-            .get(interrupt_ref.as_str())
-            .copied()
-            .ok_or_else(|| {
-                anyhow!(
-                    "peripheral {} references unknown interrupt {}",
-                    peripheral.id,
-                    interrupt_ref
-                )
-            })?;
+    for interrupt in interrupts {
         xml.start_element("interrupt");
         write_text_element(xml, "name", &interrupt.name);
         if let Some(description) = &interrupt.description {
@@ -1136,6 +1136,78 @@ fn write_peripheral(
 
     xml.end_element();
     Ok(())
+}
+
+fn assign_svd_interrupts<'a>(
+    device: &'a Device,
+    peripherals: &HashMap<&'a str, &'a Peripheral>,
+    interrupts: &HashMap<&'a str, &'a Interrupt>,
+) -> Result<HashMap<&'a str, Vec<&'a Interrupt>>> {
+    let mut assigned = HashMap::<&str, Vec<&Interrupt>>::new();
+    let mut emitted_interrupt_ids = HashSet::<&str>::new();
+
+    for peripheral in &device.peripherals {
+        for interrupt_ref in &peripheral.interrupt_refs {
+            let interrupt = interrupts
+                .get(interrupt_ref.as_str())
+                .copied()
+                .ok_or_else(|| {
+                    anyhow!(
+                        "peripheral {} references unknown interrupt {}",
+                        peripheral.id,
+                        interrupt_ref
+                    )
+                })?;
+            assigned
+                .entry(peripheral.id.as_str())
+                .or_default()
+                .push(interrupt);
+            emitted_interrupt_ids.insert(interrupt.id.as_str());
+        }
+    }
+
+    for interrupt in &device.interrupts {
+        if emitted_interrupt_ids.contains(interrupt.id.as_str()) {
+            continue;
+        }
+
+        let matches = device
+            .peripherals
+            .iter()
+            .filter(|peripheral| peripheral.name == interrupt.name)
+            .collect::<Vec<_>>();
+
+        match matches.as_slice() {
+            [peripheral] => {
+                let peripheral_id = peripheral.id.as_str();
+                let peripheral = peripherals.get(peripheral_id).copied().ok_or_else(|| {
+                    anyhow!(
+                        "internal error: peripheral {} was not indexed",
+                        peripheral_id
+                    )
+                })?;
+                assigned
+                    .entry(peripheral.id.as_str())
+                    .or_default()
+                    .push(interrupt);
+                emitted_interrupt_ids.insert(interrupt.id.as_str());
+            }
+            [] => bail!(
+                "device interrupt {} ({} at vector {}) is not linked by interruptRefs and could not be attributed to any peripheral for SVD generation",
+                interrupt.id,
+                interrupt.name,
+                interrupt.number
+            ),
+            _ => bail!(
+                "device interrupt {} ({} at vector {}) is not linked by interruptRefs and matches multiple peripherals, so SVD generation cannot attribute it safely",
+                interrupt.id,
+                interrupt.name,
+                interrupt.number
+            ),
+        }
+    }
+
+    Ok(assigned)
 }
 
 fn write_register_member(xml: &mut XmlWriter, member: &RegisterBlockMember) -> Result<()> {
@@ -1546,6 +1618,124 @@ mod tests {
         let svd = generate_svd(&document).expect("svd generation");
         assert!(svd.contains(r#"<peripheral derivedFrom="BASE"><name>DERIVED</name>"#));
         assert!(!svd.contains(r#"derivedFrom="periph.base""#));
+    }
+
+    #[test]
+    fn generate_svd_infers_same_name_interrupt_linkage() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "architectures": [
+                    {
+                        "id": "arch.test",
+                        "addressUnitBits": 8,
+                        "dataBusWidthBits": 32
+                    }
+                ],
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "architectureRef": "arch.test",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "interrupts": [
+                        {
+                            "id": "int.wwdg",
+                            "name": "WWDG",
+                            "number": 16
+                        }
+                    ],
+                    "peripherals": [
+                        {
+                            "id": "periph.wwdg",
+                            "name": "WWDG",
+                            "type": "WWDG",
+                            "baseAddress": 1073753088u64,
+                            "registers": []
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let svd = generate_svd(&document).expect("svd generation");
+        assert!(svd.contains("<interrupt><name>WWDG</name><value>16</value></interrupt>"));
+    }
+
+    #[test]
+    fn generate_svd_rejects_unattributed_interrupts() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "architectures": [
+                    {
+                        "id": "arch.test",
+                        "addressUnitBits": 8,
+                        "dataBusWidthBits": 32
+                    }
+                ],
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "architectureRef": "arch.test",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "interrupts": [
+                        {
+                            "id": "int.timer",
+                            "name": "TIMER",
+                            "number": 5
+                        }
+                    ],
+                    "peripherals": [
+                        {
+                            "id": "periph.uart",
+                            "name": "UART0",
+                            "type": "UART",
+                            "baseAddress": 1073741824u64,
+                            "registers": []
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let error = generate_svd(&document).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("is not linked by interruptRefs and could not be attributed")
+        );
     }
 
     #[test]

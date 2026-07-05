@@ -503,7 +503,8 @@
           "type": "object",
           "properties": {
             "number": {
-              "type": "integer"
+              "type": "integer",
+              "description": "Controller-visible interrupt number for the device-level interrupt inventory. Downstream generation must preserve declared interrupts even when no peripheral links back to them."
             },
             "controllerRef": {
               "$ref": "common.json#/$defs/entityRef"
@@ -549,6 +550,7 @@
               }
             },
             "interruptRefs": {
+              "description": "Optional attribution links from a peripheral to one or more device.interrupts entries. These links help downstream tooling associate interrupts with peripherals, but they do not define the authoritative device-level interrupt inventory.",
               "type": "array",
               "items": {
                 "$ref": "common.json#/$defs/entityRef"
@@ -614,6 +616,7 @@
               }
             },
             "interrupts": {
+              "description": "Authoritative device-level interrupt inventory. Generation must not silently drop declared interrupts just because a peripheral omits interruptRefs linkage.",
               "type": "array",
               "items": {
                 "$ref": "#/$defs/interrupt"

@@ -11424,6 +11424,9 @@
             "status": "imported",
             "confidence": 0.96
           },
+          "interruptRefs": [
+            "int.wwdg"
+          ],
           "registers": [
             {
               "id": "reg.wwdg.ctlr",

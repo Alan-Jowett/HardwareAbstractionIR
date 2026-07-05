@@ -42,6 +42,7 @@ First-cut behavior:
 - emit one SVD document to stdout by default or to `--output`
 - map the HAIR device, peripherals, interrupts, registers, fields, enumerated values, reset values, and access metadata when those concepts are representable in SVD
 - emit a complete CMSIS-SVD CPU block, including revision, endianness, MPU/FPU flags, interrupt priority bits, and the HAIR `vendorSystemTimerConfig` flag mapped to SVD `vendorSystickConfig`
+- preserve declared `structure.device.interrupts[]` as the authoritative device interrupt inventory; peripheral `interruptRefs` may refine attribution, but missing linkage must not cause a real device interrupt to disappear from the generated SVD/PAC
 - fail explicitly when SVD-required data is missing or when a structure that must appear in the SVD cannot be lowered safely
 
 First-cut exclusions:
