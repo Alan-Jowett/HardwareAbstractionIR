@@ -263,6 +263,32 @@
         "confidence": 0.9
       },
       {
+        "id": "e_core_priority_bits",
+        "name": "PFIC priority bit layout",
+        "sourceRef": "openwch-ch32v20x-sdk",
+        "normalizedClaim": "The CH32V20x core header documents interrupt priority using bit7 as pre-emption priority and bits6-bit4 as subpriority, implying four implemented interrupt priority bits.",
+        "locator": {
+          "fragment": "C++/Use MRS Create C++ project-example/CH32V203C8T6++/Core/core_riscv.h",
+          "lineStart": 259,
+          "lineEnd": 271
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.88
+      },
+      {
+        "id": "e_core_vendor_systick",
+        "name": "Vendor system timer block",
+        "sourceRef": "openwch-ch32v20x-sdk",
+        "normalizedClaim": "The CH32V20x core support code exposes a vendor-defined SysTick register block at 0xE000F000 and the official CH32V203C8T6 debug support code configures it directly for delay timing, so the device uses vendor system-timer configuration rather than a CMSIS-standard SysTick abstraction.",
+        "locator": {
+          "fragment": "C++/Use MRS Create C++ project-example/CH32V203C8T6++/Core/core_riscv.h and Debug/debug.c",
+          "lineStart": 102,
+          "lineEnd": 118
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.86
+      },
+      {
         "id": "e_pin_table_lqfp48",
         "name": "LQFP48 pin definition table",
         "sourceRef": "wch-ch32v20x-30x-datasheet",
@@ -437,7 +463,9 @@
           "evidenceRefs": [
             "e_architecture",
             "e_core_manual",
-            "e_sdk_toolchain"
+            "e_sdk_toolchain",
+            "e_core_priority_bits",
+            "e_core_vendor_systick"
           ],
           "status": "verified",
           "confidence": 0.9
@@ -2874,15 +2902,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 1 prescaler"
                 },
                 {
                   "id": "field.tim_chctlr1.ic1f",
@@ -2894,15 +2927,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 1 filter"
                 },
                 {
                   "id": "field.tim_chctlr1.ic2psc",
@@ -2914,15 +2952,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 2 prescaler"
                 },
                 {
                   "id": "field.tim_chctlr1.ic2f",
@@ -2934,15 +2977,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 2 filter"
                 }
               ],
               "provenance": {
@@ -3233,15 +3281,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 3 prescaler"
                 },
                 {
                   "id": "field.tim_chctlr2.ic3f",
@@ -3253,15 +3306,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 3 filter"
                 },
                 {
                   "id": "field.tim_chctlr2.ic4psc",
@@ -3273,15 +3331,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 4 prescaler"
                 },
                 {
                   "id": "field.tim_chctlr2.ic4f",
@@ -3293,15 +3356,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 4 filter"
                 }
               ],
               "provenance": {
@@ -6023,15 +6091,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 1 prescaler"
                 },
                 {
                   "id": "field.tim_chctlr1.ic1f",
@@ -6043,15 +6116,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 1 filter"
                 },
                 {
                   "id": "field.tim_chctlr1.ic2psc",
@@ -6063,15 +6141,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 2 prescaler"
                 },
                 {
                   "id": "field.tim_chctlr1.ic2f",
@@ -6083,15 +6166,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 2 filter"
                 }
               ],
               "provenance": {
@@ -6382,15 +6470,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 3 prescaler"
                 },
                 {
                   "id": "field.tim_chctlr2.ic3f",
@@ -6402,15 +6495,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 3 filter"
                 },
                 {
                   "id": "field.tim_chctlr2.ic4psc",
@@ -6422,15 +6520,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 4 prescaler"
                 },
                 {
                   "id": "field.tim_chctlr2.ic4f",
@@ -6442,15 +6545,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 4 filter"
                 }
               ],
               "provenance": {
@@ -9309,15 +9417,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 1 prescaler"
                 },
                 {
                   "id": "field.tim_chctlr1.ic1f",
@@ -9329,15 +9442,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 1 filter"
                 },
                 {
                   "id": "field.tim_chctlr1.ic2psc",
@@ -9349,15 +9467,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 2 prescaler"
                 },
                 {
                   "id": "field.tim_chctlr1.ic2f",
@@ -9369,15 +9492,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 2 filter"
                 }
               ],
               "provenance": {
@@ -9668,15 +9796,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 3 prescaler"
                 },
                 {
                   "id": "field.tim_chctlr2.ic3f",
@@ -9688,15 +9821,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 3 filter"
                 },
                 {
                   "id": "field.tim_chctlr2.ic4psc",
@@ -9708,15 +9846,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 4 prescaler"
                 },
                 {
                   "id": "field.tim_chctlr2.ic4f",
@@ -9728,15 +9871,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim234_register_model"
+                      "e_rm_tim234_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.94
-                  }
+                  },
+                  "description": "Input capture 4 filter"
                 }
               ],
               "provenance": {
@@ -20745,6 +20893,28 @@
                   },
                   "description": "Software master reset",
                   "access": "read-write"
+                },
+                {
+                  "id": "field.can_ctlr.dbf",
+                  "name": "DBF",
+                  "bitRange": {
+                    "lsb": 16,
+                    "msb": 16
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.9
+                  },
+                  "description": "Debug freeze",
+                  "access": "read-write"
                 }
               ],
               "provenance": {
@@ -21495,6 +21665,138 @@
                     "status": "imported",
                     "confidence": 0.95
                   }
+                },
+                {
+                  "id": "field.can_tstatr.low2",
+                  "name": "LOW2",
+                  "bitRange": {
+                    "lsb": 31,
+                    "msb": 31
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.9
+                  },
+                  "description": "Lowest priority flag for mailbox 2",
+                  "access": "read-only"
+                },
+                {
+                  "id": "field.can_tstatr.low1",
+                  "name": "LOW1",
+                  "bitRange": {
+                    "lsb": 30,
+                    "msb": 30
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.9
+                  },
+                  "description": "Lowest priority flag for mailbox 1",
+                  "access": "read-only"
+                },
+                {
+                  "id": "field.can_tstatr.low0",
+                  "name": "LOW0",
+                  "bitRange": {
+                    "lsb": 29,
+                    "msb": 29
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.9
+                  },
+                  "description": "Lowest priority flag for mailbox 0",
+                  "access": "read-only"
+                },
+                {
+                  "id": "field.can_tstatr.tme2",
+                  "name": "TME2",
+                  "bitRange": {
+                    "lsb": 28,
+                    "msb": 28
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.9
+                  },
+                  "description": "Transmit mailbox 2 empty",
+                  "access": "read-only"
+                },
+                {
+                  "id": "field.can_tstatr.tme1",
+                  "name": "TME1",
+                  "bitRange": {
+                    "lsb": 27,
+                    "msb": 27
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.9
+                  },
+                  "description": "Transmit mailbox 1 empty",
+                  "access": "read-only"
+                },
+                {
+                  "id": "field.can_tstatr.tme0",
+                  "name": "TME0",
+                  "bitRange": {
+                    "lsb": 26,
+                    "msb": 26
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.9
+                  },
+                  "description": "Transmit mailbox 0 empty",
+                  "access": "read-only"
                 }
               ],
               "provenance": {
@@ -22696,7 +22998,8 @@
                       "description": "Transmit mailbox request",
                       "access": "read-write"
                     }
-                  ]
+                  ],
+                  "resetValue": 0
                 },
                 {
                   "id": "reg.can1.txmdtr",
@@ -22791,7 +23094,8 @@
                       "description": "Data length code",
                       "access": "read-write"
                     }
-                  ]
+                  ],
+                  "resetValue": 0
                 },
                 {
                   "id": "reg.can1.txmdlr",
@@ -22908,7 +23212,8 @@
                       "description": "Data byte 0",
                       "access": "read-write"
                     }
-                  ]
+                  ],
+                  "resetValue": 0
                 },
                 {
                   "id": "reg.can1.txmdhr",
@@ -23025,7 +23330,8 @@
                       "description": "Data byte 4",
                       "access": "read-write"
                     }
-                  ]
+                  ],
+                  "resetValue": 0
                 }
               ],
               "array": {
@@ -23171,7 +23477,8 @@
                       "description": "Remote transmission request",
                       "access": "read-only"
                     }
-                  ]
+                  ],
+                  "resetValue": 0
                 },
                 {
                   "id": "reg.can1.rxmdtr",
@@ -23266,7 +23573,8 @@
                       "description": "Data length code",
                       "access": "read-only"
                     }
-                  ]
+                  ],
+                  "resetValue": 0
                 },
                 {
                   "id": "reg.can1.rxmdlr",
@@ -23383,7 +23691,8 @@
                       "description": "Data Byte 0",
                       "access": "read-only"
                     }
-                  ]
+                  ],
+                  "resetValue": 0
                 },
                 {
                   "id": "reg.can1.rxmdhr",
@@ -23500,7 +23809,8 @@
                       "description": "DATA4",
                       "access": "read-only"
                     }
-                  ]
+                  ],
+                  "resetValue": 0
                 }
               ],
               "array": {
@@ -24614,7 +24924,8 @@
                     "notes": "RM-backed filter-bank extent overrides the header bit-definition coverage that stops at bank 13."
                   },
                   "access": "read-write",
-                  "description": "Filter bank 0 register 1"
+                  "description": "Filter bank 0 register 1",
+                  "resetValue": 0
                 },
                 {
                   "id": "reg.can1.fr2",
@@ -25443,7 +25754,8 @@
                     "notes": "RM-backed filter-bank extent overrides the header bit-definition coverage that stops at bank 13."
                   },
                   "access": "read-write",
-                  "description": "Filter bank 0 register 2"
+                  "description": "Filter bank 0 register 2",
+                  "resetValue": 0
                 }
               ],
               "array": {
@@ -25517,14 +25829,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -25563,14 +25880,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -25609,14 +25931,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -25655,14 +25982,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -25701,14 +26033,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -25747,14 +26084,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -25793,14 +26135,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -25839,14 +26186,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -25885,14 +26237,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -25931,14 +26288,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -26319,14 +26681,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -26365,14 +26732,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -26411,14 +26783,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -26457,14 +26834,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -26503,14 +26885,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -26549,14 +26936,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -26595,14 +26987,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -26641,14 +27038,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -26687,14 +27089,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -26733,14 +27140,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -26779,14 +27191,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -26825,14 +27242,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -26871,14 +27293,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -26917,14 +27344,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -26963,14 +27395,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -27009,14 +27446,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -27055,14 +27497,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -27101,14 +27548,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -27147,14 +27599,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -27193,14 +27650,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -27239,14 +27701,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -27285,14 +27752,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -27331,14 +27803,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -27377,14 +27854,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -27423,14 +27905,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -27469,14 +27956,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -27515,14 +28007,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -27561,14 +28058,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -27607,14 +28109,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -27653,14 +28160,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -27699,14 +28211,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -27745,14 +28262,19 @@
                   },
                   "provenance": {
                     "sourceRefs": [
-                      "openwch-ch32v20x-header"
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
-                      "e_header_register_bitdefs"
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.91
-                  }
+                  },
+                  "description": "Backup data"
                 }
               ],
               "provenance": {
@@ -51972,15 +52494,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim1_register_model"
+                      "e_rm_tim1_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.95
-                  }
+                  },
+                  "description": "Input capture 1 prescaler"
                 },
                 {
                   "id": "field.tim_chctlr1.ic1f",
@@ -51992,15 +52519,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim1_register_model"
+                      "e_rm_tim1_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.95
-                  }
+                  },
+                  "description": "Input capture 1 filter"
                 },
                 {
                   "id": "field.tim_chctlr1.ic2psc",
@@ -52012,15 +52544,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim1_register_model"
+                      "e_rm_tim1_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.95
-                  }
+                  },
+                  "description": "Input capture 2 prescaler"
                 },
                 {
                   "id": "field.tim_chctlr1.ic2f",
@@ -52032,15 +52569,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim1_register_model"
+                      "e_rm_tim1_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.95
-                  }
+                  },
+                  "description": "Input capture 2 filter"
                 }
               ],
               "provenance": {
@@ -52330,15 +52872,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim1_register_model"
+                      "e_rm_tim1_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.95
-                  }
+                  },
+                  "description": "Input capture 3 prescaler"
                 },
                 {
                   "id": "field.tim_chctlr2.ic3f",
@@ -52350,15 +52897,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim1_register_model"
+                      "e_rm_tim1_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.95
-                  }
+                  },
+                  "description": "Input capture 3 filter"
                 },
                 {
                   "id": "field.tim_chctlr2.ic4psc",
@@ -52370,15 +52922,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim1_register_model"
+                      "e_rm_tim1_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.95
-                  }
+                  },
+                  "description": "Input capture 4 prescaler"
                 },
                 {
                   "id": "field.tim_chctlr2.ic4f",
@@ -52390,15 +52947,20 @@
                   "provenance": {
                     "sourceRefs": [
                       "openwch-ch32v20x-header",
-                      "wch-ch32fv2x-v3x-rm"
+                      "wch-ch32fv2x-v3x-rm",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
                     ],
                     "evidenceRefs": [
                       "e_header_register_bitdefs",
-                      "e_rm_tim1_register_model"
+                      "e_rm_tim1_register_model",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
                     ],
                     "status": "imported",
                     "confidence": 0.95
-                  }
+                  },
+                  "description": "Input capture 4 filter"
                 }
               ],
               "provenance": {
@@ -54694,16 +55256,21 @@
               "provenance": {
                 "sourceRefs": [
                   "openwch-ch32v20x-header",
-                  "openwch-ch32v20x-sdk"
+                  "openwch-ch32v20x-sdk",
+                  "ch32-rs-ch32v203xx-svd",
+                  "ch32-rs-ch32v203c8t6-yaml"
                 ],
                 "evidenceRefs": [
                   "e_header_register_typedefs",
-                  "e_core_io_qualifiers"
+                  "e_core_io_qualifiers",
+                  "e_ch32rs_ch32v203xx_svd_metadata",
+                  "e_ch32rs_ch32v203c8t6_yaml_variant"
                 ],
                 "status": "imported",
                 "confidence": 0.93
               },
-              "access": "read-write"
+              "access": "read-write",
+              "description": "SPI_I2S configure register"
             },
             {
               "id": "reg.spi1.i2spr",

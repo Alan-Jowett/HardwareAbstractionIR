@@ -173,9 +173,11 @@ HAIR supports deterministic generation of downstream artifacts, including:
 
 Generators consume HAIR IR blocks and produce reproducible outputs from the same normalized source model.
 
+For SVD generation, HAIR device documents are expected to carry explicit CPU metadata rather than relying on generator defaults. That includes CPU revision, endianness, interrupt priority width, and core feature flags such as MPU/FPU presence and vendor system-timer configuration.
+
 ## Validation
 
-Before generation, HAIR validates the semantic model against a set of invariants, including:
+The HAIR model is intended to validate against a set of invariants before generation, including:
 
 - Register alignment
 - Field ranges
@@ -187,19 +189,19 @@ Before generation, HAIR validates the semantic model against a set of invariants
 
 The goal is to catch ambiguity and modeling errors early, before they appear in generated code or documentation.
 
+For the first CLI cut, `validate` is narrower: it checks that a HAIR JSON document conforms to the repository schema set. Evaluation of document-defined validation rules remains future tooling work.
+
 ## CLI
 
-The HAIR toolchain is centered around a small set of commands operating on HAIR IR blocks:
+The first repository CLI is centered around a small set of commands operating on HAIR documents:
 
 ```text
-extract     Build IR from source materials
-normalize   Apply canonical semantic rules
-validate    Run invariants and consistency checks
-generate    Produce SVDs, PACs, HALs, simulators, and docs
-diff        Compare IR revisions or vendor updates
+validate    Check that a HAIR document matches the schema set
+generate    Produce downstream artifacts, starting with SVD
+diff        Compare two HAIR document revisions, including git-backed inputs
 ```
 
-In practice, the current repository is centered on the **schema and extraction workflow** rather than a finished CLI implementation.
+`extract` and `normalize` remain workflow-driven operations rather than CLI promises in this repository. See `docs/cli.md` for the command contract and current first-cut scope.
 
 ## Example Devices
 
@@ -218,6 +220,7 @@ The main human-oriented design references are:
 
 - `docs/schema.md` — overview of the full layered schema
 - `docs/mcu-profile.md` — explanation of the MCU/SoC profile layer
+- `docs/cli.md` — CLI scope and first-cut command contract
 
 ## Project Philosophy
 

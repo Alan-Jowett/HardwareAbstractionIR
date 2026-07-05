@@ -125,6 +125,8 @@ It currently includes:
 
 This is the layer that most directly overlaps with CMSIS-SVD and similar register-description formats.
 
+The structural `device.cpu` model is also where HAIR carries generator-critical CPU metadata. Compliant device documents now require CPU revision, endianness, interrupt priority width, and core feature flags including `vendorSystemTimerConfig`, so downstream SVD generation does not have to invent missing CPU facts.
+
 ### Important structural rule
 
 `structure.device` is the concrete hardware variant described by the current document.
@@ -272,6 +274,8 @@ Open design areas include:
 - richer canonical vocabularies for MCU/SoC block classes
 
 Those can evolve without abandoning the current layered structure.
+
+For the initial CLI, `hair validate` is limited to schema conformance against `schema/hair.json` and the layered subschemas. The declarative `validation` layer remains the place to model richer invariants and generator preconditions, but executing those rules is future tooling work.
 
 ## Practical authoring guidance
 

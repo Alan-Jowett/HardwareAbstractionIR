@@ -140,9 +140,6 @@
             "fpuPresent": {
               "type": "boolean"
             },
-            "vendorSystemTimerConfig": {
-              "type": "boolean"
-            },
             "fpuDoublePrecision": {
               "type": "boolean"
             },
@@ -162,6 +159,9 @@
               "type": "boolean"
             },
             "vtorPresent": {
+              "type": "boolean"
+            },
+            "vendorSystemTimerConfig": {
               "type": "boolean"
             }
           },
@@ -629,6 +629,7 @@
           },
           "required": [
             "vendor",
+            "cpu",
             "peripherals"
           ],
           "additionalProperties": false
