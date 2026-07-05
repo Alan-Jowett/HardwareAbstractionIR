@@ -45,12 +45,21 @@ fn write_outcome(
         stderr.flush()?;
     }
 
-    Ok(process::ExitCode::from(outcome.exit_code as u8))
+    Ok(normalize_exit_code(outcome.exit_code))
 }
 
 fn report_output_error(error: io::Error) -> process::ExitCode {
     eprintln!("failed to write command output: {error}");
     process::ExitCode::from(2)
+}
+
+fn normalize_exit_code(exit_code: i32) -> process::ExitCode {
+    let normalized = match u8::try_from(exit_code) {
+        Ok(code) => code,
+        Err(_) if exit_code < 0 => 1,
+        Err(_) => u8::MAX,
+    };
+    process::ExitCode::from(normalized)
 }
 
 fn run(cli: Cli) -> Result<CommandOutcome> {
@@ -125,7 +134,8 @@ fn run_validate(input: &Path) -> Result<CommandOutcome> {
 }
 
 fn run_generate_svd(input: &Path, output: Option<&Path>) -> Result<CommandOutcome> {
-    let document = load_hair_document(input)?;
+    let schema_root = find_schema_root(&std::env::current_dir()?)?;
+    let document = load_validated_hair_document(input, &schema_root)?;
     let svd = generate_svd(&document)?;
 
     if let Some(output_path) = output {
@@ -492,9 +502,21 @@ fn load_json_file(path: &Path) -> Result<Value> {
     serde_json::from_str(&text).with_context(|| format!("parsing {}", path.display()))
 }
 
-fn load_hair_document(path: &Path) -> Result<HairDocument> {
-    let text = fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
-    serde_json::from_str(&text).with_context(|| format!("parsing {}", path.display()))
+fn load_validated_hair_document(path: &Path, repo_root: &Path) -> Result<HairDocument> {
+    let instance = load_json_file(path)?;
+    let validator = build_validator(repo_root)?;
+    if let Err(errors) = validator.validate(&instance) {
+        let messages = errors
+            .map(|error| format_validation_error(&error))
+            .collect::<Vec<_>>();
+        bail!(
+            "input {} does not conform to the HAIR schema:\n{}",
+            path.display(),
+            messages.join("\n")
+        );
+    }
+
+    serde_json::from_value(instance).with_context(|| format!("parsing {}", path.display()))
 }
 
 fn find_schema_root(start: &Path) -> Result<PathBuf> {
@@ -1566,6 +1588,14 @@ mod tests {
     }
 
     #[test]
+    fn normalize_exit_code_clamps_out_of_range_values() {
+        assert_eq!(normalize_exit_code(0), process::ExitCode::from(0));
+        assert_eq!(normalize_exit_code(255), process::ExitCode::from(255));
+        assert_eq!(normalize_exit_code(256), process::ExitCode::from(255));
+        assert_eq!(normalize_exit_code(-1), process::ExitCode::from(1));
+    }
+
+    #[test]
     fn finds_schema_root_without_git_metadata() {
         let temp = tempdir().expect("temp dir");
         let nested = temp.path().join("snapshot").join("subdir");
@@ -1643,6 +1673,53 @@ mod tests {
         let svd = generate_svd(&document).expect("svd generation");
         assert!(svd.contains("<addressUnitBits>16</addressUnitBits>"));
         assert!(svd.contains("<width>64</width>"));
+    }
+
+    #[test]
+    fn load_validated_hair_document_rejects_schema_invalid_subset() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let mut file = NamedTempFile::new().expect("temp file");
+        write!(
+            file,
+            r#"{{
+                "metadata": {{
+                    "title": "Test Device",
+                    "version": "0.1.0"
+                }},
+                "structure": {{
+                    "device": {{
+                        "name": "TEST123",
+                        "vendor": "TestVendor",
+                        "cpu": {{
+                            "name": "QingKe V4B",
+                            "revision": "V4B",
+                            "endianness": "little",
+                            "interruptPriorityBits": 4,
+                            "featureFlags": {{
+                                "mpuPresent": false,
+                                "fpuPresent": false,
+                                "vendorSystemTimerConfig": true
+                            }}
+                        }},
+                        "peripherals": []
+                    }}
+                }}
+            }}"#
+        )
+        .expect("write temp file");
+
+        let parsed: HairDocument =
+            serde_json::from_value(load_json_file(file.path()).expect("json instance"))
+                .expect("subset still deserializes");
+        assert_eq!(parsed.metadata.title, "Test Device");
+
+        let error =
+            load_validated_hair_document(file.path(), &repo_root).expect_err("schema should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("does not conform to the HAIR schema")
+        );
     }
 
     #[test]
