@@ -125,6 +125,20 @@ It currently includes:
 
 This is the layer that most directly overlaps with CMSIS-SVD and similar register-description formats.
 
+### Interrupt inventory versus peripheral linkage
+
+`structure.device.interrupts[]` is the authoritative interrupt inventory for the concrete device variant.
+
+`peripheral.interruptRefs[]` serves a different purpose: it links a peripheral back to one or more entries in that device-level interrupt inventory so downstream tooling can attribute interrupts to blocks such as `USART1`, `DMA1`, or `WWDG`.
+
+Important consequences:
+
+1. a declared device interrupt is still part of the device even if no peripheral currently links to it
+2. generators must not silently drop device interrupts just because `interruptRefs` is absent on a peripheral
+3. missing `interruptRefs` is an attribution/completeness problem, not evidence that the interrupt does not exist
+
+This distinction matters for generation readiness. A PAC or SVD that loses a real device interrupt because of missing peripheral linkage is incomplete even when the device-level interrupt entry is present.
+
 The structural `device.cpu` model is also where HAIR carries generator-critical CPU metadata. Compliant device documents now require CPU revision, endianness, interrupt priority width, and core feature flags including `vendorSystemTimerConfig`, so downstream SVD generation does not have to invent missing CPU facts.
 
 ### Important structural rule
