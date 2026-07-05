@@ -50,6 +50,20 @@
       "kind": "other",
       "uri": "https://www.wch-ic.com/downloads/QingKeV4_Processor_Manual_PDF.html",
       "notes": "Official architecture-level processor manual referenced by the openwch datasheet README. Useful for core and exception behavior not fully explained in the device-family manuals."
+    },
+    {
+      "id": "ch32-rs-ch32v203xx-svd",
+      "kind": "svd",
+      "uri": "https://raw.githubusercontent.com/ch32-rs/ch32-rs/9b4ee66500b956bc87fbf83aa28ad245b39ebd15/svd/vendor/CH32V203xx.svd",
+      "version": "9b4ee66500b956bc87fbf83aa28ad245b39ebd15",
+      "notes": "Community-maintained CH32V203 family SVD from ch32-rs. Not affiliated with WCH, but metadata-rich and useful as an auditable gap-filler for register descriptions, reset values, field descriptions, and some field access semantics when the official manuals and headers are too sparse."
+    },
+    {
+      "id": "ch32-rs-ch32v203c8t6-yaml",
+      "kind": "generated",
+      "uri": "https://raw.githubusercontent.com/ch32-rs/ch32-data/a515903589cfbc342dc6ad0d13c02b4382da5628/data/chips/CH32V203C8T6.yaml",
+      "version": "a515903589cfbc342dc6ad0d13c02b4382da5628",
+      "notes": "Community-curated exact-variant machine-readable chip description from ch32-data. The project states its data is manually created and curated from official datasheets, MounRiver-distributed SVD files, and openwch material, making it a useful structured cross-check and provenance trail for community-derived metadata."
     }
   ]
 }

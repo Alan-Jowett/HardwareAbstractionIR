@@ -191,8 +191,10 @@ Populate the HAIR structural model for the full device:
 1. device identity, vendor, family, architecture, CPU metadata
 2. memory regions and memory map
 3. interrupt definitions and controllers
-4. peripherals
-5. registers, clusters, fields, enumerated values
+4. peripherals, including descriptions and address-block coverage where
+   evidenced
+5. registers, clusters, fields, and enumerated values, including
+   descriptions, access metadata, and reset metadata where evidenced
 
 Use code, datasheets, manuals, headers, SVDs, and related sources as
 cross-checks. When sources disagree, stop and ask rather than choosing
@@ -209,6 +211,25 @@ mandatory, not optional:
   not a successful full-device draft
 - You may emit shell peripherals only when the user explicitly narrowed
   scope away from register-level extraction
+
+Full-device extraction is also not just register topology. When approved
+evidence supports downstream-generation-critical metadata, you must
+attempt to extract and populate it, including:
+
+- peripheral descriptions
+- peripheral address-block coverage
+- register descriptions
+- register access modes
+- register reset values
+- register reset masks
+- cluster descriptions
+- field descriptions
+- field access modes
+- field enumerated values
+
+If these metadata are present in approved evidence but absent from the
+draft, treat that as incompleteness to investigate rather than as an
+acceptable "minimal but complete" full-device result.
 
 #### 2.3 Semantic extraction
 
@@ -274,6 +295,8 @@ Stop and ask targeted clarification questions before continuing when:
 - a peripheral is present only as a shell and the register-model pass has
   not populated `registers[]`, clusters, fields, and enums for the claimed
   extraction scope
+- approved evidence contains peripheral / register / cluster / field
+  metadata needed for downstream generation, but the draft omits it
 
 ### Critical Rule
 
@@ -287,6 +310,11 @@ For default full-device extraction, "complete draft" means the structural
 model includes grounded register-level content for the in-scope MMIO
 peripherals. A draft that stops at peripheral shells is not complete and
 must not advance.
+
+It also means the draft has attempted to capture evidence-supported
+descriptions, access modes, reset metadata, address-block coverage, and
+enumerated values for the in-scope model. A metadata-thin register model
+is not complete when approved evidence supports richer extraction.
 
 The only permitted outputs of this phase are the draft JSON, the draft
 report, and clarification questions. Do **not** claim final correctness
@@ -302,8 +330,10 @@ counter-evidence:
 
 1. metadata and target-device identity
 2. memory regions and addresses
-3. peripheral existence and base addresses
-4. register layouts, field positions, reset values, and enums
+3. peripheral existence, base addresses, descriptions, and address-block
+   coverage
+4. register layouts, descriptions, access modes, reset values, reset
+   masks, field positions, field descriptions, and enums
 5. interrupts and routing/controller relationships
 6. clocks, resets, timing constraints, and power domains
 7. pin mappings and alternate functions
@@ -326,6 +356,13 @@ Maintain a **Rejected Candidate Claims** table in the report with:
 
 Maintain a **Blocking Conflicts** section for unresolved contradictions.
 
+Maintain a **Metadata Coverage and Gaps** section in the report that
+distinguishes:
+
+- metadata present in approved evidence and extracted
+- metadata present in approved evidence but not extracted
+- metadata not confidently recoverable from approved evidence
+
 Run consistency checks across the JSON:
 
 - no overlapping or impossible memory ranges
@@ -335,15 +372,24 @@ Run consistency checks across the JSON:
 - provenance references resolve to actual `sources[]` / `evidence[]`
 - optional sections are omitted rather than filled with unsupported data
 
-Run a **structural completeness gate** before allowing final emission:
+Run a **structural + metadata completeness gate** before allowing final
+emission:
 
 - if default full-device coverage was claimed, verify that the in-scope
   MMIO peripherals are not shell-only placeholders
 - verify that register-bearing peripherals have grounded `registers[]`
   content, with clusters / fields / enums where the evidence supports them
+- verify that evidence-supported peripheral / register / cluster / field
+  metadata has been extracted rather than silently omitted
+- explicitly investigate whether any remaining metadata sparsity is caused
+  by missing source evidence, extraction omission, schema mismatch, or
+  generator limitation
 - if the register pass was skipped, incomplete, or only partially
   normalized, treat that as a blocker and stop instead of emitting final
   deliverables
+- if evidence-supported metadata was omitted, treat that as a blocker and
+  stop instead of describing the result as a complete full-device
+  extraction
 
 If a material entry cannot survive falsification, remove it or stop and
 ask the user. Do not leave unsupported claims in the final JSON.
@@ -383,6 +429,9 @@ Final output requirements:
   output as complete.
 - Do not present shell-only peripherals as satisfying the structural
   extraction requirement for full-device coverage.
+- Do not present a metadata-thin register model as a complete full-device
+  result when approved evidence supports richer downstream-generation
+  metadata.
 
 ## Output Expectations
 
@@ -406,6 +455,8 @@ Use this structure:
 
 ## Component Inventory
 
+## Metadata Coverage and Gaps
+
 ## Epistemic Claims Ledger
 
 ## Conflicts and Clarification Questions
@@ -418,6 +469,25 @@ Use this structure:
 ```
 
 If a section is empty, write `None identified.`
+
+In `## Metadata Coverage and Gaps`, explicitly distinguish:
+
+- metadata present in approved evidence and extracted
+- metadata present in approved evidence but not extracted
+- metadata not confidently recoverable from approved evidence
+
+When relevant, call out at least these metadata classes:
+
+- peripheral descriptions
+- peripheral address-block coverage
+- register descriptions
+- register access modes
+- register reset values
+- register reset masks
+- cluster descriptions
+- field descriptions
+- field access modes
+- field enumerated values
 
 In `## Epistemic Claims Ledger`, include a table with:
 
@@ -449,3 +519,7 @@ Before finalizing, verify:
 - [ ] No final HAIR JSON was emitted with unresolved blocking ambiguity
 - [ ] No final "full-device" result was emitted while register-level
       extraction remained at peripheral-shell depth
+- [ ] Evidence-supported metadata omissions were identified, classified,
+      and either fixed or escalated as blockers
+- [ ] The report distinguishes extracted metadata, omitted-but-supported
+      metadata, and metadata not confidently recoverable from evidence
