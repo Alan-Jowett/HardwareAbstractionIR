@@ -2282,7 +2282,7 @@ fn validate_driver_semantic_scope(
     let target_ref = target.target_ref.as_str();
 
     for operation in init_operations {
-        validate_operation_scope(driver, target_ref, operation, registers)?;
+        validate_operation_scope(driver, target_ref, operation, registers, fields)?;
     }
     for state_machine in state_machines {
         validate_state_machine_scope(driver, target_ref, state_machine, registers, fields)?;
@@ -2296,6 +2296,7 @@ fn validate_operation_scope(
     target_ref: &str,
     operation: &SemanticOperation,
     registers: &HashMap<String, ResolvedRegister>,
+    fields: &HashMap<String, ResolvedFieldTarget>,
 ) -> Result<()> {
     for operation_target in &operation.target_refs {
         if operation_target != target_ref {
@@ -2307,6 +2308,21 @@ fn validate_operation_scope(
                 target_ref
             );
         }
+    }
+
+    for predicate in operation
+        .preconditions
+        .iter()
+        .chain(operation.postconditions.iter())
+    {
+        validate_predicate_scope(
+            &format!("operation {}", operation.id),
+            driver.id.as_str(),
+            target_ref,
+            predicate,
+            registers,
+            fields,
+        )?;
     }
 
     for step in &operation.steps {
@@ -2356,7 +2372,33 @@ fn validate_state_machine_scope(
         }
     }
 
+    for state in &state_machine.states {
+        for predicate in &state.invariants {
+            validate_predicate_scope(
+                &format!("state machine {} state {}", state_machine.id, state.name),
+                driver.id.as_str(),
+                target_ref,
+                predicate,
+                registers,
+                fields,
+            )?;
+        }
+    }
+
     for transition in &state_machine.transitions {
+        for predicate in &transition.conditions {
+            validate_predicate_scope(
+                &format!(
+                    "state machine {} transition {} -> {}",
+                    state_machine.id, transition.from, transition.to
+                ),
+                driver.id.as_str(),
+                target_ref,
+                predicate,
+                registers,
+                fields,
+            )?;
+        }
         for effect in &transition.effects {
             let Some(effect_target_ref) = effect.target_ref.as_deref() else {
                 continue;
@@ -2401,6 +2443,57 @@ fn validate_state_machine_scope(
     }
 
     Ok(())
+}
+
+fn validate_predicate_scope(
+    context: &str,
+    driver_id: &str,
+    target_ref: &str,
+    predicate: &SemanticPredicate,
+    registers: &HashMap<String, ResolvedRegister>,
+    fields: &HashMap<String, ResolvedFieldTarget>,
+) -> Result<()> {
+    let Some(predicate_target_ref) = predicate.target_ref.as_deref() else {
+        return Ok(());
+    };
+    if !predicate_target_ref.starts_with("reg.") && !predicate_target_ref.starts_with("field.") {
+        return Ok(());
+    }
+    if let Some(field_target) = fields.get(predicate_target_ref) {
+        if field_target.peripheral_ref != target_ref {
+            bail!(
+                "driver {} {} predicate {} references field {} on {} instead of {}",
+                driver_id,
+                context,
+                predicate.kind,
+                predicate_target_ref,
+                field_target.peripheral_ref,
+                target_ref
+            );
+        }
+        return Ok(());
+    }
+    if let Some(register) = registers.get(predicate_target_ref) {
+        if register.peripheral_ref != target_ref {
+            bail!(
+                "driver {} {} predicate {} references register {} on {} instead of {}",
+                driver_id,
+                context,
+                predicate.kind,
+                predicate_target_ref,
+                register.peripheral_ref,
+                target_ref
+            );
+        }
+        return Ok(());
+    }
+    bail!(
+        "driver {} {} predicate {} references unknown target {}",
+        driver_id,
+        context,
+        predicate.kind,
+        predicate_target_ref
+    );
 }
 
 fn collect_unique_map<'a, T: Clone, F>(
@@ -6408,6 +6501,44 @@ mod tests {
                 "references register reg.pwm1.ctlr1 on periph.pwm1 instead of periph.tim1"
             )
         );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_predicate_targets_outside_driver_scope() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        let adc_operation = operations[1].as_object_mut().expect("adc operation");
+        let preconditions = adc_operation
+            .get_mut("preconditions")
+            .and_then(Value::as_array_mut)
+            .expect("preconditions");
+        preconditions[0]
+            .as_object_mut()
+            .expect("first precondition")
+            .insert(
+                "targetRef".to_string(),
+                Value::String("reg.tim1.ctlr1".to_string()),
+            );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("predicate scope fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("predicate"));
+        assert!(error.to_string().contains("instead of periph.adc1"));
     }
 
     #[test]
