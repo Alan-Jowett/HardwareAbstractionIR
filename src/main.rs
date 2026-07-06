@@ -2902,6 +2902,7 @@ fn write_register(
     register: &Register,
     register_names: &HashMap<String, RegisterBinding>,
 ) -> Result<()> {
+    validate_register_field_layout(register)?;
     xml.start_element("register");
     write_array_shape(xml, &register.name, register.array.as_ref())?;
     if let Some(display_name) = &register.display_name {
@@ -2956,6 +2957,56 @@ fn write_register(
     }
     xml.end_element();
     Ok(())
+}
+
+fn validate_register_field_layout(register: &Register) -> Result<()> {
+    for field in &register.fields {
+        if field.bit_range.msb < field.bit_range.lsb {
+            bail!("field {} has msb < lsb", field.id);
+        }
+        if field.bit_range.msb >= register.width_bits {
+            bail!(
+                "field {} exceeds register {} widthBits {}",
+                field.id,
+                register.id,
+                register.width_bits
+            );
+        }
+    }
+
+    for (index, left) in register.fields.iter().enumerate() {
+        for right in register.fields.iter().skip(index + 1) {
+            if left.bit_range.lsb == right.bit_range.lsb
+                && left.bit_range.msb == right.bit_range.msb
+                && !is_alias_like_duplicate_field(left, right)
+            {
+                bail!(
+                    "register {} has duplicate bit ownership in fields {} and {}",
+                    register.id,
+                    left.id,
+                    right.id
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn is_alias_like_duplicate_field(left: &Field, right: &Field) -> bool {
+    let left_name = left.name.as_str();
+    let right_name = right.name.as_str();
+
+    // The reference HAIR still carries legacy alias/encoding pseudo-fields.
+    // Keep rejecting USB/WWDG-style duplicate ownership while tolerating those patterns.
+    has_alias_prefix(left_name, right_name) || has_alias_prefix(right_name, left_name)
+}
+
+fn has_alias_prefix(name: &str, base: &str) -> bool {
+    name.strip_prefix(base).is_some_and(|suffix| {
+        !suffix.is_empty()
+            && (suffix.starts_with('_') || suffix.chars().all(|ch| ch.is_ascii_digit()))
+    })
 }
 
 fn write_cluster(xml: &mut XmlWriter, cluster: &RegisterCluster) -> Result<()> {
@@ -3028,9 +3079,6 @@ fn write_field(xml: &mut XmlWriter, field: &Field) -> Result<()> {
     write_array_shape(xml, &field.name, field.array.as_ref())?;
     if let Some(description) = &field.description {
         write_text_element(xml, "description", description);
-    }
-    if field.bit_range.msb < field.bit_range.lsb {
-        bail!("field {} has msb < lsb", field.id);
     }
     write_text_element(xml, "bitOffset", &field.bit_range.lsb.to_string());
     write_text_element(
@@ -3811,6 +3859,233 @@ mod tests {
                 .to_string()
                 .contains("references alternateOfRef reg.ctrl.output with mismatched widthBits")
         );
+    }
+
+    #[test]
+    fn generate_svd_rejects_duplicate_bit_ownership_in_one_register_view() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "peripherals": [
+                        {
+                            "id": "periph.timer",
+                            "name": "TIMER",
+                            "type": "TIM",
+                            "baseAddress": 1073741824u64,
+                            "registers": [
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl",
+                                    "name": "CTRL",
+                                    "offsetBytes": 0,
+                                    "widthBits": 8,
+                                    "fields": [
+                                        {
+                                            "id": "field.ctrl.enable",
+                                            "name": "ENABLE",
+                                            "bitRange": {
+                                                "lsb": 1,
+                                                "msb": 1
+                                            }
+                                        },
+                                        {
+                                            "id": "field.ctrl.detect",
+                                            "name": "DETECT",
+                                            "bitRange": {
+                                                "lsb": 1,
+                                                "msb": 1
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let error = generate_svd(&document).expect_err("generation should fail");
+        assert!(error.to_string().contains(
+            "register reg.ctrl has duplicate bit ownership in fields field.ctrl.enable and field.ctrl.detect"
+        ));
+    }
+
+    #[test]
+    fn generate_svd_allows_aggregate_and_alias_style_field_overlap_patterns() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "peripherals": [
+                        {
+                            "id": "periph.timer",
+                            "name": "TIMER",
+                            "type": "TIM",
+                            "baseAddress": 1073741824u64,
+                            "registers": [
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl",
+                                    "name": "CTRL",
+                                    "offsetBytes": 0,
+                                    "widthBits": 8,
+                                    "fields": [
+                                        {
+                                            "id": "field.ctrl.mode",
+                                            "name": "MODE",
+                                            "bitRange": {
+                                                "lsb": 0,
+                                                "msb": 1
+                                            }
+                                        },
+                                        {
+                                            "id": "field.ctrl.mode_1",
+                                            "name": "MODE_1",
+                                            "bitRange": {
+                                                "lsb": 0,
+                                                "msb": 1
+                                            }
+                                        },
+                                        {
+                                            "id": "field.ctrl.mode0",
+                                            "name": "MODE0",
+                                            "bitRange": {
+                                                "lsb": 0,
+                                                "msb": 0
+                                            }
+                                        },
+                                        {
+                                            "id": "field.ctrl.mode1",
+                                            "name": "MODE1",
+                                            "bitRange": {
+                                                "lsb": 1,
+                                                "msb": 1
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let svd = generate_svd(&document).expect("generation should succeed");
+        assert!(svd.contains("<name>MODE</name>"));
+        assert!(svd.contains("<name>MODE_1</name>"));
+        assert!(svd.contains("<name>MODE0</name>"));
+        assert!(svd.contains("<name>MODE1</name>"));
+    }
+
+    #[test]
+    fn generate_svd_rejects_unrelated_numbered_duplicate_fields() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "peripherals": [
+                        {
+                            "id": "periph.timer",
+                            "name": "TIMER",
+                            "type": "TIM",
+                            "baseAddress": 1073741824u64,
+                            "registers": [
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl",
+                                    "name": "CTRL",
+                                    "offsetBytes": 0,
+                                    "widthBits": 8,
+                                    "fields": [
+                                        {
+                                            "id": "field.ctrl.flag1",
+                                            "name": "FLAG1",
+                                            "bitRange": {
+                                                "lsb": 0,
+                                                "msb": 0
+                                            }
+                                        },
+                                        {
+                                            "id": "field.ctrl.flag8",
+                                            "name": "FLAG8",
+                                            "bitRange": {
+                                                "lsb": 0,
+                                                "msb": 0
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let error = generate_svd(&document).expect_err("generation should fail");
+        assert!(error.to_string().contains(
+            "register reg.ctrl has duplicate bit ownership in fields field.ctrl.flag1 and field.ctrl.flag8"
+        ));
     }
 
     #[test]

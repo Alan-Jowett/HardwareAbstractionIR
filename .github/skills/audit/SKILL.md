@@ -402,6 +402,9 @@ Run consistency checks across the audit:
 - the verdict matches the findings
 - unsupported claims are not being treated as mere limitations
 - completeness gaps are not being mislabeled as harmless sparsity
+- no register view retains ambiguous duplicate field bit ownership after
+  normalization and overlay reconciliation; any remaining overlap must be
+  an explicitly justified aggregate or encoding-alias pattern
 - evidence-supported metadata omissions are not being normalized away
 - evidence-supported alternate-register overlays are not being flattened
   into one register without challenge
