@@ -137,6 +137,9 @@
       "properties": {
         "mcuSoc": {
           "$ref": "profiles/mcu.json"
+        },
+        "embassyHal": {
+          "$ref": "profiles/embassy-hal.json"
         }
       },
       "additionalProperties": false

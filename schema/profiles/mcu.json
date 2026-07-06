@@ -36,6 +36,9 @@
       },
       "uniqueItems": true
     },
+    "dmaTopology": {
+      "$ref": "#/$defs/dmaTopology"
+    },
     "interruptTopology": {
       "$ref": "#/$defs/interruptTopology"
     },
@@ -325,66 +328,108 @@
       ]
     },
     "interruptSource": {
-      "type": "object",
-      "properties": {
-        "sourceRef": {
-          "$ref": "../common.json#/$defs/entityRef"
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
         },
-        "producerRef": {
-          "$ref": "../common.json#/$defs/entityRef"
-        },
-        "kind": {
-          "type": "string",
-          "enum": [
-            "peripheral",
-            "gpio",
-            "timer",
-            "rtc",
-            "dma",
-            "software",
-            "power",
-            "custom"
-          ]
+        {
+          "type": "object",
+          "properties": {
+            "sourceRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "producerRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "peripheral",
+                "gpio",
+                "timer",
+                "rtc",
+                "dma",
+                "software",
+                "power",
+                "custom"
+              ]
+            },
+            "flagRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "clearOperationRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "sourceRef",
+            "kind"
+          ],
+          "additionalProperties": false
         }
-      },
-      "required": [
-        "sourceRef",
-        "kind"
-      ],
-      "additionalProperties": false
+      ]
     },
     "interruptRoute": {
-      "type": "object",
-      "properties": {
-        "sourceRef": {
-          "$ref": "../common.json#/$defs/entityRef"
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
         },
-        "controllerRef": {
-          "$ref": "../common.json#/$defs/entityRef"
-        },
-        "cpuTargetRef": {
-          "$ref": "../common.json#/$defs/entityRef"
-        },
-        "lineIndex": {
-          "$ref": "../common.json#/$defs/nonNegativeInteger"
-        },
-        "routeType": {
-          "$ref": "#/$defs/routeType"
-        },
-        "controlRefs": {
-          "type": "array",
-          "items": {
-            "$ref": "../common.json#/$defs/entityRef"
+        {
+          "type": "object",
+          "properties": {
+            "sourceRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "interruptRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "controllerRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "cpuTargetRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "lineIndex": {
+              "$ref": "../common.json#/$defs/nonNegativeInteger"
+            },
+            "routeType": {
+              "$ref": "#/$defs/routeType"
+            },
+            "controlRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "acknowledgeOperationRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "sharedGroup": {
+              "type": "string"
+            }
           },
-          "uniqueItems": true
+          "required": [
+            "sourceRef",
+            "interruptRef",
+            "controllerRef",
+            "routeType"
+          ],
+          "additionalProperties": false
         }
-      },
-      "required": [
-        "sourceRef",
-        "controllerRef",
-        "routeType"
-      ],
-      "additionalProperties": false
+      ]
     },
     "interruptTopology": {
       "type": "object",
@@ -405,79 +450,121 @@
       "additionalProperties": false
     },
     "clockBinding": {
-      "type": "object",
-      "properties": {
-        "consumerRef": {
-          "$ref": "../common.json#/$defs/entityRef"
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
         },
-        "clockRef": {
-          "$ref": "../common.json#/$defs/entityRef"
-        },
-        "controllerRef": {
-          "$ref": "../common.json#/$defs/entityRef"
-        },
-        "bindingKind": {
-          "type": "string",
-          "enum": [
-            "direct",
-            "gated",
-            "selectable",
-            "divided",
-            "pll-derived",
-            "rtc-domain"
-          ]
-        },
-        "controlRefs": {
-          "type": "array",
-          "items": {
-            "$ref": "../common.json#/$defs/entityRef"
+        {
+          "type": "object",
+          "properties": {
+            "consumerRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "clockRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "controllerRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "bindingKind": {
+              "type": "string",
+              "enum": [
+                "direct",
+                "gated",
+                "selectable",
+                "divided",
+                "pll-derived",
+                "rtc-domain"
+              ]
+            },
+            "controlRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "enableOperationRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "disableOperationRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            }
           },
-          "uniqueItems": true
+          "required": [
+            "consumerRef",
+            "clockRef",
+            "bindingKind"
+          ],
+          "additionalProperties": false
         }
-      },
-      "required": [
-        "consumerRef",
-        "clockRef",
-        "bindingKind"
-      ],
-      "additionalProperties": false
+      ]
     },
     "resetBinding": {
-      "type": "object",
-      "properties": {
-        "targetRef": {
-          "$ref": "../common.json#/$defs/entityRef"
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
         },
-        "controllerRef": {
-          "$ref": "../common.json#/$defs/entityRef"
-        },
-        "resetDomainRef": {
-          "$ref": "../common.json#/$defs/entityRef"
-        },
-        "bindingKind": {
-          "type": "string",
-          "enum": [
-            "local",
-            "domain",
-            "power-on",
-            "deep-sleep",
-            "watchdog",
-            "software"
-          ]
-        },
-        "controlRefs": {
-          "type": "array",
-          "items": {
-            "$ref": "../common.json#/$defs/entityRef"
+        {
+          "type": "object",
+          "properties": {
+            "targetRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "controllerRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "resetDomainRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "bindingKind": {
+              "type": "string",
+              "enum": [
+                "local",
+                "domain",
+                "power-on",
+                "deep-sleep",
+                "watchdog",
+                "software"
+              ]
+            },
+            "controlRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "assertOperationRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "releaseOperationRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            }
           },
-          "uniqueItems": true
+          "required": [
+            "targetRef",
+            "bindingKind"
+          ],
+          "additionalProperties": false
         }
-      },
-      "required": [
-        "targetRef",
-        "bindingKind"
-      ],
-      "additionalProperties": false
+      ]
     },
     "clockResetTopology": {
       "type": "object",
@@ -606,6 +693,201 @@
       },
       "additionalProperties": false
     },
+    "dmaDirection": {
+      "type": "string",
+      "enum": [
+        "peripheral-to-memory",
+        "memory-to-peripheral",
+        "memory-to-memory",
+        "bidirectional"
+      ]
+    },
+    "dmaChannel": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "controllerRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "targetRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "channelIndex": {
+              "$ref": "../common.json#/$defs/nonNegativeInteger"
+            },
+            "capabilities": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "priorityLevels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "controllerRef",
+            "channelIndex"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "dmaRoute": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "peripheralRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "signal": {
+              "type": "string"
+            },
+            "channelRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "direction": {
+              "$ref": "#/$defs/dmaDirection"
+            },
+            "controlRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "sharedChannelGroupRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            }
+          },
+          "required": [
+            "peripheralRef",
+            "channelRef",
+            "direction"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "dmaSharedChannelGroup": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channelRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "minItems": 2,
+              "uniqueItems": true
+            },
+            "arbitrationNotes": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channelRefs"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "dmaTopology": {
+      "type": "object",
+      "properties": {
+        "channels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dmaChannel"
+          }
+        },
+        "routes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dmaRoute"
+          }
+        },
+        "sharedChannelGroups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dmaSharedChannelGroup"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "pinRoute": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "pinRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "peripheralRef": {
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "signal": {
+              "type": "string"
+            },
+            "routeType": {
+              "$ref": "#/$defs/routeType"
+            },
+            "controlRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "electricalConstraintRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "conflictRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "defaultAfterReset": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "pinRef",
+            "peripheralRef",
+            "signal",
+            "routeType"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "pinTopology": {
       "type": "object",
       "properties": {
@@ -636,6 +918,12 @@
             "$ref": "../common.json#/$defs/entityRef"
           },
           "uniqueItems": true
+        },
+        "routes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pinRoute"
+          }
         }
       },
       "additionalProperties": false

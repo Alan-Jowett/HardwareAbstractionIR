@@ -49,6 +49,7 @@ The profile currently defines these major sections:
 - `executionModel`
 - `canonicalBlocks`
 - `routingFabrics`
+- `dmaTopology`
 - `interruptTopology`
 - `clockResetTopology`
 - `memoryTopology`
@@ -170,6 +171,19 @@ Each routing fabric can describe:
 - whether routing is hardwired, muxed, or matrix-based
 - which registers or fields control the routing
 
+## `dmaTopology`
+
+This section captures DMA-specific topology that is too detailed to leave implicit in generic routing summaries.
+
+It can describe:
+
+- named DMA channels
+- peripheral-to-channel routes
+- transfer directions and capability tags
+- shared-channel groups and arbitration notes
+
+This matters because Embassy-style async drivers need auditable DMA bindings rather than best-effort name matching.
+
 ## `interruptTopology`
 
 This section models interrupt behavior beyond a flat list of interrupt definitions.
@@ -180,6 +194,7 @@ It distinguishes:
 - interrupt controllers
 - routing to CPU-visible lines
 - configurable versus fixed routes
+- interrupt flags and clear/release operations
 
 This matters for:
 
@@ -198,6 +213,7 @@ It can describe:
 - how clocks bind to consumers
 - whether the binding is direct, gated, divided, or selectable
 - how reset delivery works for a given block
+- which semantic operations enable, disable, assert, or release those bindings
 
 This helps generators and validators understand system bring-up dependencies.
 
@@ -222,6 +238,7 @@ The MCU/SoC profile adds a more canonical topological summary of:
 - GPIO port references
 - IO mux references
 - GPIO matrix references
+- named pin routes that bind pins, peripheral signals, remap controls, and electrical-constraint references together
 
 This makes it easier to reason about classic fixed-pin MCUs and matrix-routed SoCs using the same conceptual layer.
 
@@ -280,6 +297,12 @@ Instead:
 - `provenance` still explains where the information came from
 
 The profile layer only adds a more constrained, more canonical **architectural interpretation** of those facts.
+
+That distinction is especially important for downstream HAL generation:
+
+1. the core layers still hold the underlying hardware facts
+2. `profiles.mcuSoc` gives those facts stable names and topological relationships that generators can reference directly
+3. generator-specific policy can then live in a separate profile such as `profiles.embassyHal` without duplicating the hardware model
 
 ## How to use it
 

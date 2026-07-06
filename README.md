@@ -84,9 +84,12 @@ The repository now includes a layered JSON Schema set under `schema\`:
 | `schema/normalization.json` | Canonical mappings, naming rules, vendor quirks |
 | `schema/validation.json` | Validation rules and profiles |
 | `schema/profiles/mcu.json` | Optional MCU/SoC interpretation layer for canonical block classes and topology |
+| `schema/profiles/embassy-hal.json` | Optional Embassy-generation profile that binds HAIR hardware facts to crate-generation-ready driver contracts |
 | `schema/evidence-manifest.json` | Input manifest schema for extraction workflows |
 
 The core HAIR document can optionally include `profiles.mcuSoc` to classify common embedded concepts such as GPIO ports, timer classes, interrupt controllers, GPIO matrices, IO muxes, flash controllers, and other SoC infrastructure blocks.
+
+When a document is intended to drive Embassy-style HAL generation, it can also include `profiles.embassyHal` to bind supported driver instances to the audited clock/reset, interrupt, DMA, pin-routing, and semantic-operation records they require.
 
 ## Provenance and Auditability
 
@@ -175,6 +178,8 @@ Generators consume HAIR IR blocks and produce reproducible outputs from the same
 
 For SVD generation, HAIR device documents are expected to carry explicit CPU metadata rather than relying on generator defaults. That includes CPU revision, endianness, interrupt priority width, and core feature flags such as MPU/FPU presence and vendor system-timer configuration.
 
+For Embassy-style HAL generation, HAIR can additionally carry an explicit generation contract in `profiles.embassyHal` so generators fail deterministically when the input document falls outside the documented supported subset instead of silently inventing missing bindings.
+
 ## Validation
 
 The HAIR model is intended to validate against a set of invariants before generation, including:
@@ -193,15 +198,15 @@ For the first CLI cut, `validate` is narrower: it checks that a HAIR JSON docume
 
 ## CLI
 
-The first repository CLI is centered around a small set of commands operating on HAIR documents:
+The current repository CLI is centered around a small set of implemented commands operating on HAIR documents:
 
 ```text
 validate    Check that a HAIR document matches the schema set
-generate    Produce downstream artifacts, starting with SVD
+generate    Produce downstream artifacts, including SVD and Embassy-style HAL output
 diff        Compare two HAIR document revisions, including git-backed inputs
 ```
 
-`extract` and `normalize` remain workflow-driven operations rather than CLI promises in this repository. See `docs/cli.md` for the command contract and current first-cut scope.
+`extract` and `normalize` remain workflow-driven operations rather than CLI promises in this repository. See `docs/cli.md` and `docs/embassy-hal-profile.md` for the current command contract and Embassy-generation profile.
 
 ## Example Devices
 
@@ -220,6 +225,7 @@ The main human-oriented design references are:
 
 - `docs/schema.md` — overview of the full layered schema
 - `docs/mcu-profile.md` — explanation of the MCU/SoC profile layer
+- `docs/embassy-hal-profile.md` — Embassy HAL generation profile and supported first-cut subset
 - `docs/cli.md` — CLI scope and first-cut command contract
 
 ## Project Philosophy

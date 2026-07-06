@@ -239,7 +239,7 @@ This is intended for checks such as:
 - legal field ranges
 - register alignment
 - consistent reset values
-- generation readiness for specific targets such as SVD, HALs, or docs
+- generation readiness for specific targets such as SVD, HALs, Embassy HALs, or docs
 
 ## `schema/profiles/mcu.json`
 
@@ -262,6 +262,33 @@ This layer is especially useful when modeling both:
 
 The profile is optional and appears under `profiles.mcuSoc` in the top-level document.
 
+For generator-facing MCU work, `profiles.mcuSoc` now also carries named topology records that other profiles can reference directly, including:
+
+- interrupt sources and routes
+- clock and reset bindings
+- DMA channels and DMA routes
+- pin-routing records that tie pins, signals, remap controls, and electrical constraints together
+
+These remain hardware-topology facts, not Embassy-specific policy.
+
+## `schema/profiles/embassy-hal.json`
+
+The Embassy HAL profile is an optional generation-oriented layer mounted at `profiles.embassyHal`.
+
+It exists to describe how a concrete HAIR document lowers into an Embassy-style HAL crate **without** pushing Embassy-specific structure into the core hardware layers.
+
+It currently carries:
+
+- crate/package metadata for generated output
+- driver-instance declarations for supported peripheral blocks
+- explicit references to the clock/reset, interrupt, DMA, pin-routing, operation, and state-machine records each generated driver depends on
+- capability tags that are generator-facing rather than raw hardware facts
+
+The intended division of responsibility is:
+
+1. core layers + `profiles.mcuSoc` describe the hardware
+2. `profiles.embassyHal` describes a deterministic generator contract over that hardware
+
 ## How the layers fit together
 
 The layers are meant to answer different questions:
@@ -276,6 +303,7 @@ The layers are meant to answer different questions:
 | `normalization` | How do vendor-specific names map into canonical concepts? |
 | `validation` | What must be true before we trust or generate from the IR? |
 | `profiles.mcuSoc` | How should a device be interpreted as a canonical MCU/SoC architecture? |
+| `profiles.embassyHal` | How should this specific HAIR document lower into an Embassy-style HAL crate? |
 
 Together, these layers make HAIR a semantic IR rather than just a register dump.
 
@@ -292,6 +320,7 @@ In rough terms:
 - `normalization` adds cross-vendor abstraction
 - `validation` adds explicit correctness rules
 - `profiles.mcuSoc` adds an opinionated MCU/SoC interpretation layer
+- `profiles.embassyHal` adds an optional generator contract for Embassy-style HAL output
 
 That means SVD export should be treated as a **lowering step** from HAIR, not as the shape that defines HAIR itself.
 
@@ -310,7 +339,7 @@ Open design areas include:
 
 Those can evolve without abandoning the current layered structure.
 
-For the initial CLI, `hair validate` is limited to schema conformance against `schema/hair.json` and the layered subschemas. The declarative `validation` layer remains the place to model richer invariants and generator preconditions, but executing those rules is future tooling work.
+For the initial CLI, `hair validate` is limited to schema conformance against `schema/hair.json` and the layered subschemas. The declarative `validation` layer remains the place to model richer invariants and generator preconditions, including profile- and target-specific rules such as `generatorTargets: ["embassy-hal"]`, but executing those rules is future tooling work until implemented by repository tooling.
 
 ## Practical authoring guidance
 
@@ -325,6 +354,7 @@ When adding to the schema:
 7. Put machine-checkable requirements in `validation.json`.
 8. Keep `hair.json` focused on composition and the one-device-per-document model.
 9. Put canonical MCU/SoC interpretation rules in `schema/profiles/mcu.json`.
+10. Put Embassy-specific generation bindings in `schema/profiles/embassy-hal.json`.
 
 ## Summary
 
