@@ -3345,7 +3345,11 @@ fn collect_register_members(
                         register.id
                     );
                 }
-                let absolute_address = base_address + parent_offset + register.offset_bytes;
+                let absolute_address = checked_offset_add(
+                    checked_offset_add(base_address, parent_offset, "parent register offset")?,
+                    register.offset_bytes,
+                    &format!("register {} offset", register.id),
+                )?;
                 let resolved = ResolvedRegister {
                     id: register.id.clone(),
                     peripheral_ref: peripheral_ref.to_string(),
@@ -3378,13 +3382,22 @@ fn collect_register_members(
                     registers,
                     peripheral_ref,
                     base_address,
-                    parent_offset + cluster.offset_bytes,
+                    checked_offset_add(
+                        parent_offset,
+                        cluster.offset_bytes,
+                        &format!("cluster {} offset", cluster.name),
+                    )?,
                     &cluster.members,
                 )?;
             }
         }
     }
     Ok(())
+}
+
+fn checked_offset_add(left: u64, right: u64, context: &str) -> Result<u64> {
+    left.checked_add(right)
+        .ok_or_else(|| anyhow!("{context} overflows u64 address space"))
 }
 
 fn operation_method_slug(operation: &SemanticOperation) -> String {
@@ -6071,6 +6084,48 @@ mod tests {
     }
 
     #[test]
+    fn generate_embassy_rejects_overflowing_register_addresses() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        tim1.insert("baseAddress".to_string(), serde_json::json!(u64::MAX));
+        let registers = tim1
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 registers");
+        registers[0]
+            .as_object_mut()
+            .expect("tim1 ctlr1")
+            .insert("offsetBytes".to_string(), serde_json::json!(1));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("overflowing register-address fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("register reg.tim1.ctlr1 offset overflows u64 address space")
+        );
+    }
+
+    #[test]
     fn generate_embassy_rejects_arrayed_clusters() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let fixture = write_embassy_fixture(false);
@@ -6125,6 +6180,70 @@ mod tests {
                 .to_string()
                 .contains("cluster CH uses arrayed instances")
         );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_overflowing_cluster_offsets() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        tim1.insert(
+            "registers".to_string(),
+            serde_json::json!([
+                {
+                    "id": "cluster.tim1.ch",
+                    "kind": "cluster",
+                    "name": "CH",
+                    "offsetBytes": u64::MAX,
+                    "members": [
+                        {
+                            "id": "cluster.tim1.sub",
+                            "kind": "cluster",
+                            "name": "SUB",
+                            "offsetBytes": 1,
+                            "members": [
+                                {
+                                    "kind": "register",
+                                    "id": "reg.tim1.ccr",
+                                    "name": "CCR",
+                                    "offsetBytes": 0,
+                                    "widthBits": 16,
+                                    "fields": [
+                                        { "id": "field.tim1.ccr.value", "name": "VALUE", "bitRange": { "lsb": 0, "msb": 15 } }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("overflowing cluster-offset fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.chain().any(|cause| {
+            cause
+                .to_string()
+                .contains("offset overflows u64 address space")
+        }));
     }
 
     #[test]
