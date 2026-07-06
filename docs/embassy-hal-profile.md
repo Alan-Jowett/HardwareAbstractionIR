@@ -71,6 +71,33 @@ The table below defines the minimum expected evidence-backed HAIR surfaces for f
 4. A driver may omit `dmaRouteRefs` only when the generated first-cut implementation does not claim DMA-backed operation for that path.
 5. Unsupported optional hardware must produce an explicit generator error, not a stub or silently degraded driver.
 
+## Workflow targeting contract
+
+Extraction and audit workflows should not assume that Embassy-generation
+data is always desired. They should ask the user which optional profiles
+are in scope for the current run.
+
+If `profiles.embassyHal` is requested, workflows should also ask which
+supported driver kinds or concrete driver instances are intended. A
+request for the Embassy profile alone is not enough to justify inventing
+an all-peripheral Embassy-ready claim.
+
+If the user requests `profiles.embassyHal`, the workflow should also
+treat these supporting surfaces as required for the requested scope:
+
+- `profiles.mcuSoc.canonicalBlocks`
+- `profiles.mcuSoc.clockResetTopology` bindings needed by the selected drivers
+- `profiles.mcuSoc.interruptTopology` sources and routes needed by the selected drivers
+- `profiles.mcuSoc.dmaTopology` channels and routes needed by the selected drivers
+- `profiles.mcuSoc.pinTopology.routes` needed by the selected drivers
+- `semantics.operations` and `semantics.stateMachines` for driver kinds whose contract requires them
+
+Workflows should not invent a blanket Embassy-ready claim for every
+peripheral on the device. They should either:
+
+1. extract/audit the specific supported driver set requested by the user, or
+2. stop and ask the user to narrow the requested driver/profile scope.
+
 ## Relationship to the CLI contract
 
 `docs/cli.md` defines the CLI surface.
