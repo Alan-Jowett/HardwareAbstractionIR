@@ -1311,6 +1311,7 @@ impl EmbassyGenerationModel {
             .embassy_hal
             .as_ref()
             .ok_or_else(|| anyhow!("input document is missing profiles.embassyHal"))?;
+        validate_embassy_crate_metadata(&embassy.crate_info)?;
         let mcu = profiles
             .mcu_soc
             .as_ref()
@@ -1488,6 +1489,9 @@ impl EmbassyGenerationModel {
             });
         }
 
+        validate_driver_name_collisions(&drivers)?;
+        validate_interrupt_name_collisions(&document.structure.device.interrupts)?;
+
         Ok(Self {
             crate_info: embassy.crate_info.clone(),
             document_title: document.metadata.title.clone(),
@@ -1575,7 +1579,138 @@ fn validate_module_name(module_path: &str) -> Result<String> {
     {
         bail!("modulePath {module_path} does not normalize to a valid Rust module name");
     }
+    if is_rust_keyword(&normalized) {
+        bail!("modulePath {module_path} normalizes to reserved Rust keyword {normalized}");
+    }
+    if normalized == "metadata" {
+        bail!("modulePath {module_path} normalizes to reserved generated module name metadata");
+    }
     Ok(normalized)
+}
+
+fn validate_embassy_crate_metadata(crate_info: &EmbassyCrateMetadata) -> Result<()> {
+    validate_cargo_package_name(&crate_info.package_name)?;
+    validate_rust_identifier(&crate_info.crate_name, "crateName")?;
+    Ok(())
+}
+
+fn validate_cargo_package_name(package_name: &str) -> Result<()> {
+    if package_name.is_empty() {
+        bail!("packageName must not be empty");
+    }
+    if !package_name
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
+    {
+        bail!("packageName {package_name} is not a valid first-cut Cargo package name");
+    }
+    Ok(())
+}
+
+fn validate_rust_identifier(identifier: &str, field_name: &str) -> Result<()> {
+    if identifier.is_empty() {
+        bail!("{field_name} must not be empty");
+    }
+    let mut chars = identifier.chars();
+    let first = chars
+        .next()
+        .ok_or_else(|| anyhow!("{field_name} must not be empty"))?;
+    if !(first.is_ascii_alphabetic() || first == '_') {
+        bail!("{field_name} {identifier} is not a valid Rust identifier");
+    }
+    if !chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_') {
+        bail!("{field_name} {identifier} is not a valid Rust identifier");
+    }
+    if is_rust_keyword(identifier) {
+        bail!("{field_name} {identifier} is a reserved Rust keyword");
+    }
+    Ok(())
+}
+
+fn is_rust_keyword(identifier: &str) -> bool {
+    matches!(
+        identifier,
+        "as" | "break"
+            | "const"
+            | "continue"
+            | "crate"
+            | "else"
+            | "enum"
+            | "extern"
+            | "false"
+            | "fn"
+            | "for"
+            | "if"
+            | "impl"
+            | "in"
+            | "let"
+            | "loop"
+            | "match"
+            | "mod"
+            | "move"
+            | "mut"
+            | "pub"
+            | "ref"
+            | "return"
+            | "self"
+            | "Self"
+            | "static"
+            | "struct"
+            | "super"
+            | "trait"
+            | "true"
+            | "type"
+            | "unsafe"
+            | "use"
+            | "where"
+            | "while"
+            | "async"
+            | "await"
+            | "dyn"
+    )
+}
+
+fn validate_driver_name_collisions(drivers: &[ResolvedDriverInstance]) -> Result<()> {
+    let mut type_names = HashMap::<(&str, &str), &str>::new();
+    let mut const_names = HashMap::<(&str, String), &str>::new();
+    for driver in drivers {
+        let type_key = (driver.module_name.as_str(), driver.type_name.as_str());
+        if let Some(previous) = type_names.insert(type_key, driver.id.as_str()) {
+            bail!(
+                "drivers {previous} and {} normalize to the same Rust type {} in module {}",
+                driver.id,
+                driver.type_name,
+                driver.module_name
+            );
+        }
+
+        let const_name = to_rust_const_name(&driver.id);
+        let const_key = (driver.module_name.as_str(), const_name.clone());
+        if let Some(previous) = const_names.insert(const_key, driver.id.as_str()) {
+            bail!(
+                "drivers {previous} and {} normalize to the same Rust constant {} in module {}",
+                driver.id,
+                const_name,
+                driver.module_name
+            );
+        }
+    }
+    Ok(())
+}
+
+fn validate_interrupt_name_collisions(interrupts: &[Interrupt]) -> Result<()> {
+    let mut variants = HashMap::<String, &str>::new();
+    for interrupt in interrupts {
+        let variant = to_rust_type_name(&interrupt.name);
+        if let Some(previous) = variants.insert(variant.clone(), interrupt.id.as_str()) {
+            bail!(
+                "interrupts {previous} and {} normalize to the same Rust enum variant {}",
+                interrupt.id,
+                variant
+            );
+        }
+    }
+    Ok(())
 }
 
 fn resolve_ref_list<T: Clone>(
@@ -3665,6 +3800,155 @@ mod tests {
         let error =
             generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
         assert!(error.to_string().contains("unknown canonical block"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_keyword_module_names() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        drivers[0]
+            .as_object_mut()
+            .expect("rcc driver")
+            .insert("modulePath".to_string(), Value::String("type".to_string()));
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("keyword module fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("reserved Rust keyword"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_invalid_package_name() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("crate")
+            .and_then(Value::as_object_mut)
+            .expect("crate object")
+            .insert(
+                "packageName".to_string(),
+                Value::String("fixture embassy hal".to_string()),
+            );
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("invalid package fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("packageName"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_invalid_crate_name() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("crate")
+            .and_then(Value::as_object_mut)
+            .expect("crate object")
+            .insert(
+                "crateName".to_string(),
+                Value::String("fixture-embassy-hal".to_string()),
+            );
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("invalid crate fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("crateName"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_colliding_driver_type_names() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let spi = drivers[3].as_object_mut().expect("spi driver");
+        spi.insert("name".to_string(), Value::String("Usart1".to_string()));
+        spi.insert("modulePath".to_string(), Value::String("uart".to_string()));
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("colliding driver fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("same Rust type"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_colliding_interrupt_variants() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let interrupts = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("interrupts")
+            .and_then(Value::as_array_mut)
+            .expect("interrupts");
+        interrupts[1]
+            .as_object_mut()
+            .expect("spi interrupt")
+            .insert("name".to_string(), Value::String("USART1".to_string()));
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("colliding interrupt fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("same Rust enum variant"));
     }
 
     #[test]

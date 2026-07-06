@@ -202,11 +202,11 @@ The current repository CLI is centered around a small set of implemented command
 
 ```text
 validate    Check that a HAIR document matches the schema set
-generate    Produce downstream artifacts, currently starting with SVD
+generate    Produce downstream artifacts, including SVD and Embassy-style HAL output
 diff        Compare two HAIR document revisions, including git-backed inputs
 ```
 
-Embassy-style HAL generation is now specified as a planned CLI surface rather than an already-implemented command. `extract` and `normalize` remain workflow-driven operations rather than CLI promises in this repository. See `docs/cli.md` and `docs/embassy-hal-profile.md` for the current command contract and Embassy-generation profile.
+`extract` and `normalize` remain workflow-driven operations rather than CLI promises in this repository. See `docs/cli.md` and `docs/embassy-hal-profile.md` for the current command contract and Embassy-generation profile.
 
 ## Example Devices
 
