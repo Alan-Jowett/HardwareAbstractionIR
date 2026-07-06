@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://hair.dev/schema/profiles/embassy-hal.json",
   "title": "HAIR Embassy HAL Generation Profile",
-  "description": "An optional generation-oriented profile that binds HAIR structure, semantics, physical facts, and MCU topology into an auditable contract for Embassy-style HAL code generation.",
+  "description": "An optional generation-oriented profile that binds HAIR structure, semantics, physical facts, and MCU topology into an auditable contract for Embassy-style HAL code generation. Generated driver APIs must be derived from explicit referenced lowering inputs rather than from fixed placeholder method sets.",
   "type": "object",
   "properties": {
     "profileKind": {
@@ -139,9 +139,11 @@
               "$ref": "#/$defs/driverKind"
             },
             "modulePath": {
+              "description": "Generator-facing Rust module placement for the emitted driver/support code. This does not by itself define a fixed method set; methods must be derived from the referenced lowering inputs.",
               "$ref": "../common.json#/$defs/nonEmptyString"
             },
             "clockBindingRefs": {
+              "description": "Referenced clock bindings that may justify emitted clock-gating or bring-up helpers when those bindings and their linked structural/semantic data are sufficient for real lowering.",
               "type": "array",
               "items": {
                 "$ref": "../common.json#/$defs/entityRef"
@@ -149,6 +151,7 @@
               "uniqueItems": true
             },
             "resetBindingRefs": {
+              "description": "Referenced reset bindings that may justify emitted reset assert/release helpers when those bindings and their linked structural/semantic data are sufficient for real lowering.",
               "type": "array",
               "items": {
                 "$ref": "../common.json#/$defs/entityRef"
@@ -156,6 +159,7 @@
               "uniqueItems": true
             },
             "interruptRouteRefs": {
+              "description": "Referenced interrupt routes required by any emitted interrupt-driven API surface. Naming these routes does not permit the generator to invent unsupported async behavior.",
               "type": "array",
               "items": {
                 "$ref": "../common.json#/$defs/entityRef"
@@ -163,6 +167,7 @@
               "uniqueItems": true
             },
             "dmaRouteRefs": {
+              "description": "Referenced DMA routes required by any emitted DMA-backed API surface. The generator must fail explicitly if a claimed DMA-backed behavior lacks the additional lowering data needed for real code generation.",
               "type": "array",
               "items": {
                 "$ref": "../common.json#/$defs/entityRef"
@@ -170,6 +175,7 @@
               "uniqueItems": true
             },
             "pinRoles": {
+              "description": "Pin-role declarations used to bind generator-facing driver roles to explicit pin-topology routes. These support emitted pin/routing code only when the referenced routes and linked structure carry enough detail for real lowering.",
               "type": "array",
               "items": {
                 "$ref": "#/$defs/pinRole"
@@ -177,6 +183,7 @@
               "uniqueItems": true
             },
             "initOperationRefs": {
+              "description": "Semantic operations that define emitted bring-up, calibration, enable, or other executable helpers. These are lowering inputs, not documentation-only labels.",
               "type": "array",
               "items": {
                 "$ref": "../common.json#/$defs/entityRef"
@@ -184,6 +191,7 @@
               "uniqueItems": true
             },
             "stateMachineRefs": {
+              "description": "Semantic state machines that constrain emitted mode-transition helpers. These are lowering inputs, not documentation-only labels.",
               "type": "array",
               "items": {
                 "$ref": "../common.json#/$defs/entityRef"
@@ -191,6 +199,7 @@
               "uniqueItems": true
             },
             "capabilityTags": {
+              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs.",
               "type": "array",
               "items": {
                 "type": "string"

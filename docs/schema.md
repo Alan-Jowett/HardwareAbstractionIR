@@ -290,6 +290,12 @@ It currently carries:
 - explicit references to the clock/reset, interrupt, DMA, pin-routing, operation, and state-machine records each generated driver depends on
 - capability tags that are generator-facing rather than raw hardware facts
 
+The profile intentionally does **not** define one universal fixed Rust
+method list per `driverKind`. Instead, the emitted API surface is expected
+to be derived from the referenced topology and semantic records that the
+generator can lower into real register-level code for the concrete
+document under generation.
+
 The intended division of responsibility is:
 
 1. core layers + `profiles.mcuSoc` describe the hardware
