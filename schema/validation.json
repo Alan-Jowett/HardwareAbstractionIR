@@ -55,6 +55,7 @@
                 "field",
                 "semantic",
                 "physical",
+                "profile",
                 "normalization",
                 "provenance"
               ]
@@ -114,6 +115,7 @@
                   "svd",
                   "pac",
                   "hal",
+                  "embassy-hal",
                   "docs",
                   "simulator",
                   "all"

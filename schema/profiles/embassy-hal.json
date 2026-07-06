@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hair.dev/schema/profiles/embassy-hal.json",
+  "title": "HAIR Embassy HAL Generation Profile",
+  "description": "An optional generation-oriented profile that binds HAIR structure, semantics, physical facts, and MCU topology into an auditable contract for Embassy-style HAL code generation.",
+  "type": "object",
+  "properties": {
+    "profileKind": {
+      "const": "embassy-hal"
+    },
+    "crate": {
+      "$ref": "#/$defs/crateMetadata"
+    },
+    "driverInstances": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/driverInstance"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "profileKind",
+    "crate",
+    "driverInstances"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "entityBase": {
+      "allOf": [
+        {
+          "$ref": "../common.json#/$defs/namedEntity"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "provenance": {
+              "$ref": "../provenance.json#/$defs/provenanceRecord"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "driverKind": {
+      "type": "string",
+      "enum": [
+        "gpio-port",
+        "uart",
+        "usart",
+        "spi",
+        "i2c",
+        "timer",
+        "pwm",
+        "adc",
+        "dma",
+        "interrupt",
+        "rcc",
+        "custom"
+      ]
+    },
+    "resourceRequirement": {
+      "type": "string",
+      "enum": [
+        "required",
+        "optional",
+        "mutually-exclusive"
+      ]
+    },
+    "crateMetadata": {
+      "type": "object",
+      "properties": {
+        "packageName": {
+          "$ref": "../common.json#/$defs/nonEmptyString"
+        },
+        "crateName": {
+          "$ref": "../common.json#/$defs/nonEmptyString"
+        },
+        "targetArchitecture": {
+          "type": "string"
+        },
+        "featureFlags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "packageName",
+        "crateName"
+      ],
+      "additionalProperties": false
+    },
+    "pinRole": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "$ref": "../common.json#/$defs/nonEmptyString"
+        },
+        "signal": {
+          "$ref": "../common.json#/$defs/nonEmptyString"
+        },
+        "routeRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "requirement": {
+          "$ref": "#/$defs/resourceRequirement"
+        }
+      },
+      "required": [
+        "role",
+        "signal",
+        "routeRefs",
+        "requirement"
+      ],
+      "additionalProperties": false
+    },
+    "driverInstance": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "targetRef": {
+              "description": "For the first Embassy generator cut, this should resolve to a canonical block in profiles.mcuSoc that the driver instance lowers from.",
+              "$ref": "../common.json#/$defs/entityRef"
+            },
+            "driverKind": {
+              "$ref": "#/$defs/driverKind"
+            },
+            "modulePath": {
+              "$ref": "../common.json#/$defs/nonEmptyString"
+            },
+            "clockBindingRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "resetBindingRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "interruptRouteRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "dmaRouteRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "pinRoles": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/pinRole"
+              },
+              "uniqueItems": true
+            },
+            "initOperationRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "stateMachineRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "../common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            },
+            "capabilityTags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "targetRef",
+            "driverKind",
+            "modulePath"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

@@ -4,15 +4,16 @@ This document defines the first repository-managed CLI surface for HAIR.
 
 ## Scope
 
-The initial CLI covers three commands:
+The current Rust CLI implements these commands today:
 
 ```text
 hair validate <input>
 hair generate svd <input> [--output <path>]
+hair generate embassy <input> --output-dir <path>
 hair diff <left> <right>
 ```
 
-`extract` and `normalize` remain workflow-driven operations implemented through repository skills and review processes. They are not part of the initial CLI contract.
+`extract` and `normalize` remain workflow-driven operations implemented through repository skills and review processes. They are not part of the current CLI contract.
 
 ## Command contracts
 
@@ -51,6 +52,24 @@ First-cut exclusions:
 - silent omission of unsupported required data
 - lossless export of HAIR-only layers such as provenance, normalization metadata, physical constraints, or semantic relationships that have no SVD representation
 
+### `hair generate embassy`
+
+`generate embassy` lowers one HAIR document to a multi-file Embassy-style HAL crate.
+
+First-cut behavior:
+
+- require one HAIR JSON input document plus `--output-dir`
+- generate a compilable crate directory rather than a single stdout artifact
+- consume the hardware facts from the core layers plus the canonical MCU topology in `profiles.mcuSoc`
+- require an explicit `profiles.embassyHal` contract for the supported generated drivers
+- fail explicitly when the input document falls outside the documented supported subset or omits generator-required topology, semantics, or bindings documented in `docs/embassy-hal-profile.md`
+
+First-cut exclusions:
+
+- silent fallback from unsupported hardware to placeholder stubs
+- inference of driver contracts purely from vendor naming without the approved profile data
+- pretending that generic schema validity alone is enough for Embassy generation readiness
+
 ### `hair diff`
 
 `diff` compares two HAIR document revisions and reports structural differences.
@@ -85,8 +104,11 @@ The CLI is defined by the repository schema and documentation rather than by ad 
 
 - `validate` is anchored to `schema/hair.json` and its referenced layered schemas.
 - `generate svd` is a lowering step from HAIR, not a source of truth for the model.
+- `generate embassy` is also a lowering step from HAIR, but one that depends on stronger generation-profile data and explicit unsupported-feature failures.
 - `diff` compares HAIR documents as repository artifacts; it does not redefine HAIR semantics.
 
 The `validation` layer in HAIR remains important, but the first CLI cut only enforces schema conformance. Executing declarative validation rules is future work.
+
+Cross-profile `entityRef` values used by `profiles.embassyHal` are generator-resolved rather than schema-resolved. `hair validate` may accept a document whose Embassy refs are syntactically valid but unresolved; `generate embassy` must reject that document explicitly.
 
 Because `generate svd` now depends on CPU metadata that CMSIS-SVD requires, compliant HAIR device documents must include `structure.device.cpu.revision`, `structure.device.cpu.endianness`, `structure.device.cpu.interruptPriorityBits`, and `structure.device.cpu.featureFlags.{mpuPresent,fpuPresent,vendorSystemTimerConfig}`.
