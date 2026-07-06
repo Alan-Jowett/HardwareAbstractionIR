@@ -12133,150 +12133,6 @@
                     "status": "imported",
                     "confidence": 0.91
                   }
-                },
-                {
-                  "id": "field.wwdg_statr.exten_usbd_ls",
-                  "name": "EXTEN_USBD_LS",
-                  "bitRange": {
-                    "lsb": 0,
-                    "msb": 0
-                  },
-                  "provenance": {
-                    "sourceRefs": [
-                      "openwch-ch32v20x-header"
-                    ],
-                    "evidenceRefs": [
-                      "e_header_register_bitdefs"
-                    ],
-                    "status": "imported",
-                    "confidence": 0.91
-                  }
-                },
-                {
-                  "id": "field.wwdg_statr.exten_usbd_pu_en",
-                  "name": "EXTEN_USBD_PU_EN",
-                  "bitRange": {
-                    "lsb": 1,
-                    "msb": 1
-                  },
-                  "provenance": {
-                    "sourceRefs": [
-                      "openwch-ch32v20x-header"
-                    ],
-                    "evidenceRefs": [
-                      "e_header_register_bitdefs"
-                    ],
-                    "status": "imported",
-                    "confidence": 0.91
-                  }
-                },
-                {
-                  "id": "field.wwdg_statr.exten_eth_10m_en",
-                  "name": "EXTEN_ETH_10M_EN",
-                  "bitRange": {
-                    "lsb": 2,
-                    "msb": 2
-                  },
-                  "provenance": {
-                    "sourceRefs": [
-                      "openwch-ch32v20x-header"
-                    ],
-                    "evidenceRefs": [
-                      "e_header_register_bitdefs"
-                    ],
-                    "status": "imported",
-                    "confidence": 0.91
-                  }
-                },
-                {
-                  "id": "field.wwdg_statr.exten_pll_hsi_pre",
-                  "name": "EXTEN_PLL_HSI_PRE",
-                  "bitRange": {
-                    "lsb": 4,
-                    "msb": 4
-                  },
-                  "provenance": {
-                    "sourceRefs": [
-                      "openwch-ch32v20x-header"
-                    ],
-                    "evidenceRefs": [
-                      "e_header_register_bitdefs"
-                    ],
-                    "status": "imported",
-                    "confidence": 0.91
-                  }
-                },
-                {
-                  "id": "field.wwdg_statr.exten_lockup_en",
-                  "name": "EXTEN_LOCKUP_EN",
-                  "bitRange": {
-                    "lsb": 6,
-                    "msb": 6
-                  },
-                  "provenance": {
-                    "sourceRefs": [
-                      "openwch-ch32v20x-header"
-                    ],
-                    "evidenceRefs": [
-                      "e_header_register_bitdefs"
-                    ],
-                    "status": "imported",
-                    "confidence": 0.91
-                  }
-                },
-                {
-                  "id": "field.wwdg_statr.exten_lockup_rstf",
-                  "name": "EXTEN_LOCKUP_RSTF",
-                  "bitRange": {
-                    "lsb": 7,
-                    "msb": 7
-                  },
-                  "provenance": {
-                    "sourceRefs": [
-                      "openwch-ch32v20x-header"
-                    ],
-                    "evidenceRefs": [
-                      "e_header_register_bitdefs"
-                    ],
-                    "status": "imported",
-                    "confidence": 0.91
-                  }
-                },
-                {
-                  "id": "field.wwdg_statr.exten_ulldo_trim",
-                  "name": "EXTEN_ULLDO_TRIM",
-                  "bitRange": {
-                    "lsb": 8,
-                    "msb": 9
-                  },
-                  "provenance": {
-                    "sourceRefs": [
-                      "openwch-ch32v20x-header"
-                    ],
-                    "evidenceRefs": [
-                      "e_header_register_bitdefs"
-                    ],
-                    "status": "imported",
-                    "confidence": 0.91
-                  }
-                },
-                {
-                  "id": "field.wwdg_statr.exten_ldo_trim",
-                  "name": "EXTEN_LDO_TRIM",
-                  "bitRange": {
-                    "lsb": 10,
-                    "msb": 11
-                  },
-                  "provenance": {
-                    "sourceRefs": [
-                      "openwch-ch32v20x-header"
-                    ],
-                    "evidenceRefs": [
-                      "e_header_register_bitdefs"
-                    ],
-                    "status": "imported",
-                    "confidence": 0.91
-                  }
                 }
               ],
               "provenance": {
@@ -64342,7 +64198,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate device attached status on USB host."
+                  "access": "read-only",
+                  "description": "Indicate device attached status on USB host."
                 },
                 {
                   "id": "field.usbfsd_mis_st.dm_level",
@@ -64361,7 +64218,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate UDM level saved at device attached to USB host."
+                  "access": "read-only",
+                  "description": "Indicate UDM level saved at device attached to USB host."
                 },
                 {
                   "id": "field.usbfsd_mis_st.suspend",
@@ -64380,7 +64238,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate USB suspend status."
+                  "access": "read-only",
+                  "description": "Indicate USB suspend status."
                 },
                 {
                   "id": "field.usbfsd_mis_st.bus_reset",
@@ -64399,7 +64258,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate USB bus reset status."
+                  "access": "read-only",
+                  "description": "Indicate USB bus reset status."
                 },
                 {
                   "id": "field.usbfsd_mis_st.r_fifo_rdy",
@@ -64418,7 +64278,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate USB receiving FIFO ready status (not empty)."
+                  "access": "read-only",
+                  "description": "Indicate USB receiving FIFO ready status (not empty)."
                 },
                 {
                   "id": "field.usbfsd_mis_st.sie_free",
@@ -64437,7 +64298,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate USB SIE free status."
+                  "access": "read-only",
+                  "description": "Indicate USB SIE free status."
                 },
                 {
                   "id": "field.usbfsd_mis_st.sof_act",
@@ -64456,7 +64318,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate host SOF timer action status for USB host."
+                  "access": "read-only",
+                  "description": "Indicate host SOF timer action status for USB host."
                 },
                 {
                   "id": "field.usbfsd_mis_st.sof_pres",
@@ -64475,7 +64338,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate host SOF timer presage status."
+                  "access": "read-only",
+                  "description": "Indicate host SOF timer presage status."
                 }
               ]
             },
@@ -64615,7 +64479,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate USB SIE free status."
+                  "access": "read-only",
+                  "description": "Indicate USB SIE free status."
                 },
                 {
                   "id": "field.usbfsd_int_fg.tog_ok",
@@ -64634,7 +64499,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate current USB transfer toggle is OK."
+                  "access": "read-only",
+                  "description": "Indicate current USB transfer toggle is OK."
                 },
                 {
                   "id": "field.usbfsd_int_fg.is_nak",
@@ -64653,7 +64519,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate current USB transfer is NAK received."
+                  "access": "read-only",
+                  "description": "Indicate current USB transfer is NAK received."
                 }
               ]
             },
@@ -64698,7 +64565,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, bit mask of current transfer endpoint number for USB device mode."
+                  "access": "read-only",
+                  "description": "Bit mask of current transfer endpoint number for USB device mode."
                 },
                 {
                   "id": "field.usbfsd_int_st.mask_token",
@@ -64717,7 +64585,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, bit mask of current token PID code received for USB device mode.",
+                  "access": "read-only",
+                  "description": "Bit mask of current token PID code received for USB device mode.",
                   "enumeratedSets": [
                     {
                       "id": "enum.usbfsd_int_st.mask_token",
@@ -64774,7 +64643,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate current USB transfer toggle is OK."
+                  "access": "read-only",
+                  "description": "Indicate current USB transfer toggle is OK."
                 },
                 {
                   "id": "field.usbfsd_int_st.is_nak",
@@ -64793,7 +64663,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate current USB transfer is NAK received for USB device mode."
+                  "access": "read-only",
+                  "description": "Indicate current USB transfer is NAK received for USB device mode."
                 }
               ]
             },
@@ -68679,7 +68550,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate device attached status on USB host."
+                  "access": "read-only",
+                  "description": "Indicate device attached status on USB host."
                 },
                 {
                   "id": "field.usbfsh_mis_st.dm_level",
@@ -68698,7 +68570,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate UDM level saved at device attached to USB host."
+                  "access": "read-only",
+                  "description": "Indicate UDM level saved at device attached to USB host."
                 },
                 {
                   "id": "field.usbfsh_mis_st.suspend",
@@ -68717,7 +68590,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate USB suspend status."
+                  "access": "read-only",
+                  "description": "Indicate USB suspend status."
                 },
                 {
                   "id": "field.usbfsh_mis_st.bus_reset",
@@ -68736,7 +68610,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate USB bus reset status."
+                  "access": "read-only",
+                  "description": "Indicate USB bus reset status."
                 },
                 {
                   "id": "field.usbfsh_mis_st.r_fifo_rdy",
@@ -68755,7 +68630,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate USB receiving FIFO ready status (not empty)."
+                  "access": "read-only",
+                  "description": "Indicate USB receiving FIFO ready status (not empty)."
                 },
                 {
                   "id": "field.usbfsh_mis_st.sie_free",
@@ -68774,7 +68650,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate USB SIE free status."
+                  "access": "read-only",
+                  "description": "Indicate USB SIE free status."
                 },
                 {
                   "id": "field.usbfsh_mis_st.sof_act",
@@ -68793,7 +68670,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate host SOF timer action status for USB host."
+                  "access": "read-only",
+                  "description": "Indicate host SOF timer action status for USB host."
                 },
                 {
                   "id": "field.usbfsh_mis_st.sof_pres",
@@ -68812,7 +68690,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate host SOF timer presage status."
+                  "access": "read-only",
+                  "description": "Indicate host SOF timer presage status."
                 }
               ]
             },
@@ -68952,7 +68831,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate USB SIE free status."
+                  "access": "read-only",
+                  "description": "Indicate USB SIE free status."
                 },
                 {
                   "id": "field.usbfsh_int_fg.tog_ok",
@@ -68971,7 +68851,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate current USB transfer toggle is OK."
+                  "access": "read-only",
+                  "description": "Indicate current USB transfer toggle is OK."
                 },
                 {
                   "id": "field.usbfsh_int_fg.is_nak",
@@ -68990,7 +68871,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate current USB transfer is NAK received."
+                  "access": "read-only",
+                  "description": "Indicate current USB transfer is NAK received."
                 }
               ]
             },
@@ -69035,7 +68917,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, bit mask of current transfer handshake response for USB host mode: 0000=no response, time out from device, others=handshake response PID received."
+                  "access": "read-only",
+                  "description": "Bit mask of current transfer handshake response for USB host mode: 0000=no response, time out from device, others=handshake response PID received."
                 },
                 {
                   "id": "field.usbfsh_int_st.mask_token",
@@ -69054,7 +68937,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, bit mask of current token PID code received for USB device mode.",
+                  "access": "read-only",
+                  "description": "Bit mask of current token PID code received for USB device mode.",
                   "enumeratedSets": [
                     {
                       "id": "enum.usbfsh_int_st.mask_token",
@@ -69111,7 +68995,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate current USB transfer toggle is OK."
+                  "access": "read-only",
+                  "description": "Indicate current USB transfer toggle is OK."
                 },
                 {
                   "id": "field.usbfsh_int_st.is_nak",
@@ -69130,7 +69015,8 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, indicate current USB transfer is NAK received for USB device mode."
+                  "access": "read-only",
+                  "description": "Indicate current USB transfer is NAK received for USB device mode."
                 }
               ]
             },

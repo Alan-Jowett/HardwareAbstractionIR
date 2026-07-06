@@ -12,7 +12,7 @@
 
 | Artifact | Path | Role | Target identity | Notes |
 | --- | --- | --- | --- | --- |
-| HAIR JSON | `evidence\wch\ch32v203c8t6\hair.json` | Audit target | `WCH CH32V203C8T6` | Schema-valid HAIR document. Contains 8 provenance sources, 27 evidence records, 33 peripherals, 397 registers, 2366 fields, 47 interrupts, and a populated physical layer. |
+| HAIR JSON | `evidence\wch\ch32v203c8t6\hair.json` | Audit target | `WCH CH32V203C8T6` | Schema-valid HAIR document. Contains 8 provenance sources, 30 evidence records, 33 peripherals, 411 registers, 2468 fields, 47 interrupts, and a populated physical layer. |
 | Evidence manifest | `evidence\wch\ch32v203c8t6\evidence-manifest.json` | Approved evidence scope | `WCH CH32V203C8T6` | Schema-valid manifest with 8 approved sources. Mixes official WCH family-level sources with explicitly approved community metadata gap-fillers. |
 | Source-discovery report | `evidence\wch\ch32v203c8t6\source-discovery.md` | Source-approval context | `WCH CH32V203C8T6` | Documents why the community SVD/YAML were approved only as auditable gap-fillers rather than silent replacements. |
 | Extraction report | `evidence\wch\ch32v203c8t6\extraction-report.md` | Claimed extraction status | `WCH CH32V203C8T6` | Useful as a claim set to challenge, but not treated as evidence by itself. |
@@ -41,7 +41,7 @@
 
 1. **No shell-only MMIO peripherals were found.** All 33 modeled peripherals carry `registers[]`; none are placeholder shells.
 2. **Peripheral-level structure is broadly complete for the approved scope.** All 33 peripherals have descriptions and address blocks.
-3. **Register-bearing depth is present across the modeled device.** The HAIR contains 397 registers and 2366 fields, with timer/CAN adjudication notes carried in provenance, explicit timer alternate-register overlays for `CHCTLR1` / `CHCTLR2`, substantial USB prose/enum enrichment, and no remaining USB field overlaps in generated SVD output.
+3. **Register-bearing depth is present across the modeled device.** The HAIR contains 411 registers and 2468 fields, with timer/CAN adjudication notes carried in provenance, explicit timer alternate-register overlays for `CHCTLR1` / `CHCTLR2`, substantial USB prose/enum enrichment, and no remaining USB field overlaps in generated SVD output.
 4. **Cluster-level prose is absent.** The document contains 4 register clusters (`CAN1.TxMailBox`, `CAN1.FIFOMailBox`, `CAN1.FilterRegister`, `DMA1.Channel`) and 0 cluster descriptions.
 5. **Physical supporting structure is present.** The physical layer includes 6 clocks, 1 timing constraint, 1 power domain, 1 interrupt controller, 44 pins, and 1 package.
 
@@ -53,12 +53,12 @@
 | --- | --- |
 | Peripheral descriptions | Present on 33 / 33 peripherals. |
 | Peripheral address-block coverage | Present on 33 / 33 peripherals. |
-| Register access modes | Present on 397 / 397 registers. |
-| Register descriptions | Present on 393 / 397 registers. This now includes the timer/CAN/ADC/AFIO/DMA alias/template cases, explicit timer overlay views, and substantial USB prose imported conservatively from the approved transitive YAML fragments. |
-| Register reset values | Present on 303 / 397 registers. For exact community-SVD register matches, no additional reset values remain unimported. |
-| Field descriptions | Present on 1938 / 2366 fields. This now includes the safe alias/template import cases, explicit timer overlay fields, added CAN mailbox/filter and DMA channel template fields, and most USB device/host prose. |
-| Field access modes | Present on 254 / 2366 fields. Field-level access coverage remains sparse because the approved community sources annotate only a subset of fields. |
-| Field enumerated values | Present on 25 / 2366 fields, concentrated in the imported USB metadata. |
+| Register access modes | Present on 411 / 411 registers. |
+| Register descriptions | Present on 407 / 411 registers. This now includes the timer/CAN/ADC/AFIO/DMA alias/template cases, explicit timer overlay views, and substantial USB prose imported conservatively from the approved transitive YAML fragments. |
+| Register reset values | Present on 313 / 411 registers. For exact community-SVD register matches, no additional reset values remain unimported. |
+| Field descriptions | Present on 2048 / 2468 fields. This now includes the safe alias/template import cases, explicit timer overlay fields, added CAN mailbox/filter and DMA channel template fields, and most USB device/host prose. |
+| Field access modes | Present on 315 / 2468 fields. Field-level access coverage remains sparse because the approved community sources annotate only a subset of fields, although the imported USB read-only status bits are now modeled explicitly. |
+| Field enumerated values | Present on 25 / 2468 fields, concentrated in the imported USB metadata. |
 
 ### Metadata present in approved evidence but not extracted
 
@@ -73,8 +73,8 @@
 | Metadata class | Audit result |
 | --- | --- |
 | Cluster descriptions | Not confidently recoverable without further manual reconciliation. |
-| Register reset masks | 0 / 397 present; the approved community SVD does not provide a reliable importable reset-mask layer here. |
-| Remaining field access modes | 2112 / 2366 fields still lack field-level access semantics. Official sources examined so far do not provide a complete field-permission model, and the community SVD only annotates a subset. |
+| Register reset masks | 0 / 411 present; the approved community SVD does not provide a reliable importable reset-mask layer here. |
+| Remaining field access modes | 2153 / 2468 fields still lack field-level access semantics. Official sources examined so far do not provide a complete field-permission model, and the community SVD only annotates a subset. |
 | Field enumerated values | 25 enumerated sets are now present, but almost entirely within the imported USB fragments; broad non-USB enum coverage is still absent. |
 
 ## Unsupported or Weakly Supported Claims

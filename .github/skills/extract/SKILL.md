@@ -488,6 +488,9 @@ Run consistency checks across the JSON:
 
 - no overlapping or impossible memory ranges
 - registers and fields fit within declared widths
+- no two unrelated fields in the same register view claim the same exact
+  bit range; any remaining overlap must be an explicitly justified
+  aggregate or encoding-alias pattern
 - interrupt numbers/controllers are internally consistent
 - profile references resolve to extracted entities
 - provenance references resolve to actual `sources[]` / `evidence[]`
