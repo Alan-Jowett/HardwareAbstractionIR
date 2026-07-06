@@ -2,7 +2,7 @@
 
 This document defines the intended first-cut contract for `profiles.embassyHal`.
 
-It is a **governing specification** for Embassy-style HAL generation. The current Rust CLI may lag this document until the implementation phase lands, but generators are expected to follow this contract rather than inventing their own binding rules.
+It is a **governing specification** for Embassy-style HAL generation. The current Rust CLI implements the first-cut contract described here, but later profile revisions may still extend beyond the current generator; generators are expected to follow this contract rather than inventing their own binding rules.
 
 ## Design intent
 

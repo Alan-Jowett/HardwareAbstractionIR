@@ -786,6 +786,8 @@ fn escape_pointer(segment: &str) -> String {
 #[serde(rename_all = "camelCase")]
 struct HairDocument {
     metadata: DocumentMetadata,
+    #[serde(default)]
+    provenance: HairProvenance,
     structure: HairStructure,
     #[serde(default)]
     semantics: HairSemantics,
@@ -801,6 +803,59 @@ struct DocumentMetadata {
     title: String,
     version: String,
     description: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HairProvenance {
+    #[serde(default)]
+    sources: Vec<HairProvenanceSource>,
+    #[serde(default)]
+    evidence: Vec<HairProvenanceEvidence>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HairProvenanceSource {
+    id: String,
+    name: String,
+    #[serde(default)]
+    kind: Option<String>,
+    #[serde(default)]
+    path: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HairProvenanceEvidence {
+    id: String,
+    name: String,
+    source_ref: String,
+    #[serde(default)]
+    normalized_claim: Option<String>,
+    #[serde(default)]
+    extraction_method: Option<String>,
+    #[serde(default)]
+    confidence: Option<f64>,
+    #[serde(default)]
+    locator: Option<HairProvenanceLocator>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HairProvenanceLocator {
+    #[serde(default)]
+    fragment: Option<String>,
+    #[serde(default)]
+    section: Option<String>,
+    #[serde(default)]
+    line_start: Option<u32>,
+    #[serde(default)]
+    line_end: Option<u32>,
+    #[serde(default)]
+    page_start: Option<u32>,
+    #[serde(default)]
+    page_end: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1308,12 +1363,14 @@ struct DriverResourceScopeInputs<'a> {
 struct EmbassyGenerationModel {
     crate_info: EmbassyCrateMetadata,
     document_title: String,
+    document_version: String,
     device_name: String,
     target_architecture: Option<String>,
     feature_flags: Vec<String>,
     interrupts: Vec<Interrupt>,
     pins: Vec<PhysicalPin>,
     drivers: Vec<ResolvedDriverInstance>,
+    provenance: HairProvenance,
 }
 
 impl EmbassyGenerationModel {
@@ -1540,12 +1597,14 @@ impl EmbassyGenerationModel {
         Ok(Self {
             crate_info: embassy.crate_info.clone(),
             document_title: document.metadata.title.clone(),
+            document_version: document.metadata.version.clone(),
             device_name: document.structure.device.name.clone(),
             target_architecture: embassy.crate_info.target_architecture.clone(),
             feature_flags: embassy.crate_info.feature_flags.clone(),
             interrupts: document.structure.device.interrupts.clone(),
             pins: document.physical.pins.clone(),
             drivers,
+            provenance: document.provenance.clone(),
         })
     }
 
@@ -1633,6 +1692,13 @@ fn validate_module_name(module_path: &str) -> Result<String> {
     Ok(normalized)
 }
 
+fn render_module_provenance_const(module_name: &str) -> String {
+    format!(
+        "pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProvenance {{\n    module_name: {},\n    document_title: metadata::GENERATED_METADATA.document_title,\n    document_version: metadata::GENERATED_METADATA.document_version,\n    source_ids: metadata::GENERATED_PROVENANCE_SOURCE_IDS,\n    evidence_ids: metadata::GENERATED_PROVENANCE_EVIDENCE_IDS,\n}};\n\n",
+        render_rust_string(module_name)
+    )
+}
+
 fn validate_embassy_crate_metadata(crate_info: &EmbassyCrateMetadata) -> Result<()> {
     validate_cargo_package_name(&crate_info.package_name)?;
     validate_rust_identifier(&crate_info.crate_name, "crateName")?;
@@ -1712,6 +1778,21 @@ fn is_rust_keyword(identifier: &str) -> bool {
             | "async"
             | "await"
             | "dyn"
+            | "abstract"
+            | "become"
+            | "box"
+            | "do"
+            | "final"
+            | "gen"
+            | "macro"
+            | "override"
+            | "priv"
+            | "try"
+            | "typeof"
+            | "union"
+            | "unsized"
+            | "virtual"
+            | "yield"
     )
 }
 
@@ -2087,12 +2168,31 @@ fn render_embassy_lib_rs(model: &EmbassyGenerationModel) -> String {
 fn render_embassy_metadata_rs(model: &EmbassyGenerationModel) -> String {
     let doc_comment_title = model.document_title.replace(['\r', '\n'], " ");
     format!(
-        "//! Generated Embassy-style HAL metadata for {}.\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum ResourceRequirement {{\n    Required,\n    Optional,\n    MutuallyExclusive,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Error {{\n    Unsupported(&'static str),\n    InvalidReference(&'static str),\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ClockBinding {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub consumer_ref: &'static str,\n    pub clock_ref: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ResetBinding {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub target_ref: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct InterruptRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_ref: &'static str,\n    pub interrupt_ref: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct DmaRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub peripheral_ref: &'static str,\n    pub channel_ref: &'static str,\n    pub direction: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct PinRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub pin_ref: &'static str,\n    pub peripheral_ref: &'static str,\n    pub signal: &'static str,\n    pub route_type: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct PinRole {{\n    pub role: &'static str,\n    pub signal: &'static str,\n    pub routes: &'static [PinRoute],\n    pub requirement: ResourceRequirement,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct GeneratedMetadata {{\n    pub document_title: &'static str,\n    pub device_name: &'static str,\n    pub target_architecture: Option<&'static str>,\n    pub feature_flags: &'static [&'static str],\n}}\n\npub const GENERATED_METADATA: GeneratedMetadata = GeneratedMetadata {{\n    document_title: {},\n    device_name: {},\n    target_architecture: {},\n    feature_flags: &{},\n}};\n",
+        "//! Generated Embassy-style HAL metadata for {}.\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum ResourceRequirement {{\n    Required,\n    Optional,\n    MutuallyExclusive,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Error {{\n    Unsupported(&'static str),\n    InvalidReference(&'static str),\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ClockBinding {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub consumer_ref: &'static str,\n    pub clock_ref: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ResetBinding {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub target_ref: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct InterruptRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_ref: &'static str,\n    pub interrupt_ref: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct DmaRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub peripheral_ref: &'static str,\n    pub channel_ref: &'static str,\n    pub direction: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct PinRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub pin_ref: &'static str,\n    pub peripheral_ref: &'static str,\n    pub signal: &'static str,\n    pub route_type: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct PinRole {{\n    pub role: &'static str,\n    pub signal: &'static str,\n    pub routes: &'static [PinRoute],\n    pub requirement: ResourceRequirement,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct ProvenanceSource {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub kind: Option<&'static str>,\n    pub path: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct ProvenanceEvidence {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_ref: &'static str,\n    pub normalized_claim: Option<&'static str>,\n    pub extraction_method: Option<&'static str>,\n    pub confidence: Option<f64>,\n    pub locator: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ModuleProvenance {{\n    pub module_name: &'static str,\n    pub document_title: &'static str,\n    pub document_version: &'static str,\n    pub source_ids: &'static [&'static str],\n    pub evidence_ids: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct GeneratedMetadata {{\n    pub document_title: &'static str,\n    pub document_version: &'static str,\n    pub device_name: &'static str,\n    pub target_architecture: Option<&'static str>,\n    pub feature_flags: &'static [&'static str],\n    pub provenance_sources: &'static [ProvenanceSource],\n    pub provenance_evidence: &'static [ProvenanceEvidence],\n}}\n\npub const GENERATED_PROVENANCE_SOURCE_IDS: &[&str] = &{};\npub const GENERATED_PROVENANCE_EVIDENCE_IDS: &[&str] = &{};\n\npub const GENERATED_METADATA: GeneratedMetadata = GeneratedMetadata {{\n    document_title: {},\n    document_version: {},\n    device_name: {},\n    target_architecture: {},\n    feature_flags: &{},\n    provenance_sources: &{},\n    provenance_evidence: &{},\n}};\n",
         doc_comment_title,
+        render_named_entity_slice(
+            &model
+                .provenance
+                .sources
+                .iter()
+                .map(|item| item.id.clone())
+                .collect::<Vec<_>>()
+        ),
+        render_named_entity_slice(
+            &model
+                .provenance
+                .evidence
+                .iter()
+                .map(|item| item.id.clone())
+                .collect::<Vec<_>>()
+        ),
         render_rust_string(&model.document_title),
+        render_rust_string(&model.document_version),
         render_rust_string(&model.device_name),
         render_optional_rust_string(model.target_architecture.as_deref()),
         render_string_slice(&model.feature_flags),
+        render_provenance_source_slice(&model.provenance.sources),
+        render_provenance_evidence_slice(&model.provenance.evidence),
     )
 }
 
@@ -2111,6 +2211,7 @@ fn render_interrupt_module(
         ));
     }
     out.push_str("}\n\n");
+    out.push_str(&render_module_provenance_const("interrupt"));
     for driver in drivers {
         out.push_str(&render_driver_instance(driver));
     }
@@ -2126,6 +2227,7 @@ fn render_driver_module(
         "//! Generated Embassy-style {module_name} module for {}.\n\nuse crate::metadata;\n\n",
         model.device_name
     );
+    out.push_str(&render_module_provenance_const(module_name));
     for driver in drivers {
         out.push_str(&render_driver_instance(driver));
     }
@@ -2287,6 +2389,33 @@ fn render_pin_role_slice(const_prefix: &str, items: &[ResolvedEmbassyPinRole]) -
     }))
 }
 
+fn render_provenance_source_slice(items: &[HairProvenanceSource]) -> String {
+    render_struct_slice(items.iter().map(|item| {
+        format!(
+            "ProvenanceSource {{ id: {}, name: {}, kind: {}, path: {} }}",
+            render_rust_string(&item.id),
+            render_rust_string(&item.name),
+            render_optional_rust_string(item.kind.as_deref()),
+            render_optional_rust_string(item.path.as_deref())
+        )
+    }))
+}
+
+fn render_provenance_evidence_slice(items: &[HairProvenanceEvidence]) -> String {
+    render_struct_slice(items.iter().map(|item| {
+        format!(
+            "ProvenanceEvidence {{ id: {}, name: {}, source_ref: {}, normalized_claim: {}, extraction_method: {}, confidence: {}, locator: {} }}",
+            render_rust_string(&item.id),
+            render_rust_string(&item.name),
+            render_rust_string(&item.source_ref),
+            render_optional_rust_string(item.normalized_claim.as_deref()),
+            render_optional_rust_string(item.extraction_method.as_deref()),
+            render_optional_f64(item.confidence),
+            render_optional_rust_string(render_locator_summary(item.locator.as_ref()).as_deref())
+        )
+    }))
+}
+
 fn render_resource_requirement(requirement: &str) -> &'static str {
     match requirement {
         "required" => "Required",
@@ -2329,6 +2458,45 @@ fn render_optional_rust_string(value: Option<&str>) -> String {
     match value {
         Some(text) => format!("Some({})", render_rust_string(text)),
         None => "None".to_string(),
+    }
+}
+
+fn render_optional_f64(value: Option<f64>) -> String {
+    match value {
+        Some(number) => format!("Some({number})"),
+        None => "None".to_string(),
+    }
+}
+
+fn render_locator_summary(locator: Option<&HairProvenanceLocator>) -> Option<String> {
+    let locator = locator?;
+    let mut parts = Vec::new();
+    if let Some(fragment) = &locator.fragment {
+        parts.push(format!("fragment={fragment}"));
+    }
+    if let Some(section) = &locator.section {
+        parts.push(format!("section={section}"));
+    }
+    if let Some(line_start) = locator.line_start {
+        match locator.line_end {
+            Some(line_end) if line_end != line_start => {
+                parts.push(format!("lines={line_start}-{line_end}"));
+            }
+            _ => parts.push(format!("line={line_start}")),
+        }
+    }
+    if let Some(page_start) = locator.page_start {
+        match locator.page_end {
+            Some(page_end) if page_end != page_start => {
+                parts.push(format!("pages={page_start}-{page_end}"));
+            }
+            _ => parts.push(format!("page={page_start}")),
+        }
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join(", "))
     }
 }
 
@@ -3914,6 +4082,15 @@ mod tests {
         assert!(output_dir.path().join("src").join("lib.rs").exists());
         assert!(output_dir.path().join("src").join("uart.rs").exists());
         assert!(output_dir.path().join("src").join("interrupt.rs").exists());
+        let metadata_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("metadata.rs"))
+                .expect("metadata.rs");
+        let uart_rs = std::fs::read_to_string(output_dir.path().join("src").join("uart.rs"))
+            .expect("uart.rs");
+        assert!(metadata_rs.contains("GENERATED_PROVENANCE_SOURCE_IDS"));
+        assert!(metadata_rs.contains("GENERATED_PROVENANCE_EVIDENCE_IDS"));
+        assert!(metadata_rs.contains("document_version"));
+        assert!(uart_rs.contains("MODULE_PROVENANCE"));
 
         let cargo_output = Command::new("cargo")
             .arg("check")
@@ -4045,6 +4222,36 @@ mod tests {
         let error =
             generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
         assert!(error.to_string().contains("reserved Rust keyword"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_extended_reserved_module_keywords() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        drivers[0]
+            .as_object_mut()
+            .expect("rcc driver")
+            .insert("modulePath".to_string(), Value::String("union".to_string()));
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("extended keyword module fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("reserved Rust keyword union"));
     }
 
     #[test]
@@ -4256,6 +4463,34 @@ mod tests {
             generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
         assert!(error.to_string().contains("reserved Rust keyword Self"));
         assert!(error.to_string().contains("interrupt variant"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_extended_reserved_crate_name() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("crate")
+            .and_then(Value::as_object_mut)
+            .expect("crate object")
+            .insert("crateName".to_string(), Value::String("union".to_string()));
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("extended keyword crate fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("reserved Rust keyword"));
+        assert!(error.to_string().contains("crateName union"));
     }
 
     #[test]
