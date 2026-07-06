@@ -39,6 +39,37 @@ This means Embassy generation is **profile-derived and evidence-bounded**:
 the emitted Rust API may vary across documents of the same `driverKind`
 depending on what was actually extracted, reviewed, and approved.
 
+## Generated metadata contract
+
+Embassy generation emits more than executable driver methods. It also
+emits a Rust metadata surface that downstream code can inspect and reuse
+without reparsing HAIR JSON.
+
+That generated metadata must preserve the **generator-relevant structured
+subset** of the approved lowering inputs rather than collapsing them to
+names or IDs when the extra structure affects real lowering or downstream
+consumption.
+
+Normative consequences:
+
+1. emitted metadata for `profiles.mcuSoc` bindings and routes must retain
+   the generator-relevant fields from the approved HAIR records, including
+   control refs and other lowering-significant selectors such as binding
+   kind, controller/reset-domain references, remap-control references, and
+   reset-default route selection when present
+2. emitted metadata for `semantics.operations` and
+   `semantics.stateMachines` must preserve structured execution data such
+   as steps, expressions, targets, transitions, and effects rather than
+   degrading those records to ID-only lists
+3. generators may still omit unrelated optional fields that are not part
+   of the supported first-cut lowering contract, but they must not discard
+   structure that a non-stub lowering pass or downstream consumer would
+   need to reproduce the approved behavior deterministically
+4. when a generated driver module already performs a lowering justified by
+   those approved inputs, the richer metadata should remain available to
+   that module in structured form instead of being re-derived by ad hoc
+   name matching
+
 ## Reference resolution contract
 
 The Embassy profile uses `entityRef` strings heavily (`targetRef`, `clockBindingRefs`, `interruptRouteRefs`, `dmaRouteRefs`, `pinRoles[].routeRefs`, and semantic-operation refs).
@@ -110,6 +141,11 @@ The generator may choose exact Rust names and signatures, but those names
 and signatures must be traceable to the approved HAIR lowering inputs.
 The schema profile does not define a universal fixed Rust API surface for
 all documents of a given `driverKind`.
+
+The same traceability requirement applies to the generated metadata
+surface: helper structs and constants in the emitted crate must preserve
+the lowering-relevant structure needed to explain and reuse the approved
+driver contract.
 
 ## Authoring rules for `profiles.embassyHal`
 
