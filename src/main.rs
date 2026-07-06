@@ -4033,12 +4033,12 @@ fn render_optional_value_literal(value: Option<&Value>) -> String {
             )
         }
         Some(Value::Number(number)) if number.is_u64() => format!(
-            "Some(metadata::ValueLiteral::Number({}))",
+            "Some(metadata::ValueLiteral::Number({}u64 as f64))",
             number.as_u64().unwrap_or_default()
         ),
         Some(Value::Number(number)) => format!(
             "Some(metadata::ValueLiteral::Number({}))",
-            number.as_f64().unwrap_or_default()
+            render_f64_literal(number.as_f64().unwrap_or_default())
         ),
         Some(Value::String(text)) => format!(
             "Some(metadata::ValueLiteral::String({}))",
@@ -4053,9 +4053,22 @@ fn render_optional_value_literal(value: Option<&Value>) -> String {
     }
 }
 
+fn render_f64_literal(value: f64) -> String {
+    if value.is_nan() {
+        return "f64::NAN".to_string();
+    }
+    if value == f64::INFINITY {
+        return "f64::INFINITY".to_string();
+    }
+    if value == f64::NEG_INFINITY {
+        return "f64::NEG_INFINITY".to_string();
+    }
+    format!("{value:?}f64")
+}
+
 fn render_optional_f64(value: Option<f64>) -> String {
     match value {
-        Some(number) => format!("Some({number})"),
+        Some(number) => format!("Some({})", render_f64_literal(number)),
         None => "None".to_string(),
     }
 }
@@ -5984,6 +5997,85 @@ mod tests {
         assert!(rcc_rs.contains("steps: &[metadata::SemanticOperationStep"));
         assert!(timer_rs.contains("transitions: &[metadata::SemanticTransition"));
         assert!(uart_rs.contains("MODULE_PROVENANCE"));
+
+        let cargo_output = Command::new("cargo")
+            .arg("check")
+            .current_dir(output_dir.path())
+            .output()
+            .expect("cargo check");
+        assert!(
+            cargo_output.status.success(),
+            "generated crate should compile:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&cargo_output.stdout),
+            String::from_utf8_lossy(&cargo_output.stderr)
+        );
+    }
+
+    #[test]
+    fn generate_embassy_renders_numeric_value_literals_as_valid_f64_rust() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        let tim_operation = operations[2].as_object_mut().expect("tim operation");
+        let tim_steps = tim_operation
+            .get_mut("steps")
+            .and_then(Value::as_array_mut)
+            .expect("tim steps");
+        tim_steps[0]
+            .as_object_mut()
+            .expect("tim step")
+            .insert("value".to_string(), serde_json::json!(1.5));
+
+        let state_machines = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("stateMachines")
+            .and_then(Value::as_array_mut)
+            .expect("state machines");
+        let tim_state_machine = state_machines[0]
+            .as_object_mut()
+            .expect("tim state machine");
+        let states = tim_state_machine
+            .get_mut("states")
+            .and_then(Value::as_array_mut)
+            .expect("states");
+        let enabled_state = states[1].as_object_mut().expect("enabled state");
+        let invariants = enabled_state
+            .get_mut("invariants")
+            .and_then(Value::as_array_mut)
+            .expect("invariants");
+        invariants[0].as_object_mut().expect("invariant").insert(
+            "expectedValue".to_string(),
+            serde_json::json!(18446744073709551615u64),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("numeric literal fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
+
+        let timer_rs = std::fs::read_to_string(output_dir.path().join("src").join("timer.rs"))
+            .expect("timer.rs");
+        assert!(timer_rs.contains("Some(metadata::ValueLiteral::Number(1.5f64))"));
+        assert!(
+            timer_rs
+                .contains("Some(metadata::ValueLiteral::Number(18446744073709551615u64 as f64))")
+        );
 
         let cargo_output = Command::new("cargo")
             .arg("check")
