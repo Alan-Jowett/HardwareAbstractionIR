@@ -359,7 +359,7 @@ family:
 
 - the HAIR overlay view
 - the approved-source view or fragment
-- the comparison basis: exact / alias / array-template /
+- the comparison basis: exact / alias / array/template /
   overlay-preserving
 - which metadata classes were imported
 - the explicit residual unmapped registers or fields
