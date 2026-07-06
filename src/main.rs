@@ -2932,9 +2932,7 @@ fn render_operation_methods(
                     )
                 })?;
                 let parsed = parse_field_write_expression(
-                    step.expression
-                        .as_ref()
-                        .map(|expression| expression.text.as_str()),
+                    step.expression.as_ref(),
                     step.value.as_ref(),
                     &operation.id,
                     step.index,
@@ -2960,16 +2958,36 @@ fn render_state_machine_methods(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
 ) -> Result<Vec<GeneratedMethod>> {
+    let mut transition_pair_counts = BTreeMap::<(String, String), usize>::new();
+    for state_machine in &driver.state_machines {
+        for transition in &state_machine.transitions {
+            *transition_pair_counts
+                .entry((transition.from.clone(), transition.to.clone()))
+                .or_default() += 1;
+        }
+    }
     let mut methods = Vec::new();
     for state_machine in &driver.state_machines {
         for transition in &state_machine.transitions {
             let (register, field, value) =
                 resolve_transition_effect_write(model, driver, state_machine, transition)?;
-            let method_name = format!(
-                "transition_{}_to_{}",
-                to_rust_method_name(&transition.from),
-                to_rust_method_name(&transition.to)
-            );
+            let from_slug = to_rust_method_name(&transition.from);
+            let to_slug = to_rust_method_name(&transition.to);
+            let method_name = if transition_pair_counts
+                .get(&(transition.from.clone(), transition.to.clone()))
+                .copied()
+                .unwrap_or_default()
+                > 1
+            {
+                format!(
+                    "transition_{}_{}_to_{}",
+                    state_machine_method_slug(state_machine),
+                    from_slug,
+                    to_slug
+                )
+            } else {
+                format!("transition_{}_to_{}", from_slug, to_slug)
+            };
             let mut code =
                 format!("    pub fn {method_name}(&self) -> Result<(), metadata::Error> {{\n");
             code.push_str(&render_register_write_statement(
@@ -3378,6 +3396,15 @@ fn operation_method_slug(operation: &SemanticOperation) -> String {
     to_rust_method_name(candidate)
 }
 
+fn state_machine_method_slug(state_machine: &SemanticStateMachine) -> String {
+    let candidate = state_machine
+        .id
+        .rsplit('.')
+        .next()
+        .unwrap_or(state_machine.name.as_str());
+    to_rust_method_name(candidate)
+}
+
 fn last_ref_segment(reference: &str) -> &str {
     reference.rsplit('.').next().unwrap_or(reference)
 }
@@ -3433,13 +3460,28 @@ struct ParsedFieldWrite {
 }
 
 fn parse_field_write_expression(
-    expression_text: Option<&str>,
+    expression: Option<&SemanticExpression>,
     _value: Option<&Value>,
     operation_id: &str,
     step_index: u32,
 ) -> Result<ParsedFieldWrite> {
-    if let Some(text) = expression_text {
-        return parse_field_write_text(text).with_context(|| {
+    if let Some(expression) = expression {
+        let language = expression.language.as_deref().ok_or_else(|| {
+            anyhow!(
+                "operation {} step {} is missing expression language required for lowering",
+                operation_id,
+                step_index
+            )
+        })?;
+        if language != "plain" {
+            bail!(
+                "operation {} step {} uses unsupported expression language {} for first-cut lowering",
+                operation_id,
+                step_index,
+                language
+            );
+        }
+        return parse_field_write_text(&expression.text).with_context(|| {
             format!("parsing expression on operation {operation_id} step {step_index}")
         });
     }
@@ -5703,6 +5745,47 @@ mod tests {
     }
 
     #[test]
+    fn generate_embassy_rejects_non_plain_expression_languages() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        let adc_operation = operations[1].as_object_mut().expect("adc operation");
+        let steps = adc_operation
+            .get_mut("steps")
+            .and_then(Value::as_array_mut)
+            .expect("steps");
+        steps[0]
+            .as_object_mut()
+            .expect("first step")
+            .get_mut("expression")
+            .and_then(Value::as_object_mut)
+            .expect("expression")
+            .insert("language".to_string(), serde_json::json!("cel"));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("non-plain expression fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("uses unsupported expression language cel")
+        );
+    }
+
+    #[test]
     fn generate_embassy_rejects_contradictory_set_clear_expressions() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let fixture = write_embassy_fixture(false);
@@ -6165,6 +6248,68 @@ mod tests {
             .expect("uart.rs");
         assert!(uart_rs.contains("pub fn assert_usart1_rst_usart1_reset"));
         assert!(uart_rs.contains("pub fn assert_usart1_rst_usart1_alt_reset"));
+    }
+
+    #[test]
+    fn generate_embassy_disambiguates_duplicate_transition_pairs() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let state_machines = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("stateMachines")
+            .and_then(Value::as_array_mut)
+            .expect("state machines");
+        state_machines.push(serde_json::json!({
+            "id": "sm.tim1.alt",
+            "name": "TIM1 alternate modes",
+            "targetRefs": ["periph.tim1"],
+            "initialState": "disabled",
+            "states": [{ "name": "disabled" }, { "name": "enabled" }],
+            "transitions": [
+                {
+                    "from": "disabled",
+                    "to": "enabled",
+                    "trigger": "alternate enable",
+                    "effects": [{ "kind": "starts-hardware", "targetRef": "field.tim1.ctlr1.cen" }]
+                }
+            ]
+        }));
+
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let tim1 = drivers[5].as_object_mut().expect("tim1 driver");
+        tim1.get_mut("stateMachineRefs")
+            .and_then(Value::as_array_mut)
+            .expect("stateMachineRefs")
+            .push(serde_json::json!("sm.tim1.alt"));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("duplicate transition-pair fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
+
+        let timer_rs = std::fs::read_to_string(output_dir.path().join("src").join("timer.rs"))
+            .expect("timer.rs");
+        assert!(timer_rs.contains("pub fn transition_tim1_disabled_to_enabled"));
+        assert!(timer_rs.contains("pub fn transition_alt_disabled_to_enabled"));
     }
 
     #[test]
