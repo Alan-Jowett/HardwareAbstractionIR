@@ -2999,15 +2999,14 @@ fn is_alias_like_duplicate_field(left: &Field, right: &Field) -> bool {
 
     // The reference HAIR still carries legacy alias/encoding pseudo-fields.
     // Keep rejecting USB/WWDG-style duplicate ownership while tolerating those patterns.
-    has_alias_prefix(left_name, right_name)
-        || has_alias_prefix(right_name, left_name)
-        || left_name.chars().any(|ch| ch.is_ascii_digit())
-        || right_name.chars().any(|ch| ch.is_ascii_digit())
+    has_alias_prefix(left_name, right_name) || has_alias_prefix(right_name, left_name)
 }
 
 fn has_alias_prefix(name: &str, base: &str) -> bool {
-    name.strip_prefix(base)
-        .is_some_and(|suffix| suffix.starts_with('_'))
+    name.strip_prefix(base).is_some_and(|suffix| {
+        !suffix.is_empty()
+            && (suffix.starts_with('_') || suffix.chars().all(|ch| ch.is_ascii_digit()))
+    })
 }
 
 fn write_cluster(xml: &mut XmlWriter, cluster: &RegisterCluster) -> Result<()> {
@@ -4017,6 +4016,76 @@ mod tests {
         assert!(svd.contains("<name>MODE_1</name>"));
         assert!(svd.contains("<name>MODE0</name>"));
         assert!(svd.contains("<name>MODE1</name>"));
+    }
+
+    #[test]
+    fn generate_svd_rejects_unrelated_numbered_duplicate_fields() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "peripherals": [
+                        {
+                            "id": "periph.timer",
+                            "name": "TIMER",
+                            "type": "TIM",
+                            "baseAddress": 1073741824u64,
+                            "registers": [
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl",
+                                    "name": "CTRL",
+                                    "offsetBytes": 0,
+                                    "widthBits": 8,
+                                    "fields": [
+                                        {
+                                            "id": "field.ctrl.flag1",
+                                            "name": "FLAG1",
+                                            "bitRange": {
+                                                "lsb": 0,
+                                                "msb": 0
+                                            }
+                                        },
+                                        {
+                                            "id": "field.ctrl.flag8",
+                                            "name": "FLAG8",
+                                            "bitRange": {
+                                                "lsb": 0,
+                                                "msb": 0
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let error = generate_svd(&document).expect_err("generation should fail");
+        assert!(error.to_string().contains(
+            "register reg.ctrl has duplicate bit ownership in fields field.ctrl.flag1 and field.ctrl.flag8"
+        ));
     }
 
     #[test]
