@@ -1394,107 +1394,82 @@ impl EmbassyGenerationModel {
             .as_ref()
             .ok_or_else(|| anyhow!("input document is missing profiles.mcuSoc"))?;
 
-        let canonical_blocks = mcu
-            .canonical_blocks
-            .iter()
-            .map(|item| (item.id.as_str(), item.clone()))
-            .collect::<HashMap<_, _>>();
+        let canonical_blocks =
+            collect_unique_map(&mcu.canonical_blocks, "canonical block", |item| {
+                item.id.as_str()
+            })?;
         let clock_bindings = mcu
             .clock_reset_topology
             .as_ref()
             .map(|topology| {
-                topology
-                    .clock_bindings
-                    .iter()
-                    .map(|item| (item.id.as_str(), item.clone()))
-                    .collect::<HashMap<_, _>>()
+                collect_unique_map(&topology.clock_bindings, "clock binding", |item| {
+                    item.id.as_str()
+                })
             })
+            .transpose()?
             .unwrap_or_default();
         let reset_bindings = mcu
             .clock_reset_topology
             .as_ref()
             .map(|topology| {
-                topology
-                    .reset_bindings
-                    .iter()
-                    .map(|item| (item.id.as_str(), item.clone()))
-                    .collect::<HashMap<_, _>>()
+                collect_unique_map(&topology.reset_bindings, "reset binding", |item| {
+                    item.id.as_str()
+                })
             })
+            .transpose()?
             .unwrap_or_default();
         let interrupt_routes = mcu
             .interrupt_topology
             .as_ref()
             .map(|topology| {
-                topology
-                    .routes
-                    .iter()
-                    .map(|item| (item.id.as_str(), item.clone()))
-                    .collect::<HashMap<_, _>>()
+                collect_unique_map(&topology.routes, "interrupt route", |item| item.id.as_str())
             })
+            .transpose()?
             .unwrap_or_default();
         let interrupt_sources = mcu
             .interrupt_topology
             .as_ref()
             .map(|topology| {
-                topology
-                    .sources
-                    .iter()
-                    .map(|item| (item.id.as_str(), item.clone()))
-                    .collect::<HashMap<_, _>>()
+                collect_unique_map(&topology.sources, "interrupt source", |item| {
+                    item.id.as_str()
+                })
             })
+            .transpose()?
             .unwrap_or_default();
         let dma_routes = mcu
             .dma_topology
             .as_ref()
             .map(|topology| {
-                topology
-                    .routes
-                    .iter()
-                    .map(|item| (item.id.as_str(), item.clone()))
-                    .collect::<HashMap<_, _>>()
+                collect_unique_map(&topology.routes, "DMA route", |item| item.id.as_str())
             })
+            .transpose()?
             .unwrap_or_default();
         let dma_channels = mcu
             .dma_topology
             .as_ref()
             .map(|topology| {
-                topology
-                    .channels
-                    .iter()
-                    .map(|item| (item.id.as_str(), item.clone()))
-                    .collect::<HashMap<_, _>>()
+                collect_unique_map(&topology.channels, "DMA channel", |item| item.id.as_str())
             })
+            .transpose()?
             .unwrap_or_default();
         let pin_routes = mcu
             .pin_topology
             .as_ref()
             .map(|topology| {
-                topology
-                    .routes
-                    .iter()
-                    .map(|item| (item.id.as_str(), item.clone()))
-                    .collect::<HashMap<_, _>>()
+                collect_unique_map(&topology.routes, "pin route", |item| item.id.as_str())
             })
+            .transpose()?
             .unwrap_or_default();
-        let operations = document
-            .semantics
-            .operations
-            .iter()
-            .map(|item| (item.id.as_str(), item.clone()))
-            .collect::<HashMap<_, _>>();
-        let state_machines = document
-            .semantics
-            .state_machines
-            .iter()
-            .map(|item| (item.id.as_str(), item.clone()))
-            .collect::<HashMap<_, _>>();
-        let device_interrupts = document
-            .structure
-            .device
-            .interrupts
-            .iter()
-            .map(|item| (item.id.as_str(), item.clone()))
-            .collect::<HashMap<_, _>>();
+        let operations = document.semantics.operations.as_slice();
+        let operations = collect_unique_map(operations, "operation", |item| item.id.as_str())?;
+        let state_machines = document.semantics.state_machines.as_slice();
+        let state_machines =
+            collect_unique_map(state_machines, "state machine", |item| item.id.as_str())?;
+        let device_interrupts = document.structure.device.interrupts.as_slice();
+        let device_interrupts =
+            collect_unique_map(device_interrupts, "device interrupt", |item| {
+                item.id.as_str()
+            })?;
 
         let mut drivers = Vec::with_capacity(embassy.driver_instances.len());
         for driver in &embassy.driver_instances {
@@ -2060,6 +2035,24 @@ fn validate_driver_resource_scope(
     }
 
     Ok(())
+}
+
+fn collect_unique_map<'a, T: Clone, F>(
+    items: &'a [T],
+    kind: &str,
+    id_fn: F,
+) -> Result<HashMap<&'a str, T>>
+where
+    F: Fn(&'a T) -> &'a str,
+{
+    let mut map = HashMap::new();
+    for item in items {
+        let id = id_fn(item);
+        if map.insert(id, item.clone()).is_some() {
+            bail!("duplicate {kind} id {id} is not supported");
+        }
+    }
+    Ok(map)
 }
 
 fn resolve_ref_list<T: Clone>(
@@ -4457,6 +4450,42 @@ mod tests {
         let error =
             generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
         assert!(error.to_string().contains("unknown channel"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_duplicate_canonical_block_ids() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("canonicalBlocks")
+            .and_then(Value::as_array_mut)
+            .expect("canonicalBlocks")
+            .push(serde_json::json!({
+                "id": "block.usart1",
+                "name": "Duplicate USART1 block",
+                "targetRef": "periph.spi1",
+                "blockClass": "spi"
+            }));
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("duplicate canonical block fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("duplicate canonical block id block.usart1")
+        );
     }
 
     #[test]
