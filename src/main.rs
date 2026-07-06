@@ -854,7 +854,10 @@ enum RegisterBlockMember {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Register {
+    id: String,
     name: String,
+    #[serde(default)]
+    display_name: Option<String>,
     #[serde(default)]
     description: Option<String>,
     offset_bytes: u64,
@@ -867,6 +870,8 @@ struct Register {
     reset_mask: Option<Value>,
     #[serde(default)]
     array: Option<ArrayShape>,
+    #[serde(default)]
+    alternate_of_ref: Option<String>,
     #[serde(default)]
     fields: Vec<Field>,
 }
@@ -883,13 +888,13 @@ struct RegisterCluster {
     members: Vec<RegisterBlockMember>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ArrayShape {
     axes: Vec<ArrayAxis>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ArrayAxis {
     count: u32,
@@ -897,6 +902,17 @@ struct ArrayAxis {
     labels: Vec<String>,
     #[serde(default)]
     stride_bytes: Option<u64>,
+}
+
+#[derive(Debug)]
+struct RegisterBinding {
+    svd_name: String,
+    offset_bytes: u64,
+    width_bits: u32,
+    access: Option<String>,
+    reset_value: Option<Value>,
+    reset_mask: Option<Value>,
+    array: Option<ArrayShape>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1127,9 +1143,10 @@ fn write_peripheral(
     }
 
     if !peripheral.registers.is_empty() {
+        let register_names = build_register_name_index(&peripheral.registers)?;
         xml.start_element("registers");
         for member in &peripheral.registers {
-            write_register_member(xml, member)?;
+            write_register_member(xml, member, &register_names)?;
         }
         xml.end_element();
     }
@@ -1210,18 +1227,75 @@ fn assign_svd_interrupts<'a>(
     Ok(assigned)
 }
 
-fn write_register_member(xml: &mut XmlWriter, member: &RegisterBlockMember) -> Result<()> {
+fn build_register_name_index(
+    members: &[RegisterBlockMember],
+) -> Result<HashMap<String, RegisterBinding>> {
+    let mut names = HashMap::new();
+    for member in members {
+        if let RegisterBlockMember::Register(register) = member {
+            let svd_name = svd_item_name(&register.name, register.array.as_ref())?;
+            let binding = RegisterBinding {
+                svd_name: svd_name.clone(),
+                offset_bytes: register.offset_bytes,
+                width_bits: register.width_bits,
+                access: register.access.clone(),
+                reset_value: register.reset_value.clone(),
+                reset_mask: register.reset_mask.clone(),
+                array: register.array.clone(),
+            };
+            if let Some(previous_binding) = names.insert(register.id.clone(), binding) {
+                bail!(
+                    "duplicate register id {} for SVD generation (names: {} and {})",
+                    register.id,
+                    previous_binding.svd_name,
+                    svd_name
+                );
+            }
+        }
+    }
+    Ok(names)
+}
+
+fn write_register_member(
+    xml: &mut XmlWriter,
+    member: &RegisterBlockMember,
+    register_names: &HashMap<String, RegisterBinding>,
+) -> Result<()> {
     match member {
-        RegisterBlockMember::Register(register) => write_register(xml, register),
+        RegisterBlockMember::Register(register) => write_register(xml, register, register_names),
         RegisterBlockMember::Cluster(cluster) => write_cluster(xml, cluster),
     }
 }
 
-fn write_register(xml: &mut XmlWriter, register: &Register) -> Result<()> {
+fn write_register(
+    xml: &mut XmlWriter,
+    register: &Register,
+    register_names: &HashMap<String, RegisterBinding>,
+) -> Result<()> {
     xml.start_element("register");
     write_array_shape(xml, &register.name, register.array.as_ref())?;
+    if let Some(display_name) = &register.display_name {
+        write_text_element(xml, "displayName", display_name);
+    }
     if let Some(description) = &register.description {
         write_text_element(xml, "description", description);
+    }
+    if let Some(alternate_of_ref) = &register.alternate_of_ref {
+        if alternate_of_ref == &register.id {
+            bail!(
+                "register {} references itself via alternateOfRef",
+                register.id
+            );
+        }
+        let alternate_binding = register_names.get(alternate_of_ref).ok_or_else(|| {
+            anyhow!(
+                "register {} references unknown alternateOfRef {}",
+                register.id,
+                alternate_of_ref
+            )
+        })?;
+        validate_alternate_register_contract(register, alternate_of_ref, alternate_binding)?;
+        write_text_element(xml, "alternateRegister", &alternate_binding.svd_name);
     }
     write_text_element(xml, "addressOffset", &format_hex(register.offset_bytes));
     write_text_element(xml, "size", &register.width_bits.to_string());
@@ -1255,6 +1329,7 @@ fn write_register(xml: &mut XmlWriter, register: &Register) -> Result<()> {
 }
 
 fn write_cluster(xml: &mut XmlWriter, cluster: &RegisterCluster) -> Result<()> {
+    let register_names = build_register_name_index(&cluster.members)?;
     xml.start_element("cluster");
     write_array_shape(xml, &cluster.name, cluster.array.as_ref())?;
     if let Some(description) = &cluster.description {
@@ -1262,9 +1337,59 @@ fn write_cluster(xml: &mut XmlWriter, cluster: &RegisterCluster) -> Result<()> {
     }
     write_text_element(xml, "addressOffset", &format_hex(cluster.offset_bytes));
     for member in &cluster.members {
-        write_register_member(xml, member)?;
+        write_register_member(xml, member, &register_names)?;
     }
     xml.end_element();
+    Ok(())
+}
+
+fn validate_alternate_register_contract(
+    register: &Register,
+    alternate_of_ref: &str,
+    alternate_binding: &RegisterBinding,
+) -> Result<()> {
+    if register.offset_bytes != alternate_binding.offset_bytes {
+        bail!(
+            "register {} references alternateOfRef {} with mismatched offsetBytes",
+            register.id,
+            alternate_of_ref
+        );
+    }
+    if register.width_bits != alternate_binding.width_bits {
+        bail!(
+            "register {} references alternateOfRef {} with mismatched widthBits",
+            register.id,
+            alternate_of_ref
+        );
+    }
+    if register.access != alternate_binding.access {
+        bail!(
+            "register {} references alternateOfRef {} with mismatched access",
+            register.id,
+            alternate_of_ref
+        );
+    }
+    if register.reset_value != alternate_binding.reset_value {
+        bail!(
+            "register {} references alternateOfRef {} with mismatched resetValue",
+            register.id,
+            alternate_of_ref
+        );
+    }
+    if register.reset_mask != alternate_binding.reset_mask {
+        bail!(
+            "register {} references alternateOfRef {} with mismatched resetMask",
+            register.id,
+            alternate_of_ref
+        );
+    }
+    if register.array != alternate_binding.array {
+        bail!(
+            "register {} references alternateOfRef {} with mismatched array shape",
+            register.id,
+            alternate_of_ref
+        );
+    }
     Ok(())
 }
 
@@ -1330,10 +1455,9 @@ fn choose_enumerated_set(sets: &[EnumeratedSet]) -> Result<&EnumeratedSet> {
 }
 
 fn write_array_shape(xml: &mut XmlWriter, name: &str, array: Option<&ArrayShape>) -> Result<()> {
+    write_text_element(xml, "name", &svd_item_name(name, array)?);
     match array {
-        None => {
-            write_text_element(xml, "name", name);
-        }
+        None => {}
         Some(shape) => {
             if shape.axes.len() != 1 {
                 bail!("multi-axis arrays are not supported in first-cut SVD generation");
@@ -1342,7 +1466,6 @@ fn write_array_shape(xml: &mut XmlWriter, name: &str, array: Option<&ArrayShape>
             let stride_bytes = axis
                 .stride_bytes
                 .ok_or_else(|| anyhow!("arrayed item {} is missing strideBytes", name))?;
-            write_text_element(xml, "name", &format!("{name}%s"));
             write_text_element(xml, "dim", &axis.count.to_string());
             write_text_element(xml, "dimIncrement", &format_hex(stride_bytes));
             if !axis.labels.is_empty() {
@@ -1351,6 +1474,18 @@ fn write_array_shape(xml: &mut XmlWriter, name: &str, array: Option<&ArrayShape>
         }
     }
     Ok(())
+}
+
+fn svd_item_name(name: &str, array: Option<&ArrayShape>) -> Result<String> {
+    match array {
+        None => Ok(name.to_string()),
+        Some(shape) => {
+            if shape.axes.len() != 1 {
+                bail!("multi-axis arrays are not supported in first-cut SVD generation");
+            }
+            Ok(format!("{name}%s"))
+        }
+    }
 }
 
 fn write_text_element(xml: &mut XmlWriter, name: &str, value: &str) {
@@ -1618,6 +1753,413 @@ mod tests {
         let svd = generate_svd(&document).expect("svd generation");
         assert!(svd.contains(r#"<peripheral derivedFrom="BASE"><name>DERIVED</name>"#));
         assert!(!svd.contains(r#"derivedFrom="periph.base""#));
+    }
+
+    #[test]
+    fn generate_svd_emits_alternate_register_views() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "peripherals": [
+                        {
+                            "id": "periph.timer",
+                            "name": "TIMER",
+                            "type": "TIM",
+                            "baseAddress": 1073741824u64,
+                            "registers": [
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl.output",
+                                    "name": "CTRL_Output",
+                                    "displayName": "CTRL",
+                                    "offsetBytes": 0,
+                                    "widthBits": 32,
+                                    "access": "read-write",
+                                    "fields": [
+                                        {
+                                            "id": "field.output",
+                                            "name": "MODE",
+                                            "bitRange": {
+                                                "lsb": 0,
+                                                "msb": 1
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl.input",
+                                    "name": "CTRL_Input",
+                                    "displayName": "CTRL",
+                                    "alternateOfRef": "reg.ctrl.output",
+                                    "offsetBytes": 0,
+                                    "widthBits": 32,
+                                    "access": "read-write",
+                                    "fields": [
+                                        {
+                                            "id": "field.input",
+                                            "name": "FILTER",
+                                            "bitRange": {
+                                                "lsb": 0,
+                                                "msb": 3
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let svd = generate_svd(&document).expect("svd generation");
+        assert!(svd.contains("<name>CTRL_Output</name><displayName>CTRL</displayName>"));
+        assert!(svd.contains("<name>CTRL_Input</name><displayName>CTRL</displayName>"));
+        assert!(svd.contains("<alternateRegister>CTRL_Output</alternateRegister>"));
+    }
+
+    #[test]
+    fn generate_svd_uses_array_name_for_alternate_register_views() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "peripherals": [
+                        {
+                            "id": "periph.timer",
+                            "name": "TIMER",
+                            "type": "TIM",
+                            "baseAddress": 1073741824u64,
+                            "registers": [
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl.output",
+                                    "name": "CTRL_Output",
+                                    "displayName": "CTRL",
+                                    "offsetBytes": 0,
+                                    "widthBits": 32,
+                                    "array": {
+                                        "axes": [
+                                            {
+                                                "name": "channel",
+                                                "count": 2,
+                                                "strideBytes": 4
+                                            }
+                                        ]
+                                    }
+                                },
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl.input",
+                                    "name": "CTRL_Input",
+                                    "displayName": "CTRL",
+                                    "alternateOfRef": "reg.ctrl.output",
+                                    "offsetBytes": 0,
+                                    "widthBits": 32,
+                                    "array": {
+                                        "axes": [
+                                            {
+                                                "name": "channel",
+                                                "count": 2,
+                                                "strideBytes": 4
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let svd = generate_svd(&document).expect("svd generation");
+        assert!(svd.contains("<name>CTRL_Output%s</name>"));
+        assert!(svd.contains("<alternateRegister>CTRL_Output%s</alternateRegister>"));
+    }
+
+    #[test]
+    fn generate_svd_rejects_unknown_alternate_register_reference() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "peripherals": [
+                        {
+                            "id": "periph.timer",
+                            "name": "TIMER",
+                            "type": "TIM",
+                            "baseAddress": 1073741824u64,
+                            "registers": [
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl.input",
+                                    "name": "CTRL_Input",
+                                    "alternateOfRef": "reg.ctrl.output",
+                                    "offsetBytes": 0,
+                                    "widthBits": 32
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let error = generate_svd(&document).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("references unknown alternateOfRef")
+        );
+    }
+
+    #[test]
+    fn generate_svd_rejects_self_referential_alternate_register() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "peripherals": [
+                        {
+                            "id": "periph.timer",
+                            "name": "TIMER",
+                            "type": "TIM",
+                            "baseAddress": 1073741824u64,
+                            "registers": [
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl",
+                                    "name": "CTRL",
+                                    "alternateOfRef": "reg.ctrl",
+                                    "offsetBytes": 0,
+                                    "widthBits": 32
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let error = generate_svd(&document).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("register reg.ctrl references itself via alternateOfRef")
+        );
+    }
+
+    #[test]
+    fn generate_svd_rejects_cross_scope_alternate_register_reference() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "peripherals": [
+                        {
+                            "id": "periph.timer",
+                            "name": "TIMER",
+                            "type": "TIM",
+                            "baseAddress": 1073741824u64,
+                            "registers": [
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl.output",
+                                    "name": "CTRL_Output",
+                                    "offsetBytes": 0,
+                                    "widthBits": 32
+                                },
+                                {
+                                    "kind": "cluster",
+                                    "id": "cluster.inner",
+                                    "name": "INNER",
+                                    "offsetBytes": 16,
+                                    "members": [
+                                        {
+                                            "kind": "register",
+                                            "id": "reg.inner.input",
+                                            "name": "INNER_Input",
+                                            "alternateOfRef": "reg.ctrl.output",
+                                            "offsetBytes": 0,
+                                            "widthBits": 32
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let error = generate_svd(&document).expect_err("generation should fail");
+        assert!(error.to_string().contains(
+            "register reg.inner.input references unknown alternateOfRef reg.ctrl.output"
+        ));
+    }
+
+    #[test]
+    fn generate_svd_rejects_incompatible_alternate_register_contract() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "cpu": {
+                        "name": "QingKe V4B",
+                        "revision": "V4B",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": false,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": true
+                        }
+                    },
+                    "peripherals": [
+                        {
+                            "id": "periph.timer",
+                            "name": "TIMER",
+                            "type": "TIM",
+                            "baseAddress": 1073741824u64,
+                            "registers": [
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl.output",
+                                    "name": "CTRL_Output",
+                                    "offsetBytes": 0,
+                                    "widthBits": 32,
+                                    "access": "read-write",
+                                    "resetValue": 0
+                                },
+                                {
+                                    "kind": "register",
+                                    "id": "reg.ctrl.input",
+                                    "name": "CTRL_Input",
+                                    "alternateOfRef": "reg.ctrl.output",
+                                    "offsetBytes": 0,
+                                    "widthBits": 16,
+                                    "access": "read-write",
+                                    "resetValue": 0
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let error = generate_svd(&document).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("references alternateOfRef reg.ctrl.output with mismatched widthBits")
+        );
     }
 
     #[test]

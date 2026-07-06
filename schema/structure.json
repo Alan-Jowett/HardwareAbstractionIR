@@ -432,6 +432,7 @@
               "$ref": "common.json#/$defs/arrayShape"
             },
             "alternateOfRef": {
+              "description": "Reference to another register in the same containment scope that occupies the same offset, width, access contract, and reset semantics but exposes an alternate logical field view. This is intended for same-address register overlays such as timer input/output mode views, not for unrelated aliases or peripheral-level shared-base overlays.",
               "$ref": "common.json#/$defs/entityRef"
             },
             "fields": {
