@@ -2166,7 +2166,7 @@ fn render_embassy_lib_rs(model: &EmbassyGenerationModel) -> String {
 }
 
 fn render_embassy_metadata_rs(model: &EmbassyGenerationModel) -> String {
-    let doc_comment_title = model.document_title.replace(['\r', '\n'], " ");
+    let doc_comment_title = render_comment_text(&model.document_title);
     format!(
         "//! Generated Embassy-style HAL metadata for {}.\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum ResourceRequirement {{\n    Required,\n    Optional,\n    MutuallyExclusive,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Error {{\n    Unsupported(&'static str),\n    InvalidReference(&'static str),\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ClockBinding {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub consumer_ref: &'static str,\n    pub clock_ref: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ResetBinding {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub target_ref: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct InterruptRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_ref: &'static str,\n    pub interrupt_ref: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct DmaRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub peripheral_ref: &'static str,\n    pub channel_ref: &'static str,\n    pub direction: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct PinRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub pin_ref: &'static str,\n    pub peripheral_ref: &'static str,\n    pub signal: &'static str,\n    pub route_type: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct PinRole {{\n    pub role: &'static str,\n    pub signal: &'static str,\n    pub routes: &'static [PinRoute],\n    pub requirement: ResourceRequirement,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct ProvenanceSource {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub kind: Option<&'static str>,\n    pub path: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct ProvenanceEvidence {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_ref: &'static str,\n    pub normalized_claim: Option<&'static str>,\n    pub extraction_method: Option<&'static str>,\n    pub confidence: Option<f64>,\n    pub locator: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ModuleProvenance {{\n    pub module_name: &'static str,\n    pub document_title: &'static str,\n    pub document_version: &'static str,\n    pub source_ids: &'static [&'static str],\n    pub evidence_ids: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct GeneratedMetadata {{\n    pub document_title: &'static str,\n    pub document_version: &'static str,\n    pub device_name: &'static str,\n    pub target_architecture: Option<&'static str>,\n    pub feature_flags: &'static [&'static str],\n    pub provenance_sources: &'static [ProvenanceSource],\n    pub provenance_evidence: &'static [ProvenanceEvidence],\n}}\n\npub const GENERATED_PROVENANCE_SOURCE_IDS: &[&str] = &{};\npub const GENERATED_PROVENANCE_EVIDENCE_IDS: &[&str] = &{};\n\npub const GENERATED_METADATA: GeneratedMetadata = GeneratedMetadata {{\n    document_title: {},\n    document_version: {},\n    device_name: {},\n    target_architecture: {},\n    feature_flags: &{},\n    provenance_sources: &{},\n    provenance_evidence: &{},\n}};\n",
         doc_comment_title,
@@ -2225,7 +2225,7 @@ fn render_driver_module(
 ) -> String {
     let mut out = format!(
         "//! Generated Embassy-style {module_name} module for {}.\n\nuse crate::metadata;\n\n",
-        model.device_name
+        render_comment_text(&model.device_name)
     );
     out.push_str(&render_module_provenance_const(module_name));
     for driver in drivers {
@@ -4185,6 +4185,55 @@ mod tests {
             String::from_utf8_lossy(&cargo_output.stdout),
             String::from_utf8_lossy(&cargo_output.stderr)
         );
+    }
+
+    #[test]
+    fn generate_embassy_sanitizes_doc_comment_text() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("metadata")
+            .and_then(Value::as_object_mut)
+            .expect("metadata object")
+            .insert(
+                "title".to_string(),
+                Value::String("Fixture\nTitle\u{0}".to_string()),
+            );
+
+        document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .insert(
+                "name".to_string(),
+                Value::String("FIXTURE\nDEVICE\u{7}".to_string()),
+            );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("doc comment control-char fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
+
+        let metadata_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("metadata.rs"))
+                .expect("metadata.rs");
+        let uart_rs = std::fs::read_to_string(output_dir.path().join("src").join("uart.rs"))
+            .expect("uart.rs");
+        assert!(
+            metadata_rs.contains("//! Generated Embassy-style HAL metadata for Fixture Title ")
+        );
+        assert!(uart_rs.contains("//! Generated Embassy-style uart module for FIXTURE DEVICE "));
     }
 
     #[test]
