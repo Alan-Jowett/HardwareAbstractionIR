@@ -1428,6 +1428,7 @@ impl EmbassyGenerationModel {
         for driver in &embassy.driver_instances {
             validate_supported_driver_kind(&driver.driver_kind)?;
             let module_name = validate_module_name(&driver.module_path)?;
+            validate_driver_module_scope(driver, &module_name)?;
             let target = canonical_blocks
                 .get(driver.target_ref.as_str())
                 .cloned()
@@ -1718,6 +1719,13 @@ fn validate_driver_name_collisions(drivers: &[ResolvedDriverInstance]) -> Result
     let mut type_names = HashMap::<(&str, &str), &str>::new();
     let mut const_names = HashMap::<(&str, String), &str>::new();
     for driver in drivers {
+        validate_generated_type_name(
+            &driver.type_name,
+            "driver name",
+            &driver.name,
+            &driver.id,
+            "driver type",
+        )?;
         let type_key = (driver.module_name.as_str(), driver.type_name.as_str());
         if let Some(previous) = type_names.insert(type_key, driver.id.as_str()) {
             bail!(
@@ -1746,6 +1754,13 @@ fn validate_interrupt_name_collisions(interrupts: &[Interrupt]) -> Result<()> {
     let mut variants = HashMap::<String, &str>::new();
     for interrupt in interrupts {
         let variant = to_rust_type_name(&interrupt.name);
+        validate_generated_type_name(
+            &variant,
+            "interrupt name",
+            &interrupt.name,
+            &interrupt.id,
+            "interrupt variant",
+        )?;
         if let Some(previous) = variants.insert(variant.clone(), interrupt.id.as_str()) {
             bail!(
                 "interrupts {previous} and {} normalize to the same Rust enum variant {}",
@@ -1753,6 +1768,38 @@ fn validate_interrupt_name_collisions(interrupts: &[Interrupt]) -> Result<()> {
                 variant
             );
         }
+    }
+    Ok(())
+}
+
+fn validate_driver_module_scope(driver: &EmbassyDriverInstance, module_name: &str) -> Result<()> {
+    if module_name == "interrupt" && driver.driver_kind != "interrupt" {
+        bail!(
+            "driver {} uses reserved interrupt modulePath {} but has driver kind {}",
+            driver.id,
+            driver.module_path,
+            driver.driver_kind
+        );
+    }
+    Ok(())
+}
+
+fn validate_generated_type_name(
+    generated_name: &str,
+    source_kind: &str,
+    source_name: &str,
+    owner_id: &str,
+    generated_kind: &str,
+) -> Result<()> {
+    if is_rust_keyword(generated_name) {
+        bail!(
+            "{} {} on {} normalizes to reserved Rust keyword {} for {}",
+            source_kind,
+            source_name,
+            owner_id,
+            generated_name,
+            generated_kind
+        );
     }
     Ok(())
 }
@@ -4001,6 +4048,67 @@ mod tests {
     }
 
     #[test]
+    fn generate_embassy_rejects_reserved_interrupt_module_for_non_interrupt_driver() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        drivers[2].as_object_mut().expect("uart driver").insert(
+            "modulePath".to_string(),
+            Value::String("interrupt".to_string()),
+        );
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("reserved interrupt module fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("reserved interrupt modulePath"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_keyword_driver_type_name() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        drivers[2]
+            .as_object_mut()
+            .expect("uart driver")
+            .insert("name".to_string(), Value::String("self".to_string()));
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("keyword driver name fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("reserved Rust keyword Self"));
+        assert!(error.to_string().contains("driver type"));
+    }
+
+    #[test]
     fn generate_embassy_rejects_invalid_package_name() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let fixture = write_embassy_fixture(false);
@@ -4117,6 +4225,37 @@ mod tests {
         let error =
             generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
         assert!(error.to_string().contains("same Rust enum variant"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_keyword_interrupt_variant_name() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let interrupts = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("interrupts")
+            .and_then(Value::as_array_mut)
+            .expect("interrupts");
+        interrupts[0]
+            .as_object_mut()
+            .expect("usart interrupt")
+            .insert("name".to_string(), Value::String("self".to_string()));
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("keyword interrupt fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("reserved Rust keyword Self"));
+        assert!(error.to_string().contains("interrupt variant"));
     }
 
     #[test]
