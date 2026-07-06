@@ -1309,15 +1309,23 @@ struct EmbassyPinRole {
     role: String,
     signal: String,
     route_refs: Vec<String>,
-    requirement: String,
+    requirement: ResourceRequirement,
 }
 
 #[derive(Debug, Clone)]
 struct ResolvedEmbassyPinRole {
     role: String,
     signal: String,
-    requirement: String,
+    requirement: ResourceRequirement,
     routes: Vec<McuPinRoute>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum ResourceRequirement {
+    Required,
+    Optional,
+    MutuallyExclusive,
 }
 
 #[derive(Debug, Clone)]
@@ -1480,6 +1488,13 @@ impl EmbassyGenerationModel {
             .iter()
             .map(|item| (item.id.as_str(), item.clone()))
             .collect::<HashMap<_, _>>();
+        let device_interrupts = document
+            .structure
+            .device
+            .interrupts
+            .iter()
+            .map(|item| (item.id.as_str(), item.clone()))
+            .collect::<HashMap<_, _>>();
 
         let mut drivers = Vec::with_capacity(embassy.driver_instances.len());
         for driver in &embassy.driver_instances {
@@ -1516,6 +1531,8 @@ impl EmbassyGenerationModel {
             )?;
             let dma_routes =
                 resolve_ref_list(&driver.dma_route_refs, &dma_routes, "DMA route", &driver.id)?;
+            validate_interrupt_route_targets(driver, &interrupt_routes, &device_interrupts)?;
+            validate_dma_route_channels(driver, &dma_routes, &dma_channels)?;
             let mut pin_roles = Vec::with_capacity(driver.pin_roles.len());
             for pin_role in &driver.pin_roles {
                 let routes =
@@ -1881,6 +1898,42 @@ fn validate_generated_type_name(
             generated_name,
             generated_kind
         );
+    }
+    Ok(())
+}
+
+fn validate_interrupt_route_targets(
+    driver: &EmbassyDriverInstance,
+    interrupt_routes: &[McuInterruptRoute],
+    device_interrupts: &HashMap<&str, Interrupt>,
+) -> Result<()> {
+    for route in interrupt_routes {
+        if !device_interrupts.contains_key(route.interrupt_ref.as_str()) {
+            bail!(
+                "driver {} interrupt route {} references unknown device interrupt {}",
+                driver.id,
+                route.id,
+                route.interrupt_ref
+            );
+        }
+    }
+    Ok(())
+}
+
+fn validate_dma_route_channels(
+    driver: &EmbassyDriverInstance,
+    dma_routes: &[McuDmaRoute],
+    dma_channels: &HashMap<&str, McuDmaChannel>,
+) -> Result<()> {
+    for route in dma_routes {
+        if !dma_channels.contains_key(route.channel_ref.as_str()) {
+            bail!(
+                "driver {} DMA route {} references unknown channel {}",
+                driver.id,
+                route.id,
+                route.channel_ref
+            );
+        }
     }
     Ok(())
 }
@@ -2419,12 +2472,11 @@ fn render_provenance_evidence_slice(items: &[HairProvenanceEvidence]) -> String 
     }))
 }
 
-fn render_resource_requirement(requirement: &str) -> &'static str {
+fn render_resource_requirement(requirement: &ResourceRequirement) -> &'static str {
     match requirement {
-        "required" => "Required",
-        "optional" => "Optional",
-        "mutually-exclusive" => "MutuallyExclusive",
-        _ => "Required",
+        ResourceRequirement::Required => "Required",
+        ResourceRequirement::Optional => "Optional",
+        ResourceRequirement::MutuallyExclusive => "MutuallyExclusive",
     }
 }
 
@@ -4323,6 +4375,88 @@ mod tests {
         let error =
             generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
         assert!(error.to_string().contains("unknown canonical block"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_unknown_interrupt_route_target() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("interruptTopology")
+            .and_then(Value::as_object_mut)
+            .expect("interruptTopology object")
+            .get_mut("routes")
+            .and_then(Value::as_array_mut)
+            .expect("routes")[0]
+            .as_object_mut()
+            .expect("interrupt route")
+            .insert(
+                "interruptRef".to_string(),
+                Value::String("irq.missing".to_string()),
+            );
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("missing interrupt target fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("unknown device interrupt"));
+    }
+
+    #[test]
+    fn embassy_pin_role_requirement_deserializes_as_enum() {
+        let role: EmbassyPinRole = serde_json::from_value(serde_json::json!({
+            "role": "tx",
+            "signal": "TX",
+            "routeRefs": ["pinroute.usart1.tx"],
+            "requirement": "required"
+        }))
+        .expect("valid requirement should deserialize");
+        assert!(matches!(role.requirement, ResourceRequirement::Required));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_unknown_dma_channel_for_non_dma_driver() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("dmaTopology")
+            .and_then(Value::as_object_mut)
+            .expect("dmaTopology object")
+            .get_mut("routes")
+            .and_then(Value::as_array_mut)
+            .expect("routes")[0]
+            .as_object_mut()
+            .expect("dma route")
+            .insert(
+                "channelRef".to_string(),
+                Value::String("dma.missing".to_string()),
+            );
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("missing dma channel fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("unknown channel"));
     }
 
     #[test]
