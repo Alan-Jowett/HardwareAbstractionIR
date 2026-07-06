@@ -2543,7 +2543,7 @@ where
     let mut seen = HashSet::new();
     for source in sources {
         let reference = related_ref(source);
-        if !seen.insert(reference.to_string()) {
+        if !seen.insert(reference) {
             continue;
         }
         resolved.push(map.get(reference).cloned().ok_or_else(|| {
@@ -4122,16 +4122,24 @@ fn render_optional_value_literal(value: Option<&Value>) -> String {
         Some(Value::Number(number)) if number.is_i64() => {
             format!(
                 "Some(metadata::ValueLiteral::Integer({}))",
-                number.as_i64().unwrap_or_default()
+                number
+                    .as_i64()
+                    .expect("serde_json::Number reported is_i64 but did not yield an i64")
             )
         }
         Some(Value::Number(number)) if number.is_u64() => format!(
             "Some(metadata::ValueLiteral::Unsigned({}u64))",
-            number.as_u64().unwrap_or_default()
+            number
+                .as_u64()
+                .expect("serde_json::Number reported is_u64 but did not yield a u64")
         ),
         Some(Value::Number(number)) => format!(
             "Some(metadata::ValueLiteral::Number({}))",
-            render_f64_literal(number.as_f64().unwrap_or_default())
+            render_f64_literal(
+                number
+                    .as_f64()
+                    .expect("serde_json::Number should yield f64 in non-integer rendering path"),
+            )
         ),
         Some(Value::String(text)) => format!(
             "Some(metadata::ValueLiteral::String({}))",
