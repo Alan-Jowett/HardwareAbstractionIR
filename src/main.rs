@@ -2556,7 +2556,7 @@ fn render_driver_methods(
 }
 
 fn render_mmio_helpers() -> &'static str {
-    "#[allow(dead_code)]\nfn modify_u8(address: usize, clear_mask: u8, set_mask: u8) {\n    unsafe {\n        let current = read_volatile(address as *const u8);\n        write_volatile(address as *mut u8, (current & !clear_mask) | set_mask);\n    }\n}\n\n#[allow(dead_code)]\nfn modify_u16(address: usize, clear_mask: u16, set_mask: u16) {\n    unsafe {\n        let current = read_volatile(address as *const u16);\n        write_volatile(address as *mut u16, (current & !clear_mask) | set_mask);\n    }\n}\n\n#[allow(dead_code)]\nfn modify_u32(address: usize, clear_mask: u32, set_mask: u32) {\n    unsafe {\n        let current = read_volatile(address as *const u32);\n        write_volatile(address as *mut u32, (current & !clear_mask) | set_mask);\n    }\n}\n"
+    "#[allow(dead_code)]\nfn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {\n    let address = usize::try_from(address)\n        .map_err(|_| metadata::Error::Unsupported(\"MMIO address does not fit usize on this target\"))?;\n    if address % align != 0 {\n        return Err(metadata::Error::Unsupported(\"MMIO address is not naturally aligned for the target register width\"));\n    }\n    Ok(address)\n}\n\n#[allow(dead_code)]\nfn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u8>())?;\n    unsafe {\n        let current = read_volatile(address as *const u8);\n        write_volatile(address as *mut u8, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u16>())?;\n    unsafe {\n        let current = read_volatile(address as *const u16);\n        write_volatile(address as *mut u16, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        let current = read_volatile(address as *const u32);\n        write_volatile(address as *mut u32, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n"
 }
 
 fn render_clock_binding_methods(
@@ -2698,6 +2698,17 @@ fn render_operation_methods(
             }
 
             let mut steps = operation.steps.clone();
+            let mut seen_indices = HashSet::new();
+            for step in &steps {
+                if !seen_indices.insert(step.index) {
+                    bail!(
+                        "operation {} on driver {} reuses step index {}",
+                        operation.id,
+                        driver.id,
+                        step.index
+                    );
+                }
+            }
             steps.sort_by_key(|step| step.index);
             let method_name = format!("apply_{}", operation_method_slug(operation));
             let mut code =
@@ -2973,7 +2984,7 @@ fn render_register_write_statement(
                 )
             })?;
             Ok(format!(
-                "{indent}modify_u8(0x{address:X}usize, 0x{clear_mask:02X}u8, 0x{set_mask:02X}u8);\n"
+                "{indent}modify_u8(0x{address:X}u64, 0x{clear_mask:02X}u8, 0x{set_mask:02X}u8)?;\n"
             ))
         }
         16 => {
@@ -2998,7 +3009,7 @@ fn render_register_write_statement(
                 )
             })?;
             Ok(format!(
-                "{indent}modify_u16(0x{address:X}usize, 0x{clear_mask:04X}u16, 0x{set_mask:04X}u16);\n"
+                "{indent}modify_u16(0x{address:X}u64, 0x{clear_mask:04X}u16, 0x{set_mask:04X}u16)?;\n"
             ))
         }
         32 => {
@@ -3023,7 +3034,7 @@ fn render_register_write_statement(
                 )
             })?;
             Ok(format!(
-                "{indent}modify_u32(0x{address:X}usize, 0x{clear_mask:08X}u32, 0x{set_mask:08X}u32);\n"
+                "{indent}modify_u32(0x{address:X}u64, 0x{clear_mask:08X}u32, 0x{set_mask:08X}u32)?;\n"
             ))
         }
         other => bail!(
@@ -5484,6 +5495,40 @@ mod tests {
                 .to_string()
                 .contains("requires exactly one effect targetRef")
         );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_duplicate_operation_step_indices() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        let adc_operation = operations[1].as_object_mut().expect("adc operation");
+        let steps = adc_operation
+            .get_mut("steps")
+            .and_then(Value::as_array_mut)
+            .expect("steps");
+        steps[1]
+            .as_object_mut()
+            .expect("second step")
+            .insert("index".to_string(), serde_json::json!(0));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("duplicate-step fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("reuses step index 0"));
     }
 
     #[test]
