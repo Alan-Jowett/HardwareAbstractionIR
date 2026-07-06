@@ -1,4 +1,6 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+#![recursion_limit = "512"]
+
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -198,9 +200,9 @@ fn generate_embassy_crate(document: &HairDocument, output_dir: &Path) -> Result<
 
     for (module_name, driver_group) in model.driver_groups() {
         let rendered = if module_name == "interrupt" {
-            render_interrupt_module(&model, &driver_group)
+            render_interrupt_module(&model, &driver_group)?
         } else {
-            render_driver_module(&model, &module_name, &driver_group)
+            render_driver_module(&model, &module_name, &driver_group)?
         };
         write_generated_text(&src_dir.join(format!("{module_name}.rs")), &rendered)?;
     }
@@ -797,7 +799,7 @@ struct HairDocument {
     profiles: HairProfiles,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DocumentMetadata {
     title: String,
@@ -858,7 +860,7 @@ struct HairProvenanceLocator {
     page_end: Option<u32>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct HairStructure {
     #[serde(default)]
@@ -866,7 +868,7 @@ struct HairStructure {
     device: Device,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ArchitectureProfile {
     id: String,
@@ -876,7 +878,7 @@ struct ArchitectureProfile {
     data_bus_width_bits: Option<u32>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Device {
     name: String,
@@ -889,7 +891,7 @@ struct Device {
     peripherals: Vec<Peripheral>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CpuModel {
     name: String,
@@ -899,7 +901,7 @@ struct CpuModel {
     feature_flags: CpuFeatureFlags,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CpuFeatureFlags {
     mpu_present: bool,
@@ -931,7 +933,7 @@ struct Interrupt {
     description: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Peripheral {
     id: String,
@@ -952,7 +954,7 @@ struct Peripheral {
     registers: Vec<RegisterBlockMember>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AddressBlock {
     #[serde(default)]
@@ -962,14 +964,14 @@ struct AddressBlock {
     usage: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 enum RegisterBlockMember {
     Register(Register),
     Cluster(RegisterCluster),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Register {
     id: String,
@@ -994,7 +996,7 @@ struct Register {
     fields: Vec<Field>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RegisterCluster {
     name: String,
@@ -1033,7 +1035,7 @@ struct RegisterBinding {
     array: Option<ArrayShape>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Field {
     id: String,
@@ -1049,14 +1051,14 @@ struct Field {
     enumerated_sets: Vec<EnumeratedSet>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BitRange {
     lsb: u32,
     msb: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct EnumeratedSet {
     #[serde(default)]
@@ -1064,7 +1066,7 @@ struct EnumeratedSet {
     values: Vec<EnumeratedValue>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct EnumeratedValue {
     name: String,
@@ -1091,6 +1093,12 @@ struct HairSemantics {
 struct SemanticOperation {
     id: String,
     name: String,
+    #[serde(default)]
+    kind: Option<String>,
+    #[serde(default)]
+    target_refs: Vec<String>,
+    #[serde(default)]
+    steps: Vec<SemanticOperationStep>,
 }
 
 #[allow(dead_code)]
@@ -1099,6 +1107,69 @@ struct SemanticOperation {
 struct SemanticStateMachine {
     id: String,
     name: String,
+    #[serde(default)]
+    target_refs: Vec<String>,
+    #[serde(default)]
+    initial_state: Option<String>,
+    #[serde(default)]
+    states: Vec<SemanticState>,
+    #[serde(default)]
+    transitions: Vec<SemanticTransition>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SemanticOperationStep {
+    index: u32,
+    action: String,
+    #[serde(default)]
+    target_ref: Option<String>,
+    #[serde(default)]
+    expression: Option<SemanticExpression>,
+    #[serde(default)]
+    value: Option<Value>,
+    #[serde(default)]
+    description: Option<String>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SemanticExpression {
+    #[serde(default)]
+    language: Option<String>,
+    text: String,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SemanticState {
+    name: String,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SemanticTransition {
+    from: String,
+    to: String,
+    #[allow(dead_code)]
+    #[serde(default)]
+    trigger: Option<String>,
+    #[serde(default)]
+    effects: Vec<SemanticSideEffect>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SemanticSideEffect {
+    kind: String,
+    #[serde(default)]
+    target_ref: Option<String>,
+    #[serde(default)]
+    description: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1163,6 +1234,7 @@ struct McuClockResetTopology {
     reset_bindings: Vec<McuResetBinding>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct McuClockBinding {
@@ -1170,14 +1242,27 @@ struct McuClockBinding {
     name: String,
     consumer_ref: String,
     clock_ref: String,
+    #[serde(default)]
+    control_refs: Vec<String>,
+    #[serde(default)]
+    enable_operation_refs: Vec<String>,
+    #[serde(default)]
+    disable_operation_refs: Vec<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct McuResetBinding {
     id: String,
     name: String,
     target_ref: String,
+    #[serde(default)]
+    control_refs: Vec<String>,
+    #[serde(default)]
+    assert_operation_refs: Vec<String>,
+    #[serde(default)]
+    release_operation_refs: Vec<String>,
 }
 
 #[allow(dead_code)]
@@ -1197,8 +1282,11 @@ struct McuInterruptSource {
     id: String,
     name: String,
     source_ref: String,
+    #[serde(default)]
+    clear_operation_refs: Vec<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct McuInterruptRoute {
@@ -1206,8 +1294,9 @@ struct McuInterruptRoute {
     name: String,
     source_ref: String,
     interrupt_ref: String,
-    #[allow(dead_code)]
     controller_ref: String,
+    #[serde(default)]
+    acknowledge_operation_refs: Vec<String>,
 }
 
 #[allow(dead_code)]
@@ -1230,6 +1319,7 @@ struct McuDmaChannel {
     channel_index: u32,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct McuDmaRoute {
@@ -1238,6 +1328,8 @@ struct McuDmaRoute {
     peripheral_ref: String,
     channel_ref: String,
     direction: String,
+    #[serde(default)]
+    control_refs: Vec<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1247,6 +1339,7 @@ struct McuPinTopology {
     routes: Vec<McuPinRoute>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct McuPinRoute {
@@ -1256,6 +1349,39 @@ struct McuPinRoute {
     peripheral_ref: String,
     signal: String,
     route_type: String,
+    #[serde(default)]
+    control_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedRegister {
+    id: String,
+    peripheral_ref: String,
+    absolute_address: u64,
+    width_bits: u32,
+    fields: Vec<ResolvedField>,
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedField {
+    id: String,
+    name: String,
+    description: Option<String>,
+    lsb: u32,
+    msb: u32,
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedFieldTarget {
+    peripheral_ref: String,
+    register_id: String,
+    field: ResolvedField,
+}
+
+#[derive(Debug)]
+struct GeneratedMethod {
+    name: String,
+    code: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1378,6 +1504,9 @@ struct EmbassyGenerationModel {
     interrupts: Vec<Interrupt>,
     pins: Vec<PhysicalPin>,
     drivers: Vec<ResolvedDriverInstance>,
+    peripheral_names: HashMap<String, String>,
+    registers: HashMap<String, ResolvedRegister>,
+    fields: HashMap<String, ResolvedFieldTarget>,
     provenance: HairProvenance,
 }
 
@@ -1470,6 +1599,15 @@ impl EmbassyGenerationModel {
             collect_unique_map(device_interrupts, "device interrupt", |item| {
                 item.id.as_str()
             })?;
+        let peripheral_names = document
+            .structure
+            .device
+            .peripherals
+            .iter()
+            .map(|peripheral| (peripheral.id.clone(), peripheral.name.clone()))
+            .collect::<HashMap<_, _>>();
+        let registers = collect_register_map(&document.structure.device.peripherals)?;
+        let fields = collect_field_map(&registers)?;
 
         let mut drivers = Vec::with_capacity(embassy.driver_instances.len());
         for driver in &embassy.driver_instances {
@@ -1553,6 +1691,14 @@ impl EmbassyGenerationModel {
                 pin_roles: &pin_roles,
             };
             validate_driver_resource_scope(driver, &target, &resource_scope)?;
+            validate_driver_semantic_scope(
+                driver,
+                &target,
+                &init_operations,
+                &state_machines,
+                &registers,
+                &fields,
+            )?;
 
             let requirements = DriverRequirementInputs {
                 clock_bindings: &clock_bindings,
@@ -1596,6 +1742,9 @@ impl EmbassyGenerationModel {
             interrupts: document.structure.device.interrupts.clone(),
             pins: document.physical.pins.clone(),
             drivers,
+            peripheral_names,
+            registers,
+            fields,
             provenance: document.provenance.clone(),
         })
     }
@@ -2037,6 +2186,138 @@ fn validate_driver_resource_scope(
     Ok(())
 }
 
+fn validate_driver_semantic_scope(
+    driver: &EmbassyDriverInstance,
+    target: &McuCanonicalBlock,
+    init_operations: &[SemanticOperation],
+    state_machines: &[SemanticStateMachine],
+    registers: &HashMap<String, ResolvedRegister>,
+    fields: &HashMap<String, ResolvedFieldTarget>,
+) -> Result<()> {
+    let target_ref = target.target_ref.as_str();
+
+    for operation in init_operations {
+        validate_operation_scope(driver, target_ref, operation, registers)?;
+    }
+    for state_machine in state_machines {
+        validate_state_machine_scope(driver, target_ref, state_machine, registers, fields)?;
+    }
+
+    Ok(())
+}
+
+fn validate_operation_scope(
+    driver: &EmbassyDriverInstance,
+    target_ref: &str,
+    operation: &SemanticOperation,
+    registers: &HashMap<String, ResolvedRegister>,
+) -> Result<()> {
+    for operation_target in &operation.target_refs {
+        if operation_target != target_ref {
+            bail!(
+                "driver {} references operation {} for {} instead of {}",
+                driver.id,
+                operation.id,
+                operation_target,
+                target_ref
+            );
+        }
+    }
+
+    for step in &operation.steps {
+        let Some(step_target_ref) = step.target_ref.as_deref() else {
+            continue;
+        };
+        let register = registers.get(step_target_ref).ok_or_else(|| {
+            anyhow!(
+                "operation {} step {} references unknown register {}",
+                operation.id,
+                step.index,
+                step_target_ref
+            )
+        })?;
+        if register.peripheral_ref != target_ref {
+            bail!(
+                "driver {} operation {} step {} references register {} on {} instead of {}",
+                driver.id,
+                operation.id,
+                step.index,
+                step_target_ref,
+                register.peripheral_ref,
+                target_ref
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_state_machine_scope(
+    driver: &EmbassyDriverInstance,
+    target_ref: &str,
+    state_machine: &SemanticStateMachine,
+    registers: &HashMap<String, ResolvedRegister>,
+    fields: &HashMap<String, ResolvedFieldTarget>,
+) -> Result<()> {
+    for state_machine_target in &state_machine.target_refs {
+        if state_machine_target != target_ref {
+            bail!(
+                "driver {} references state machine {} for {} instead of {}",
+                driver.id,
+                state_machine.id,
+                state_machine_target,
+                target_ref
+            );
+        }
+    }
+
+    for transition in &state_machine.transitions {
+        for effect in &transition.effects {
+            let Some(effect_target_ref) = effect.target_ref.as_deref() else {
+                continue;
+            };
+            if let Some(field_target) = fields.get(effect_target_ref) {
+                if field_target.peripheral_ref != target_ref {
+                    bail!(
+                        "driver {} state machine {} transition {} -> {} references field {} on {} instead of {}",
+                        driver.id,
+                        state_machine.id,
+                        transition.from,
+                        transition.to,
+                        effect_target_ref,
+                        field_target.peripheral_ref,
+                        target_ref
+                    );
+                }
+                continue;
+            }
+            let register = registers.get(effect_target_ref).ok_or_else(|| {
+                anyhow!(
+                    "state machine {} transition {} -> {} references unknown effect target {}",
+                    state_machine.id,
+                    transition.from,
+                    transition.to,
+                    effect_target_ref
+                )
+            })?;
+            if register.peripheral_ref != target_ref {
+                bail!(
+                    "driver {} state machine {} transition {} -> {} references register {} on {} instead of {}",
+                    driver.id,
+                    state_machine.id,
+                    transition.from,
+                    transition.to,
+                    effect_target_ref,
+                    register.peripheral_ref,
+                    target_ref
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn collect_unique_map<'a, T: Clone, F>(
     items: &'a [T],
     kind: &str,
@@ -2093,6 +2374,12 @@ fn validate_driver_requirements(
                     driver.id
                 );
             }
+            if requirements.clock_bindings.is_empty() && requirements.reset_bindings.is_empty() {
+                bail!(
+                    "gpio-port driver {} requires clock or reset bindings for first-cut executable lowering",
+                    driver.id
+                );
+            }
         }
         "uart" | "usart" => {
             if requirements.pin_roles.is_empty() {
@@ -2102,18 +2389,9 @@ fn validate_driver_requirements(
                     driver.id
                 );
             }
-            let claims_async_dma =
-                !requirements.interrupt_routes.is_empty() || !requirements.dma_routes.is_empty();
-            if claims_async_dma && requirements.interrupt_routes.is_empty() {
+            if !requirements.dma_routes.is_empty() && requirements.interrupt_routes.is_empty() {
                 bail!(
                     "{} driver {} requires interrupt routes for async DMA-backed operation",
-                    driver.driver_kind,
-                    driver.id
-                );
-            }
-            if claims_async_dma && requirements.dma_routes.is_empty() {
-                bail!(
-                    "{} driver {} requires DMA routes for async DMA-backed operation",
                     driver.driver_kind,
                     driver.id
                 );
@@ -2195,6 +2473,42 @@ fn to_rust_type_name(text: &str) -> String {
     }
 }
 
+fn to_rust_method_name(text: &str) -> String {
+    let mut output = String::new();
+    let mut last_was_separator = false;
+    let chars = text.chars().collect::<Vec<_>>();
+    for (index, ch) in chars.iter().copied().enumerate() {
+        if ch.is_ascii_alphanumeric() {
+            let prev = chars.get(index.wrapping_sub(1)).copied();
+            let next = chars.get(index + 1).copied();
+            let should_insert_separator = ch.is_ascii_uppercase()
+                && !output.is_empty()
+                && !last_was_separator
+                && prev.is_some_and(|prev| {
+                    prev.is_ascii_lowercase()
+                        || (prev.is_ascii_uppercase()
+                            && next.is_some_and(|next| next.is_ascii_lowercase()))
+                });
+            if should_insert_separator {
+                output.push('_');
+            }
+            output.push(ch.to_ascii_lowercase());
+            last_was_separator = false;
+        } else if !output.is_empty() && !last_was_separator {
+            output.push('_');
+            last_was_separator = true;
+        }
+    }
+    while output.ends_with('_') {
+        output.pop();
+    }
+    if output.is_empty() || !output.chars().next().unwrap_or('a').is_ascii_alphabetic() {
+        format!("generated_{output}")
+    } else {
+        output
+    }
+}
+
 fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
     format!(
         "[package]\nname = {}\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[lib]\nname = {}\npath = \"src/lib.rs\"\n",
@@ -2245,7 +2559,7 @@ fn render_embassy_metadata_rs(model: &EmbassyGenerationModel) -> String {
 fn render_interrupt_module(
     model: &EmbassyGenerationModel,
     drivers: &[&ResolvedDriverInstance],
-) -> String {
+) -> Result<String> {
     let mut out = String::from(
         "use crate::metadata;\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Irq {\n",
     );
@@ -2259,28 +2573,32 @@ fn render_interrupt_module(
     out.push_str("}\n\n");
     out.push_str(&render_module_provenance_const("interrupt"));
     for driver in drivers {
-        out.push_str(&render_driver_instance(driver));
+        out.push_str(&render_driver_instance(model, driver)?);
     }
-    out
+    Ok(out)
 }
 
 fn render_driver_module(
     model: &EmbassyGenerationModel,
     module_name: &str,
     drivers: &[&ResolvedDriverInstance],
-) -> String {
+) -> Result<String> {
     let mut out = format!(
-        "//! Generated Embassy-style {module_name} module for {}.\n\nuse crate::metadata;\n\n",
-        render_comment_text(&model.device_name)
+        "//! Generated Embassy-style {module_name} module for {}.\n\nuse crate::metadata;\nuse core::ptr::{{read_volatile, write_volatile}};\n\n{}\n",
+        render_comment_text(&model.device_name),
+        render_mmio_helpers()
     );
     out.push_str(&render_module_provenance_const(module_name));
     for driver in drivers {
-        out.push_str(&render_driver_instance(driver));
+        out.push_str(&render_driver_instance(model, driver)?);
     }
-    out
+    Ok(out)
 }
 
-fn render_driver_instance(driver: &ResolvedDriverInstance) -> String {
+fn render_driver_instance(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
     let const_prefix = to_rust_const_name(&driver.id);
     let mut out = String::new();
     out.push_str(&format!(
@@ -2344,25 +2662,944 @@ fn render_driver_instance(driver: &ResolvedDriverInstance) -> String {
         "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [&'static str],\n    pub state_machines: &'static [&'static str],\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n",
         type_name = driver.type_name,
         const_prefix = const_prefix,
-        methods = render_driver_methods(driver)
+        methods = render_driver_methods(model, driver)?
     ));
-    out
+    Ok(out)
 }
 
-fn render_driver_methods(driver: &ResolvedDriverInstance) -> String {
-    match driver.driver_kind.as_str() {
-        "rcc" => "    pub fn init(&self) -> Result<(), metadata::Error> {\n        Ok(())\n    }\n".to_string(),
-        "gpio-port" => "    pub fn configure(&self, _signal: &str) -> Result<(), metadata::Error> {\n        Ok(())\n    }\n".to_string(),
-        "uart" | "usart" => "    pub async fn read(&mut self, _buffer: &mut [u8]) -> Result<usize, metadata::Error> {\n        Ok(0)\n    }\n\n    pub async fn write(&mut self, _buffer: &[u8]) -> Result<(), metadata::Error> {\n        Ok(())\n    }\n".to_string(),
-        "spi" => "    pub async fn transfer(&mut self, _read: &mut [u8], _write: &[u8]) -> Result<(), metadata::Error> {\n        Ok(())\n    }\n".to_string(),
-        "i2c" => "    pub async fn read(&mut self, _address: u8, _buffer: &mut [u8]) -> Result<(), metadata::Error> {\n        Ok(())\n    }\n\n    pub async fn write(&mut self, _address: u8, _buffer: &[u8]) -> Result<(), metadata::Error> {\n        Ok(())\n    }\n".to_string(),
-        "timer" => "    pub fn start(&mut self) -> Result<(), metadata::Error> {\n        Ok(())\n    }\n".to_string(),
-        "pwm" => "    pub fn set_duty(&mut self, _duty: u16) -> Result<(), metadata::Error> {\n        Ok(())\n    }\n".to_string(),
-        "adc" => "    pub async fn read_sample(&mut self) -> Result<u16, metadata::Error> {\n        Ok(0)\n    }\n".to_string(),
-        "dma" => "    pub async fn copy(&mut self, _source: &[u8], _destination: &mut [u8]) -> Result<usize, metadata::Error> {\n        Ok(0)\n    }\n".to_string(),
-        "interrupt" => "    pub fn bind(&self) -> &'static [metadata::InterruptRoute] {\n        self.resources.interrupts\n    }\n".to_string(),
-        _ => "    pub fn unsupported(&self) -> Result<(), metadata::Error> {\n        Err(metadata::Error::Unsupported(\"unsupported driver kind\"))\n    }\n".to_string(),
+fn render_driver_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    if driver.driver_kind == "interrupt" {
+        return Ok(
+            "    pub fn bind(&self) -> &'static [metadata::InterruptRoute] {\n        self.resources.interrupts\n    }\n"
+                .to_string(),
+        );
     }
+
+    let mut methods = Vec::new();
+    methods.extend(render_clock_binding_methods(model, driver)?);
+    methods.extend(render_reset_binding_methods(model, driver)?);
+    methods.extend(render_operation_methods(model, driver)?);
+    methods.extend(render_state_machine_methods(model, driver)?);
+
+    if methods.is_empty() {
+        bail!(
+            "driver {} has no executable lowering inputs for {}",
+            driver.id,
+            driver.driver_kind
+        );
+    }
+
+    let mut seen = BTreeSet::new();
+    let mut rendered = String::new();
+    for method in methods {
+        if !seen.insert(method.name.clone()) {
+            bail!(
+                "driver {} produced duplicate method {}",
+                driver.id,
+                method.name
+            );
+        }
+        rendered.push_str(&method.code);
+        rendered.push('\n');
+    }
+    Ok(rendered)
+}
+
+fn render_mmio_helpers() -> &'static str {
+    "#[allow(dead_code)]\nfn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {\n    let address = usize::try_from(address)\n        .map_err(|_| metadata::Error::Unsupported(\"MMIO address does not fit usize on this target\"))?;\n    if address % align != 0 {\n        return Err(metadata::Error::Unsupported(\"MMIO address is not naturally aligned for the target register width\"));\n    }\n    Ok(address)\n}\n\n#[allow(dead_code)]\nfn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u8>())?;\n    unsafe {\n        let current = read_volatile(address as *const u8);\n        write_volatile(address as *mut u8, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u16>())?;\n    unsafe {\n        let current = read_volatile(address as *const u16);\n        write_volatile(address as *mut u16, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        let current = read_volatile(address as *const u32);\n        write_volatile(address as *mut u32, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n"
+}
+
+fn render_clock_binding_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    let multi_binding_names = driver.clock_bindings.len() > 1 || driver.driver_kind == "rcc";
+    let mut subject_counts = BTreeMap::<String, usize>::new();
+    for binding in &driver.clock_bindings {
+        let subject = model
+            .peripheral_names
+            .get(&binding.consumer_ref)
+            .cloned()
+            .unwrap_or_else(|| last_ref_segment(&binding.consumer_ref).to_string());
+        *subject_counts
+            .entry(to_rust_method_name(&subject))
+            .or_default() += 1;
+    }
+    driver
+        .clock_bindings
+        .iter()
+        .map(|binding| {
+            let subject = model
+                .peripheral_names
+                .get(&binding.consumer_ref)
+                .cloned()
+                .unwrap_or_else(|| last_ref_segment(&binding.consumer_ref).to_string());
+            let register = resolve_control_register(
+                model,
+                &binding.control_refs,
+                "clock binding",
+                &binding.id,
+            )?;
+            let field = resolve_control_field(
+                register,
+                &[
+                    binding.name.clone(),
+                    subject.clone(),
+                    last_ref_segment(&binding.consumer_ref).to_string(),
+                ],
+            )?;
+            let subject_slug = to_rust_method_name(&subject);
+            let duplicate_subject = subject_counts
+                .get(&subject_slug)
+                .copied()
+                .unwrap_or_default()
+                > 1;
+            let binding_suffix = duplicate_subject.then(|| to_rust_method_name(&binding.id));
+            let enable_name = if multi_binding_names {
+                binding_method_name("enable", &subject_slug, binding_suffix.as_deref(), "clock")
+            } else {
+                "enable_clock".to_string()
+            };
+            let disable_name = if multi_binding_names {
+                binding_method_name("disable", &subject_slug, binding_suffix.as_deref(), "clock")
+            } else {
+                "disable_clock".to_string()
+            };
+
+            Ok(vec![
+                render_register_write_method(
+                    enable_name,
+                    register,
+                    &field,
+                    1,
+                    &format!("Enable the {} clock gate.", subject),
+                )?,
+                render_register_write_method(
+                    disable_name,
+                    register,
+                    &field,
+                    0,
+                    &format!("Disable the {} clock gate.", subject),
+                )?,
+            ])
+        })
+        .collect::<Result<Vec<_>>>()
+        .map(|nested| nested.into_iter().flatten().collect())
+}
+
+fn render_reset_binding_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    let multi_binding_names = driver.reset_bindings.len() > 1 || driver.driver_kind == "rcc";
+    let mut subject_counts = BTreeMap::<String, usize>::new();
+    for binding in &driver.reset_bindings {
+        let subject = model
+            .peripheral_names
+            .get(&binding.target_ref)
+            .cloned()
+            .unwrap_or_else(|| last_ref_segment(&binding.target_ref).to_string());
+        *subject_counts
+            .entry(to_rust_method_name(&subject))
+            .or_default() += 1;
+    }
+    driver
+        .reset_bindings
+        .iter()
+        .map(|binding| {
+            let subject = model
+                .peripheral_names
+                .get(&binding.target_ref)
+                .cloned()
+                .unwrap_or_else(|| last_ref_segment(&binding.target_ref).to_string());
+            let register = resolve_control_register(
+                model,
+                &binding.control_refs,
+                "reset binding",
+                &binding.id,
+            )?;
+            let field = resolve_control_field(
+                register,
+                &[
+                    binding.name.clone(),
+                    subject.clone(),
+                    last_ref_segment(&binding.target_ref).to_string(),
+                ],
+            )?;
+            let subject_slug = to_rust_method_name(&subject);
+            let duplicate_subject = subject_counts
+                .get(&subject_slug)
+                .copied()
+                .unwrap_or_default()
+                > 1;
+            let binding_suffix = duplicate_subject.then(|| to_rust_method_name(&binding.id));
+            let assert_name = if multi_binding_names {
+                binding_method_name("assert", &subject_slug, binding_suffix.as_deref(), "reset")
+            } else {
+                "assert_reset".to_string()
+            };
+            let release_name = if multi_binding_names {
+                binding_method_name("release", &subject_slug, binding_suffix.as_deref(), "reset")
+            } else {
+                "release_reset".to_string()
+            };
+
+            Ok(vec![
+                render_register_write_method(
+                    assert_name,
+                    register,
+                    &field,
+                    1,
+                    &format!("Assert reset for {}.", subject),
+                )?,
+                render_register_write_method(
+                    release_name,
+                    register,
+                    &field,
+                    0,
+                    &format!("Release reset for {}.", subject),
+                )?,
+            ])
+        })
+        .collect::<Result<Vec<_>>>()
+        .map(|nested| nested.into_iter().flatten().collect())
+}
+
+fn binding_method_name(prefix: &str, subject: &str, suffix: Option<&str>, noun: &str) -> String {
+    match suffix {
+        Some(suffix) => format!("{prefix}_{subject}_{suffix}_{noun}"),
+        None => format!("{prefix}_{subject}_{noun}"),
+    }
+}
+
+fn render_operation_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    driver
+        .init_operations
+        .iter()
+        .map(|operation| {
+            if operation.steps.is_empty() {
+                bail!(
+                    "operation {} on driver {} has no steps",
+                    operation.id,
+                    driver.id
+                );
+            }
+
+            let mut steps = operation.steps.clone();
+            let mut seen_indices = HashSet::new();
+            for step in &steps {
+                if !seen_indices.insert(step.index) {
+                    bail!(
+                        "operation {} on driver {} reuses step index {}",
+                        operation.id,
+                        driver.id,
+                        step.index
+                    );
+                }
+            }
+            steps.sort_by_key(|step| step.index);
+            let method_name = format!("apply_{}", operation_method_slug(operation));
+            let mut code =
+                format!("    pub fn {method_name}(&self) -> Result<(), metadata::Error> {{\n");
+            for step in &steps {
+                if step.action != "write" {
+                    bail!(
+                        "operation {} on driver {} uses unsupported action {}",
+                        operation.id,
+                        driver.id,
+                        step.action
+                    );
+                }
+                let target_ref = step.target_ref.as_deref().ok_or_else(|| {
+                    anyhow!(
+                        "operation {} step {} is missing targetRef",
+                        operation.id,
+                        step.index
+                    )
+                })?;
+                let register = model.registers.get(target_ref).ok_or_else(|| {
+                    anyhow!(
+                        "operation {} step {} references unknown register {}",
+                        operation.id,
+                        step.index,
+                        target_ref
+                    )
+                })?;
+                let parsed = parse_field_write_expression(
+                    step.expression.as_ref(),
+                    step.value.as_ref(),
+                    &operation.id,
+                    step.index,
+                )?;
+                let field = resolve_register_field(register, &parsed.field_name)?;
+                code.push_str(&render_register_write_statement(
+                    register,
+                    &field,
+                    parsed.value,
+                    "        ",
+                )?);
+            }
+            code.push_str("        Ok(())\n    }\n");
+            Ok(GeneratedMethod {
+                name: method_name,
+                code,
+            })
+        })
+        .collect()
+}
+
+fn render_state_machine_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    let mut transition_pair_counts = BTreeMap::<(String, String), usize>::new();
+    for state_machine in &driver.state_machines {
+        for transition in &state_machine.transitions {
+            *transition_pair_counts
+                .entry((transition.from.clone(), transition.to.clone()))
+                .or_default() += 1;
+        }
+    }
+    let mut methods = Vec::new();
+    for state_machine in &driver.state_machines {
+        for transition in &state_machine.transitions {
+            let (register, field, value) =
+                resolve_transition_effect_write(model, driver, state_machine, transition)?;
+            let from_slug = to_rust_method_name(&transition.from);
+            let to_slug = to_rust_method_name(&transition.to);
+            let method_name = if transition_pair_counts
+                .get(&(transition.from.clone(), transition.to.clone()))
+                .copied()
+                .unwrap_or_default()
+                > 1
+            {
+                format!(
+                    "transition_{}_{}_to_{}",
+                    state_machine_method_slug(state_machine),
+                    from_slug,
+                    to_slug
+                )
+            } else {
+                format!("transition_{}_to_{}", from_slug, to_slug)
+            };
+            let mut code =
+                format!("    pub fn {method_name}(&self) -> Result<(), metadata::Error> {{\n");
+            code.push_str(&render_register_write_statement(
+                register, &field, value, "        ",
+            )?);
+            code.push_str("        Ok(())\n    }\n");
+            methods.push(GeneratedMethod {
+                name: method_name,
+                code,
+            });
+        }
+    }
+    Ok(methods)
+}
+
+fn resolve_transition_effect_write<'a>(
+    model: &'a EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+    state_machine: &SemanticStateMachine,
+    transition: &SemanticTransition,
+) -> Result<(&'a ResolvedRegister, ResolvedField, u64)> {
+    let [effect] = transition.effects.as_slice() else {
+        bail!(
+            "state machine {} transition {} -> {} on driver {} requires exactly one effect for first-cut lowering, found {}",
+            state_machine.id,
+            transition.from,
+            transition.to,
+            driver.id,
+            transition.effects.len()
+        );
+    };
+    let effect_target_ref = effect.target_ref.as_deref().ok_or_else(|| {
+        anyhow!(
+            "state machine {} transition {} -> {} on driver {} is missing effect targetRef",
+            state_machine.id,
+            transition.from,
+            transition.to,
+            driver.id
+        )
+    })?;
+    let field_target = model.fields.get(effect_target_ref).ok_or_else(|| {
+        anyhow!(
+            "state machine {} transition {} -> {} on driver {} requires effect targetRef {} to resolve to a field for first-cut lowering",
+            state_machine.id,
+            transition.from,
+            transition.to,
+            driver.id,
+            effect_target_ref
+        )
+    })?;
+    let register = model
+        .registers
+        .get(field_target.register_id.as_str())
+        .ok_or_else(|| {
+            anyhow!(
+                "field {} on state machine {} transition {} -> {} resolved to unknown register {}",
+                effect_target_ref,
+                state_machine.id,
+                transition.from,
+                transition.to,
+                field_target.register_id
+            )
+        })?;
+    let value = transition_effect_value(effect, state_machine, transition, &driver.id)?;
+    Ok((register, field_target.field.clone(), value))
+}
+
+fn resolve_control_register<'a>(
+    model: &'a EmbassyGenerationModel,
+    control_refs: &[String],
+    kind: &str,
+    owner_id: &str,
+) -> Result<&'a ResolvedRegister> {
+    let control_ref = control_refs.first().ok_or_else(|| {
+        anyhow!("{kind} {owner_id} is missing controlRefs required for executable lowering")
+    })?;
+    if control_refs.len() > 1 {
+        bail!("{kind} {owner_id} references multiple controlRefs, which is not yet supported");
+    }
+    model.registers.get(control_ref).ok_or_else(|| {
+        anyhow!("{kind} {owner_id} references unknown control register {control_ref}")
+    })
+}
+
+fn resolve_control_field(
+    register: &ResolvedRegister,
+    subjects: &[String],
+) -> Result<ResolvedField> {
+    let subject_aliases = subjects
+        .iter()
+        .flat_map(|subject| subject_aliases(subject))
+        .filter(|subject| subject.len() >= 3)
+        .collect::<Vec<_>>();
+
+    let mut matches = Vec::<(usize, ResolvedField)>::new();
+    for field in &register.fields {
+        let haystack = normalize_search_text(&format!(
+            "{} {}",
+            field.name,
+            field.description.as_deref().unwrap_or_default()
+        ));
+        let mut score = 0usize;
+        for subject in &subject_aliases {
+            let normalized_subject = normalize_search_text(subject);
+            if !normalized_subject.is_empty() && haystack.contains(&normalized_subject) {
+                score = score.max(normalized_subject.len());
+            }
+        }
+        if score > 0 {
+            matches.push((score, field.clone()));
+        }
+    }
+
+    matches.sort_by_key(|right| std::cmp::Reverse(right.0));
+    let (best_score, best_field) = matches.first().cloned().ok_or_else(|| {
+        anyhow!(
+            "register {} does not expose a uniquely matchable control field",
+            register.id
+        )
+    })?;
+    if matches
+        .iter()
+        .filter(|(score, _)| *score == best_score)
+        .nth(1)
+        .is_some()
+    {
+        bail!(
+            "register {} has ambiguous control-field matches for the requested subject",
+            register.id
+        );
+    }
+    Ok(best_field)
+}
+
+fn resolve_register_field(register: &ResolvedRegister, field_name: &str) -> Result<ResolvedField> {
+    let normalized_name = normalize_search_text(field_name);
+    register
+        .fields
+        .iter()
+        .find(|field| normalize_search_text(&field.name) == normalized_name)
+        .cloned()
+        .ok_or_else(|| {
+            anyhow!(
+                "register {} does not contain field {}",
+                register.id,
+                field_name
+            )
+        })
+}
+
+fn render_register_write_method(
+    method_name: String,
+    register: &ResolvedRegister,
+    field: &ResolvedField,
+    value: u64,
+    description: &str,
+) -> Result<GeneratedMethod> {
+    let mut code = format!("    /// {}\n", render_comment_text(description));
+    code.push_str(&format!(
+        "    pub fn {method_name}(&self) -> Result<(), metadata::Error> {{\n"
+    ));
+    code.push_str(&render_register_write_statement(
+        register, field, value, "        ",
+    )?);
+    code.push_str("        Ok(())\n    }\n");
+    Ok(GeneratedMethod {
+        name: method_name,
+        code,
+    })
+}
+
+fn render_register_write_statement(
+    register: &ResolvedRegister,
+    field: &ResolvedField,
+    value: u64,
+    indent: &str,
+) -> Result<String> {
+    match register.width_bits {
+        8 | 16 | 32 => {}
+        other => {
+            bail!(
+                "register {} uses unsupported width {} for Embassy code generation",
+                register.id,
+                other
+            );
+        }
+    }
+    if field.msb >= register.width_bits || field.lsb >= register.width_bits {
+        bail!(
+            "field {} bit range {}..={} exceeds register {} width {}",
+            field.name,
+            field.lsb,
+            field.msb,
+            register.id,
+            register.width_bits
+        );
+    }
+    let field_width = field
+        .msb
+        .checked_sub(field.lsb)
+        .and_then(|delta| delta.checked_add(1))
+        .ok_or_else(|| anyhow!("field {} has an invalid bit range", field.name))?;
+    let raw_mask = if field_width == 64 {
+        u64::MAX
+    } else {
+        ((1u128 << field_width) - 1) as u64
+    };
+    if value > raw_mask {
+        bail!(
+            "field {} on register {} cannot hold value {}",
+            field.name,
+            register.id,
+            value
+        );
+    }
+    let clear_mask = raw_mask << field.lsb;
+    let set_mask = (value & raw_mask) << field.lsb;
+    let address = register.absolute_address;
+
+    match register.width_bits {
+        8 => {
+            let clear_mask = u8::try_from(clear_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            let set_mask = u8::try_from(set_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            Ok(format!(
+                "{indent}modify_u8(0x{address:X}u64, 0x{clear_mask:02X}u8, 0x{set_mask:02X}u8)?;\n"
+            ))
+        }
+        16 => {
+            let clear_mask = u16::try_from(clear_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            let set_mask = u16::try_from(set_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            Ok(format!(
+                "{indent}modify_u16(0x{address:X}u64, 0x{clear_mask:04X}u16, 0x{set_mask:04X}u16)?;\n"
+            ))
+        }
+        32 => {
+            let clear_mask = u32::try_from(clear_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            let set_mask = u32::try_from(set_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            Ok(format!(
+                "{indent}modify_u32(0x{address:X}u64, 0x{clear_mask:08X}u32, 0x{set_mask:08X}u32)?;\n"
+            ))
+        }
+        _ => unreachable!("unsupported widths are rejected before mask computation"),
+    }
+}
+
+fn collect_register_map(peripherals: &[Peripheral]) -> Result<HashMap<String, ResolvedRegister>> {
+    let mut registers = HashMap::new();
+    for peripheral in peripherals {
+        if peripheral.registers.is_empty() {
+            continue;
+        }
+        let base_address = peripheral.base_address.ok_or_else(|| {
+            anyhow!(
+                "peripheral {} is missing baseAddress required for code generation",
+                peripheral.id
+            )
+        })?;
+        collect_register_members(
+            &mut registers,
+            peripheral.id.as_str(),
+            base_address,
+            0,
+            &peripheral.registers,
+        )?;
+    }
+    Ok(registers)
+}
+
+fn collect_field_map(
+    registers: &HashMap<String, ResolvedRegister>,
+) -> Result<HashMap<String, ResolvedFieldTarget>> {
+    let mut fields = HashMap::new();
+    for register in registers.values() {
+        for field in &register.fields {
+            let resolved = ResolvedFieldTarget {
+                peripheral_ref: register.peripheral_ref.clone(),
+                register_id: register.id.clone(),
+                field: field.clone(),
+            };
+            if fields.insert(field.id.clone(), resolved).is_some() {
+                bail!("duplicate field {} is not supported", field.id);
+            }
+        }
+    }
+    Ok(fields)
+}
+
+fn collect_register_members(
+    registers: &mut HashMap<String, ResolvedRegister>,
+    peripheral_ref: &str,
+    base_address: u64,
+    parent_offset: u64,
+    members: &[RegisterBlockMember],
+) -> Result<()> {
+    for member in members {
+        match member {
+            RegisterBlockMember::Register(register) => {
+                if register.array.is_some() {
+                    bail!(
+                        "register {} uses arrayed instances, which are not yet supported for Embassy lowering",
+                        register.id
+                    );
+                }
+                let absolute_address = checked_offset_add(
+                    checked_offset_add(base_address, parent_offset, "parent register offset")?,
+                    register.offset_bytes,
+                    &format!("register {} offset", register.id),
+                )?;
+                let resolved = ResolvedRegister {
+                    id: register.id.clone(),
+                    peripheral_ref: peripheral_ref.to_string(),
+                    absolute_address,
+                    width_bits: register.width_bits,
+                    fields: register
+                        .fields
+                        .iter()
+                        .map(|field| ResolvedField {
+                            id: field.id.clone(),
+                            name: field.name.clone(),
+                            description: field.description.clone(),
+                            lsb: field.bit_range.lsb,
+                            msb: field.bit_range.msb,
+                        })
+                        .collect(),
+                };
+                if registers.insert(register.id.clone(), resolved).is_some() {
+                    bail!("duplicate register {} is not supported", register.id);
+                }
+            }
+            RegisterBlockMember::Cluster(cluster) => {
+                if cluster.array.is_some() {
+                    bail!(
+                        "cluster {} uses arrayed instances, which are not yet supported for Embassy lowering",
+                        cluster.name
+                    );
+                }
+                collect_register_members(
+                    registers,
+                    peripheral_ref,
+                    base_address,
+                    checked_offset_add(
+                        parent_offset,
+                        cluster.offset_bytes,
+                        &format!("cluster {} offset", cluster.name),
+                    )?,
+                    &cluster.members,
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn checked_offset_add(left: u64, right: u64, context: &str) -> Result<u64> {
+    left.checked_add(right)
+        .ok_or_else(|| anyhow!("{context} overflows u64 address space"))
+}
+
+fn operation_method_slug(operation: &SemanticOperation) -> String {
+    let candidate = operation
+        .id
+        .rsplit('.')
+        .next()
+        .unwrap_or(operation.name.as_str());
+    to_rust_method_name(candidate)
+}
+
+fn state_machine_method_slug(state_machine: &SemanticStateMachine) -> String {
+    let candidate = state_machine
+        .id
+        .rsplit('.')
+        .next()
+        .unwrap_or(state_machine.name.as_str());
+    to_rust_method_name(candidate)
+}
+
+fn last_ref_segment(reference: &str) -> &str {
+    reference.rsplit('.').next().unwrap_or(reference)
+}
+
+fn normalize_search_text(value: &str) -> String {
+    value
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .map(|ch| ch.to_ascii_uppercase())
+        .collect()
+}
+
+fn subject_aliases(value: &str) -> Vec<String> {
+    let mut aliases = Vec::new();
+    let normalized = normalize_search_text(value);
+    if !normalized.is_empty() {
+        aliases.push(normalized.clone());
+    }
+
+    let upper = value.to_ascii_uppercase();
+    if let Some(port) = upper.strip_prefix("GPIO")
+        && !port.is_empty()
+    {
+        aliases.push(format!("IOP{port}"));
+        aliases.push(format!("PORT{port}"));
+        aliases.push(format!("IOPORT{port}"));
+    }
+    if let Some(index) = upper.strip_prefix("PWM")
+        && !index.is_empty()
+        && index.chars().all(|ch| ch.is_ascii_digit())
+    {
+        aliases.push(format!("TIM{index}"));
+    }
+    if let Some(index) = upper.strip_prefix("UART")
+        && !index.is_empty()
+    {
+        aliases.push(format!("USART{index}"));
+    }
+    if let Some(index) = upper.strip_prefix("USART")
+        && !index.is_empty()
+    {
+        aliases.push(format!("UART{index}"));
+    }
+
+    aliases.sort();
+    aliases.dedup();
+    aliases
+}
+
+struct ParsedFieldWrite {
+    field_name: String,
+    value: u64,
+}
+
+fn parse_field_write_expression(
+    expression: Option<&SemanticExpression>,
+    _value: Option<&Value>,
+    operation_id: &str,
+    step_index: u32,
+) -> Result<ParsedFieldWrite> {
+    if let Some(expression) = expression {
+        let language = expression.language.as_deref().ok_or_else(|| {
+            anyhow!(
+                "operation {} step {} is missing expression language required for lowering",
+                operation_id,
+                step_index
+            )
+        })?;
+        if language != "plain" {
+            bail!(
+                "operation {} step {} uses unsupported expression language {} for first-cut lowering",
+                operation_id,
+                step_index,
+                language
+            );
+        }
+        return parse_field_write_text(&expression.text).with_context(|| {
+            format!("parsing expression on operation {operation_id} step {step_index}")
+        });
+    }
+    bail!(
+        "operation {} step {} requires explicit expression text for field-level lowering",
+        operation_id,
+        step_index
+    )
+}
+
+fn parse_field_write_text(text: &str) -> Result<ParsedFieldWrite> {
+    let trimmed = text.trim();
+    if let Some(rest) = trimmed.strip_prefix("Set ") {
+        if let Some((field_name, value)) = parse_explicit_assignment(rest)? {
+            if value != 1 {
+                bail!("plain-text write expression {trimmed} contradicts Set semantics");
+            }
+            return Ok(ParsedFieldWrite { field_name, value });
+        }
+        return Ok(ParsedFieldWrite {
+            field_name: extract_field_name(rest),
+            value: 1,
+        });
+    }
+    if let Some(rest) = trimmed.strip_prefix("Clear ") {
+        if let Some((field_name, value)) = parse_explicit_assignment(rest)? {
+            if value != 0 {
+                bail!("plain-text write expression {trimmed} contradicts Clear semantics");
+            }
+            return Ok(ParsedFieldWrite { field_name, value });
+        }
+        return Ok(ParsedFieldWrite {
+            field_name: extract_field_name(rest),
+            value: 0,
+        });
+    }
+    if let Some(rest) = trimmed.strip_prefix("Write ") {
+        let mut parts = rest.split('=');
+        let left = parts.next().unwrap_or_default().trim();
+        let right = parts
+            .next()
+            .ok_or_else(|| anyhow!("unsupported write expression {trimmed}"))?
+            .trim();
+        return Ok(ParsedFieldWrite {
+            field_name: extract_field_name(left),
+            value: parse_integer_literal(right)?,
+        });
+    }
+    bail!("unsupported plain-text write expression {trimmed}")
+}
+
+fn parse_explicit_assignment(text: &str) -> Result<Option<(String, u64)>> {
+    let Some((left, right)) = text.split_once('=') else {
+        return Ok(None);
+    };
+    Ok(Some((
+        extract_field_name(left),
+        parse_integer_literal(right.trim())?,
+    )))
+}
+
+fn transition_effect_value(
+    effect: &SemanticSideEffect,
+    state_machine: &SemanticStateMachine,
+    transition: &SemanticTransition,
+    driver_id: &str,
+) -> Result<u64> {
+    match effect.kind.as_str() {
+        "self-set" | "starts-hardware" => Ok(1),
+        "self-clear" | "stops-hardware" => Ok(0),
+        other => bail!(
+            "state machine {} transition {} -> {} on driver {} uses unsupported effect kind {} for first-cut lowering",
+            state_machine.id,
+            transition.from,
+            transition.to,
+            driver_id,
+            other
+        ),
+    }
+}
+
+fn extract_field_name(text: &str) -> String {
+    text.trim()
+        .trim_end_matches("= 1")
+        .trim_end_matches("= 0")
+        .trim()
+        .rsplit('.')
+        .next()
+        .unwrap_or(text.trim())
+        .trim()
+        .to_string()
+}
+
+fn parse_integer_literal(text: &str) -> Result<u64> {
+    let trimmed = text.trim();
+    if let Some(hex) = trimmed
+        .strip_prefix("0x")
+        .or_else(|| trimmed.strip_prefix("0X"))
+    {
+        return u64::from_str_radix(hex, 16)
+            .with_context(|| format!("parsing hexadecimal integer literal {trimmed}"));
+    }
+    trimmed
+        .parse::<u64>()
+        .with_context(|| format!("parsing integer literal {trimmed}"))
 }
 
 fn render_clock_binding_slice(items: &[McuClockBinding]) -> String {
@@ -4442,6 +5679,809 @@ mod tests {
     }
 
     #[test]
+    fn generate_embassy_derives_methods_from_lowering_inputs_instead_of_stubs() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let document = load_validated_hair_document(fixture.path(), &repo_root)
+            .expect("embassy fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&document, output_dir.path()).expect("embassy generation");
+
+        let rcc_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("rcc.rs")).expect("rcc.rs");
+        let gpio_rs = std::fs::read_to_string(output_dir.path().join("src").join("gpio.rs"))
+            .expect("gpio.rs");
+        let uart_rs = std::fs::read_to_string(output_dir.path().join("src").join("uart.rs"))
+            .expect("uart.rs");
+        let timer_rs = std::fs::read_to_string(output_dir.path().join("src").join("timer.rs"))
+            .expect("timer.rs");
+        let pwm_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("pwm.rs")).expect("pwm.rs");
+        let adc_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("adc.rs")).expect("adc.rs");
+        let dma_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("dma.rs")).expect("dma.rs");
+
+        assert!(rcc_rs.contains("pub fn enable_usart1_clock"));
+        assert!(rcc_rs.contains("pub fn apply_init"));
+        assert!(gpio_rs.contains("pub fn enable_clock"));
+        assert!(gpio_rs.contains("pub fn assert_reset"));
+        assert!(uart_rs.contains("pub fn enable_clock"));
+        assert!(uart_rs.contains("pub fn release_reset"));
+        assert!(!uart_rs.contains("pub async fn read"));
+        assert!(!uart_rs.contains("pub async fn write"));
+        assert!(timer_rs.contains("pub fn apply_enable"));
+        assert!(timer_rs.contains("pub fn transition_disabled_to_enabled"));
+        assert!(timer_rs.contains("modify_u16("));
+        assert!(pwm_rs.contains("pub fn transition_enabled_to_disabled"));
+        assert!(adc_rs.contains("pub fn apply_calibrate"));
+        assert!(adc_rs.contains("modify_u32("));
+        assert!(dma_rs.contains("pub fn enable_clock"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_operation_steps_without_expression_text() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        let adc_operation = operations[1].as_object_mut().expect("adc operation");
+        let steps = adc_operation
+            .get_mut("steps")
+            .and_then(Value::as_array_mut)
+            .expect("steps");
+        let first_step = steps[0].as_object_mut().expect("first step");
+        first_step.remove("expression");
+        first_step.insert("value".to_string(), serde_json::json!(1));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("value-only operation fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("requires explicit expression text for field-level lowering")
+        );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_non_plain_expression_languages() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        let adc_operation = operations[1].as_object_mut().expect("adc operation");
+        let steps = adc_operation
+            .get_mut("steps")
+            .and_then(Value::as_array_mut)
+            .expect("steps");
+        steps[0]
+            .as_object_mut()
+            .expect("first step")
+            .get_mut("expression")
+            .and_then(Value::as_object_mut)
+            .expect("expression")
+            .insert("language".to_string(), serde_json::json!("cel"));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("non-plain expression fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("uses unsupported expression language cel")
+        );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_contradictory_set_clear_expressions() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        let adc_operation = operations[1].as_object_mut().expect("adc operation");
+        let steps = adc_operation
+            .get_mut("steps")
+            .and_then(Value::as_array_mut)
+            .expect("steps");
+        steps[0]
+            .as_object_mut()
+            .expect("first step")
+            .get_mut("expression")
+            .and_then(Value::as_object_mut)
+            .expect("expression")
+            .insert("text".to_string(), serde_json::json!("Set ADON = 0"));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("contradictory expression fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .chain()
+                .any(|cause| cause.to_string().contains("contradicts Set semantics"))
+        );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_fields_that_exceed_register_width() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        let registers = tim1
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 registers");
+        let ctlr1 = registers[0].as_object_mut().expect("tim1 ctlr1");
+        let fields = ctlr1
+            .get_mut("fields")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 fields");
+        let cen = fields[0].as_object_mut().expect("tim1 cen field");
+        cen.get_mut("bitRange")
+            .and_then(Value::as_object_mut)
+            .expect("bit range")
+            .insert("msb".to_string(), serde_json::json!(16));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("out-of-range field fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("exceeds register"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_state_machine_transitions_with_multiple_effect_targets() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let state_machines = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("stateMachines")
+            .and_then(Value::as_array_mut)
+            .expect("state machines");
+        let tim1 = state_machines[0]
+            .as_object_mut()
+            .expect("tim1 state machine");
+        let transitions = tim1
+            .get_mut("transitions")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 transitions");
+        let enable_transition = transitions[0].as_object_mut().expect("enable transition");
+        let effects = enable_transition
+            .get_mut("effects")
+            .and_then(Value::as_array_mut)
+            .expect("effects");
+        effects.push(serde_json::json!({
+            "kind": "updates-status",
+            "targetRef": "field.tim1.ctlr1.cen"
+        }));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("multi-effect state machine fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("requires exactly one effect for first-cut lowering")
+        );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_duplicate_operation_step_indices() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        let adc_operation = operations[1].as_object_mut().expect("adc operation");
+        let steps = adc_operation
+            .get_mut("steps")
+            .and_then(Value::as_array_mut)
+            .expect("steps");
+        steps[1]
+            .as_object_mut()
+            .expect("second step")
+            .insert("index".to_string(), serde_json::json!(0));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("duplicate-step fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("reuses step index 0"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_operation_steps_outside_driver_scope() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        let tim1_operation = operations[2].as_object_mut().expect("tim1 operation");
+        let steps = tim1_operation
+            .get_mut("steps")
+            .and_then(Value::as_array_mut)
+            .expect("steps");
+        steps[0]
+            .as_object_mut()
+            .expect("tim1 step")
+            .insert("targetRef".to_string(), serde_json::json!("reg.pwm1.ctlr1"));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("mismatched operation scope fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error.to_string().contains(
+                "references register reg.pwm1.ctlr1 on periph.pwm1 instead of periph.tim1"
+            )
+        );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_state_machine_effects_that_do_not_target_fields() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let state_machines = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("stateMachines")
+            .and_then(Value::as_array_mut)
+            .expect("state machines");
+        let tim1 = state_machines[0]
+            .as_object_mut()
+            .expect("tim1 state machine");
+        let transitions = tim1
+            .get_mut("transitions")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 transitions");
+        let enable_transition = transitions[0].as_object_mut().expect("enable transition");
+        let effects = enable_transition
+            .get_mut("effects")
+            .and_then(Value::as_array_mut)
+            .expect("effects");
+        effects[0]
+            .as_object_mut()
+            .expect("enable effect")
+            .insert("targetRef".to_string(), serde_json::json!("reg.tim1.ctlr1"));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("register-target state machine fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains(
+            "requires effect targetRef reg.tim1.ctlr1 to resolve to a field for first-cut lowering"
+        ));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_arrayed_registers() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        let registers = tim1
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 registers");
+        registers[0].as_object_mut().expect("tim1 ctlr1").insert(
+            "array".to_string(),
+            serde_json::json!({ "axes": [{ "name": "channel", "count": 2, "strideBytes": 4 }] }),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("arrayed register fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("register reg.tim1.ctlr1 uses arrayed instances")
+        );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_overflowing_register_addresses() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        tim1.insert("baseAddress".to_string(), serde_json::json!(u64::MAX));
+        let registers = tim1
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 registers");
+        registers[0]
+            .as_object_mut()
+            .expect("tim1 ctlr1")
+            .insert("offsetBytes".to_string(), serde_json::json!(1));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("overflowing register-address fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("register reg.tim1.ctlr1 offset overflows u64 address space")
+        );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_arrayed_clusters() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        tim1.insert(
+            "registers".to_string(),
+            serde_json::json!([
+                {
+                    "id": "cluster.tim1.ch",
+                    "kind": "cluster",
+                    "name": "CH",
+                    "offsetBytes": 0,
+                    "array": { "axes": [{ "name": "channel", "count": 2, "strideBytes": 8 }] },
+                    "members": [
+                        {
+                            "kind": "register",
+                            "id": "reg.tim1.ccr",
+                            "name": "CCR",
+                            "offsetBytes": 0,
+                            "widthBits": 16,
+                            "fields": [
+                                { "id": "field.tim1.ccr.value", "name": "VALUE", "bitRange": { "lsb": 0, "msb": 15 } }
+                            ]
+                        }
+                    ]
+                }
+            ]),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("arrayed cluster fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("cluster CH uses arrayed instances")
+        );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_overflowing_cluster_offsets() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        tim1.insert(
+            "registers".to_string(),
+            serde_json::json!([
+                {
+                    "id": "cluster.tim1.ch",
+                    "kind": "cluster",
+                    "name": "CH",
+                    "offsetBytes": u64::MAX,
+                    "members": [
+                        {
+                            "id": "cluster.tim1.sub",
+                            "kind": "cluster",
+                            "name": "SUB",
+                            "offsetBytes": 1,
+                            "members": [
+                                {
+                                    "kind": "register",
+                                    "id": "reg.tim1.ccr",
+                                    "name": "CCR",
+                                    "offsetBytes": 0,
+                                    "widthBits": 16,
+                                    "fields": [
+                                        { "id": "field.tim1.ccr.value", "name": "VALUE", "bitRange": { "lsb": 0, "msb": 15 } }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("overflowing cluster-offset fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.chain().any(|cause| {
+            cause
+                .to_string()
+                .contains("offset overflows u64 address space")
+        }));
+    }
+
+    #[test]
+    fn generate_embassy_disambiguates_duplicate_clock_binding_names() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let clock_bindings = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("clockResetTopology")
+            .and_then(Value::as_object_mut)
+            .expect("clockResetTopology object")
+            .get_mut("clockBindings")
+            .and_then(Value::as_array_mut)
+            .expect("clock bindings");
+        clock_bindings.push(serde_json::json!({
+            "id": "clk.usart1.alt",
+            "name": "USART1 alternate clock",
+            "consumerRef": "periph.usart1",
+            "clockRef": "clk.apb2",
+            "bindingKind": "gated",
+            "controlRefs": ["reg.rcc.apb2pcenr"]
+        }));
+
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let usart1 = drivers[2].as_object_mut().expect("usart1 driver");
+        usart1
+            .get_mut("clockBindingRefs")
+            .and_then(Value::as_array_mut)
+            .expect("clockBindingRefs")
+            .push(serde_json::json!("clk.usart1.alt"));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("duplicate clock-binding fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
+
+        let uart_rs = std::fs::read_to_string(output_dir.path().join("src").join("uart.rs"))
+            .expect("uart.rs");
+        assert!(uart_rs.contains("pub fn enable_usart1_clk_usart1_clock"));
+        assert!(uart_rs.contains("pub fn enable_usart1_clk_usart1_alt_clock"));
+    }
+
+    #[test]
+    fn generate_embassy_disambiguates_duplicate_reset_binding_names() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let reset_bindings = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("clockResetTopology")
+            .and_then(Value::as_object_mut)
+            .expect("clockResetTopology object")
+            .get_mut("resetBindings")
+            .and_then(Value::as_array_mut)
+            .expect("reset bindings");
+        reset_bindings.push(serde_json::json!({
+            "id": "rst.usart1.alt",
+            "name": "USART1 alternate reset",
+            "targetRef": "periph.usart1",
+            "bindingKind": "software",
+            "controlRefs": ["reg.rcc.apb2prstr"]
+        }));
+
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let usart1 = drivers[2].as_object_mut().expect("usart1 driver");
+        usart1
+            .get_mut("resetBindingRefs")
+            .and_then(Value::as_array_mut)
+            .expect("resetBindingRefs")
+            .push(serde_json::json!("rst.usart1.alt"));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("duplicate reset-binding fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
+
+        let uart_rs = std::fs::read_to_string(output_dir.path().join("src").join("uart.rs"))
+            .expect("uart.rs");
+        assert!(uart_rs.contains("pub fn assert_usart1_rst_usart1_reset"));
+        assert!(uart_rs.contains("pub fn assert_usart1_rst_usart1_alt_reset"));
+    }
+
+    #[test]
+    fn generate_embassy_disambiguates_duplicate_transition_pairs() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let state_machines = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("stateMachines")
+            .and_then(Value::as_array_mut)
+            .expect("state machines");
+        state_machines.push(serde_json::json!({
+            "id": "sm.tim1.alt",
+            "name": "TIM1 alternate modes",
+            "targetRefs": ["periph.tim1"],
+            "initialState": "disabled",
+            "states": [{ "name": "disabled" }, { "name": "enabled" }],
+            "transitions": [
+                {
+                    "from": "disabled",
+                    "to": "enabled",
+                    "trigger": "alternate enable",
+                    "effects": [{ "kind": "starts-hardware", "targetRef": "field.tim1.ctlr1.cen" }]
+                }
+            ]
+        }));
+
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let tim1 = drivers[5].as_object_mut().expect("tim1 driver");
+        tim1.get_mut("stateMachineRefs")
+            .and_then(Value::as_array_mut)
+            .expect("stateMachineRefs")
+            .push(serde_json::json!("sm.tim1.alt"));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("duplicate transition-pair fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
+
+        let timer_rs = std::fs::read_to_string(output_dir.path().join("src").join("timer.rs"))
+            .expect("timer.rs");
+        assert!(timer_rs.contains("pub fn transition_tim1_disabled_to_enabled"));
+        assert!(timer_rs.contains("pub fn transition_alt_disabled_to_enabled"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_unsupported_register_widths_without_panicking() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        let registers = tim1
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 registers");
+        let ctlr1 = registers[0].as_object_mut().expect("tim1 ctlr1");
+        ctlr1.insert("widthBits".to_string(), serde_json::json!(128));
+        let fields = ctlr1
+            .get_mut("fields")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 fields");
+        fields[0]
+            .as_object_mut()
+            .expect("tim1 cen field")
+            .get_mut("bitRange")
+            .and_then(Value::as_object_mut)
+            .expect("bit range")
+            .insert("msb".to_string(), serde_json::json!(80));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("unsupported-width fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("register reg.tim1.ctlr1 uses unsupported width 128")
+        );
+    }
+
+    #[test]
     fn render_rust_string_uses_rust_escapes_for_control_chars() {
         let rendered = render_rust_string("line\u{1}break");
         assert!(rendered.starts_with('"'));
@@ -5361,14 +7401,52 @@ mod tests {
                         { "id": "irq.adc1", "name": "ADC1", "number": 5 }
                     ],
                     "peripherals": [
-                        { "id": "periph.rcc", "name": "RCC", "kind": "peripheral", "type": "RCC" },
+                        { "id": "periph.rcc", "name": "RCC", "kind": "peripheral", "type": "RCC", "baseAddress": 1073872896u64, "registers": [
+                            { "id": "reg.rcc.apb2pcenr", "name": "APB2PCENR", "kind": "register", "offsetBytes": 0, "widthBits": 32, "fields": [
+                                { "id": "field.rcc.apb2pcenr.iopaen", "name": "IOPAEN", "description": "I/O port A clock enable", "bitRange": { "lsb": 2, "msb": 2 } },
+                                { "id": "field.rcc.apb2pcenr.usart1en", "name": "USART1EN", "description": "USART1 clock enable", "bitRange": { "lsb": 14, "msb": 14 } },
+                                { "id": "field.rcc.apb2pcenr.spi1en", "name": "SPI1EN", "description": "SPI1 clock enable", "bitRange": { "lsb": 12, "msb": 12 } },
+                                { "id": "field.rcc.apb2pcenr.tim1en", "name": "TIM1EN", "description": "TIM1 clock enable", "bitRange": { "lsb": 11, "msb": 11 } },
+                                { "id": "field.rcc.apb2pcenr.adc1en", "name": "ADC1EN", "description": "ADC1 clock enable", "bitRange": { "lsb": 9, "msb": 9 } }
+                            ] },
+                            { "id": "reg.rcc.apb1pcenr", "name": "APB1PCENR", "kind": "register", "offsetBytes": 4, "widthBits": 32, "fields": [
+                                { "id": "field.rcc.apb1pcenr.i2c1en", "name": "I2C1EN", "description": "I2C1 clock enable", "bitRange": { "lsb": 21, "msb": 21 } }
+                            ] },
+                            { "id": "reg.rcc.ahbpcenr", "name": "AHBPCENR", "kind": "register", "offsetBytes": 8, "widthBits": 32, "fields": [
+                                { "id": "field.rcc.ahbpcenr.dma1en", "name": "DMA1EN", "description": "DMA1 clock enable", "bitRange": { "lsb": 0, "msb": 0 } }
+                            ] },
+                            { "id": "reg.rcc.apb2prstr", "name": "APB2PRSTR", "kind": "register", "offsetBytes": 12, "widthBits": 32, "fields": [
+                                { "id": "field.rcc.apb2prstr.ioparst", "name": "IOPARST", "description": "I/O port A reset", "bitRange": { "lsb": 2, "msb": 2 } },
+                                { "id": "field.rcc.apb2prstr.usart1rst", "name": "USART1RST", "description": "USART1 reset", "bitRange": { "lsb": 14, "msb": 14 } },
+                                { "id": "field.rcc.apb2prstr.spi1rst", "name": "SPI1RST", "description": "SPI1 reset", "bitRange": { "lsb": 12, "msb": 12 } },
+                                { "id": "field.rcc.apb2prstr.tim1rst", "name": "TIM1RST", "description": "TIM1 reset", "bitRange": { "lsb": 11, "msb": 11 } },
+                                { "id": "field.rcc.apb2prstr.adc1rst", "name": "ADC1RST", "description": "ADC1 reset", "bitRange": { "lsb": 9, "msb": 9 } }
+                            ] },
+                            { "id": "reg.rcc.apb1prstr", "name": "APB1PRSTR", "kind": "register", "offsetBytes": 16, "widthBits": 32, "fields": [
+                                { "id": "field.rcc.apb1prstr.i2c1rst", "name": "I2C1RST", "description": "I2C1 reset", "bitRange": { "lsb": 21, "msb": 21 } }
+                            ] }
+                        ] },
                         { "id": "periph.gpioa", "name": "GPIOA", "kind": "peripheral", "type": "GPIO" },
                         { "id": "periph.usart1", "name": "USART1", "kind": "peripheral", "type": "USART", "interruptRefs": ["irq.usart1"] },
                         { "id": "periph.spi1", "name": "SPI1", "kind": "peripheral", "type": "SPI", "interruptRefs": ["irq.spi1"] },
                         { "id": "periph.i2c1", "name": "I2C1", "kind": "peripheral", "type": "I2C", "interruptRefs": ["irq.i2c1"] },
-                        { "id": "periph.tim1", "name": "TIM1", "kind": "peripheral", "type": "TIM", "interruptRefs": ["irq.tim1"] },
-                        { "id": "periph.pwm1", "name": "PWM1", "kind": "peripheral", "type": "PWM" },
-                        { "id": "periph.adc1", "name": "ADC1", "kind": "peripheral", "type": "ADC", "interruptRefs": ["irq.adc1"] },
+                        { "id": "periph.tim1", "name": "TIM1", "kind": "peripheral", "type": "TIM", "interruptRefs": ["irq.tim1"], "baseAddress": 1073812480u64, "registers": [
+                            { "id": "reg.tim1.ctlr1", "name": "CTLR1", "kind": "register", "offsetBytes": 0, "widthBits": 16, "fields": [
+                                { "id": "field.tim1.ctlr1.cen", "name": "CEN", "description": "Counter enable", "bitRange": { "lsb": 0, "msb": 0 } }
+                            ] }
+                        ] },
+                        { "id": "periph.pwm1", "name": "PWM1", "kind": "peripheral", "type": "PWM", "baseAddress": 1073812544u64, "registers": [
+                            { "id": "reg.pwm1.ctlr1", "name": "CTLR1", "kind": "register", "offsetBytes": 0, "widthBits": 16, "fields": [
+                                { "id": "field.pwm1.ctlr1.cen", "name": "CEN", "description": "Counter enable", "bitRange": { "lsb": 0, "msb": 0 } }
+                            ] }
+                        ] },
+                        { "id": "periph.adc1", "name": "ADC1", "kind": "peripheral", "type": "ADC", "interruptRefs": ["irq.adc1"], "baseAddress": 1073811456u64, "registers": [
+                            { "id": "reg.adc1.ctlr2", "name": "CTLR2", "kind": "register", "offsetBytes": 8, "widthBits": 32, "fields": [
+                                { "id": "field.adc1.ctlr2.adon", "name": "ADON", "description": "ADC enable", "bitRange": { "lsb": 0, "msb": 0 } },
+                                { "id": "field.adc1.ctlr2.cal", "name": "CAL", "description": "Calibration start", "bitRange": { "lsb": 2, "msb": 2 } },
+                                { "id": "field.adc1.ctlr2.rstcal", "name": "RSTCAL", "description": "Reset calibration", "bitRange": { "lsb": 3, "msb": 3 } }
+                            ] }
+                        ] },
                         { "id": "periph.dma1", "name": "DMA1", "kind": "peripheral", "type": "DMA" },
                         { "id": "periph.pfic", "name": "PFIC", "kind": "peripheral", "type": "INTC" }
                     ]
@@ -5376,14 +7454,14 @@ mod tests {
             },
             "semantics": {
                 "operations": [
-                    { "id": "op.rcc.init", "name": "Initialize RCC", "kind": "initialization", "targetRefs": ["periph.rcc"], "steps": [{ "index": 0, "action": "write", "description": "Enable clocks" }] },
-                    { "id": "op.adc.calibrate", "name": "Calibrate ADC", "kind": "initialization", "targetRefs": ["periph.adc1"], "steps": [{ "index": 0, "action": "write", "description": "Start calibration" }] },
-                    { "id": "op.tim1.enable", "name": "Enable TIM1", "kind": "mode-transition", "targetRefs": ["periph.tim1"], "steps": [{ "index": 0, "action": "write", "description": "Enable timer" }] },
-                    { "id": "op.pwm1.enable", "name": "Enable PWM1", "kind": "mode-transition", "targetRefs": ["periph.pwm1"], "steps": [{ "index": 0, "action": "write", "description": "Enable PWM" }] }
+                    { "id": "op.rcc.init", "name": "Initialize RCC", "kind": "initialization", "targetRefs": ["periph.rcc"], "steps": [{ "index": 0, "action": "write", "targetRef": "reg.rcc.apb2pcenr", "expression": { "language": "plain", "text": "Set USART1EN = 1" } }] },
+                    { "id": "op.adc.calibrate", "name": "Calibrate ADC", "kind": "initialization", "targetRefs": ["periph.adc1"], "steps": [{ "index": 0, "action": "write", "targetRef": "reg.adc1.ctlr2", "expression": { "language": "plain", "text": "Set ADON = 1" } }, { "index": 1, "action": "write", "targetRef": "reg.adc1.ctlr2", "expression": { "language": "plain", "text": "Set RSTCAL = 1" } }, { "index": 2, "action": "write", "targetRef": "reg.adc1.ctlr2", "expression": { "language": "plain", "text": "Set CAL = 1" } }] },
+                    { "id": "op.tim1.enable", "name": "Enable TIM1", "kind": "mode-transition", "targetRefs": ["periph.tim1"], "steps": [{ "index": 0, "action": "write", "targetRef": "reg.tim1.ctlr1", "expression": { "language": "plain", "text": "Set CEN = 1" } }] },
+                    { "id": "op.pwm1.enable", "name": "Enable PWM1", "kind": "mode-transition", "targetRefs": ["periph.pwm1"], "steps": [{ "index": 0, "action": "write", "targetRef": "reg.pwm1.ctlr1", "expression": { "language": "plain", "text": "Set CEN = 1" } }] }
                 ],
                 "stateMachines": [
-                    { "id": "sm.tim1", "name": "TIM1 modes", "targetRefs": ["periph.tim1"], "states": [{ "name": "disabled" }, { "name": "enabled" }], "transitions": [{ "from": "disabled", "to": "enabled" }] },
-                    { "id": "sm.pwm1", "name": "PWM1 modes", "targetRefs": ["periph.pwm1"], "states": [{ "name": "disabled" }, { "name": "enabled" }], "transitions": [{ "from": "disabled", "to": "enabled" }] }
+                    { "id": "sm.tim1", "name": "TIM1 modes", "targetRefs": ["periph.tim1"], "initialState": "disabled", "states": [{ "name": "disabled" }, { "name": "enabled" }], "transitions": [{ "from": "disabled", "to": "enabled", "trigger": "enable requested", "effects": [{ "kind": "starts-hardware", "targetRef": "field.tim1.ctlr1.cen" }] }, { "from": "enabled", "to": "disabled", "trigger": "disable requested", "effects": [{ "kind": "stops-hardware", "targetRef": "field.tim1.ctlr1.cen" }] }] },
+                    { "id": "sm.pwm1", "name": "PWM1 modes", "targetRefs": ["periph.pwm1"], "initialState": "disabled", "states": [{ "name": "disabled" }, { "name": "enabled" }], "transitions": [{ "from": "disabled", "to": "enabled", "trigger": "enable requested", "effects": [{ "kind": "starts-hardware", "targetRef": "field.pwm1.ctlr1.cen" }] }, { "from": "enabled", "to": "disabled", "trigger": "disable requested", "effects": [{ "kind": "stops-hardware", "targetRef": "field.pwm1.ctlr1.cen" }] }] }
                 ]
             },
             "physical": {
@@ -5418,20 +7496,23 @@ mod tests {
                     ],
                     "clockResetTopology": {
                         "clockBindings": [
-                            { "id": "clk.usart1", "name": "USART1 clock", "consumerRef": "periph.usart1", "clockRef": "clk.apb2", "bindingKind": "gated" },
-                            { "id": "clk.spi1", "name": "SPI1 clock", "consumerRef": "periph.spi1", "clockRef": "clk.apb2", "bindingKind": "gated" },
-                            { "id": "clk.i2c1", "name": "I2C1 clock", "consumerRef": "periph.i2c1", "clockRef": "clk.apb1", "bindingKind": "gated" },
-                            { "id": "clk.tim1", "name": "TIM1 clock", "consumerRef": "periph.tim1", "clockRef": "clk.apb2", "bindingKind": "gated" },
-                            { "id": "clk.pwm1", "name": "PWM1 clock", "consumerRef": "periph.pwm1", "clockRef": "clk.apb2", "bindingKind": "gated" },
-                            { "id": "clk.adc1", "name": "ADC1 clock", "consumerRef": "periph.adc1", "clockRef": "clk.apb2", "bindingKind": "gated" }
+                            { "id": "clk.gpioa", "name": "GPIOA clock", "consumerRef": "periph.gpioa", "clockRef": "clk.apb2", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"] },
+                            { "id": "clk.usart1", "name": "USART1 clock", "consumerRef": "periph.usart1", "clockRef": "clk.apb2", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"] },
+                            { "id": "clk.spi1", "name": "SPI1 clock", "consumerRef": "periph.spi1", "clockRef": "clk.apb2", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"] },
+                            { "id": "clk.i2c1", "name": "I2C1 clock", "consumerRef": "periph.i2c1", "clockRef": "clk.apb1", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb1pcenr"] },
+                            { "id": "clk.tim1", "name": "TIM1 clock", "consumerRef": "periph.tim1", "clockRef": "clk.apb2", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"] },
+                            { "id": "clk.pwm1", "name": "PWM1 clock", "consumerRef": "periph.pwm1", "clockRef": "clk.apb2", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"] },
+                            { "id": "clk.adc1", "name": "ADC1 clock", "consumerRef": "periph.adc1", "clockRef": "clk.apb2", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"] },
+                            { "id": "clk.dma1", "name": "DMA1 clock", "consumerRef": "periph.dma1", "clockRef": "clk.ahb", "bindingKind": "gated", "controlRefs": ["reg.rcc.ahbpcenr"] }
                         ],
                         "resetBindings": [
-                            { "id": "rst.usart1", "name": "USART1 reset", "targetRef": "periph.usart1", "bindingKind": "software" },
-                            { "id": "rst.spi1", "name": "SPI1 reset", "targetRef": "periph.spi1", "bindingKind": "software" },
-                            { "id": "rst.i2c1", "name": "I2C1 reset", "targetRef": "periph.i2c1", "bindingKind": "software" },
-                            { "id": "rst.tim1", "name": "TIM1 reset", "targetRef": "periph.tim1", "bindingKind": "software" },
-                            { "id": "rst.pwm1", "name": "PWM1 reset", "targetRef": "periph.pwm1", "bindingKind": "software" },
-                            { "id": "rst.adc1", "name": "ADC1 reset", "targetRef": "periph.adc1", "bindingKind": "software" }
+                            { "id": "rst.gpioa", "name": "GPIOA reset", "targetRef": "periph.gpioa", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] },
+                            { "id": "rst.usart1", "name": "USART1 reset", "targetRef": "periph.usart1", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] },
+                            { "id": "rst.spi1", "name": "SPI1 reset", "targetRef": "periph.spi1", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] },
+                            { "id": "rst.i2c1", "name": "I2C1 reset", "targetRef": "periph.i2c1", "bindingKind": "software", "controlRefs": ["reg.rcc.apb1prstr"] },
+                            { "id": "rst.tim1", "name": "TIM1 reset", "targetRef": "periph.tim1", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] },
+                            { "id": "rst.pwm1", "name": "PWM1 reset", "targetRef": "periph.pwm1", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] },
+                            { "id": "rst.adc1", "name": "ADC1 reset", "targetRef": "periph.adc1", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] }
                         ]
                     },
                     "interruptTopology": {
@@ -5487,14 +7568,14 @@ mod tests {
                     },
                     "driverInstances": [
                         { "id": "drv.rcc", "name": "Rcc", "targetRef": "block.rcc", "driverKind": "rcc", "modulePath": "rcc", "clockBindingRefs": ["clk.usart1"], "initOperationRefs": ["op.rcc.init"] },
-                        { "id": "drv.gpioa", "name": "GpioA", "targetRef": "block.gpioa", "driverKind": "gpio-port", "modulePath": "gpio", "pinRoles": [{ "role": "gpio0", "signal": "GPIO0", "routeRefs": ["pinroute.gpioa.pa0"], "requirement": "required" }] },
+                        { "id": "drv.gpioa", "name": "GpioA", "targetRef": "block.gpioa", "driverKind": "gpio-port", "modulePath": "gpio", "clockBindingRefs": ["clk.gpioa"], "resetBindingRefs": ["rst.gpioa"], "pinRoles": [{ "role": "gpio0", "signal": "GPIO0", "routeRefs": ["pinroute.gpioa.pa0"], "requirement": "required" }] },
                         { "id": "drv.usart1", "name": "Usart1", "targetRef": "block.usart1", "driverKind": uart_driver_kind, "modulePath": "uart", "clockBindingRefs": ["clk.usart1"], "resetBindingRefs": ["rst.usart1"], "interruptRouteRefs": ["iroute.usart1"], "dmaRouteRefs": ["dmaroute.usart1_tx", "dmaroute.usart1_rx"], "pinRoles": [{ "role": "tx", "signal": "TX", "routeRefs": ["pinroute.usart1.tx"], "requirement": "required" }, { "role": "rx", "signal": "RX", "routeRefs": ["pinroute.usart1.rx"], "requirement": "required" }] },
                         { "id": "drv.spi1", "name": "Spi1", "targetRef": "block.spi1", "driverKind": "spi", "modulePath": "spi", "clockBindingRefs": ["clk.spi1"], "resetBindingRefs": ["rst.spi1"], "interruptRouteRefs": ["iroute.spi1"], "pinRoles": [{ "role": "sck", "signal": "SCK", "routeRefs": ["pinroute.spi1.sck"], "requirement": "required" }, { "role": "mosi", "signal": "MOSI", "routeRefs": ["pinroute.spi1.mosi"], "requirement": "required" }, { "role": "miso", "signal": "MISO", "routeRefs": ["pinroute.spi1.miso"], "requirement": "required" }] },
                         { "id": "drv.i2c1", "name": "I2c1", "targetRef": "block.i2c1", "driverKind": "i2c", "modulePath": "i2c", "clockBindingRefs": ["clk.i2c1"], "resetBindingRefs": ["rst.i2c1"], "interruptRouteRefs": ["iroute.i2c1"], "pinRoles": [{ "role": "scl", "signal": "SCL", "routeRefs": ["pinroute.i2c1.scl"], "requirement": "required" }, { "role": "sda", "signal": "SDA", "routeRefs": ["pinroute.i2c1.sda"], "requirement": "required" }] },
                         { "id": "drv.tim1", "name": "Tim1", "targetRef": "block.tim1", "driverKind": "timer", "modulePath": "timer", "clockBindingRefs": ["clk.tim1"], "resetBindingRefs": ["rst.tim1"], "interruptRouteRefs": ["iroute.tim1"], "pinRoles": [{ "role": "ch1", "signal": "CH1", "routeRefs": ["pinroute.tim1.ch1"], "requirement": "required" }], "initOperationRefs": ["op.tim1.enable"], "stateMachineRefs": ["sm.tim1"] },
                         { "id": "drv.pwm1", "name": "Pwm1", "targetRef": "block.pwm1", "driverKind": "pwm", "modulePath": "pwm", "clockBindingRefs": ["clk.pwm1"], "resetBindingRefs": ["rst.pwm1"], "pinRoles": [{ "role": "out", "signal": "PWM_OUT", "routeRefs": ["pinroute.pwm1.out"], "requirement": "required" }], "initOperationRefs": ["op.pwm1.enable"], "stateMachineRefs": ["sm.pwm1"] },
                         { "id": "drv.adc1", "name": "Adc1", "targetRef": "block.adc1", "driverKind": "adc", "modulePath": "adc", "clockBindingRefs": ["clk.adc1"], "resetBindingRefs": ["rst.adc1"], "interruptRouteRefs": ["iroute.adc1"], "dmaRouteRefs": ["dmaroute.adc1"], "pinRoles": [{ "role": "input0", "signal": "IN0", "routeRefs": ["pinroute.adc1.in0"], "requirement": "required" }], "initOperationRefs": ["op.adc.calibrate"] },
-                        { "id": "drv.dma1", "name": "Dma1", "targetRef": "block.dma1", "driverKind": "dma", "modulePath": "dma", "dmaRouteRefs": ["dmaroute.usart1_tx", "dmaroute.usart1_rx", "dmaroute.adc1"] },
+                        { "id": "drv.dma1", "name": "Dma1", "targetRef": "block.dma1", "driverKind": "dma", "modulePath": "dma", "clockBindingRefs": ["clk.dma1"], "dmaRouteRefs": ["dmaroute.usart1_tx", "dmaroute.usart1_rx", "dmaroute.adc1"] },
                         { "id": "drv.pfic", "name": "Pfic", "targetRef": "block.pfic", "driverKind": "interrupt", "modulePath": "interrupt", "interruptRouteRefs": ["iroute.usart1", "iroute.spi1", "iroute.i2c1", "iroute.tim1", "iroute.adc1"] }
                     ]
                 }

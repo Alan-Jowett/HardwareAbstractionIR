@@ -62,11 +62,14 @@ First-cut behavior:
 - generate a compilable crate directory rather than a single stdout artifact
 - consume the hardware facts from the core layers plus the canonical MCU topology in `profiles.mcuSoc`
 - require an explicit `profiles.embassyHal` contract for the supported generated drivers
+- derive the emitted Rust API surface from the approved topology and semantic lowering inputs in the HAIR document rather than from fixed placeholder signatures per driver kind
+- emit register-level code only for methods that can be justified by explicit HAIR lowering inputs, and fail explicitly when the requested or implied behavior is underspecified
 - fail explicitly when the input document falls outside the documented supported subset or omits generator-required topology, semantics, or bindings documented in `docs/embassy-hal-profile.md`
 
 First-cut exclusions:
 
 - silent fallback from unsupported hardware to placeholder stubs
+- fixed success-return driver methods that are disconnected from the input document's approved lowering data
 - inference of driver contracts purely from vendor naming without the approved profile data
 - pretending that generic schema validity alone is enough for Embassy generation readiness
 
