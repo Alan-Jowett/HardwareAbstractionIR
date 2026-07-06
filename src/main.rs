@@ -1154,6 +1154,7 @@ struct SemanticState {
 struct SemanticTransition {
     from: String,
     to: String,
+    #[allow(dead_code)]
     #[serde(default)]
     trigger: Option<String>,
     #[serde(default)]
@@ -1355,6 +1356,7 @@ struct McuPinRoute {
 #[derive(Debug, Clone)]
 struct ResolvedRegister {
     id: String,
+    peripheral_ref: String,
     absolute_address: u64,
     width_bits: u32,
     fields: Vec<ResolvedField>,
@@ -1362,10 +1364,18 @@ struct ResolvedRegister {
 
 #[derive(Debug, Clone)]
 struct ResolvedField {
+    id: String,
     name: String,
     description: Option<String>,
     lsb: u32,
     msb: u32,
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedFieldTarget {
+    peripheral_ref: String,
+    register_id: String,
+    field: ResolvedField,
 }
 
 #[derive(Debug)]
@@ -1496,6 +1506,7 @@ struct EmbassyGenerationModel {
     drivers: Vec<ResolvedDriverInstance>,
     peripheral_names: HashMap<String, String>,
     registers: HashMap<String, ResolvedRegister>,
+    fields: HashMap<String, ResolvedFieldTarget>,
     provenance: HairProvenance,
 }
 
@@ -1596,6 +1607,7 @@ impl EmbassyGenerationModel {
             .map(|peripheral| (peripheral.id.clone(), peripheral.name.clone()))
             .collect::<HashMap<_, _>>();
         let registers = collect_register_map(&document.structure.device.peripherals)?;
+        let fields = collect_field_map(&registers)?;
 
         let mut drivers = Vec::with_capacity(embassy.driver_instances.len());
         for driver in &embassy.driver_instances {
@@ -1679,6 +1691,14 @@ impl EmbassyGenerationModel {
                 pin_roles: &pin_roles,
             };
             validate_driver_resource_scope(driver, &target, &resource_scope)?;
+            validate_driver_semantic_scope(
+                driver,
+                &target,
+                &init_operations,
+                &state_machines,
+                &registers,
+                &fields,
+            )?;
 
             let requirements = DriverRequirementInputs {
                 clock_bindings: &clock_bindings,
@@ -1724,6 +1744,7 @@ impl EmbassyGenerationModel {
             drivers,
             peripheral_names,
             registers,
+            fields,
             provenance: document.provenance.clone(),
         })
     }
@@ -2160,6 +2181,138 @@ fn validate_driver_resource_scope(
         }
         "rcc" => {}
         _ => {}
+    }
+
+    Ok(())
+}
+
+fn validate_driver_semantic_scope(
+    driver: &EmbassyDriverInstance,
+    target: &McuCanonicalBlock,
+    init_operations: &[SemanticOperation],
+    state_machines: &[SemanticStateMachine],
+    registers: &HashMap<String, ResolvedRegister>,
+    fields: &HashMap<String, ResolvedFieldTarget>,
+) -> Result<()> {
+    let target_ref = target.target_ref.as_str();
+
+    for operation in init_operations {
+        validate_operation_scope(driver, target_ref, operation, registers)?;
+    }
+    for state_machine in state_machines {
+        validate_state_machine_scope(driver, target_ref, state_machine, registers, fields)?;
+    }
+
+    Ok(())
+}
+
+fn validate_operation_scope(
+    driver: &EmbassyDriverInstance,
+    target_ref: &str,
+    operation: &SemanticOperation,
+    registers: &HashMap<String, ResolvedRegister>,
+) -> Result<()> {
+    for operation_target in &operation.target_refs {
+        if operation_target != target_ref {
+            bail!(
+                "driver {} references operation {} for {} instead of {}",
+                driver.id,
+                operation.id,
+                operation_target,
+                target_ref
+            );
+        }
+    }
+
+    for step in &operation.steps {
+        let Some(step_target_ref) = step.target_ref.as_deref() else {
+            continue;
+        };
+        let register = registers.get(step_target_ref).ok_or_else(|| {
+            anyhow!(
+                "operation {} step {} references unknown register {}",
+                operation.id,
+                step.index,
+                step_target_ref
+            )
+        })?;
+        if register.peripheral_ref != target_ref {
+            bail!(
+                "driver {} operation {} step {} references register {} on {} instead of {}",
+                driver.id,
+                operation.id,
+                step.index,
+                step_target_ref,
+                register.peripheral_ref,
+                target_ref
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_state_machine_scope(
+    driver: &EmbassyDriverInstance,
+    target_ref: &str,
+    state_machine: &SemanticStateMachine,
+    registers: &HashMap<String, ResolvedRegister>,
+    fields: &HashMap<String, ResolvedFieldTarget>,
+) -> Result<()> {
+    for state_machine_target in &state_machine.target_refs {
+        if state_machine_target != target_ref {
+            bail!(
+                "driver {} references state machine {} for {} instead of {}",
+                driver.id,
+                state_machine.id,
+                state_machine_target,
+                target_ref
+            );
+        }
+    }
+
+    for transition in &state_machine.transitions {
+        for effect in &transition.effects {
+            let Some(effect_target_ref) = effect.target_ref.as_deref() else {
+                continue;
+            };
+            if let Some(field_target) = fields.get(effect_target_ref) {
+                if field_target.peripheral_ref != target_ref {
+                    bail!(
+                        "driver {} state machine {} transition {} -> {} references field {} on {} instead of {}",
+                        driver.id,
+                        state_machine.id,
+                        transition.from,
+                        transition.to,
+                        effect_target_ref,
+                        field_target.peripheral_ref,
+                        target_ref
+                    );
+                }
+                continue;
+            }
+            let register = registers.get(effect_target_ref).ok_or_else(|| {
+                anyhow!(
+                    "state machine {} transition {} -> {} references unknown effect target {}",
+                    state_machine.id,
+                    transition.from,
+                    transition.to,
+                    effect_target_ref
+                )
+            })?;
+            if register.peripheral_ref != target_ref {
+                bail!(
+                    "driver {} state machine {} transition {} -> {} references register {} on {} instead of {}",
+                    driver.id,
+                    state_machine.id,
+                    transition.from,
+                    transition.to,
+                    effect_target_ref,
+                    register.peripheral_ref,
+                    target_ref
+                );
+            }
+        }
     }
 
     Ok(())
@@ -2769,33 +2922,8 @@ fn render_state_machine_methods(
     let mut methods = Vec::new();
     for state_machine in &driver.state_machines {
         for transition in &state_machine.transitions {
-            let effect_target_refs = transition
-                .effects
-                .iter()
-                .filter_map(|effect| effect.target_ref.as_deref())
-                .collect::<Vec<_>>();
-            let [register_ref] = effect_target_refs.as_slice() else {
-                bail!(
-                    "state machine {} transition {} -> {} on driver {} requires exactly one effect targetRef, found {}",
-                    state_machine.id,
-                    transition.from,
-                    transition.to,
-                    driver.id,
-                    effect_target_refs.len()
-                );
-            };
-            let register = model.registers.get(*register_ref).ok_or_else(|| {
-                anyhow!(
-                    "state machine {} transition {} -> {} references unknown register {}",
-                    state_machine.id,
-                    transition.from,
-                    transition.to,
-                    register_ref
-                )
-            })?;
-            let parsed =
-                parse_transition_trigger(transition.trigger.as_deref(), &state_machine.id)?;
-            let field = resolve_register_field(register, &parsed.field_name)?;
+            let (register, field, value) =
+                resolve_transition_effect_write(model, driver, state_machine, transition)?;
             let method_name = format!(
                 "transition_{}_to_{}",
                 to_rust_method_name(&transition.from),
@@ -2804,10 +2932,7 @@ fn render_state_machine_methods(
             let mut code =
                 format!("    pub fn {method_name}(&self) -> Result<(), metadata::Error> {{\n");
             code.push_str(&render_register_write_statement(
-                register,
-                &field,
-                parsed.value,
-                "        ",
+                register, &field, value, "        ",
             )?);
             code.push_str("        Ok(())\n    }\n");
             methods.push(GeneratedMethod {
@@ -2817,6 +2942,58 @@ fn render_state_machine_methods(
         }
     }
     Ok(methods)
+}
+
+fn resolve_transition_effect_write<'a>(
+    model: &'a EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+    state_machine: &SemanticStateMachine,
+    transition: &SemanticTransition,
+) -> Result<(&'a ResolvedRegister, ResolvedField, u64)> {
+    let [effect] = transition.effects.as_slice() else {
+        bail!(
+            "state machine {} transition {} -> {} on driver {} requires exactly one effect for first-cut lowering, found {}",
+            state_machine.id,
+            transition.from,
+            transition.to,
+            driver.id,
+            transition.effects.len()
+        );
+    };
+    let effect_target_ref = effect.target_ref.as_deref().ok_or_else(|| {
+        anyhow!(
+            "state machine {} transition {} -> {} on driver {} is missing effect targetRef",
+            state_machine.id,
+            transition.from,
+            transition.to,
+            driver.id
+        )
+    })?;
+    let field_target = model.fields.get(effect_target_ref).ok_or_else(|| {
+        anyhow!(
+            "state machine {} transition {} -> {} on driver {} requires effect targetRef {} to resolve to a field for first-cut lowering",
+            state_machine.id,
+            transition.from,
+            transition.to,
+            driver.id,
+            effect_target_ref
+        )
+    })?;
+    let register = model
+        .registers
+        .get(field_target.register_id.as_str())
+        .ok_or_else(|| {
+            anyhow!(
+                "field {} on state machine {} transition {} -> {} resolved to unknown register {}",
+                effect_target_ref,
+                state_machine.id,
+                transition.from,
+                transition.to,
+                field_target.register_id
+            )
+        })?;
+    let value = transition_effect_value(effect, state_machine, transition, &driver.id)?;
+    Ok((register, field_target.field.clone(), value))
 }
 
 fn resolve_control_register<'a>(
@@ -3057,13 +3234,39 @@ fn collect_register_map(peripherals: &[Peripheral]) -> Result<HashMap<String, Re
                 peripheral.id
             )
         })?;
-        collect_register_members(&mut registers, base_address, 0, &peripheral.registers)?;
+        collect_register_members(
+            &mut registers,
+            peripheral.id.as_str(),
+            base_address,
+            0,
+            &peripheral.registers,
+        )?;
     }
     Ok(registers)
 }
 
+fn collect_field_map(
+    registers: &HashMap<String, ResolvedRegister>,
+) -> Result<HashMap<String, ResolvedFieldTarget>> {
+    let mut fields = HashMap::new();
+    for register in registers.values() {
+        for field in &register.fields {
+            let resolved = ResolvedFieldTarget {
+                peripheral_ref: register.peripheral_ref.clone(),
+                register_id: register.id.clone(),
+                field: field.clone(),
+            };
+            if fields.insert(field.id.clone(), resolved).is_some() {
+                bail!("duplicate field {} is not supported", field.id);
+            }
+        }
+    }
+    Ok(fields)
+}
+
 fn collect_register_members(
     registers: &mut HashMap<String, ResolvedRegister>,
+    peripheral_ref: &str,
     base_address: u64,
     parent_offset: u64,
     members: &[RegisterBlockMember],
@@ -3074,12 +3277,14 @@ fn collect_register_members(
                 let absolute_address = base_address + parent_offset + register.offset_bytes;
                 let resolved = ResolvedRegister {
                     id: register.id.clone(),
+                    peripheral_ref: peripheral_ref.to_string(),
                     absolute_address,
                     width_bits: register.width_bits,
                     fields: register
                         .fields
                         .iter()
                         .map(|field| ResolvedField {
+                            id: field.id.clone(),
                             name: field.name.clone(),
                             description: field.description.clone(),
                             lsb: field.bit_range.lsb,
@@ -3094,6 +3299,7 @@ fn collect_register_members(
             RegisterBlockMember::Cluster(cluster) => {
                 collect_register_members(
                     registers,
+                    peripheral_ref,
                     base_address,
                     parent_offset + cluster.offset_bytes,
                     &cluster.members,
@@ -3214,18 +3420,24 @@ fn parse_field_write_text(text: &str) -> Result<ParsedFieldWrite> {
     bail!("unsupported plain-text write expression {trimmed}")
 }
 
-fn parse_transition_trigger(
-    trigger: Option<&str>,
-    state_machine_id: &str,
-) -> Result<ParsedFieldWrite> {
-    let trigger = trigger.ok_or_else(|| {
-        anyhow!(
-            "state machine {} transition is missing a trigger",
-            state_machine_id
-        )
-    })?;
-    parse_field_write_text(trigger)
-        .with_context(|| format!("parsing trigger on state machine {state_machine_id}"))
+fn transition_effect_value(
+    effect: &SemanticSideEffect,
+    state_machine: &SemanticStateMachine,
+    transition: &SemanticTransition,
+    driver_id: &str,
+) -> Result<u64> {
+    match effect.kind.as_str() {
+        "self-set" | "starts-hardware" => Ok(1),
+        "self-clear" | "stops-hardware" => Ok(0),
+        other => bail!(
+            "state machine {} transition {} -> {} on driver {} uses unsupported effect kind {} for first-cut lowering",
+            state_machine.id,
+            transition.from,
+            transition.to,
+            driver_id,
+            other
+        ),
+    }
 }
 
 fn extract_field_name(text: &str) -> String {
@@ -5481,7 +5693,7 @@ mod tests {
             .expect("effects");
         effects.push(serde_json::json!({
             "kind": "updates-status",
-            "targetRef": "reg.pwm1.ctlr1"
+            "targetRef": "field.tim1.ctlr1.cen"
         }));
 
         let file = write_temp_json(&document);
@@ -5493,7 +5705,7 @@ mod tests {
         assert!(
             error
                 .to_string()
-                .contains("requires exactly one effect targetRef")
+                .contains("requires exactly one effect for first-cut lowering")
         );
     }
 
@@ -5529,6 +5741,87 @@ mod tests {
         let error =
             generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
         assert!(error.to_string().contains("reuses step index 0"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_operation_steps_outside_driver_scope() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        let tim1_operation = operations[2].as_object_mut().expect("tim1 operation");
+        let steps = tim1_operation
+            .get_mut("steps")
+            .and_then(Value::as_array_mut)
+            .expect("steps");
+        steps[0]
+            .as_object_mut()
+            .expect("tim1 step")
+            .insert("targetRef".to_string(), serde_json::json!("reg.pwm1.ctlr1"));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("mismatched operation scope fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error.to_string().contains(
+                "references register reg.pwm1.ctlr1 on periph.pwm1 instead of periph.tim1"
+            )
+        );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_state_machine_effects_that_do_not_target_fields() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let state_machines = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("stateMachines")
+            .and_then(Value::as_array_mut)
+            .expect("state machines");
+        let tim1 = state_machines[0]
+            .as_object_mut()
+            .expect("tim1 state machine");
+        let transitions = tim1
+            .get_mut("transitions")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 transitions");
+        let enable_transition = transitions[0].as_object_mut().expect("enable transition");
+        let effects = enable_transition
+            .get_mut("effects")
+            .and_then(Value::as_array_mut)
+            .expect("effects");
+        effects[0]
+            .as_object_mut()
+            .expect("enable effect")
+            .insert("targetRef".to_string(), serde_json::json!("reg.tim1.ctlr1"));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("register-target state machine fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains(
+            "requires effect targetRef reg.tim1.ctlr1 to resolve to a field for first-cut lowering"
+        ));
     }
 
     #[test]
@@ -6510,8 +6803,8 @@ mod tests {
                     { "id": "op.pwm1.enable", "name": "Enable PWM1", "kind": "mode-transition", "targetRefs": ["periph.pwm1"], "steps": [{ "index": 0, "action": "write", "targetRef": "reg.pwm1.ctlr1", "expression": { "language": "plain", "text": "Set CEN = 1" } }] }
                 ],
                 "stateMachines": [
-                    { "id": "sm.tim1", "name": "TIM1 modes", "targetRefs": ["periph.tim1"], "initialState": "disabled", "states": [{ "name": "disabled" }, { "name": "enabled" }], "transitions": [{ "from": "disabled", "to": "enabled", "trigger": "Set CTLR1.CEN", "effects": [{ "kind": "starts-hardware", "targetRef": "reg.tim1.ctlr1" }] }, { "from": "enabled", "to": "disabled", "trigger": "Clear CTLR1.CEN", "effects": [{ "kind": "stops-hardware", "targetRef": "reg.tim1.ctlr1" }] }] },
-                    { "id": "sm.pwm1", "name": "PWM1 modes", "targetRefs": ["periph.pwm1"], "initialState": "disabled", "states": [{ "name": "disabled" }, { "name": "enabled" }], "transitions": [{ "from": "disabled", "to": "enabled", "trigger": "Set CTLR1.CEN", "effects": [{ "kind": "starts-hardware", "targetRef": "reg.pwm1.ctlr1" }] }, { "from": "enabled", "to": "disabled", "trigger": "Clear CTLR1.CEN", "effects": [{ "kind": "stops-hardware", "targetRef": "reg.pwm1.ctlr1" }] }] }
+                    { "id": "sm.tim1", "name": "TIM1 modes", "targetRefs": ["periph.tim1"], "initialState": "disabled", "states": [{ "name": "disabled" }, { "name": "enabled" }], "transitions": [{ "from": "disabled", "to": "enabled", "trigger": "enable requested", "effects": [{ "kind": "starts-hardware", "targetRef": "field.tim1.ctlr1.cen" }] }, { "from": "enabled", "to": "disabled", "trigger": "disable requested", "effects": [{ "kind": "stops-hardware", "targetRef": "field.tim1.ctlr1.cen" }] }] },
+                    { "id": "sm.pwm1", "name": "PWM1 modes", "targetRefs": ["periph.pwm1"], "initialState": "disabled", "states": [{ "name": "disabled" }, { "name": "enabled" }], "transitions": [{ "from": "disabled", "to": "enabled", "trigger": "enable requested", "effects": [{ "kind": "starts-hardware", "targetRef": "field.pwm1.ctlr1.cen" }] }, { "from": "enabled", "to": "disabled", "trigger": "disable requested", "effects": [{ "kind": "stops-hardware", "targetRef": "field.pwm1.ctlr1.cen" }] }] }
                 ]
             },
             "physical": {

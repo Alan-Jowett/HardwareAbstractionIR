@@ -183,7 +183,7 @@
               "uniqueItems": true
             },
             "initOperationRefs": {
-              "description": "Semantic operations that define emitted bring-up, calibration, enable, or other executable helpers. These are lowering inputs, not documentation-only labels.",
+              "description": "Semantic operations that define emitted bring-up, calibration, enable, or other executable helpers. These are lowering inputs, not documentation-only labels, and should target the same hardware block as the driver instance.",
               "type": "array",
               "items": {
                 "$ref": "../common.json#/$defs/entityRef"
@@ -191,7 +191,7 @@
               "uniqueItems": true
             },
             "stateMachineRefs": {
-              "description": "Semantic state machines that constrain emitted mode-transition helpers. These are lowering inputs, not documentation-only labels.",
+              "description": "Semantic state machines that constrain emitted mode-transition helpers. These are lowering inputs, not documentation-only labels, and first-cut lowering expects the transition effect being emitted to target a field on the same hardware block as the driver instance.",
               "type": "array",
               "items": {
                 "$ref": "../common.json#/$defs/entityRef"
