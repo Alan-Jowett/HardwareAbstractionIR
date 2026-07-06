@@ -1151,6 +1151,8 @@ struct McuInterruptRoute {
     name: String,
     source_ref: String,
     interrupt_ref: String,
+    #[allow(dead_code)]
+    controller_ref: String,
 }
 
 #[allow(dead_code)]
@@ -1291,6 +1293,16 @@ struct DriverRequirementInputs<'a> {
     state_machines: &'a [SemanticStateMachine],
 }
 
+struct DriverResourceScopeInputs<'a> {
+    clock_bindings: &'a [McuClockBinding],
+    reset_bindings: &'a [McuResetBinding],
+    interrupt_routes: &'a [McuInterruptRoute],
+    interrupt_sources: &'a HashMap<&'a str, McuInterruptSource>,
+    dma_routes: &'a [McuDmaRoute],
+    dma_channels: &'a HashMap<&'a str, McuDmaChannel>,
+    pin_roles: &'a [ResolvedEmbassyPinRole],
+}
+
 #[allow(dead_code)]
 #[derive(Debug)]
 struct EmbassyGenerationModel {
@@ -1355,12 +1367,34 @@ impl EmbassyGenerationModel {
                     .collect::<HashMap<_, _>>()
             })
             .unwrap_or_default();
+        let interrupt_sources = mcu
+            .interrupt_topology
+            .as_ref()
+            .map(|topology| {
+                topology
+                    .sources
+                    .iter()
+                    .map(|item| (item.id.as_str(), item.clone()))
+                    .collect::<HashMap<_, _>>()
+            })
+            .unwrap_or_default();
         let dma_routes = mcu
             .dma_topology
             .as_ref()
             .map(|topology| {
                 topology
                     .routes
+                    .iter()
+                    .map(|item| (item.id.as_str(), item.clone()))
+                    .collect::<HashMap<_, _>>()
+            })
+            .unwrap_or_default();
+        let dma_channels = mcu
+            .dma_topology
+            .as_ref()
+            .map(|topology| {
+                topology
+                    .channels
                     .iter()
                     .map(|item| (item.id.as_str(), item.clone()))
                     .collect::<HashMap<_, _>>()
@@ -1459,6 +1493,16 @@ impl EmbassyGenerationModel {
                 "state machine",
                 &driver.id,
             )?;
+            let resource_scope = DriverResourceScopeInputs {
+                clock_bindings: &clock_bindings,
+                reset_bindings: &reset_bindings,
+                interrupt_routes: &interrupt_routes,
+                interrupt_sources: &interrupt_sources,
+                dma_routes: &dma_routes,
+                dma_channels: &dma_channels,
+                pin_roles: &pin_roles,
+            };
+            validate_driver_resource_scope(driver, &target, &resource_scope)?;
 
             let requirements = DriverRequirementInputs {
                 clock_bindings: &clock_bindings,
@@ -1710,6 +1754,130 @@ fn validate_interrupt_name_collisions(interrupts: &[Interrupt]) -> Result<()> {
             );
         }
     }
+    Ok(())
+}
+
+fn validate_driver_resource_scope(
+    driver: &EmbassyDriverInstance,
+    target: &McuCanonicalBlock,
+    resources: &DriverResourceScopeInputs<'_>,
+) -> Result<()> {
+    match driver.driver_kind.as_str() {
+        "uart" | "usart" | "spi" | "i2c" | "timer" | "pwm" | "adc" | "gpio-port" => {
+            let target_ref = target.target_ref.as_str();
+            for binding in resources.clock_bindings {
+                if binding.consumer_ref != target_ref {
+                    bail!(
+                        "driver {} references clock binding {} for {} instead of {}",
+                        driver.id,
+                        binding.id,
+                        binding.consumer_ref,
+                        target_ref
+                    );
+                }
+            }
+            for binding in resources.reset_bindings {
+                if binding.target_ref != target_ref {
+                    bail!(
+                        "driver {} references reset binding {} for {} instead of {}",
+                        driver.id,
+                        binding.id,
+                        binding.target_ref,
+                        target_ref
+                    );
+                }
+            }
+            for route in resources.interrupt_routes {
+                let source = resources
+                    .interrupt_sources
+                    .get(route.source_ref.as_str())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "driver {} interrupt route {} references unknown source {}",
+                            driver.id,
+                            route.id,
+                            route.source_ref
+                        )
+                    })?;
+                if source.source_ref != target_ref {
+                    bail!(
+                        "driver {} references interrupt route {} for {} instead of {}",
+                        driver.id,
+                        route.id,
+                        source.source_ref,
+                        target_ref
+                    );
+                }
+            }
+            for route in resources.dma_routes {
+                if route.peripheral_ref != target_ref {
+                    bail!(
+                        "driver {} references DMA route {} for {} instead of {}",
+                        driver.id,
+                        route.id,
+                        route.peripheral_ref,
+                        target_ref
+                    );
+                }
+            }
+            for pin_role in resources.pin_roles {
+                for route in &pin_role.routes {
+                    if route.peripheral_ref != target_ref {
+                        bail!(
+                            "driver {} pin role {} references pin route {} for {} instead of {}",
+                            driver.id,
+                            pin_role.role,
+                            route.id,
+                            route.peripheral_ref,
+                            target_ref
+                        );
+                    }
+                }
+            }
+        }
+        "interrupt" => {
+            let target_ref = driver.target_ref.as_str();
+            for route in resources.interrupt_routes {
+                if route.controller_ref != target_ref {
+                    bail!(
+                        "driver {} references interrupt route {} for controller {} instead of {}",
+                        driver.id,
+                        route.id,
+                        route.controller_ref,
+                        target_ref
+                    );
+                }
+            }
+        }
+        "dma" => {
+            let target_ref = driver.target_ref.as_str();
+            for route in resources.dma_routes {
+                let channel = resources
+                    .dma_channels
+                    .get(route.channel_ref.as_str())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "driver {} DMA route {} references unknown channel {}",
+                            driver.id,
+                            route.id,
+                            route.channel_ref
+                        )
+                    })?;
+                if channel.controller_ref != target_ref {
+                    bail!(
+                        "driver {} references DMA route {} through controller {} instead of {}",
+                        driver.id,
+                        route.id,
+                        channel.controller_ref,
+                        target_ref
+                    );
+                }
+            }
+        }
+        "rcc" => {}
+        _ => {}
+    }
+
     Ok(())
 }
 
@@ -3949,6 +4117,222 @@ mod tests {
         let error =
             generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
         assert!(error.to_string().contains("same Rust enum variant"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_mismatched_clock_binding_scope() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        drivers[2].as_object_mut().expect("uart driver").insert(
+            "clockBindingRefs".to_string(),
+            serde_json::json!(["clk.spi1"]),
+        );
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("mismatched clock binding fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("clock binding"));
+        assert!(error.to_string().contains("instead of periph.usart1"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_mismatched_interrupt_route_scope() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        drivers[2].as_object_mut().expect("uart driver").insert(
+            "interruptRouteRefs".to_string(),
+            serde_json::json!(["iroute.spi1"]),
+        );
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("mismatched interrupt route fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("interrupt route"));
+        assert!(error.to_string().contains("instead of periph.usart1"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_mismatched_dma_route_scope() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        drivers[2].as_object_mut().expect("uart driver").insert(
+            "dmaRouteRefs".to_string(),
+            serde_json::json!(["dmaroute.adc1"]),
+        );
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("mismatched dma route fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("DMA route"));
+        assert!(error.to_string().contains("instead of periph.usart1"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_mismatched_pin_route_scope() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let uart = drivers[2].as_object_mut().expect("uart driver");
+        let pin_roles = uart
+            .get_mut("pinRoles")
+            .and_then(Value::as_array_mut)
+            .expect("pinRoles");
+        pin_roles[0].as_object_mut().expect("tx role").insert(
+            "routeRefs".to_string(),
+            serde_json::json!(["pinroute.spi1.mosi"]),
+        );
+        pin_roles[0]
+            .as_object_mut()
+            .expect("tx role")
+            .insert("signal".to_string(), Value::String("MOSI".to_string()));
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("mismatched pin route fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("pin route"));
+        assert!(error.to_string().contains("instead of periph.usart1"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_mismatched_interrupt_controller_scope() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("interruptTopology")
+            .and_then(Value::as_object_mut)
+            .expect("interruptTopology object")
+            .get_mut("routes")
+            .and_then(Value::as_array_mut)
+            .expect("routes")[0]
+            .as_object_mut()
+            .expect("interrupt route")
+            .insert(
+                "controllerRef".to_string(),
+                Value::String("block.usart1".to_string()),
+            );
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("mismatched interrupt controller fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("controller"));
+        assert!(error.to_string().contains("instead of block.pfic"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_mismatched_dma_controller_scope() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let dma_topology = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("dmaTopology")
+            .and_then(Value::as_object_mut)
+            .expect("dmaTopology object");
+        dma_topology
+            .get_mut("channels")
+            .and_then(Value::as_array_mut)
+            .expect("channels")
+            .push(serde_json::json!({
+                "id": "dma.chan99",
+                "name": "DMAX Channel 99",
+                "controllerRef": "block.usart1",
+                "channelIndex": 99
+            }));
+        dma_topology
+            .get_mut("routes")
+            .and_then(Value::as_array_mut)
+            .expect("routes")[0]
+            .as_object_mut()
+            .expect("dma route")
+            .insert(
+                "channelRef".to_string(),
+                Value::String("dma.chan99".to_string()),
+            );
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("mismatched dma controller fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("through controller"));
+        assert!(error.to_string().contains("instead of block.dma1"));
     }
 
     #[test]
