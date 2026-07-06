@@ -29,6 +29,15 @@ You require:
 
 - the path to one HAIR JSON document
 - the path to the evidence manifest JSON that governed the extraction
+- the requested audit profile scope when generator-facing readiness is in
+  question:
+  - core/full-device only,
+  - `profiles.mcuSoc`, or
+  - `profiles.embassyHal` (which implicitly also requires auditing the
+    supporting `profiles.mcuSoc` surfaces)
+- if `profiles.embassyHal` readiness is in scope, the supported driver
+  kinds or concrete driver instances whose readiness is actually being
+  claimed
 - optional output path for:
   - the Markdown audit report
 - optional scope notes from the user
@@ -97,6 +106,7 @@ Before auditing, read and internalize the local HAIR repository context:
 - `README.md`
 - `docs/schema.md`
 - `docs/mcu-profile.md`
+- `docs/embassy-hal-profile.md`
 - `schema/common.json`
 - `schema/hair.json`
 - `schema/evidence-manifest.json`
@@ -107,6 +117,7 @@ Before auditing, read and internalize the local HAIR repository context:
 - `schema/normalization.json`
 - `schema/validation.json`
 - `schema/profiles/mcu.json`
+- `schema/profiles/embassy-hal.json`
 - `.github/skills/find-mcu-sources/SKILL.md`
 - `.github/skills/extract/SKILL.md`
 
@@ -120,6 +131,10 @@ Grounding rules:
 - full-device extraction means more than peripheral and register topology;
   it also includes evidence-supported downstream-generation-critical
   metadata
+- if `profiles.embassyHal` readiness is being claimed or requested, the
+  audit must challenge the supporting `profiles.mcuSoc` topology and the
+  reference wiring between the two profiles rather than treating the
+  Embassy layer as self-justifying
 - if the HAIR document cannot support its own claimed scope, the audit
   must report that plainly rather than normalizing the gap away
 - a PASS verdict is earned only after the audit has actively tried to
@@ -137,6 +152,11 @@ Grounding rules:
 4. Read the HAIR document and manifest and extract:
    - target device identity
    - claimed scope and major modeled areas
+   - which optional profiles are present
+   - whether the user is asking for `profiles.mcuSoc` and/or
+     `profiles.embassyHal` readiness
+   - which Embassy driver kinds or instances are claimed to be ready, if
+     that profile scope is in play
    - manifest source inventory
    - provenance source/evidence inventory
 5. Build an **Input Inventory** table with:
@@ -147,6 +167,8 @@ Grounding rules:
    - notes
 6. Build an **Audit Plan** covering:
    - target device
+   - requested audit profile scope
+   - requested Embassy driver scope, when applicable
    - approved evidence sources
    - which HAIR layers will be checked
    - which evidence categories are likely needed for structure vs metadata
@@ -299,6 +321,21 @@ Run a **translation-gap check** whenever generation tooling exists:
    - representational difference only
    - unsupported by approved evidence
 
+If the requested or claimed scope includes `profiles.embassyHal`, also
+run an **Embassy profile contract audit**:
+
+1. resolve every `profiles.embassyHal` reference explicitly
+2. verify each reference resolves to the expected kind of HAIR entity
+3. verify the selected driver instances have the supporting
+   `profiles.mcuSoc`, semantic, and physical/topology records required by
+   `docs/embassy-hal-profile.md`
+4. run `hair generate embassy` when the document claims Embassy-ready
+   lowering and classify any failure as:
+   - missing in HAIR
+   - incorrect profile wiring
+   - generator limitation
+   - unsupported by approved evidence
+
 Do not let the audit stop at "the generated artifact is thinner" without
 attributing which boundary introduced the loss.
 
@@ -337,10 +374,12 @@ In parallel with the audit findings, build a Markdown report with:
 9. normalization and translation attribution matrix
 10. overlay reconciliation findings when shared-base overlays are in
     scope
-11. unresolved differences inventory
-12. coverage statement
-13. limitations
-14. draft verdict
+11. Embassy profile contract findings when `profiles.embassyHal` is in
+    scope
+12. unresolved differences inventory
+13. coverage statement
+14. limitations
+15. draft verdict
 
 ### Critical Rule
 

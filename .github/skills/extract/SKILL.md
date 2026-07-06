@@ -22,6 +22,13 @@ You require:
 
 - The path to an evidence manifest JSON file conforming to
   `schema/evidence-manifest.json`
+- The requested optional profile scope for this extraction run:
+  - core HAIR only,
+  - `profiles.mcuSoc`, or
+  - `profiles.embassyHal` (which implicitly also requires the supporting
+    `profiles.mcuSoc` surfaces)
+- If `profiles.embassyHal` is requested, the supported driver kinds or
+  concrete driver instances that are in scope for this run
 - Optional output paths for:
   - the HAIR JSON document
   - the Markdown discovery report
@@ -93,6 +100,7 @@ HAIR repository context:
 - `README.md`
 - `docs/schema.md`
 - `docs/mcu-profile.md`
+- `docs/embassy-hal-profile.md`
 - `schema/common.json`
 - `schema/hair.json`
 - `schema/evidence-manifest.json`
@@ -103,6 +111,7 @@ HAIR repository context:
 - `schema/normalization.json`
 - `schema/validation.json`
 - `schema/profiles/mcu.json`
+- `schema/profiles/embassy-hal.json`
 
 Grounding rules:
 
@@ -112,6 +121,11 @@ Grounding rules:
   a separate provenance sidecar
 - `profiles.mcuSoc` is optional and may only be populated when supported
   by evidence
+- `profiles.embassyHal` is optional and may only be populated when the
+  user explicitly requests that profile scope
+- if `profiles.embassyHal` is requested, the supporting
+  `profiles.mcuSoc` topology plus any referenced semantic/physical
+  records become required for the requested profile scope
 - Prefer omission of optional sections over unsupported invention
 - Required HAIR sections still need real evidence; if you cannot support
   them, stop and ask questions
@@ -126,25 +140,32 @@ Grounding rules:
    - target device identity
    - source list
    - which sources are local paths vs. URIs
-3. Build a **source inventory table** with:
+3. Ask the user which optional profile scope is requested for this run if
+   it was not already specified explicitly.
+   - Treat `profiles.embassyHal` as implying `profiles.mcuSoc`.
+   - If `profiles.embassyHal` is requested, also ask which supported
+     driver kinds or concrete driver instances are in scope.
+4. Build a **source inventory table** with:
    - source id
    - source kind
    - location
    - version
    - notes
    - intended HAIR layers likely informed by that source
-4. Apply strict operational discipline:
+5. Apply strict operational discipline:
    - search before deep reading
    - group work by source category
    - record what you will exclude for now
    - do not ingest everything at once if the source set is large
-5. Produce an **Extraction Plan** covering:
+6. Produce an **Extraction Plan** covering:
    - target device
+   - requested optional profile scope
+   - requested Embassy driver scope, when applicable
    - candidate evidence sources
    - planned reading order
    - expected HAIR layers to populate from each source
    - obvious evidence gaps
-6. Produce a **Coverage** section:
+7. Produce a **Coverage** section:
 
    ```markdown
    ## Coverage
@@ -306,16 +327,38 @@ Populate `physical` where supported:
 Be conservative about "typical" datasheet values. If a value is not
 guaranteed or not tied to the target variant, call that out explicitly.
 
-#### 2.5 Normalization, validation, and MCU/SoC profile extraction
+#### 2.5 Normalization, validation, and profile extraction
 
 Only populate:
 
 - `normalization`
 - `validation`
 - `profiles.mcuSoc`
+- `profiles.embassyHal`
 
 when you have real evidence for canonical mappings, rules, profile block
-classes, and topology relationships.
+classes, topology relationships, and generator-facing bindings.
+
+If the requested profile scope includes `profiles.embassyHal`, extract
+only the supported driver set the user actually asked for and ensure the
+document includes the supporting records those drivers need, including
+where applicable:
+
+- `profiles.mcuSoc.canonicalBlocks`
+- `profiles.mcuSoc.clockResetTopology.clockBindings` /
+  `resetBindings`
+- `profiles.mcuSoc.interruptTopology.sources` / `routes`
+- `profiles.mcuSoc.dmaTopology.channels` / `routes`
+- `profiles.mcuSoc.pinTopology.routes`
+- `semantics.operations`
+- `semantics.stateMachines`
+- `profiles.embassyHal.crate`
+- `profiles.embassyHal.driverInstances`
+
+Do not invent an Embassy-ready driver inventory from vendor naming alone.
+If the requested driver set is unclear or the evidence cannot support the
+required bindings, stop and ask the user to narrow scope or provide more
+guidance.
 
 #### 2.6 Discovery report drafting
 
@@ -336,6 +379,12 @@ The draft report must also include:
 9. an **Unresolved Differences Inventory**
 10. an **Overlay Reconciliation Table** whenever any shared-base overlay
     family required reconciliation
+11. an **Embassy Readiness Summary** whenever the requested profile scope
+    includes `profiles.embassyHal`, covering:
+    - requested driver/profile scope
+    - driver instances extracted
+    - required supporting topology/semantic records
+    - unresolved readiness blockers and their root causes
 
 In the Normalization and Completeness Matrix, record for each approved
 source and relevant metadata class:

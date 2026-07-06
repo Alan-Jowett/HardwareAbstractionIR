@@ -76,6 +76,12 @@ It includes:
 The goal is to give extractors a deterministic, auditable starting point:
 one target device and an explicit list of allowed source materials.
 
+Profile-selection intent for optional generator-facing layers is a
+**workflow concern**, not a manifest-schema concern. The manifest still
+describes approved evidence and one target device; extraction workflows
+should ask the user which optional profiles, if any, are being requested
+for the current run.
+
 ## `schema/common.json`
 
 Shared primitive and utility types used across the rest of the schema set.
@@ -288,6 +294,14 @@ The intended division of responsibility is:
 
 1. core layers + `profiles.mcuSoc` describe the hardware
 2. `profiles.embassyHal` describes a deterministic generator contract over that hardware
+
+When an extraction or audit workflow is asked to target Embassy-ready
+output, it should explicitly ask the user whether `profiles.embassyHal`
+is in scope. If the answer is yes, the workflow must also ask which
+supported driver set is in scope and treat the
+supporting `profiles.mcuSoc` topology, relevant semantic operations/state
+machines, and referenced physical/topology records as required for the
+requested profile scope rather than as optional nice-to-have enrichment.
 
 ## How the layers fit together
 

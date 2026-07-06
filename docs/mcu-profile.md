@@ -313,6 +313,13 @@ Use this profile when:
 - you want generators to reason about canonical block types
 - you want to normalize both simple MCUs and richer SoCs into a shared model
 
+When a workflow is asked to author a generator-facing profile such as
+`profiles.embassyHal`, it should ask the user which optional profiles are
+requested. An Embassy-targeted request implicitly makes the supporting
+`profiles.mcuSoc` topology part of the required extraction/audit scope,
+because Embassy driver instances reference canonical blocks plus clock,
+reset, interrupt, DMA, and pin-topology records defined here.
+
 Do not use it as a substitute for the core structural description. It is a specialization layer, not a replacement layer.
 
 ## Mental model
