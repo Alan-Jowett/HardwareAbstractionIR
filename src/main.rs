@@ -2758,20 +2758,22 @@ fn render_state_machine_methods(
     let mut methods = Vec::new();
     for state_machine in &driver.state_machines {
         for transition in &state_machine.transitions {
-            let register_ref = transition
+            let effect_target_refs = transition
                 .effects
                 .iter()
-                .find_map(|effect| effect.target_ref.as_deref())
-                .ok_or_else(|| {
-                    anyhow!(
-                        "state machine {} transition {} -> {} on driver {} is missing an effect targetRef",
-                        state_machine.id,
-                        transition.from,
-                        transition.to,
-                        driver.id
-                    )
-                })?;
-            let register = model.registers.get(register_ref).ok_or_else(|| {
+                .filter_map(|effect| effect.target_ref.as_deref())
+                .collect::<Vec<_>>();
+            let [register_ref] = effect_target_refs.as_slice() else {
+                bail!(
+                    "state machine {} transition {} -> {} on driver {} requires exactly one effect targetRef, found {}",
+                    state_machine.id,
+                    transition.from,
+                    transition.to,
+                    driver.id,
+                    effect_target_refs.len()
+                );
+            };
+            let register = model.registers.get(*register_ref).ok_or_else(|| {
                 anyhow!(
                     "state machine {} transition {} -> {} references unknown register {}",
                     state_machine.id,
@@ -2916,6 +2918,16 @@ fn render_register_write_statement(
     value: u64,
     indent: &str,
 ) -> Result<String> {
+    if field.msb >= register.width_bits || field.lsb >= register.width_bits {
+        bail!(
+            "field {} bit range {}..={} exceeds register {} width {}",
+            field.name,
+            field.lsb,
+            field.msb,
+            register.id,
+            register.width_bits
+        );
+    }
     let field_width = field
         .msb
         .checked_sub(field.lsb)
@@ -2939,15 +2951,81 @@ fn render_register_write_statement(
     let address = register.absolute_address;
 
     match register.width_bits {
-        8 => Ok(format!(
-            "{indent}modify_u8(0x{address:X}usize, 0x{clear_mask:02X}u8, 0x{set_mask:02X}u8);\n"
-        )),
-        16 => Ok(format!(
-            "{indent}modify_u16(0x{address:X}usize, 0x{clear_mask:04X}u16, 0x{set_mask:04X}u16);\n"
-        )),
-        32 => Ok(format!(
-            "{indent}modify_u32(0x{address:X}usize, 0x{clear_mask:08X}u32, 0x{set_mask:08X}u32);\n"
-        )),
+        8 => {
+            let clear_mask = u8::try_from(clear_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            let set_mask = u8::try_from(set_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            Ok(format!(
+                "{indent}modify_u8(0x{address:X}usize, 0x{clear_mask:02X}u8, 0x{set_mask:02X}u8);\n"
+            ))
+        }
+        16 => {
+            let clear_mask = u16::try_from(clear_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            let set_mask = u16::try_from(set_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            Ok(format!(
+                "{indent}modify_u16(0x{address:X}usize, 0x{clear_mask:04X}u16, 0x{set_mask:04X}u16);\n"
+            ))
+        }
+        32 => {
+            let clear_mask = u32::try_from(clear_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            let set_mask = u32::try_from(set_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            Ok(format!(
+                "{indent}modify_u32(0x{address:X}usize, 0x{clear_mask:08X}u32, 0x{set_mask:08X}u32);\n"
+            ))
+        }
         other => bail!(
             "register {} uses unsupported width {} for Embassy code generation",
             register.id,
@@ -3080,7 +3158,7 @@ struct ParsedFieldWrite {
 
 fn parse_field_write_expression(
     expression_text: Option<&str>,
-    value: Option<&Value>,
+    _value: Option<&Value>,
     operation_id: &str,
     step_index: u32,
 ) -> Result<ParsedFieldWrite> {
@@ -3089,14 +3167,8 @@ fn parse_field_write_expression(
             format!("parsing expression on operation {operation_id} step {step_index}")
         });
     }
-    if let Some(value) = value.and_then(Value::as_u64) {
-        return Ok(ParsedFieldWrite {
-            field_name: "VALUE".to_string(),
-            value,
-        });
-    }
     bail!(
-        "operation {} step {} requires a plain-text expression or integer value",
+        "operation {} step {} requires explicit expression text for field-level lowering",
         operation_id,
         step_index
     )
@@ -5287,6 +5359,131 @@ mod tests {
         assert!(adc_rs.contains("pub fn apply_calibrate"));
         assert!(adc_rs.contains("modify_u32("));
         assert!(dma_rs.contains("pub fn enable_clock"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_operation_steps_without_expression_text() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        let adc_operation = operations[1].as_object_mut().expect("adc operation");
+        let steps = adc_operation
+            .get_mut("steps")
+            .and_then(Value::as_array_mut)
+            .expect("steps");
+        let first_step = steps[0].as_object_mut().expect("first step");
+        first_step.remove("expression");
+        first_step.insert("value".to_string(), serde_json::json!(1));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("value-only operation fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("requires explicit expression text for field-level lowering")
+        );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_fields_that_exceed_register_width() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        let registers = tim1
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 registers");
+        let ctlr1 = registers[0].as_object_mut().expect("tim1 ctlr1");
+        let fields = ctlr1
+            .get_mut("fields")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 fields");
+        let cen = fields[0].as_object_mut().expect("tim1 cen field");
+        cen.get_mut("bitRange")
+            .and_then(Value::as_object_mut)
+            .expect("bit range")
+            .insert("msb".to_string(), serde_json::json!(16));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("out-of-range field fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("exceeds register"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_state_machine_transitions_with_multiple_effect_targets() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let state_machines = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("stateMachines")
+            .and_then(Value::as_array_mut)
+            .expect("state machines");
+        let tim1 = state_machines[0]
+            .as_object_mut()
+            .expect("tim1 state machine");
+        let transitions = tim1
+            .get_mut("transitions")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 transitions");
+        let enable_transition = transitions[0].as_object_mut().expect("enable transition");
+        let effects = enable_transition
+            .get_mut("effects")
+            .and_then(Value::as_array_mut)
+            .expect("effects");
+        effects.push(serde_json::json!({
+            "kind": "updates-status",
+            "targetRef": "reg.pwm1.ctlr1"
+        }));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("multi-effect state machine fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("requires exactly one effect targetRef")
+        );
     }
 
     #[test]
