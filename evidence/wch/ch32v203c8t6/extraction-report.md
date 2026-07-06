@@ -19,6 +19,8 @@
 | `openwch-ch32v20x-sdk` | sdk | `https://github.com/openwch/ch32v20x/tree/804daf39a21af99be64c5abe0ea4bdaf361eb2e4` | `804daf39a21af99be64c5abe0ea4bdaf361eb2e4` | Cross-checks linker, startup, and core-support behavior. | structure, physical |
 | `openwch-ch32v20x-header` | vendor-header | `https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h` | V1.0.1 | Official register structs, many field descriptions, timer enable bit, and ADC enable/calibration bits. | structure, semantics |
 | `openwch-ch32v20x-startup-d6` | source-code | `https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Startup/startup_ch32v20x_D6.S` | V1.0.2 | D6 interrupt-vector ordering cross-check. | structure, profiles.mcuSoc |
+| `openwch-ch32v20x-adc-dma-example` | source-code | `https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/ADC/ADC_DMA/User/main.c` | V1.0.1 | Official narrow-scope ADC DMA example grounding the ADC1 DMA direction and channel assignment. | semantics, profiles.mcuSoc, profiles.embassyHal |
+| `openwch-ch32v20x-tim-dma-example` | source-code | `https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/TIM/TIM_DMA/User/main.c` | V1.0.1 | Official narrow-scope TIM DMA example grounding a TIM1 update DMA route and direction. | semantics, profiles.mcuSoc, profiles.embassyHal |
 | `qingke-v4-processor-manual` | other | `https://www.wch-ic.com/download/file?id=367` | 1.5 | Core/PFIC context. | structure, physical |
 | `ch32-rs-ch32v203xx-svd` | svd | `https://raw.githubusercontent.com/ch32-rs/ch32-rs/9b4ee66500b956bc87fbf83aa28ad245b39ebd15/svd/vendor/CH32V203xx.svd` | `9b4ee66500b956bc87fbf83aa28ad245b39ebd15` | Conservative structural metadata gap-filler retained from the prior pass. | structure |
 | `ch32-rs-ch32v203c8t6-yaml` | generated | `https://raw.githubusercontent.com/ch32-rs/ch32-data/a515903589cfbc342dc6ad0d13c02b4382da5628/data/chips/CH32V203C8T6.yaml` | `a515903589cfbc342dc6ad0d13c02b4382da5628` | Exact-variant topology source for RCC bindings, interrupt routes, DMA channels, package-filtered pin routes, and remap controls. | structure, physical, semantics, profiles.mcuSoc, profiles.embassyHal |
@@ -30,7 +32,7 @@
 - MCU/SoC canonical blocks for clock/reset, DMA, GPIO ports, serial blocks, timers, PWM views, ADCs, and the interrupt controller
 - Clock/reset topology linking exact-variant peripherals to HCLK, PCLK1, PCLK2, PCLK1_TIM, PCLK2_TIM, and ADC domains
 - Interrupt topology for supported first-cut Embassy drivers plus DMA1 channel interrupts
-- DMA topology for ADC1, USART1/2/3/4, SPI1/2, and I2C1/2
+- DMA topology for ADC1, TIM1 update, USART1/2/3/4, SPI1/2, and I2C1/2
 - Package-filtered pin and remap topology for GPIO, USART, SPI, I2C, TIM, PWM, and ADC signals
 - Minimal but evidence-backed semantics for timer counter enable/disable and ADC enable/calibration
 
@@ -52,9 +54,9 @@
 
 - **Requested scope:** all first-cut supported driver kinds on the exact CH32V203C8T6 variant
 - **Driver instances extracted:** 25 total — RCC; GPIOA-D; USART1/2/3; UART4; SPI1/2; I2C1/2; TIM1/2/3/4; TIM1/2/3/4 PWM; ADC1/2; DMA1; PFIC interrupt
-- **Supporting records added:** 26 canonical blocks, 19 clock bindings, 18 reset bindings, 34 interrupt sources/routes, 8 DMA channels, 17 DMA routes, 159 pin routes, 6 semantic operations, and 4 state machines
+- **Supporting records added:** 26 canonical blocks, 19 clock bindings, 18 reset bindings, 34 interrupt sources/routes, 8 DMA channels, 18 DMA routes, 159 pin routes, 6 semantic operations, and 4 state machines
 - **Generation result:** both downstream lowerings succeed from this HAIR document
-- **Known readiness limits:** timer DMA request names remain outside the Embassy profile because the approved DMA map does not encode transfer direction; ADC2 has no DMA route because the approved DMA map lists only ADC1; UART4 is exposed only through the PB0/PB1 remapped route because the default PC10/PC11 pins are not present on the LQFP48 package
+- **Known readiness limits:** the official `TIM_DMA` example now grounds the TIM1 update DMA route on DMA1 Channel 5 in memory-to-peripheral direction, but the remaining timer DMA request names still remain outside the Embassy profile because the approved DMA map does not encode their direction; ADC2 has no DMA route because the approved evidence still lists only ADC1; UART4 is exposed only through the PB0/PB1 remapped route because the default PC10/PC11 pins are not present on the LQFP48 package
 
 ## Metadata Coverage and Gaps
 
@@ -65,23 +67,23 @@
 | Canonical MCU block inventory | Extracted for RCC, AFIO, PFIC, DMA1, GPIOA-D, USART/UART, SPI, I2C, TIM, PWM, and ADC. | Official structure plus exact-variant YAML topology records. |
 | Clock/reset topology | Extracted for all first-cut Embassy peripherals in scope. | `CH32V203C8T6.yaml` and included family/peripheral RCC fragments. |
 | Interrupt topology | Extracted for supported drivers plus DMA1 channel interrupts. | `CH32V203C8T6.yaml`, `CH32V2_D6.yaml`, and D6 startup vector ordering. |
-| DMA topology | Extracted for ADC1, USART1/2/3/4, SPI1/2, and I2C1/2. | `CH32V_V4B.yaml`. |
+| DMA topology | Extracted for ADC1, TIM1 update, USART1/2/3/4, SPI1/2, and I2C1/2. | `CH32V_V4B.yaml` plus the official `TIM_DMA` example for TIM1 update direction. |
 | Pin/remap topology | Extracted and filtered to the exact LQFP48 package. | Datasheet table 3-1-1 plus peripheral YAML pin/remap sections. |
 | Timer enable semantics | Extracted as one operation plus one state machine per TIM1/TIM2/TIM3/TIM4. | `TIM_CEN` in the official header plus the timer chapters already used to classify TIM1 vs TIM2/3/4. |
 | ADC enable/calibration semantics | Extracted for ADC1 and ADC2. | `ADC_ADON`, `ADC_CAL`, and `ADC_RSTCAL` in the official header. |
+| UART4 RCC/AFIO structural mirroring | Extracted for `USART4EN`, `USART4RST`, and `USART4_RM` so the core register model now matches the approved UART4 clock/reset/remap topology. | Official header bit definitions plus exact-variant YAML clock/reset and remap topology. |
 
 ### Metadata present in approved evidence but not extracted
 
 | Metadata class | Status | Reason |
 | --- | --- | --- |
-| Timer DMA request lines in `CH32V_V4B.yaml` | Intentionally omitted from `profiles.mcuSoc.dmaTopology.routes`. | The approved DMA map names timer request sources but does not encode transfer direction, so emitting Embassy DMA routes would require invention. |
-| RCC/AFIO field-level structural records for some Embassy-only topology facts | Still absent from the core structural model. | The profile layer captures the needed clock/reset/remap relationships from approved community YAML even where the official header and current structural extraction do not expose a complete matching field record, notably for UART4 remap and several late APB1 enable bits. |
+| Remaining timer DMA request lines in `CH32V_V4B.yaml` | Partially extracted into `profiles.mcuSoc.dmaTopology.routes`. | The official `TIM_DMA` example grounds `TIM1_UP`, but the remaining timer request names still lack an approved direction contract. |
 
 ### Metadata not confidently recoverable from approved evidence examined in this pass
 
 | Metadata class | Status | Why still absent |
 | --- | --- | --- |
-| Timer DMA transfer direction | Not recovered. | The approved DMA route map gives channel assignments but not a direction contract for timer request lines. |
+| Timer DMA transfer direction for the remaining timer request lines | Not recovered. | The official `TIM_DMA` example grounds `TIM1_UP`, but the approved DMA route map still gives only channel assignments for the remaining timer requests. |
 | Broader peripheral state-machine semantics beyond timer enable and ADC calibration | Not recovered. | The approved sources examined in this pass support the minimal enable/calibration controls needed for the requested generator contract, but not a richer auditable behavior model for every supported peripheral mode. |
 | Unsupported first-cut Embassy driver kinds | Not applicable. | CAN and USB remain structurally modeled in HAIR but are outside the current Embassy generator's supported driver subset. |
 
@@ -93,8 +95,8 @@
 | `openwch-ch32v20x-header` | ADC enable/calibration semantics | Yes | Yes | No | None identified. | None. |
 | `ch32-rs-ch32v203c8t6-yaml` + datasheet package map | Pin/remap routes | Yes | Yes | Yes | Default-package routes for absent pins were intentionally excluded, notably UART4 PC10/PC11 and ADC1/2 PC4/PC5. | Exact-variant package filtering. |
 | `ch32-rs-ch32v203c8t6-yaml` + `CH32V2_D6.yaml` | Interrupt routes | Yes | Yes | Yes | Shared CAN/USB vector names remain modeled only as shared interrupt routes, not Embassy drivers. | Supported-driver boundary. |
-| `ch32-rs-ch32v203c8t6-yaml` + `CH32V_V4B.yaml` | DMA routes | Partially | Partially | Yes | Timer DMA request lines omitted; ADC2 has no listed DMA route. | Direction ambiguity for timers; source sparsity for ADC2. |
-| Existing official/community structural extraction | Core register-bearing MMIO model | Yes | Preserved | Previously completed | Structural gaps such as cluster prose, reset masks, and some field-level metadata remain from the prior full-device pass. | Outside this Embassy-profile enablement pass. |
+| `ch32-rs-ch32v203c8t6-yaml` + `CH32V_V4B.yaml` + official `TIM_DMA` example | DMA routes | Partially | Partially | Yes | `TIM1_UP` is now grounded and extracted; remaining timer DMA request lines still omitted; ADC2 has no listed DMA route. | Direction ambiguity for remaining timer routes; source sparsity for ADC2. |
+| Existing official/community structural extraction | Core register-bearing MMIO model | Yes | Preserved and tightened | Previously completed | Embassy-critical UART4 RCC/AFIO control-field mirroring is now repaired; structural gaps such as cluster prose, reset masks, and some field-level metadata remain from the prior full-device pass. | Mixed: targeted extraction fix applied; broader residuals remain outside this pass. |
 
 ## Overlay Reconciliation Table
 
@@ -110,6 +112,7 @@
 | UART4 is available only on PB0/PB1 for this exact package. | [KNOWN] | The peripheral YAML offers default PC10/PC11 and remapped PB0/PB1 routes, but only PB0/PB1 exist on the LQFP48 package. |
 | TIM1/TIM2/TIM3/TIM4 can be represented with a minimal enabled/disabled counter state machine. | [KNOWN] | `TIM_CEN` is explicitly the counter-enable bit in the official header. |
 | ADC1 and ADC2 can be represented with a minimal enable/calibration operation. | [KNOWN] | `ADC_ADON`, `ADC_CAL`, and `ADC_RSTCAL` are explicitly defined in the official header. |
+| The official `TIM_DMA` example grounds one concrete timer DMA route and direction on this family. | [KNOWN] | The official WCH `TIM_DMA` example configures `DMA1_Channel5`, `DMA_DIR_PeripheralDST`, and `TIM_DMA_Update` for `TIM1`. |
 | PCLK1_TIM and PCLK2_TIM should be modeled as derived timer clock domains distinct from plain PCLK1/PCLK2 in the profile layer. | [INFERRED] | The approved YAML distinguishes `bus_clock: PCLKx_TIM` from `kernel_clock: PCLKx`, so the profile keeps the timer-facing derived domains explicit. |
 | Timer DMA direction is safe to infer from channel names alone. | [ASSUMPTION] | Rejected; the profile omits those routes rather than guessing direction. |
 
@@ -117,7 +120,7 @@
 
 - **Resolved conflict:** the official header is sufficient for the core register model, but it is not sufficient by itself for the full Embassy topology because some late APB1 enable bits and UART4 remap details are not recoverable there. The profile therefore uses the approved exact-variant YAML to carry those topology facts explicitly.
 - **Resolved conflict:** several community routes land on pins not present on the C8T6 package. Those routes were dropped rather than carried into the exact-variant profile.
-- **Resolved conflict:** the approved DMA map includes timer request names but not a transfer-direction contract. Timer DMA routes were omitted instead of being guessed.
+- **Resolved conflict:** the approved DMA map includes timer request names but not a complete transfer-direction contract. The official `TIM_DMA` example grounds `TIM1_UP` on DMA1 Channel 5 in memory-to-peripheral direction, so that route is now modeled while the remaining timer request lines stay omitted instead of being guessed.
 - **Clarification questions:** None identified.
 
 ## Rejected Candidate Claims
@@ -131,21 +134,19 @@
 
 ## Unresolved Differences Inventory
 
-- **Profile-vs-core structural gap:** the Embassy profile carries some clock/reset/remap facts at topology level that are still not represented as precise field-level structure records in the core HAIR model, especially around UART4 remap and incomplete late APB1 enable coverage.
-- **Timer DMA omission:** the approved DMA map's timer request lines remain unmodeled in the Embassy profile because emitting a route direction would require unsupported inference.
+- **Partial timer DMA grounding:** the official `TIM_DMA` example now grounds the `TIM1_UP` route on DMA1 Channel 5 in memory-to-peripheral direction, but the remaining timer request lines still remain unmodeled because emitting their direction would require unsupported inference.
 - **Existing structural residuals from the prior full-device pass:** cluster descriptions, reset masks, and portions of field-level prose/access/enums remain incomplete outside the Embassy-focused additions.
 
 ## Coverage
 
 - **Examined:** manifest, repository schemas/docs, current CH32V203 HAIR/report, official header, official startup vector, RM timer chapters already used in the structural pass, datasheet package pin map, `CH32V203C8T6.yaml`, `CH32V2.yaml`, `CH32V2_D6.yaml`, and `CH32V_V4B.yaml`
 - **Method:** manifest validation, package-aware topology extraction, conservative community-topology reuse, minimal semantics extraction from explicit control-bit definitions, JSON rewrite, schema validation, and downstream `svd` / `embassy` generation
-- **Excluded:** timer DMA routes without explicit direction, unsupported Embassy driver kinds (for example CAN and USB), and any richer semantic behavior not directly evidenced by the approved sources examined here
+- **Excluded:** timer DMA routes without explicit direction beyond the grounded `TIM1_UP` case, unsupported Embassy driver kinds (for example CAN and USB), and any richer semantic behavior not directly evidenced by the approved sources examined here
 - **Limitations:** the Embassy-ready profile is complete for the requested first-cut supported drivers, but it still sits on top of a core HAIR model that retains some pre-existing structural metadata gaps outside this pass
 
 ## Limitations
 
-- The Embassy profile intentionally omits timer DMA routes because the approved DMA map does not encode direction.
+- The Embassy profile now carries the grounded `TIM1_UP` DMA route from the official `TIM_DMA` example, but the broader timer DMA matrix still remains intentionally incomplete because the approved DMA map does not encode direction for the remaining timer request lines.
 - ADC2 has no DMA route in the approved evidence examined here.
 - UART4 is Embassy-ready only through the PB0/PB1 remapped pins on the exact LQFP48 package.
-- Some field-level RCC/AFIO structural records needed to mirror the profile topology exactly are still absent from the core HAIR register model.
 - Existing non-Embassy structural residuals from the prior full-device extraction remain, including cluster prose, reset masks, and a tail of field-level metadata gaps.

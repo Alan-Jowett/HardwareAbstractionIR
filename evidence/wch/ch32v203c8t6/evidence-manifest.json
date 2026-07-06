@@ -46,6 +46,20 @@
       "notes": "Official WCH startup file for the D6 subset that includes CH32V203C8. Useful to cross-check exception and interrupt vector ordering."
     },
     {
+      "id": "openwch-ch32v20x-adc-dma-example",
+      "kind": "source-code",
+      "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/ADC/ADC_DMA/User/main.c",
+      "version": "V1.0.1",
+      "notes": "Official WCH ADC DMA example for the CH32V20x family. Grounds the ADC1 regular-conversion DMA path as DMA1_Channel1 in peripheral-to-memory direction, but does not demonstrate ADC2 DMA."
+    },
+    {
+      "id": "openwch-ch32v20x-tim-dma-example",
+      "kind": "source-code",
+      "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/TIM/TIM_DMA/User/main.c",
+      "version": "V1.0.1",
+      "notes": "Official WCH timer DMA example for the CH32V20x family. Grounds TIM1 update-triggered DMA to TIM1_CH1CVR on DMA1_Channel5 in memory-to-peripheral direction for PWM output, but does not cover every timer DMA request line."
+    },
+    {
       "id": "qingke-v4-processor-manual",
       "kind": "other",
       "uri": "https://www.wch-ic.com/downloads/QingKeV4_Processor_Manual_PDF.html",

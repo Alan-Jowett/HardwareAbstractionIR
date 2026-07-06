@@ -76,6 +76,22 @@
         "uri": "https://raw.githubusercontent.com/ch32-rs/ch32-data/a515903589cfbc342dc6ad0d13c02b4382da5628/data/chips/CH32V203C8T6.yaml",
         "version": "a515903589cfbc342dc6ad0d13c02b4382da5628",
         "publisher": "ch32-rs community"
+      },
+      {
+        "id": "openwch-ch32v20x-adc-dma-example",
+        "name": "ADC_DMA main.c",
+        "kind": "source-code",
+        "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/ADC/ADC_DMA/User/main.c",
+        "version": "V1.0.1",
+        "publisher": "WCH"
+      },
+      {
+        "id": "openwch-ch32v20x-tim-dma-example",
+        "name": "TIM_DMA main.c",
+        "kind": "source-code",
+        "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/TIM/TIM_DMA/User/main.c",
+        "version": "V1.0.1",
+        "publisher": "WCH"
       }
     ],
     "evidence": [
@@ -519,6 +535,28 @@
         },
         "extractionMethod": "manual",
         "confidence": 0.9
+      },
+      {
+        "id": "e_adc_dma_example",
+        "name": "Official ADC1 DMA example",
+        "sourceRef": "openwch-ch32v20x-adc-dma-example",
+        "normalizedClaim": "The official WCH ADC_DMA example enables ADC1 DMA, configures DMA1_Channel1 with DMA_DIR_PeripheralSRC from ADC1->RDATAR to memory, and waits for DMA1 transfer complete on channel 1.",
+        "locator": {
+          "fragment": "EVT/EXAM/ADC/ADC_DMA/User/main.c"
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.95
+      },
+      {
+        "id": "e_tim_dma_example",
+        "name": "Official TIM1 update DMA example",
+        "sourceRef": "openwch-ch32v20x-tim-dma-example",
+        "normalizedClaim": "The official WCH TIM_DMA example initializes DMA1_Channel5 with DMA_DIR_PeripheralDST targeting TIM1_CH1CVR_ADDRESS, enables TIM_DMA_Update on TIM1, and uses that route to update PWM output values.",
+        "locator": {
+          "fragment": "EVT/EXAM/TIM/TIM_DMA/User/main.c"
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.95
       }
     ]
   },
@@ -1051,7 +1089,7 @@
               "widthBits": 16,
               "fields": [
                 {
-                  "id": "field.tim_ctlr1.cen",
+                  "id": "field.tim2.ctlr1.cen",
                   "name": "CEN",
                   "bitRange": {
                     "lsb": 0,
@@ -4404,7 +4442,7 @@
               "widthBits": 16,
               "fields": [
                 {
-                  "id": "field.tim_ctlr1.cen",
+                  "id": "field.tim3.ctlr1.cen",
                   "name": "CEN",
                   "bitRange": {
                     "lsb": 0,
@@ -7894,7 +7932,7 @@
               "widthBits": 16,
               "fields": [
                 {
-                  "id": "field.tim_ctlr1.cen",
+                  "id": "field.tim4.ctlr1.cen",
                   "name": "CEN",
                   "bitRange": {
                     "lsb": 0,
@@ -32451,7 +32489,30 @@
               },
               "access": "read-write",
               "description": "AF remap and debug I/O configuration register (AFIO_PCFR2)",
-              "resetValue": 0
+              "resetValue": 0,
+              "fields": [
+                {
+                  "id": "field.afio_pcfr2.usart4_rm",
+                  "name": "USART4_RM",
+                  "bitRange": {
+                    "lsb": 26,
+                    "msb": 27
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203c8t6_yaml_pin_topology"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.92
+                  },
+                  "description": "USART4 remap"
+                }
+              ]
             }
           ],
           "addressBlocks": [
@@ -50801,7 +50862,7 @@
               "widthBits": 16,
               "fields": [
                 {
-                  "id": "field.tim_ctlr1.cen",
+                  "id": "field.tim1.ctlr1.cen",
                   "name": "CEN",
                   "bitRange": {
                     "lsb": 0,
@@ -61008,6 +61069,27 @@
                     "status": "imported",
                     "confidence": 0.91
                   }
+                },
+                {
+                  "id": "field.rcc_apb1prstr.usart4rst",
+                  "name": "USART4RST",
+                  "bitRange": {
+                    "lsb": 19,
+                    "msb": 19
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203c8t6_yaml_clock_reset_topology"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.92
+                  },
+                  "description": "USART 4 reset"
                 }
               ],
               "provenance": {
@@ -61462,6 +61544,29 @@
                   "description": "Timer 3 clock enable"
                 },
                 {
+                  "id": "field.rcc_apb1pcenr.tim4en",
+                  "name": "TIM4EN",
+                  "bitRange": {
+                    "lsb": 2,
+                    "msb": 2
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.91
+                  },
+                  "description": "Timer 4 clock enable"
+                },
+                {
                   "id": "field.rcc_apb1pcenr.wwdgen",
                   "name": "WWDGEN",
                   "bitRange": {
@@ -61508,6 +61613,52 @@
                   "description": "USART 2 clock enable"
                 },
                 {
+                  "id": "field.rcc_apb1pcenr.spi2en",
+                  "name": "SPI2EN",
+                  "bitRange": {
+                    "lsb": 14,
+                    "msb": 14
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.91
+                  },
+                  "description": "SPI2 clock enable"
+                },
+                {
+                  "id": "field.rcc_apb1pcenr.usart3en",
+                  "name": "USART3EN",
+                  "bitRange": {
+                    "lsb": 18,
+                    "msb": 18
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.91
+                  },
+                  "description": "USART 3 clock enable"
+                },
+                {
                   "id": "field.rcc_apb1pcenr.i2c1en",
                   "name": "I2C1EN",
                   "bitRange": {
@@ -61529,6 +61680,29 @@
                     "confidence": 0.91
                   },
                   "description": "I2C 1 clock enable"
+                },
+                {
+                  "id": "field.rcc_apb1pcenr.i2c2en",
+                  "name": "I2C2EN",
+                  "bitRange": {
+                    "lsb": 22,
+                    "msb": 22
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.91
+                  },
+                  "description": "I2C 2 clock enable"
                 },
                 {
                   "id": "field.rcc_apb1pcenr.bkpen",
@@ -61593,6 +61767,27 @@
                     "status": "imported",
                     "confidence": 0.91
                   }
+                },
+                {
+                  "id": "field.rcc_apb1pcenr.usart4en",
+                  "name": "USART4EN",
+                  "bitRange": {
+                    "lsb": 19,
+                    "msb": 19
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203c8t6_yaml_clock_reset_topology"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.92
+                  },
+                  "description": "USART 4 clock enable"
                 }
               ],
               "provenance": {
@@ -71686,7 +71881,7 @@
             "effects": [
               {
                 "kind": "starts-hardware",
-                "targetRef": "reg.tim1.ctlr1",
+                "targetRef": "field.tim1.ctlr1.cen",
                 "description": "Counter starts when CEN is asserted."
               }
             ]
@@ -71698,7 +71893,7 @@
             "effects": [
               {
                 "kind": "stops-hardware",
-                "targetRef": "reg.tim1.ctlr1",
+                "targetRef": "field.tim1.ctlr1.cen",
                 "description": "Counter stops when CEN is cleared."
               }
             ]
@@ -71742,7 +71937,7 @@
             "effects": [
               {
                 "kind": "starts-hardware",
-                "targetRef": "reg.tim2.ctlr1",
+                "targetRef": "field.tim2.ctlr1.cen",
                 "description": "Counter starts when CEN is asserted."
               }
             ]
@@ -71754,7 +71949,7 @@
             "effects": [
               {
                 "kind": "stops-hardware",
-                "targetRef": "reg.tim2.ctlr1",
+                "targetRef": "field.tim2.ctlr1.cen",
                 "description": "Counter stops when CEN is cleared."
               }
             ]
@@ -71798,7 +71993,7 @@
             "effects": [
               {
                 "kind": "starts-hardware",
-                "targetRef": "reg.tim3.ctlr1",
+                "targetRef": "field.tim3.ctlr1.cen",
                 "description": "Counter starts when CEN is asserted."
               }
             ]
@@ -71810,7 +72005,7 @@
             "effects": [
               {
                 "kind": "stops-hardware",
-                "targetRef": "reg.tim3.ctlr1",
+                "targetRef": "field.tim3.ctlr1.cen",
                 "description": "Counter stops when CEN is cleared."
               }
             ]
@@ -71854,7 +72049,7 @@
             "effects": [
               {
                 "kind": "starts-hardware",
-                "targetRef": "reg.tim4.ctlr1",
+                "targetRef": "field.tim4.ctlr1.cen",
                 "description": "Counter starts when CEN is asserted."
               }
             ]
@@ -71866,7 +72061,7 @@
             "effects": [
               {
                 "kind": "stops-hardware",
-                "targetRef": "reg.tim4.ctlr1",
+                "targetRef": "field.tim4.ctlr1.cen",
                 "description": "Counter stops when CEN is cleared."
               }
             ]
@@ -74932,6 +75127,26 @@
               ],
               "status": "verified",
               "confidence": 0.84
+            }
+          },
+          {
+            "id": "dmaroute.tim1.up",
+            "name": "TIM1 UPDATE DMA route",
+            "peripheralRef": "periph.tim1",
+            "signal": "UPDATE",
+            "channelRef": "dmach.dma1.ch5",
+            "direction": "memory-to-peripheral",
+            "provenance": {
+              "sourceRefs": [
+                "ch32-rs-ch32v203c8t6-yaml",
+                "openwch-ch32v20x-tim-dma-example"
+              ],
+              "evidenceRefs": [
+                "e_ch32rs_ch32v203c8t6_yaml_dma_topology",
+                "e_tim_dma_example"
+              ],
+              "status": "verified",
+              "confidence": 0.9
             }
           }
         ]
@@ -80242,6 +80457,9 @@
           "targetRef": "block.dma1",
           "driverKind": "dma",
           "modulePath": "dma",
+          "clockBindingRefs": [
+            "clk.dma1"
+          ],
           "dmaRouteRefs": [
             "dmaroute.adc1.global",
             "dmaroute.spi1.rx",
