@@ -3274,6 +3274,12 @@ fn collect_register_members(
     for member in members {
         match member {
             RegisterBlockMember::Register(register) => {
+                if register.array.is_some() {
+                    bail!(
+                        "register {} uses arrayed instances, which are not yet supported for Embassy lowering",
+                        register.id
+                    );
+                }
                 let absolute_address = base_address + parent_offset + register.offset_bytes;
                 let resolved = ResolvedRegister {
                     id: register.id.clone(),
@@ -3297,6 +3303,12 @@ fn collect_register_members(
                 }
             }
             RegisterBlockMember::Cluster(cluster) => {
+                if cluster.array.is_some() {
+                    bail!(
+                        "cluster {} uses arrayed instances, which are not yet supported for Embassy lowering",
+                        cluster.name
+                    );
+                }
                 collect_register_members(
                     registers,
                     peripheral_ref,
@@ -3394,12 +3406,24 @@ fn parse_field_write_expression(
 fn parse_field_write_text(text: &str) -> Result<ParsedFieldWrite> {
     let trimmed = text.trim();
     if let Some(rest) = trimmed.strip_prefix("Set ") {
+        if let Some((field_name, value)) = parse_explicit_assignment(rest)? {
+            if value != 1 {
+                bail!("plain-text write expression {trimmed} contradicts Set semantics");
+            }
+            return Ok(ParsedFieldWrite { field_name, value });
+        }
         return Ok(ParsedFieldWrite {
             field_name: extract_field_name(rest),
             value: 1,
         });
     }
     if let Some(rest) = trimmed.strip_prefix("Clear ") {
+        if let Some((field_name, value)) = parse_explicit_assignment(rest)? {
+            if value != 0 {
+                bail!("plain-text write expression {trimmed} contradicts Clear semantics");
+            }
+            return Ok(ParsedFieldWrite { field_name, value });
+        }
         return Ok(ParsedFieldWrite {
             field_name: extract_field_name(rest),
             value: 0,
@@ -3418,6 +3442,16 @@ fn parse_field_write_text(text: &str) -> Result<ParsedFieldWrite> {
         });
     }
     bail!("unsupported plain-text write expression {trimmed}")
+}
+
+fn parse_explicit_assignment(text: &str) -> Result<Option<(String, u64)>> {
+    let Some((left, right)) = text.split_once('=') else {
+        return Ok(None);
+    };
+    Ok(Some((
+        extract_field_name(left),
+        parse_integer_literal(right.trim())?,
+    )))
 }
 
 fn transition_effect_value(
@@ -5622,6 +5656,47 @@ mod tests {
     }
 
     #[test]
+    fn generate_embassy_rejects_contradictory_set_clear_expressions() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        let adc_operation = operations[1].as_object_mut().expect("adc operation");
+        let steps = adc_operation
+            .get_mut("steps")
+            .and_then(Value::as_array_mut)
+            .expect("steps");
+        steps[0]
+            .as_object_mut()
+            .expect("first step")
+            .get_mut("expression")
+            .and_then(Value::as_object_mut)
+            .expect("expression")
+            .insert("text".to_string(), serde_json::json!("Set ADON = 0"));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("contradictory expression fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .chain()
+                .any(|cause| cause.to_string().contains("contradicts Set semantics"))
+        );
+    }
+
+    #[test]
     fn generate_embassy_rejects_fields_that_exceed_register_width() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let fixture = write_embassy_fixture(false);
@@ -5822,6 +5897,104 @@ mod tests {
         assert!(error.to_string().contains(
             "requires effect targetRef reg.tim1.ctlr1 to resolve to a field for first-cut lowering"
         ));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_arrayed_registers() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        let registers = tim1
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 registers");
+        registers[0].as_object_mut().expect("tim1 ctlr1").insert(
+            "array".to_string(),
+            serde_json::json!({ "axes": [{ "name": "channel", "count": 2, "strideBytes": 4 }] }),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("arrayed register fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("register reg.tim1.ctlr1 uses arrayed instances")
+        );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_arrayed_clusters() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        tim1.insert(
+            "registers".to_string(),
+            serde_json::json!([
+                {
+                    "id": "cluster.tim1.ch",
+                    "kind": "cluster",
+                    "name": "CH",
+                    "offsetBytes": 0,
+                    "array": { "axes": [{ "name": "channel", "count": 2, "strideBytes": 8 }] },
+                    "members": [
+                        {
+                            "kind": "register",
+                            "id": "reg.tim1.ccr",
+                            "name": "CCR",
+                            "offsetBytes": 0,
+                            "widthBits": 16,
+                            "fields": [
+                                { "id": "field.tim1.ccr.value", "name": "VALUE", "bitRange": { "lsb": 0, "msb": 15 } }
+                            ]
+                        }
+                    ]
+                }
+            ]),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("arrayed cluster fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("cluster CH uses arrayed instances")
+        );
     }
 
     #[test]
