@@ -2239,7 +2239,10 @@ fn render_driver_instance(driver: &ResolvedDriverInstance) -> String {
     let mut out = String::new();
     out.push_str(&format!(
         "// Driver instance: {} ({}) from canonical block {} -> {}\n",
-        driver.name, driver.driver_kind, driver.target.id, driver.target.block_class
+        render_comment_text(&driver.name),
+        render_comment_text(&driver.driver_kind),
+        render_comment_text(&driver.target.id),
+        render_comment_text(&driver.target.block_class)
     ));
     out.push_str(&format!(
         "pub const {const_prefix}_CLOCK_BINDINGS: &[metadata::ClockBinding] = &{};\n",
@@ -2501,7 +2504,20 @@ fn render_locator_summary(locator: Option<&HairProvenanceLocator>) -> Option<Str
 }
 
 fn render_rust_string(value: &str) -> String {
-    serde_json::to_string(value).unwrap_or_else(|_| "\"<invalid>\"".to_string())
+    format!("{value:?}")
+}
+
+fn render_comment_text(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| {
+            if ch == '\r' || ch == '\n' || ch.is_control() {
+                ' '
+            } else {
+                ch
+            }
+        })
+        .collect()
 }
 
 fn to_rust_const_name(text: &str) -> String {
@@ -4091,6 +4107,72 @@ mod tests {
         assert!(metadata_rs.contains("GENERATED_PROVENANCE_EVIDENCE_IDS"));
         assert!(metadata_rs.contains("document_version"));
         assert!(uart_rs.contains("MODULE_PROVENANCE"));
+
+        let cargo_output = Command::new("cargo")
+            .arg("check")
+            .current_dir(output_dir.path())
+            .output()
+            .expect("cargo check");
+        assert!(
+            cargo_output.status.success(),
+            "generated crate should compile:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&cargo_output.stdout),
+            String::from_utf8_lossy(&cargo_output.stderr)
+        );
+    }
+
+    #[test]
+    fn render_rust_string_uses_rust_escapes_for_control_chars() {
+        let rendered = render_rust_string("line\u{1}break");
+        assert!(rendered.contains("\\u{1}"));
+        assert!(!rendered.contains("\\u0001"));
+    }
+
+    #[test]
+    fn generate_embassy_allows_control_chars_in_strings_without_breaking_codegen() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("provenance")
+            .and_then(Value::as_object_mut)
+            .expect("provenance object")
+            .get_mut("evidence")
+            .and_then(Value::as_array_mut)
+            .expect("evidence")[0]
+            .as_object_mut()
+            .expect("evidence item")
+            .insert(
+                "normalizedClaim".to_string(),
+                Value::String("line1\nline2\u{1}".to_string()),
+            );
+
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        drivers[2].as_object_mut().expect("uart driver").insert(
+            "name".to_string(),
+            Value::String("Usart1\ncontrol\u{7}comment".to_string()),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("control-char fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
 
         let cargo_output = Command::new("cargo")
             .arg("check")
