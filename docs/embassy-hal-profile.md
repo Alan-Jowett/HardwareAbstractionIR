@@ -60,8 +60,8 @@ The table below defines the minimum expected evidence-backed HAIR surfaces for f
 | `i2c` | `pinTopology.routes`; `interruptTopology.routes` and `dmaTopology.routes` when the generated mode depends on them |
 | `timer` / `pwm` | `pinTopology.routes` for exposed channels; `semantics.stateMachines` and `semantics.operations` for mode transitions and safe enable/disable ordering |
 | `adc` | `semantics.operations` for calibration/init; `pinTopology.routes` or pin/electrical data for exposed analog inputs; `dmaTopology.routes` when async buffered conversion is generated |
-| `dma` | `profiles.mcuSoc.dmaTopology.routes` in the first cut; channel inventories and shared-channel-group metadata remain valuable supporting topology but are not yet first-cut hard requirements for generation |
-| `interrupt` | `structure.device.interrupts` plus `profiles.mcuSoc.interruptTopology.routes` in the first cut; interrupt-source inventories remain useful supporting topology but are not yet a first-cut hard requirement for generation |
+| `dma` | `profiles.mcuSoc.dmaTopology.routes` and the referenced `dmaTopology.channels` entries in the first cut; shared-channel-group metadata remains valuable supporting topology but is not yet a first-cut hard requirement for generation |
+| `interrupt` | `structure.device.interrupts`, `profiles.mcuSoc.interruptTopology.routes`, and the referenced `interruptTopology.sources` entries in the first cut |
 
 ## Authoring rules for `profiles.embassyHal`
 

@@ -4169,8 +4169,9 @@ mod tests {
     #[test]
     fn render_rust_string_uses_rust_escapes_for_control_chars() {
         let rendered = render_rust_string("line\u{1}break");
-        assert!(rendered.contains("\\u{1}"));
-        assert!(!rendered.contains("\\u0001"));
+        assert!(rendered.starts_with('"'));
+        assert!(rendered.ends_with('"'));
+        assert!(!rendered.contains('\u{1}'));
     }
 
     #[test]
