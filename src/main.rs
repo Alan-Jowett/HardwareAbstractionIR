@@ -1094,11 +1094,17 @@ struct SemanticOperation {
     id: String,
     name: String,
     #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
     kind: Option<String>,
     #[serde(default)]
     target_refs: Vec<String>,
     #[serde(default)]
     steps: Vec<SemanticOperationStep>,
+    #[serde(default)]
+    preconditions: Vec<SemanticPredicate>,
+    #[serde(default)]
+    postconditions: Vec<SemanticPredicate>,
 }
 
 #[allow(dead_code)]
@@ -1108,6 +1114,8 @@ struct SemanticStateMachine {
     id: String,
     name: String,
     #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
     target_refs: Vec<String>,
     #[serde(default)]
     initial_state: Option<String>,
@@ -1115,6 +1123,21 @@ struct SemanticStateMachine {
     states: Vec<SemanticState>,
     #[serde(default)]
     transitions: Vec<SemanticTransition>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SemanticPredicate {
+    kind: String,
+    #[serde(default)]
+    target_ref: Option<String>,
+    #[serde(default)]
+    expression: Option<SemanticExpression>,
+    #[serde(default)]
+    expected_value: Option<Value>,
+    #[serde(default)]
+    description: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -1147,6 +1170,10 @@ struct SemanticExpression {
 #[serde(rename_all = "camelCase")]
 struct SemanticState {
     name: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    invariants: Vec<SemanticPredicate>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -1157,6 +1184,8 @@ struct SemanticTransition {
     #[allow(dead_code)]
     #[serde(default)]
     trigger: Option<String>,
+    #[serde(default)]
+    conditions: Vec<SemanticPredicate>,
     #[serde(default)]
     effects: Vec<SemanticSideEffect>,
 }
@@ -1243,6 +1272,9 @@ struct McuClockBinding {
     consumer_ref: String,
     clock_ref: String,
     #[serde(default)]
+    controller_ref: Option<String>,
+    binding_kind: String,
+    #[serde(default)]
     control_refs: Vec<String>,
     #[serde(default)]
     enable_operation_refs: Vec<String>,
@@ -1257,6 +1289,11 @@ struct McuResetBinding {
     id: String,
     name: String,
     target_ref: String,
+    #[serde(default)]
+    controller_ref: Option<String>,
+    #[serde(default)]
+    reset_domain_ref: Option<String>,
+    binding_kind: String,
     #[serde(default)]
     control_refs: Vec<String>,
     #[serde(default)]
@@ -1283,6 +1320,11 @@ struct McuInterruptSource {
     name: String,
     source_ref: String,
     #[serde(default)]
+    producer_ref: Option<String>,
+    kind: String,
+    #[serde(default)]
+    flag_refs: Vec<String>,
+    #[serde(default)]
     clear_operation_refs: Vec<String>,
 }
 
@@ -1296,7 +1338,16 @@ struct McuInterruptRoute {
     interrupt_ref: String,
     controller_ref: String,
     #[serde(default)]
+    cpu_target_ref: Option<String>,
+    #[serde(default)]
+    line_index: Option<u32>,
+    route_type: String,
+    #[serde(default)]
+    control_refs: Vec<String>,
+    #[serde(default)]
     acknowledge_operation_refs: Vec<String>,
+    #[serde(default)]
+    shared_group: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -1316,7 +1367,13 @@ struct McuDmaChannel {
     id: String,
     name: String,
     controller_ref: String,
+    #[serde(default)]
+    target_ref: Option<String>,
     channel_index: u32,
+    #[serde(default)]
+    capabilities: Vec<String>,
+    #[serde(default)]
+    priority_levels: Vec<String>,
 }
 
 #[allow(dead_code)]
@@ -1326,10 +1383,14 @@ struct McuDmaRoute {
     id: String,
     name: String,
     peripheral_ref: String,
+    #[serde(default)]
+    signal: Option<String>,
     channel_ref: String,
     direction: String,
     #[serde(default)]
     control_refs: Vec<String>,
+    #[serde(default)]
+    shared_channel_group_ref: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1351,6 +1412,12 @@ struct McuPinRoute {
     route_type: String,
     #[serde(default)]
     control_refs: Vec<String>,
+    #[serde(default)]
+    electrical_constraint_refs: Vec<String>,
+    #[serde(default)]
+    conflict_refs: Vec<String>,
+    #[serde(default)]
+    default_after_reset: Option<bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -1464,7 +1531,9 @@ struct ResolvedDriverInstance {
     target: McuCanonicalBlock,
     clock_bindings: Vec<McuClockBinding>,
     reset_bindings: Vec<McuResetBinding>,
+    interrupt_sources: Vec<McuInterruptSource>,
     interrupt_routes: Vec<McuInterruptRoute>,
+    dma_channels: Vec<McuDmaChannel>,
     dma_routes: Vec<McuDmaRoute>,
     pin_roles: Vec<ResolvedEmbassyPinRole>,
     init_operations: Vec<SemanticOperation>,
@@ -1642,8 +1711,22 @@ impl EmbassyGenerationModel {
                 "interrupt route",
                 &driver.id,
             )?;
+            let driver_interrupt_sources = resolve_related_ref_list(
+                &interrupt_routes,
+                |route| route.source_ref.as_str(),
+                &interrupt_sources,
+                "interrupt source",
+                &driver.id,
+            )?;
             let dma_routes =
                 resolve_ref_list(&driver.dma_route_refs, &dma_routes, "DMA route", &driver.id)?;
+            let driver_dma_channels = resolve_related_ref_list(
+                &dma_routes,
+                |route| route.channel_ref.as_str(),
+                &dma_channels,
+                "DMA channel",
+                &driver.id,
+            )?;
             validate_interrupt_route_targets(driver, &interrupt_routes, &device_interrupts)?;
             validate_dma_route_channels(driver, &dma_routes, &dma_channels)?;
             let mut pin_roles = Vec::with_capacity(driver.pin_roles.len());
@@ -1720,7 +1803,9 @@ impl EmbassyGenerationModel {
                 target,
                 clock_bindings,
                 reset_bindings,
+                interrupt_sources: driver_interrupt_sources,
                 interrupt_routes,
+                dma_channels: driver_dma_channels,
                 dma_routes,
                 pin_roles,
                 init_operations,
@@ -2351,6 +2436,30 @@ fn resolve_ref_list<T: Clone>(
         .collect()
 }
 
+fn resolve_related_ref_list<TSource, TTarget: Clone, F>(
+    sources: &[TSource],
+    related_ref: F,
+    map: &HashMap<&str, TTarget>,
+    kind: &str,
+    owner_id: &str,
+) -> Result<Vec<TTarget>>
+where
+    F: Fn(&TSource) -> &str,
+{
+    let mut resolved = Vec::new();
+    let mut seen = HashSet::new();
+    for source in sources {
+        let reference = related_ref(source);
+        if !seen.insert(reference.to_string()) {
+            continue;
+        }
+        resolved.push(map.get(reference).cloned().ok_or_else(|| {
+            anyhow!("{kind} reference {reference} on driver {owner_id} could not be resolved")
+        })?);
+    }
+    Ok(resolved)
+}
+
 fn validate_driver_requirements(
     driver: &EmbassyDriverInstance,
     requirements: &DriverRequirementInputs<'_>,
@@ -2528,7 +2637,7 @@ fn render_embassy_lib_rs(model: &EmbassyGenerationModel) -> String {
 fn render_embassy_metadata_rs(model: &EmbassyGenerationModel) -> String {
     let doc_comment_title = render_comment_text(&model.document_title);
     format!(
-        "//! Generated Embassy-style HAL metadata for {}.\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum ResourceRequirement {{\n    Required,\n    Optional,\n    MutuallyExclusive,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Error {{\n    Unsupported(&'static str),\n    InvalidReference(&'static str),\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ClockBinding {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub consumer_ref: &'static str,\n    pub clock_ref: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ResetBinding {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub target_ref: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct InterruptRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_ref: &'static str,\n    pub interrupt_ref: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct DmaRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub peripheral_ref: &'static str,\n    pub channel_ref: &'static str,\n    pub direction: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct PinRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub pin_ref: &'static str,\n    pub peripheral_ref: &'static str,\n    pub signal: &'static str,\n    pub route_type: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct PinRole {{\n    pub role: &'static str,\n    pub signal: &'static str,\n    pub routes: &'static [PinRoute],\n    pub requirement: ResourceRequirement,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct ProvenanceSource {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub kind: Option<&'static str>,\n    pub path: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct ProvenanceEvidence {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_ref: &'static str,\n    pub normalized_claim: Option<&'static str>,\n    pub extraction_method: Option<&'static str>,\n    pub confidence: Option<f64>,\n    pub locator: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ModuleProvenance {{\n    pub module_name: &'static str,\n    pub document_title: &'static str,\n    pub document_version: &'static str,\n    pub source_ids: &'static [&'static str],\n    pub evidence_ids: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct GeneratedMetadata {{\n    pub document_title: &'static str,\n    pub document_version: &'static str,\n    pub device_name: &'static str,\n    pub target_architecture: Option<&'static str>,\n    pub feature_flags: &'static [&'static str],\n    pub provenance_sources: &'static [ProvenanceSource],\n    pub provenance_evidence: &'static [ProvenanceEvidence],\n}}\n\npub const GENERATED_PROVENANCE_SOURCE_IDS: &[&str] = &{};\npub const GENERATED_PROVENANCE_EVIDENCE_IDS: &[&str] = &{};\n\npub const GENERATED_METADATA: GeneratedMetadata = GeneratedMetadata {{\n    document_title: {},\n    document_version: {},\n    device_name: {},\n    target_architecture: {},\n    feature_flags: &{},\n    provenance_sources: &{},\n    provenance_evidence: &{},\n}};\n",
+        "//! Generated Embassy-style HAL metadata for {}.\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum ResourceRequirement {{\n    Required,\n    Optional,\n    MutuallyExclusive,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Error {{\n    Unsupported(&'static str),\n    InvalidReference(&'static str),\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub enum ValueLiteral {{\n    Integer(i64),\n    Number(f64),\n    String(&'static str),\n    Bool(bool),\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct SemanticExpression {{\n    pub language: Option<&'static str>,\n    pub text: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct Predicate {{\n    pub kind: &'static str,\n    pub target_ref: Option<&'static str>,\n    pub expression: Option<SemanticExpression>,\n    pub expected_value: Option<ValueLiteral>,\n    pub description: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct SemanticOperationStep {{\n    pub index: u32,\n    pub action: &'static str,\n    pub target_ref: Option<&'static str>,\n    pub expression: Option<SemanticExpression>,\n    pub value: Option<ValueLiteral>,\n    pub description: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct SemanticOperation {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub description: Option<&'static str>,\n    pub kind: Option<&'static str>,\n    pub target_refs: &'static [&'static str],\n    pub steps: &'static [SemanticOperationStep],\n    pub preconditions: &'static [Predicate],\n    pub postconditions: &'static [Predicate],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct SemanticState {{\n    pub name: &'static str,\n    pub description: Option<&'static str>,\n    pub invariants: &'static [Predicate],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct SemanticSideEffect {{\n    pub kind: &'static str,\n    pub target_ref: Option<&'static str>,\n    pub description: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct SemanticTransition {{\n    pub from: &'static str,\n    pub to: &'static str,\n    pub trigger: Option<&'static str>,\n    pub conditions: &'static [Predicate],\n    pub effects: &'static [SemanticSideEffect],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct SemanticStateMachine {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub description: Option<&'static str>,\n    pub target_refs: &'static [&'static str],\n    pub initial_state: Option<&'static str>,\n    pub states: &'static [SemanticState],\n    pub transitions: &'static [SemanticTransition],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ClockBinding {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub consumer_ref: &'static str,\n    pub clock_ref: &'static str,\n    pub controller_ref: Option<&'static str>,\n    pub binding_kind: &'static str,\n    pub control_refs: &'static [&'static str],\n    pub enable_operation_refs: &'static [&'static str],\n    pub disable_operation_refs: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ResetBinding {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub target_ref: &'static str,\n    pub controller_ref: Option<&'static str>,\n    pub reset_domain_ref: Option<&'static str>,\n    pub binding_kind: &'static str,\n    pub control_refs: &'static [&'static str],\n    pub assert_operation_refs: &'static [&'static str],\n    pub release_operation_refs: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct InterruptSource {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_ref: &'static str,\n    pub producer_ref: Option<&'static str>,\n    pub kind: &'static str,\n    pub flag_refs: &'static [&'static str],\n    pub clear_operation_refs: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct InterruptRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_ref: &'static str,\n    pub interrupt_ref: &'static str,\n    pub controller_ref: &'static str,\n    pub cpu_target_ref: Option<&'static str>,\n    pub line_index: Option<u32>,\n    pub route_type: &'static str,\n    pub control_refs: &'static [&'static str],\n    pub acknowledge_operation_refs: &'static [&'static str],\n    pub shared_group: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct DmaChannel {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub controller_ref: &'static str,\n    pub target_ref: Option<&'static str>,\n    pub channel_index: u32,\n    pub capabilities: &'static [&'static str],\n    pub priority_levels: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct DmaRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub peripheral_ref: &'static str,\n    pub signal: Option<&'static str>,\n    pub channel_ref: &'static str,\n    pub direction: &'static str,\n    pub control_refs: &'static [&'static str],\n    pub shared_channel_group_ref: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct PinRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub pin_ref: &'static str,\n    pub peripheral_ref: &'static str,\n    pub signal: &'static str,\n    pub route_type: &'static str,\n    pub control_refs: &'static [&'static str],\n    pub electrical_constraint_refs: &'static [&'static str],\n    pub conflict_refs: &'static [&'static str],\n    pub default_after_reset: Option<bool>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct PinRole {{\n    pub role: &'static str,\n    pub signal: &'static str,\n    pub routes: &'static [PinRoute],\n    pub requirement: ResourceRequirement,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct ProvenanceSource {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub kind: Option<&'static str>,\n    pub path: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct ProvenanceEvidence {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_ref: &'static str,\n    pub normalized_claim: Option<&'static str>,\n    pub extraction_method: Option<&'static str>,\n    pub confidence: Option<f64>,\n    pub locator: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ModuleProvenance {{\n    pub module_name: &'static str,\n    pub document_title: &'static str,\n    pub document_version: &'static str,\n    pub source_ids: &'static [&'static str],\n    pub evidence_ids: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct GeneratedMetadata {{\n    pub document_title: &'static str,\n    pub document_version: &'static str,\n    pub device_name: &'static str,\n    pub target_architecture: Option<&'static str>,\n    pub feature_flags: &'static [&'static str],\n    pub provenance_sources: &'static [ProvenanceSource],\n    pub provenance_evidence: &'static [ProvenanceEvidence],\n}}\n\npub const GENERATED_PROVENANCE_SOURCE_IDS: &[&str] = &{};\npub const GENERATED_PROVENANCE_EVIDENCE_IDS: &[&str] = &{};\n\npub const GENERATED_METADATA: GeneratedMetadata = GeneratedMetadata {{\n    document_title: {},\n    document_version: {},\n    device_name: {},\n    target_architecture: {},\n    feature_flags: &{},\n    provenance_sources: &{},\n    provenance_evidence: &{},\n}};\n",
         doc_comment_title,
         render_named_entity_slice(
             &model
@@ -2617,8 +2726,16 @@ fn render_driver_instance(
         render_reset_binding_slice(&driver.reset_bindings)
     ));
     out.push_str(&format!(
+        "pub const {const_prefix}_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &{};\n",
+        render_interrupt_source_slice(&driver.interrupt_sources)
+    ));
+    out.push_str(&format!(
         "pub const {const_prefix}_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &{};\n",
         render_interrupt_route_slice(&driver.interrupt_routes)
+    ));
+    out.push_str(&format!(
+        "pub const {const_prefix}_DMA_CHANNELS: &[metadata::DmaChannel] = &{};\n",
+        render_dma_channel_slice(&driver.dma_channels)
     ));
     out.push_str(&format!(
         "pub const {const_prefix}_DMA_ROUTES: &[metadata::DmaRoute] = &{};\n",
@@ -2635,31 +2752,19 @@ fn render_driver_instance(
         render_pin_role_slice(const_prefix.as_str(), &driver.pin_roles)
     ));
     out.push_str(&format!(
-        "pub const {const_prefix}_INIT_OPERATIONS: &[&str] = &{};\n",
-        render_named_entity_slice(
-            &driver
-                .init_operations
-                .iter()
-                .map(|item| item.id.clone())
-                .collect::<Vec<_>>()
-        )
+        "pub const {const_prefix}_INIT_OPERATIONS: &[metadata::SemanticOperation] = &{};\n",
+        render_semantic_operation_slice(&driver.init_operations)
     ));
     out.push_str(&format!(
-        "pub const {const_prefix}_STATE_MACHINES: &[&str] = &{};\n",
-        render_named_entity_slice(
-            &driver
-                .state_machines
-                .iter()
-                .map(|item| item.id.clone())
-                .collect::<Vec<_>>()
-        )
+        "pub const {const_prefix}_STATE_MACHINES: &[metadata::SemanticStateMachine] = &{};\n",
+        render_semantic_state_machine_slice(&driver.state_machines)
     ));
     out.push_str(&format!(
         "pub const {const_prefix}_CAPABILITY_TAGS: &[&str] = &{};\n\n",
         render_named_entity_slice(&driver.capability_tags)
     ));
     out.push_str(&format!(
-        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [&'static str],\n    pub state_machines: &'static [&'static str],\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n",
+        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n",
         type_name = driver.type_name,
         const_prefix = const_prefix,
         methods = render_driver_methods(model, driver)?
@@ -3605,11 +3710,16 @@ fn parse_integer_literal(text: &str) -> Result<u64> {
 fn render_clock_binding_slice(items: &[McuClockBinding]) -> String {
     render_struct_slice(items.iter().map(|item| {
         format!(
-            "metadata::ClockBinding {{ id: {}, name: {}, consumer_ref: {}, clock_ref: {} }}",
+            "metadata::ClockBinding {{ id: {}, name: {}, consumer_ref: {}, clock_ref: {}, controller_ref: {}, binding_kind: {}, control_refs: &{}, enable_operation_refs: &{}, disable_operation_refs: &{} }}",
             render_rust_string(&item.id),
             render_rust_string(&item.name),
             render_rust_string(&item.consumer_ref),
-            render_rust_string(&item.clock_ref)
+            render_rust_string(&item.clock_ref),
+            render_optional_rust_string(item.controller_ref.as_deref()),
+            render_rust_string(&item.binding_kind),
+            render_string_slice(&item.control_refs),
+            render_string_slice(&item.enable_operation_refs),
+            render_string_slice(&item.disable_operation_refs)
         )
     }))
 }
@@ -3617,10 +3727,31 @@ fn render_clock_binding_slice(items: &[McuClockBinding]) -> String {
 fn render_reset_binding_slice(items: &[McuResetBinding]) -> String {
     render_struct_slice(items.iter().map(|item| {
         format!(
-            "metadata::ResetBinding {{ id: {}, name: {}, target_ref: {} }}",
+            "metadata::ResetBinding {{ id: {}, name: {}, target_ref: {}, controller_ref: {}, reset_domain_ref: {}, binding_kind: {}, control_refs: &{}, assert_operation_refs: &{}, release_operation_refs: &{} }}",
             render_rust_string(&item.id),
             render_rust_string(&item.name),
-            render_rust_string(&item.target_ref)
+            render_rust_string(&item.target_ref),
+            render_optional_rust_string(item.controller_ref.as_deref()),
+            render_optional_rust_string(item.reset_domain_ref.as_deref()),
+            render_rust_string(&item.binding_kind),
+            render_string_slice(&item.control_refs),
+            render_string_slice(&item.assert_operation_refs),
+            render_string_slice(&item.release_operation_refs)
+        )
+    }))
+}
+
+fn render_interrupt_source_slice(items: &[McuInterruptSource]) -> String {
+    render_struct_slice(items.iter().map(|item| {
+        format!(
+            "metadata::InterruptSource {{ id: {}, name: {}, source_ref: {}, producer_ref: {}, kind: {}, flag_refs: &{}, clear_operation_refs: &{} }}",
+            render_rust_string(&item.id),
+            render_rust_string(&item.name),
+            render_rust_string(&item.source_ref),
+            render_optional_rust_string(item.producer_ref.as_deref()),
+            render_rust_string(&item.kind),
+            render_string_slice(&item.flag_refs),
+            render_string_slice(&item.clear_operation_refs)
         )
     }))
 }
@@ -3628,11 +3759,33 @@ fn render_reset_binding_slice(items: &[McuResetBinding]) -> String {
 fn render_interrupt_route_slice(items: &[McuInterruptRoute]) -> String {
     render_struct_slice(items.iter().map(|item| {
         format!(
-            "metadata::InterruptRoute {{ id: {}, name: {}, source_ref: {}, interrupt_ref: {} }}",
+            "metadata::InterruptRoute {{ id: {}, name: {}, source_ref: {}, interrupt_ref: {}, controller_ref: {}, cpu_target_ref: {}, line_index: {}, route_type: {}, control_refs: &{}, acknowledge_operation_refs: &{}, shared_group: {} }}",
             render_rust_string(&item.id),
             render_rust_string(&item.name),
             render_rust_string(&item.source_ref),
-            render_rust_string(&item.interrupt_ref)
+            render_rust_string(&item.interrupt_ref),
+            render_rust_string(&item.controller_ref),
+            render_optional_rust_string(item.cpu_target_ref.as_deref()),
+            render_optional_u32(item.line_index),
+            render_rust_string(&item.route_type),
+            render_string_slice(&item.control_refs),
+            render_string_slice(&item.acknowledge_operation_refs),
+            render_optional_rust_string(item.shared_group.as_deref())
+        )
+    }))
+}
+
+fn render_dma_channel_slice(items: &[McuDmaChannel]) -> String {
+    render_struct_slice(items.iter().map(|item| {
+        format!(
+            "metadata::DmaChannel {{ id: {}, name: {}, controller_ref: {}, target_ref: {}, channel_index: {}, capabilities: &{}, priority_levels: &{} }}",
+            render_rust_string(&item.id),
+            render_rust_string(&item.name),
+            render_rust_string(&item.controller_ref),
+            render_optional_rust_string(item.target_ref.as_deref()),
+            item.channel_index,
+            render_string_slice(&item.capabilities),
+            render_string_slice(&item.priority_levels)
         )
     }))
 }
@@ -3640,12 +3793,15 @@ fn render_interrupt_route_slice(items: &[McuInterruptRoute]) -> String {
 fn render_dma_route_slice(items: &[McuDmaRoute]) -> String {
     render_struct_slice(items.iter().map(|item| {
         format!(
-            "metadata::DmaRoute {{ id: {}, name: {}, peripheral_ref: {}, channel_ref: {}, direction: {} }}",
+            "metadata::DmaRoute {{ id: {}, name: {}, peripheral_ref: {}, signal: {}, channel_ref: {}, direction: {}, control_refs: &{}, shared_channel_group_ref: {} }}",
             render_rust_string(&item.id),
             render_rust_string(&item.name),
             render_rust_string(&item.peripheral_ref),
+            render_optional_rust_string(item.signal.as_deref()),
             render_rust_string(&item.channel_ref),
-            render_rust_string(&item.direction)
+            render_rust_string(&item.direction),
+            render_string_slice(&item.control_refs),
+            render_optional_rust_string(item.shared_channel_group_ref.as_deref())
         )
     }))
 }
@@ -3653,13 +3809,110 @@ fn render_dma_route_slice(items: &[McuDmaRoute]) -> String {
 fn render_pin_route_slice(items: &[McuPinRoute]) -> String {
     render_struct_slice(items.iter().map(|item| {
         format!(
-            "metadata::PinRoute {{ id: {}, name: {}, pin_ref: {}, peripheral_ref: {}, signal: {}, route_type: {} }}",
+            "metadata::PinRoute {{ id: {}, name: {}, pin_ref: {}, peripheral_ref: {}, signal: {}, route_type: {}, control_refs: &{}, electrical_constraint_refs: &{}, conflict_refs: &{}, default_after_reset: {} }}",
             render_rust_string(&item.id),
             render_rust_string(&item.name),
             render_rust_string(&item.pin_ref),
             render_rust_string(&item.peripheral_ref),
             render_rust_string(&item.signal),
-            render_rust_string(&item.route_type)
+            render_rust_string(&item.route_type),
+            render_string_slice(&item.control_refs),
+            render_string_slice(&item.electrical_constraint_refs),
+            render_string_slice(&item.conflict_refs),
+            render_optional_bool(item.default_after_reset)
+        )
+    }))
+}
+
+fn render_semantic_operation_slice(items: &[SemanticOperation]) -> String {
+    render_struct_slice(items.iter().map(|item| {
+        format!(
+            "metadata::SemanticOperation {{ id: {}, name: {}, description: {}, kind: {}, target_refs: &{}, steps: &{}, preconditions: &{}, postconditions: &{} }}",
+            render_rust_string(&item.id),
+            render_rust_string(&item.name),
+            render_optional_rust_string(item.description.as_deref()),
+            render_optional_rust_string(item.kind.as_deref()),
+            render_string_slice(&item.target_refs),
+            render_semantic_operation_step_slice(&item.steps),
+            render_semantic_predicate_slice(&item.preconditions),
+            render_semantic_predicate_slice(&item.postconditions)
+        )
+    }))
+}
+
+fn render_semantic_operation_step_slice(items: &[SemanticOperationStep]) -> String {
+    render_struct_slice(items.iter().map(|item| {
+        format!(
+            "metadata::SemanticOperationStep {{ index: {}, action: {}, target_ref: {}, expression: {}, value: {}, description: {} }}",
+            item.index,
+            render_rust_string(&item.action),
+            render_optional_rust_string(item.target_ref.as_deref()),
+            render_optional_semantic_expression(item.expression.as_ref()),
+            render_optional_value_literal(item.value.as_ref()),
+            render_optional_rust_string(item.description.as_deref())
+        )
+    }))
+}
+
+fn render_semantic_state_machine_slice(items: &[SemanticStateMachine]) -> String {
+    render_struct_slice(items.iter().map(|item| {
+        format!(
+            "metadata::SemanticStateMachine {{ id: {}, name: {}, description: {}, target_refs: &{}, initial_state: {}, states: &{}, transitions: &{} }}",
+            render_rust_string(&item.id),
+            render_rust_string(&item.name),
+            render_optional_rust_string(item.description.as_deref()),
+            render_string_slice(&item.target_refs),
+            render_optional_rust_string(item.initial_state.as_deref()),
+            render_semantic_state_slice(&item.states),
+            render_semantic_transition_slice(&item.transitions)
+        )
+    }))
+}
+
+fn render_semantic_state_slice(items: &[SemanticState]) -> String {
+    render_struct_slice(items.iter().map(|item| {
+        format!(
+            "metadata::SemanticState {{ name: {}, description: {}, invariants: &{} }}",
+            render_rust_string(&item.name),
+            render_optional_rust_string(item.description.as_deref()),
+            render_semantic_predicate_slice(&item.invariants)
+        )
+    }))
+}
+
+fn render_semantic_transition_slice(items: &[SemanticTransition]) -> String {
+    render_struct_slice(items.iter().map(|item| {
+        format!(
+            "metadata::SemanticTransition {{ from: {}, to: {}, trigger: {}, conditions: &{}, effects: &{} }}",
+            render_rust_string(&item.from),
+            render_rust_string(&item.to),
+            render_optional_rust_string(item.trigger.as_deref()),
+            render_semantic_predicate_slice(&item.conditions),
+            render_semantic_side_effect_slice(&item.effects)
+        )
+    }))
+}
+
+fn render_semantic_side_effect_slice(items: &[SemanticSideEffect]) -> String {
+    render_struct_slice(items.iter().map(|item| {
+        format!(
+            "metadata::SemanticSideEffect {{ kind: {}, target_ref: {}, description: {} }}",
+            render_rust_string(&item.kind),
+            render_optional_rust_string(item.target_ref.as_deref()),
+            render_optional_rust_string(item.description.as_deref())
+        )
+    }))
+}
+
+fn render_semantic_predicate_slice(items: &[SemanticPredicate]) -> String {
+    render_struct_slice(items.iter().map(|item| {
+        format!(
+            "metadata::Predicate {{ kind: {}, target_ref: {}, expression: {}, expected_value: {}, description: {} }}",
+            render_rust_string(&item.kind),
+            render_optional_rust_string(item.target_ref.as_deref()),
+            render_optional_semantic_expression(item.expression.as_ref()),
+            render_optional_value_literal(item.expected_value.as_ref()),
+            render_optional_rust_string(item.description.as_deref())
         )
     }))
 }
@@ -3742,6 +3995,60 @@ fn render_string_slice(items: &[String]) -> String {
 fn render_optional_rust_string(value: Option<&str>) -> String {
     match value {
         Some(text) => format!("Some({})", render_rust_string(text)),
+        None => "None".to_string(),
+    }
+}
+
+fn render_optional_u32(value: Option<u32>) -> String {
+    match value {
+        Some(number) => format!("Some({number})"),
+        None => "None".to_string(),
+    }
+}
+
+fn render_optional_bool(value: Option<bool>) -> String {
+    match value {
+        Some(flag) => format!("Some({flag})"),
+        None => "None".to_string(),
+    }
+}
+
+fn render_optional_semantic_expression(value: Option<&SemanticExpression>) -> String {
+    match value {
+        Some(expression) => format!(
+            "Some(metadata::SemanticExpression {{ language: {}, text: {} }})",
+            render_optional_rust_string(expression.language.as_deref()),
+            render_rust_string(&expression.text)
+        ),
+        None => "None".to_string(),
+    }
+}
+
+fn render_optional_value_literal(value: Option<&Value>) -> String {
+    match value {
+        Some(Value::Number(number)) if number.is_i64() => {
+            format!(
+                "Some(metadata::ValueLiteral::Integer({}))",
+                number.as_i64().unwrap_or_default()
+            )
+        }
+        Some(Value::Number(number)) if number.is_u64() => format!(
+            "Some(metadata::ValueLiteral::Number({}))",
+            number.as_u64().unwrap_or_default()
+        ),
+        Some(Value::Number(number)) => format!(
+            "Some(metadata::ValueLiteral::Number({}))",
+            number.as_f64().unwrap_or_default()
+        ),
+        Some(Value::String(text)) => format!(
+            "Some(metadata::ValueLiteral::String({}))",
+            render_rust_string(text)
+        ),
+        Some(Value::Bool(flag)) => format!("Some(metadata::ValueLiteral::Bool({flag}))"),
+        Some(other) => format!(
+            "Some(metadata::ValueLiteral::String({}))",
+            render_rust_string(&other.to_string())
+        ),
         None => "None".to_string(),
     }
 }
@@ -5658,11 +5965,24 @@ mod tests {
         let metadata_rs =
             std::fs::read_to_string(output_dir.path().join("src").join("metadata.rs"))
                 .expect("metadata.rs");
+        let rcc_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("rcc.rs")).expect("rcc.rs");
+        let timer_rs = std::fs::read_to_string(output_dir.path().join("src").join("timer.rs"))
+            .expect("timer.rs");
         let uart_rs = std::fs::read_to_string(output_dir.path().join("src").join("uart.rs"))
             .expect("uart.rs");
         assert!(metadata_rs.contains("GENERATED_PROVENANCE_SOURCE_IDS"));
         assert!(metadata_rs.contains("GENERATED_PROVENANCE_EVIDENCE_IDS"));
         assert!(metadata_rs.contains("document_version"));
+        assert!(metadata_rs.contains("pub struct SemanticOperation"));
+        assert!(metadata_rs.contains("pub struct SemanticStateMachine"));
+        assert!(rcc_rs.contains("binding_kind: \"gated\""));
+        assert!(rcc_rs.contains("controller_ref: Some(\"block.rcc\")"));
+        assert!(uart_rs.contains("reset_domain_ref: Some(\"rst.apb2\")"));
+        assert!(rcc_rs.contains("control_refs: &[\"reg.rcc.apb2pcenr\"]"));
+        assert!(uart_rs.contains("default_after_reset: Some(true)"));
+        assert!(rcc_rs.contains("steps: &[metadata::SemanticOperationStep"));
+        assert!(timer_rs.contains("transitions: &[metadata::SemanticTransition"));
         assert!(uart_rs.contains("MODULE_PROVENANCE"));
 
         let cargo_output = Command::new("cargo")
@@ -6765,7 +7085,10 @@ mod tests {
         let temp = tempdir().expect("tempdir");
         let error =
             generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
-        assert!(error.to_string().contains("unknown channel"));
+        assert!(
+            error.to_string().contains("DMA channel reference")
+                || error.to_string().contains("unknown channel")
+        );
     }
 
     #[test]
@@ -7454,13 +7777,13 @@ mod tests {
             },
             "semantics": {
                 "operations": [
-                    { "id": "op.rcc.init", "name": "Initialize RCC", "kind": "initialization", "targetRefs": ["periph.rcc"], "steps": [{ "index": 0, "action": "write", "targetRef": "reg.rcc.apb2pcenr", "expression": { "language": "plain", "text": "Set USART1EN = 1" } }] },
-                    { "id": "op.adc.calibrate", "name": "Calibrate ADC", "kind": "initialization", "targetRefs": ["periph.adc1"], "steps": [{ "index": 0, "action": "write", "targetRef": "reg.adc1.ctlr2", "expression": { "language": "plain", "text": "Set ADON = 1" } }, { "index": 1, "action": "write", "targetRef": "reg.adc1.ctlr2", "expression": { "language": "plain", "text": "Set RSTCAL = 1" } }, { "index": 2, "action": "write", "targetRef": "reg.adc1.ctlr2", "expression": { "language": "plain", "text": "Set CAL = 1" } }] },
-                    { "id": "op.tim1.enable", "name": "Enable TIM1", "kind": "mode-transition", "targetRefs": ["periph.tim1"], "steps": [{ "index": 0, "action": "write", "targetRef": "reg.tim1.ctlr1", "expression": { "language": "plain", "text": "Set CEN = 1" } }] },
+                    { "id": "op.rcc.init", "name": "Initialize RCC", "description": "Enable the APB2 USART1 gate.", "kind": "initialization", "targetRefs": ["periph.rcc"], "steps": [{ "index": 0, "action": "write", "targetRef": "reg.rcc.apb2pcenr", "expression": { "language": "plain", "text": "Set USART1EN = 1" }, "description": "Turn on USART1 clocking." }], "postconditions": [{ "kind": "clock-enabled", "targetRef": "periph.usart1", "description": "USART1 clock is running." }] },
+                    { "id": "op.adc.calibrate", "name": "Calibrate ADC", "description": "Bring ADC1 online and start calibration.", "kind": "initialization", "targetRefs": ["periph.adc1"], "steps": [{ "index": 0, "action": "write", "targetRef": "reg.adc1.ctlr2", "expression": { "language": "plain", "text": "Set ADON = 1" } }, { "index": 1, "action": "write", "targetRef": "reg.adc1.ctlr2", "expression": { "language": "plain", "text": "Set RSTCAL = 1" }, "description": "Reset calibration state." }, { "index": 2, "action": "write", "targetRef": "reg.adc1.ctlr2", "expression": { "language": "plain", "text": "Set CAL = 1" } }], "preconditions": [{ "kind": "clock-enabled", "targetRef": "periph.adc1", "description": "ADC1 clock must already be running." }] },
+                    { "id": "op.tim1.enable", "name": "Enable TIM1", "kind": "mode-transition", "targetRefs": ["periph.tim1"], "steps": [{ "index": 0, "action": "write", "targetRef": "reg.tim1.ctlr1", "expression": { "language": "plain", "text": "Set CEN = 1" }, "value": 1 }] },
                     { "id": "op.pwm1.enable", "name": "Enable PWM1", "kind": "mode-transition", "targetRefs": ["periph.pwm1"], "steps": [{ "index": 0, "action": "write", "targetRef": "reg.pwm1.ctlr1", "expression": { "language": "plain", "text": "Set CEN = 1" } }] }
                 ],
                 "stateMachines": [
-                    { "id": "sm.tim1", "name": "TIM1 modes", "targetRefs": ["periph.tim1"], "initialState": "disabled", "states": [{ "name": "disabled" }, { "name": "enabled" }], "transitions": [{ "from": "disabled", "to": "enabled", "trigger": "enable requested", "effects": [{ "kind": "starts-hardware", "targetRef": "field.tim1.ctlr1.cen" }] }, { "from": "enabled", "to": "disabled", "trigger": "disable requested", "effects": [{ "kind": "stops-hardware", "targetRef": "field.tim1.ctlr1.cen" }] }] },
+                    { "id": "sm.tim1", "name": "TIM1 modes", "description": "Minimal counter enable state machine.", "targetRefs": ["periph.tim1"], "initialState": "disabled", "states": [{ "name": "disabled", "description": "Counter stopped." }, { "name": "enabled", "description": "Counter running.", "invariants": [{ "kind": "field-value", "targetRef": "field.tim1.ctlr1.cen", "expectedValue": 1 }] }], "transitions": [{ "from": "disabled", "to": "enabled", "trigger": "enable requested", "conditions": [{ "kind": "clock-enabled", "targetRef": "periph.tim1" }], "effects": [{ "kind": "starts-hardware", "targetRef": "field.tim1.ctlr1.cen" }] }, { "from": "enabled", "to": "disabled", "trigger": "disable requested", "effects": [{ "kind": "stops-hardware", "targetRef": "field.tim1.ctlr1.cen" }] }] },
                     { "id": "sm.pwm1", "name": "PWM1 modes", "targetRefs": ["periph.pwm1"], "initialState": "disabled", "states": [{ "name": "disabled" }, { "name": "enabled" }], "transitions": [{ "from": "disabled", "to": "enabled", "trigger": "enable requested", "effects": [{ "kind": "starts-hardware", "targetRef": "field.pwm1.ctlr1.cen" }] }, { "from": "enabled", "to": "disabled", "trigger": "disable requested", "effects": [{ "kind": "stops-hardware", "targetRef": "field.pwm1.ctlr1.cen" }] }] }
                 ]
             },
@@ -7496,65 +7819,65 @@ mod tests {
                     ],
                     "clockResetTopology": {
                         "clockBindings": [
-                            { "id": "clk.gpioa", "name": "GPIOA clock", "consumerRef": "periph.gpioa", "clockRef": "clk.apb2", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"] },
-                            { "id": "clk.usart1", "name": "USART1 clock", "consumerRef": "periph.usart1", "clockRef": "clk.apb2", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"] },
-                            { "id": "clk.spi1", "name": "SPI1 clock", "consumerRef": "periph.spi1", "clockRef": "clk.apb2", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"] },
-                            { "id": "clk.i2c1", "name": "I2C1 clock", "consumerRef": "periph.i2c1", "clockRef": "clk.apb1", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb1pcenr"] },
-                            { "id": "clk.tim1", "name": "TIM1 clock", "consumerRef": "periph.tim1", "clockRef": "clk.apb2", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"] },
-                            { "id": "clk.pwm1", "name": "PWM1 clock", "consumerRef": "periph.pwm1", "clockRef": "clk.apb2", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"] },
-                            { "id": "clk.adc1", "name": "ADC1 clock", "consumerRef": "periph.adc1", "clockRef": "clk.apb2", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"] },
-                            { "id": "clk.dma1", "name": "DMA1 clock", "consumerRef": "periph.dma1", "clockRef": "clk.ahb", "bindingKind": "gated", "controlRefs": ["reg.rcc.ahbpcenr"] }
+                            { "id": "clk.gpioa", "name": "GPIOA clock", "consumerRef": "periph.gpioa", "clockRef": "clk.apb2", "controllerRef": "block.rcc", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"] },
+                            { "id": "clk.usart1", "name": "USART1 clock", "consumerRef": "periph.usart1", "clockRef": "clk.apb2", "controllerRef": "block.rcc", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"], "enableOperationRefs": ["op.rcc.init"] },
+                            { "id": "clk.spi1", "name": "SPI1 clock", "consumerRef": "periph.spi1", "clockRef": "clk.apb2", "controllerRef": "block.rcc", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"] },
+                            { "id": "clk.i2c1", "name": "I2C1 clock", "consumerRef": "periph.i2c1", "clockRef": "clk.apb1", "controllerRef": "block.rcc", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb1pcenr"] },
+                            { "id": "clk.tim1", "name": "TIM1 clock", "consumerRef": "periph.tim1", "clockRef": "clk.apb2", "controllerRef": "block.rcc", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"], "enableOperationRefs": ["op.tim1.enable"] },
+                            { "id": "clk.pwm1", "name": "PWM1 clock", "consumerRef": "periph.pwm1", "clockRef": "clk.apb2", "controllerRef": "block.rcc", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"], "enableOperationRefs": ["op.pwm1.enable"] },
+                            { "id": "clk.adc1", "name": "ADC1 clock", "consumerRef": "periph.adc1", "clockRef": "clk.apb2", "controllerRef": "block.rcc", "bindingKind": "gated", "controlRefs": ["reg.rcc.apb2pcenr"], "enableOperationRefs": ["op.adc.calibrate"] },
+                            { "id": "clk.dma1", "name": "DMA1 clock", "consumerRef": "periph.dma1", "clockRef": "clk.ahb", "controllerRef": "block.rcc", "bindingKind": "gated", "controlRefs": ["reg.rcc.ahbpcenr"] }
                         ],
                         "resetBindings": [
-                            { "id": "rst.gpioa", "name": "GPIOA reset", "targetRef": "periph.gpioa", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] },
-                            { "id": "rst.usart1", "name": "USART1 reset", "targetRef": "periph.usart1", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] },
-                            { "id": "rst.spi1", "name": "SPI1 reset", "targetRef": "periph.spi1", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] },
-                            { "id": "rst.i2c1", "name": "I2C1 reset", "targetRef": "periph.i2c1", "bindingKind": "software", "controlRefs": ["reg.rcc.apb1prstr"] },
-                            { "id": "rst.tim1", "name": "TIM1 reset", "targetRef": "periph.tim1", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] },
-                            { "id": "rst.pwm1", "name": "PWM1 reset", "targetRef": "periph.pwm1", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] },
-                            { "id": "rst.adc1", "name": "ADC1 reset", "targetRef": "periph.adc1", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] }
+                            { "id": "rst.gpioa", "name": "GPIOA reset", "targetRef": "periph.gpioa", "controllerRef": "block.rcc", "resetDomainRef": "rst.apb2", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] },
+                            { "id": "rst.usart1", "name": "USART1 reset", "targetRef": "periph.usart1", "controllerRef": "block.rcc", "resetDomainRef": "rst.apb2", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] },
+                            { "id": "rst.spi1", "name": "SPI1 reset", "targetRef": "periph.spi1", "controllerRef": "block.rcc", "resetDomainRef": "rst.apb2", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] },
+                            { "id": "rst.i2c1", "name": "I2C1 reset", "targetRef": "periph.i2c1", "controllerRef": "block.rcc", "resetDomainRef": "rst.apb1", "bindingKind": "software", "controlRefs": ["reg.rcc.apb1prstr"] },
+                            { "id": "rst.tim1", "name": "TIM1 reset", "targetRef": "periph.tim1", "controllerRef": "block.rcc", "resetDomainRef": "rst.apb2", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] },
+                            { "id": "rst.pwm1", "name": "PWM1 reset", "targetRef": "periph.pwm1", "controllerRef": "block.rcc", "resetDomainRef": "rst.apb2", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] },
+                            { "id": "rst.adc1", "name": "ADC1 reset", "targetRef": "periph.adc1", "controllerRef": "block.rcc", "resetDomainRef": "rst.apb2", "bindingKind": "software", "controlRefs": ["reg.rcc.apb2prstr"] }
                         ]
                     },
                     "interruptTopology": {
                         "sources": [
-                            { "id": "isrc.usart1", "name": "USART1 source", "sourceRef": "periph.usart1", "kind": "peripheral" },
-                            { "id": "isrc.spi1", "name": "SPI1 source", "sourceRef": "periph.spi1", "kind": "peripheral" },
-                            { "id": "isrc.i2c1", "name": "I2C1 source", "sourceRef": "periph.i2c1", "kind": "peripheral" },
-                            { "id": "isrc.tim1", "name": "TIM1 source", "sourceRef": "periph.tim1", "kind": "timer" },
-                            { "id": "isrc.adc1", "name": "ADC1 source", "sourceRef": "periph.adc1", "kind": "peripheral" }
+                            { "id": "isrc.usart1", "name": "USART1 source", "sourceRef": "periph.usart1", "producerRef": "block.usart1", "kind": "peripheral" },
+                            { "id": "isrc.spi1", "name": "SPI1 source", "sourceRef": "periph.spi1", "producerRef": "block.spi1", "kind": "peripheral" },
+                            { "id": "isrc.i2c1", "name": "I2C1 source", "sourceRef": "periph.i2c1", "producerRef": "block.i2c1", "kind": "peripheral" },
+                            { "id": "isrc.tim1", "name": "TIM1 source", "sourceRef": "periph.tim1", "producerRef": "block.tim1", "kind": "timer" },
+                            { "id": "isrc.adc1", "name": "ADC1 source", "sourceRef": "periph.adc1", "producerRef": "block.adc1", "kind": "peripheral" }
                         ],
                         "routes": [
                             { "id": "iroute.usart1", "name": "USART1 route", "sourceRef": "isrc.usart1", "interruptRef": "irq.usart1", "controllerRef": "block.pfic", "routeType": "hardwired" },
                             { "id": "iroute.spi1", "name": "SPI1 route", "sourceRef": "isrc.spi1", "interruptRef": "irq.spi1", "controllerRef": "block.pfic", "routeType": "hardwired" },
                             { "id": "iroute.i2c1", "name": "I2C1 route", "sourceRef": "isrc.i2c1", "interruptRef": "irq.i2c1", "controllerRef": "block.pfic", "routeType": "hardwired" },
-                            { "id": "iroute.tim1", "name": "TIM1 route", "sourceRef": "isrc.tim1", "interruptRef": "irq.tim1", "controllerRef": "block.pfic", "routeType": "hardwired" },
+                            { "id": "iroute.tim1", "name": "TIM1 route", "sourceRef": "isrc.tim1", "interruptRef": "irq.tim1", "controllerRef": "block.pfic", "cpuTargetRef": "block.pfic", "lineIndex": 25, "routeType": "hardwired", "sharedGroup": "tim-group" },
                             { "id": "iroute.adc1", "name": "ADC1 route", "sourceRef": "isrc.adc1", "interruptRef": "irq.adc1", "controllerRef": "block.pfic", "routeType": "hardwired" }
                         ]
                     },
                     "dmaTopology": {
                         "channels": [
-                            { "id": "dma.chan1", "name": "DMA1 Channel 1", "controllerRef": "block.dma1", "channelIndex": 1 },
-                            { "id": "dma.chan2", "name": "DMA1 Channel 2", "controllerRef": "block.dma1", "channelIndex": 2 }
+                            { "id": "dma.chan1", "name": "DMA1 Channel 1", "controllerRef": "block.dma1", "targetRef": "periph.usart1", "channelIndex": 1, "capabilities": ["tx", "peripheral"], "priorityLevels": ["low", "high"] },
+                            { "id": "dma.chan2", "name": "DMA1 Channel 2", "controllerRef": "block.dma1", "targetRef": "periph.usart1", "channelIndex": 2, "capabilities": ["rx", "peripheral"], "priorityLevels": ["low", "high"] }
                         ],
                         "routes": [
-                            { "id": "dmaroute.usart1_tx", "name": "USART1 TX DMA", "peripheralRef": "periph.usart1", "channelRef": "dma.chan1", "direction": "memory-to-peripheral" },
-                            { "id": "dmaroute.usart1_rx", "name": "USART1 RX DMA", "peripheralRef": "periph.usart1", "channelRef": "dma.chan2", "direction": "peripheral-to-memory" },
-                            { "id": "dmaroute.adc1", "name": "ADC1 DMA", "peripheralRef": "periph.adc1", "channelRef": "dma.chan1", "direction": "peripheral-to-memory" }
+                            { "id": "dmaroute.usart1_tx", "name": "USART1 TX DMA", "peripheralRef": "periph.usart1", "signal": "TX", "channelRef": "dma.chan1", "direction": "memory-to-peripheral", "controlRefs": ["reg.rcc.ahbpcenr"] },
+                            { "id": "dmaroute.usart1_rx", "name": "USART1 RX DMA", "peripheralRef": "periph.usart1", "signal": "RX", "channelRef": "dma.chan2", "direction": "peripheral-to-memory", "controlRefs": ["reg.rcc.ahbpcenr"] },
+                            { "id": "dmaroute.adc1", "name": "ADC1 DMA", "peripheralRef": "periph.adc1", "signal": "IN0", "channelRef": "dma.chan1", "direction": "peripheral-to-memory", "controlRefs": ["reg.rcc.ahbpcenr"] }
                         ]
                     },
                     "pinTopology": {
                         "routes": [
-                            { "id": "pinroute.gpioa.pa0", "name": "GPIOA PA0", "pinRef": "pin.pa0", "peripheralRef": "periph.gpioa", "signal": "GPIO0", "routeType": "hardwired" },
-                            { "id": "pinroute.usart1.tx", "name": "USART1 TX", "pinRef": "pin.pa9", "peripheralRef": "periph.usart1", "signal": "TX", "routeType": "hardwired" },
-                            { "id": "pinroute.usart1.rx", "name": "USART1 RX", "pinRef": "pin.pa10", "peripheralRef": "periph.usart1", "signal": "RX", "routeType": "hardwired" },
+                            { "id": "pinroute.gpioa.pa0", "name": "GPIOA PA0", "pinRef": "pin.pa0", "peripheralRef": "periph.gpioa", "signal": "GPIO0", "routeType": "hardwired", "defaultAfterReset": true },
+                            { "id": "pinroute.usart1.tx", "name": "USART1 TX", "pinRef": "pin.pa9", "peripheralRef": "periph.usart1", "signal": "TX", "routeType": "hardwired", "controlRefs": ["reg.rcc.apb2pcenr"] },
+                            { "id": "pinroute.usart1.rx", "name": "USART1 RX", "pinRef": "pin.pa10", "peripheralRef": "periph.usart1", "signal": "RX", "routeType": "hardwired", "defaultAfterReset": true },
                             { "id": "pinroute.spi1.sck", "name": "SPI1 SCK", "pinRef": "pin.pa5", "peripheralRef": "periph.spi1", "signal": "SCK", "routeType": "hardwired" },
                             { "id": "pinroute.spi1.mosi", "name": "SPI1 MOSI", "pinRef": "pin.pa7", "peripheralRef": "periph.spi1", "signal": "MOSI", "routeType": "hardwired" },
                             { "id": "pinroute.spi1.miso", "name": "SPI1 MISO", "pinRef": "pin.pa6", "peripheralRef": "periph.spi1", "signal": "MISO", "routeType": "hardwired" },
-                            { "id": "pinroute.i2c1.scl", "name": "I2C1 SCL", "pinRef": "pin.pa1", "peripheralRef": "periph.i2c1", "signal": "SCL", "routeType": "hardwired" },
-                            { "id": "pinroute.i2c1.sda", "name": "I2C1 SDA", "pinRef": "pin.pa2", "peripheralRef": "periph.i2c1", "signal": "SDA", "routeType": "hardwired" },
-                            { "id": "pinroute.tim1.ch1", "name": "TIM1 CH1", "pinRef": "pin.pa8", "peripheralRef": "periph.tim1", "signal": "CH1", "routeType": "hardwired" },
-                            { "id": "pinroute.pwm1.out", "name": "PWM1 OUT", "pinRef": "pin.pa3", "peripheralRef": "periph.pwm1", "signal": "PWM_OUT", "routeType": "hardwired" },
-                            { "id": "pinroute.adc1.in0", "name": "ADC1 IN0", "pinRef": "pin.pa0", "peripheralRef": "periph.adc1", "signal": "IN0", "routeType": "hardwired" }
+                            { "id": "pinroute.i2c1.scl", "name": "I2C1 SCL", "pinRef": "pin.pa1", "peripheralRef": "periph.i2c1", "signal": "SCL", "routeType": "hardwired", "electricalConstraintRefs": ["elec.i2c1.scl"] },
+                            { "id": "pinroute.i2c1.sda", "name": "I2C1 SDA", "pinRef": "pin.pa2", "peripheralRef": "periph.i2c1", "signal": "SDA", "routeType": "hardwired", "electricalConstraintRefs": ["elec.i2c1.sda"], "conflictRefs": ["pinroute.adc1.in0"] },
+                            { "id": "pinroute.tim1.ch1", "name": "TIM1 CH1", "pinRef": "pin.pa8", "peripheralRef": "periph.tim1", "signal": "CH1", "routeType": "hardwired", "controlRefs": ["reg.tim1.ctlr1"] },
+                            { "id": "pinroute.pwm1.out", "name": "PWM1 OUT", "pinRef": "pin.pa3", "peripheralRef": "periph.pwm1", "signal": "PWM_OUT", "routeType": "hardwired", "controlRefs": ["reg.pwm1.ctlr1"] },
+                            { "id": "pinroute.adc1.in0", "name": "ADC1 IN0", "pinRef": "pin.pa0", "peripheralRef": "periph.adc1", "signal": "IN0", "routeType": "hardwired", "conflictRefs": ["pinroute.i2c1.sda"] }
                         ]
                     }
                 },

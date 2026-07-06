@@ -296,6 +296,14 @@ to be derived from the referenced topology and semantic records that the
 generator can lower into real register-level code for the concrete
 document under generation.
 
+When a repository generator emits a Rust metadata layer alongside the
+driver code, that metadata is expected to preserve the generator-relevant
+structured subset of those referenced topology and semantic records rather
+than collapsing them to identifier-only lists. In particular, approved
+clock/reset/remap control references and structured operation/state-machine
+data remain part of the generator contract when they are needed for
+deterministic downstream lowering.
+
 The intended division of responsibility is:
 
 1. core layers + `profiles.mcuSoc` describe the hardware
