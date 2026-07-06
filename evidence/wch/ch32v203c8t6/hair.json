@@ -63899,25 +63899,6 @@
                   "description": "USB device enable and internal pullup resistance enable."
                 },
                 {
-                  "id": "field.usbfsd_base_ctrl.dev_pu_en",
-                  "name": "DEV_PU_EN",
-                  "bitRange": {
-                    "lsb": 5,
-                    "msb": 5
-                  },
-                  "provenance": {
-                    "sourceRefs": [
-                      "ch32-rs-ch32v203c8t6-yaml"
-                    ],
-                    "evidenceRefs": [
-                      "e_ch32rs_ch32v203c8t6_yaml_usb_fragments"
-                    ],
-                    "status": "imported",
-                    "confidence": 0.86
-                  },
-                  "description": "USB device internal pullup resistance enable."
-                },
-                {
                   "id": "field.usbfsd_base_ctrl.low_speed",
                   "name": "LOW_SPEED",
                   "bitRange": {
@@ -64542,25 +64523,6 @@
                   "description": "bus reset event interrupt flag for USB device mode, direct bit address clear or write 1 to clear"
                 },
                 {
-                  "id": "field.usbfsd_int_fg.detect",
-                  "name": "DETECT",
-                  "bitRange": {
-                    "lsb": 0,
-                    "msb": 0
-                  },
-                  "provenance": {
-                    "sourceRefs": [
-                      "ch32-rs-ch32v203c8t6-yaml"
-                    ],
-                    "evidenceRefs": [
-                      "e_ch32rs_ch32v203c8t6_yaml_usb_fragments"
-                    ],
-                    "status": "imported",
-                    "confidence": 0.86
-                  },
-                  "description": "device detected event interrupt flag for USB host mode, direct bit address clear or write 1 to clear."
-                },
-                {
                   "id": "field.usbfsd_int_fg.transfer",
                   "name": "TRANSFER",
                   "bitRange": {
@@ -64720,25 +64682,6 @@
               "description": "USB interrupt status.",
               "fields": [
                 {
-                  "id": "field.usbfsd_int_st.mask_h_res",
-                  "name": "MASK_H_RES",
-                  "bitRange": {
-                    "lsb": 0,
-                    "msb": 3
-                  },
-                  "provenance": {
-                    "sourceRefs": [
-                      "ch32-rs-ch32v203c8t6-yaml"
-                    ],
-                    "evidenceRefs": [
-                      "e_ch32rs_ch32v203c8t6_yaml_usb_fragments"
-                    ],
-                    "status": "imported",
-                    "confidence": 0.86
-                  },
-                  "description": "RO, bit mask of current transfer handshake response for USB host mode: 0000=no response, time out from device, others=handshake response PID received;RO, bit mask of current transfer endpoint number for USB device mode."
-                },
-                {
                   "id": "field.usbfsd_int_st.mask_uis_endp",
                   "name": "MASK_UIS_ENDP",
                   "bitRange": {
@@ -64755,7 +64698,7 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, bit mask of current transfer handshake response for USB host mode: 0000=no response, time out from device, others=handshake response PID received;RO, bit mask of current transfer endpoint number for USB device mode."
+                  "description": "RO, bit mask of current transfer endpoint number for USB device mode."
                 },
                 {
                   "id": "field.usbfsd_int_st.mask_token",
@@ -68293,44 +68236,6 @@
                   "description": "enable automatic responding busy for device mode or automatic pause for host mode during interrupt flag UIF_TRANSFER valid."
                 },
                 {
-                  "id": "field.usbfsh_base_ctrl.sys_ctrl",
-                  "name": "SYS_CTRL",
-                  "bitRange": {
-                    "lsb": 4,
-                    "msb": 5
-                  },
-                  "provenance": {
-                    "sourceRefs": [
-                      "ch32-rs-ch32v203c8t6-yaml"
-                    ],
-                    "evidenceRefs": [
-                      "e_ch32rs_ch32v203c8t6_yaml_usb_fragments"
-                    ],
-                    "status": "imported",
-                    "confidence": 0.86
-                  },
-                  "description": "USB device enable and internal pullup resistance enable."
-                },
-                {
-                  "id": "field.usbfsh_base_ctrl.dev_pu_en",
-                  "name": "DEV_PU_EN",
-                  "bitRange": {
-                    "lsb": 5,
-                    "msb": 5
-                  },
-                  "provenance": {
-                    "sourceRefs": [
-                      "ch32-rs-ch32v203c8t6-yaml"
-                    ],
-                    "evidenceRefs": [
-                      "e_ch32rs_ch32v203c8t6_yaml_usb_fragments"
-                    ],
-                    "status": "imported",
-                    "confidence": 0.86
-                  },
-                  "description": "USB device internal pullup resistance enable."
-                },
-                {
                   "id": "field.usbfsh_base_ctrl.low_speed",
                   "name": "LOW_SPEED",
                   "bitRange": {
@@ -68936,25 +68841,6 @@
               "description": "USB interrupt flag.",
               "fields": [
                 {
-                  "id": "field.usbfsh_int_fg.bus_rst",
-                  "name": "BUS_RST",
-                  "bitRange": {
-                    "lsb": 0,
-                    "msb": 0
-                  },
-                  "provenance": {
-                    "sourceRefs": [
-                      "ch32-rs-ch32v203c8t6-yaml"
-                    ],
-                    "evidenceRefs": [
-                      "e_ch32rs_ch32v203c8t6_yaml_usb_fragments"
-                    ],
-                    "status": "imported",
-                    "confidence": 0.86
-                  },
-                  "description": "bus reset event interrupt flag for USB device mode, direct bit address clear or write 1 to clear"
-                },
-                {
                   "id": "field.usbfsh_int_fg.detect",
                   "name": "DETECT",
                   "bitRange": {
@@ -69149,26 +69035,7 @@
                     "status": "imported",
                     "confidence": 0.86
                   },
-                  "description": "RO, bit mask of current transfer handshake response for USB host mode: 0000=no response, time out from device, others=handshake response PID received;RO, bit mask of current transfer endpoint number for USB device mode."
-                },
-                {
-                  "id": "field.usbfsh_int_st.mask_uis_endp",
-                  "name": "MASK_UIS_ENDP",
-                  "bitRange": {
-                    "lsb": 0,
-                    "msb": 3
-                  },
-                  "provenance": {
-                    "sourceRefs": [
-                      "ch32-rs-ch32v203c8t6-yaml"
-                    ],
-                    "evidenceRefs": [
-                      "e_ch32rs_ch32v203c8t6_yaml_usb_fragments"
-                    ],
-                    "status": "imported",
-                    "confidence": 0.86
-                  },
-                  "description": "RO, bit mask of current transfer handshake response for USB host mode: 0000=no response, time out from device, others=handshake response PID received;RO, bit mask of current transfer endpoint number for USB device mode."
+                  "description": "RO, bit mask of current transfer handshake response for USB host mode: 0000=no response, time out from device, others=handshake response PID received."
                 },
                 {
                   "id": "field.usbfsh_int_st.mask_token",
