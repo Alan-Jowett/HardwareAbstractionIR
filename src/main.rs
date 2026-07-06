@@ -1,6 +1,6 @@
 #![recursion_limit = "512"]
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -2717,6 +2717,17 @@ fn render_clock_binding_methods(
     driver: &ResolvedDriverInstance,
 ) -> Result<Vec<GeneratedMethod>> {
     let multi_binding_names = driver.clock_bindings.len() > 1 || driver.driver_kind == "rcc";
+    let mut subject_counts = BTreeMap::<String, usize>::new();
+    for binding in &driver.clock_bindings {
+        let subject = model
+            .peripheral_names
+            .get(&binding.consumer_ref)
+            .cloned()
+            .unwrap_or_else(|| last_ref_segment(&binding.consumer_ref).to_string());
+        *subject_counts
+            .entry(to_rust_method_name(&subject))
+            .or_default() += 1;
+    }
     driver
         .clock_bindings
         .iter()
@@ -2741,13 +2752,19 @@ fn render_clock_binding_methods(
                 ],
             )?;
             let subject_slug = to_rust_method_name(&subject);
+            let duplicate_subject = subject_counts
+                .get(&subject_slug)
+                .copied()
+                .unwrap_or_default()
+                > 1;
+            let binding_suffix = duplicate_subject.then(|| to_rust_method_name(&binding.id));
             let enable_name = if multi_binding_names {
-                format!("enable_{}_clock", subject_slug)
+                binding_method_name("enable", &subject_slug, binding_suffix.as_deref(), "clock")
             } else {
                 "enable_clock".to_string()
             };
             let disable_name = if multi_binding_names {
-                format!("disable_{}_clock", subject_slug)
+                binding_method_name("disable", &subject_slug, binding_suffix.as_deref(), "clock")
             } else {
                 "disable_clock".to_string()
             };
@@ -2778,6 +2795,17 @@ fn render_reset_binding_methods(
     driver: &ResolvedDriverInstance,
 ) -> Result<Vec<GeneratedMethod>> {
     let multi_binding_names = driver.reset_bindings.len() > 1 || driver.driver_kind == "rcc";
+    let mut subject_counts = BTreeMap::<String, usize>::new();
+    for binding in &driver.reset_bindings {
+        let subject = model
+            .peripheral_names
+            .get(&binding.target_ref)
+            .cloned()
+            .unwrap_or_else(|| last_ref_segment(&binding.target_ref).to_string());
+        *subject_counts
+            .entry(to_rust_method_name(&subject))
+            .or_default() += 1;
+    }
     driver
         .reset_bindings
         .iter()
@@ -2802,13 +2830,19 @@ fn render_reset_binding_methods(
                 ],
             )?;
             let subject_slug = to_rust_method_name(&subject);
+            let duplicate_subject = subject_counts
+                .get(&subject_slug)
+                .copied()
+                .unwrap_or_default()
+                > 1;
+            let binding_suffix = duplicate_subject.then(|| to_rust_method_name(&binding.id));
             let assert_name = if multi_binding_names {
-                format!("assert_{}_reset", subject_slug)
+                binding_method_name("assert", &subject_slug, binding_suffix.as_deref(), "reset")
             } else {
                 "assert_reset".to_string()
             };
             let release_name = if multi_binding_names {
-                format!("release_{}_reset", subject_slug)
+                binding_method_name("release", &subject_slug, binding_suffix.as_deref(), "reset")
             } else {
                 "release_reset".to_string()
             };
@@ -2832,6 +2866,13 @@ fn render_reset_binding_methods(
         })
         .collect::<Result<Vec<_>>>()
         .map(|nested| nested.into_iter().flatten().collect())
+}
+
+fn binding_method_name(prefix: &str, subject: &str, suffix: Option<&str>, noun: &str) -> String {
+    match suffix {
+        Some(suffix) => format!("{prefix}_{subject}_{suffix}_{noun}"),
+        None => format!("{prefix}_{subject}_{noun}"),
+    }
 }
 
 fn render_operation_methods(
@@ -3106,6 +3147,16 @@ fn render_register_write_statement(
     value: u64,
     indent: &str,
 ) -> Result<String> {
+    match register.width_bits {
+        8 | 16 | 32 => {}
+        other => {
+            bail!(
+                "register {} uses unsupported width {} for Embassy code generation",
+                register.id,
+                other
+            );
+        }
+    }
     if field.msb >= register.width_bits || field.lsb >= register.width_bits {
         bail!(
             "field {} bit range {}..={} exceeds register {} width {}",
@@ -3214,11 +3265,7 @@ fn render_register_write_statement(
                 "{indent}modify_u32(0x{address:X}u64, 0x{clear_mask:08X}u32, 0x{set_mask:08X}u32)?;\n"
             ))
         }
-        other => bail!(
-            "register {} uses unsupported width {} for Embassy code generation",
-            register.id,
-            other
-        ),
+        _ => unreachable!("unsupported widths are rejected before mask computation"),
     }
 }
 
@@ -5994,6 +6041,179 @@ mod tests {
             error
                 .to_string()
                 .contains("cluster CH uses arrayed instances")
+        );
+    }
+
+    #[test]
+    fn generate_embassy_disambiguates_duplicate_clock_binding_names() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let clock_bindings = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("clockResetTopology")
+            .and_then(Value::as_object_mut)
+            .expect("clockResetTopology object")
+            .get_mut("clockBindings")
+            .and_then(Value::as_array_mut)
+            .expect("clock bindings");
+        clock_bindings.push(serde_json::json!({
+            "id": "clk.usart1.alt",
+            "name": "USART1 alternate clock",
+            "consumerRef": "periph.usart1",
+            "clockRef": "clk.apb2",
+            "bindingKind": "gated",
+            "controlRefs": ["reg.rcc.apb2pcenr"]
+        }));
+
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let usart1 = drivers[2].as_object_mut().expect("usart1 driver");
+        usart1
+            .get_mut("clockBindingRefs")
+            .and_then(Value::as_array_mut)
+            .expect("clockBindingRefs")
+            .push(serde_json::json!("clk.usart1.alt"));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("duplicate clock-binding fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
+
+        let uart_rs = std::fs::read_to_string(output_dir.path().join("src").join("uart.rs"))
+            .expect("uart.rs");
+        assert!(uart_rs.contains("pub fn enable_usart1_clk_usart1_clock"));
+        assert!(uart_rs.contains("pub fn enable_usart1_clk_usart1_alt_clock"));
+    }
+
+    #[test]
+    fn generate_embassy_disambiguates_duplicate_reset_binding_names() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let reset_bindings = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("clockResetTopology")
+            .and_then(Value::as_object_mut)
+            .expect("clockResetTopology object")
+            .get_mut("resetBindings")
+            .and_then(Value::as_array_mut)
+            .expect("reset bindings");
+        reset_bindings.push(serde_json::json!({
+            "id": "rst.usart1.alt",
+            "name": "USART1 alternate reset",
+            "targetRef": "periph.usart1",
+            "bindingKind": "software",
+            "controlRefs": ["reg.rcc.apb2prstr"]
+        }));
+
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let usart1 = drivers[2].as_object_mut().expect("usart1 driver");
+        usart1
+            .get_mut("resetBindingRefs")
+            .and_then(Value::as_array_mut)
+            .expect("resetBindingRefs")
+            .push(serde_json::json!("rst.usart1.alt"));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("duplicate reset-binding fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
+
+        let uart_rs = std::fs::read_to_string(output_dir.path().join("src").join("uart.rs"))
+            .expect("uart.rs");
+        assert!(uart_rs.contains("pub fn assert_usart1_rst_usart1_reset"));
+        assert!(uart_rs.contains("pub fn assert_usart1_rst_usart1_alt_reset"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_unsupported_register_widths_without_panicking() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        let registers = tim1
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 registers");
+        let ctlr1 = registers[0].as_object_mut().expect("tim1 ctlr1");
+        ctlr1.insert("widthBits".to_string(), serde_json::json!(128));
+        let fields = ctlr1
+            .get_mut("fields")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 fields");
+        fields[0]
+            .as_object_mut()
+            .expect("tim1 cen field")
+            .get_mut("bitRange")
+            .and_then(Value::as_object_mut)
+            .expect("bit range")
+            .insert("msb".to_string(), serde_json::json!(80));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("unsupported-width fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("register reg.tim1.ctlr1 uses unsupported width 128")
         );
     }
 
