@@ -14,14 +14,14 @@
 
 | Source ID | Kind | Location | Version | Notes | Likely HAIR layers |
 | --- | --- | --- | --- | --- | --- |
-| `wch-ch32v20x-30x-datasheet` | datasheet | `https://www.wch-ic.com/download/file?id=354` | 3.0 | Exact-variant package, clocks, memories, and pad inventory. | structure, physical, profiles |
+| `wch-ch32v20x-30x-datasheet` | datasheet | `https://www.wch-ic.com/download/file?id=354` | 3.0 | Exact-variant package, clocks, memories, and pad inventory. | structure, physical, profiles.mcuSoc |
 | `wch-ch32fv2x-v3x-rm` | reference-manual | `https://www.wch-ic.com/download/file?id=324` | 2.5 | Timer-class adjudication and timer register semantics. | structure, semantics |
 | `openwch-ch32v20x-sdk` | sdk | `https://github.com/openwch/ch32v20x/tree/804daf39a21af99be64c5abe0ea4bdaf361eb2e4` | `804daf39a21af99be64c5abe0ea4bdaf361eb2e4` | Cross-checks linker, startup, and core-support behavior. | structure, physical |
 | `openwch-ch32v20x-header` | vendor-header | `https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h` | V1.0.1 | Official register structs, many field descriptions, timer enable bit, and ADC enable/calibration bits. | structure, semantics |
-| `openwch-ch32v20x-startup-d6` | source-code | `https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Startup/startup_ch32v20x_D6.S` | V1.0.2 | D6 interrupt-vector ordering cross-check. | structure, profiles |
+| `openwch-ch32v20x-startup-d6` | source-code | `https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Startup/startup_ch32v20x_D6.S` | V1.0.2 | D6 interrupt-vector ordering cross-check. | structure, profiles.mcuSoc |
 | `qingke-v4-processor-manual` | other | `https://www.wch-ic.com/download/file?id=367` | 1.5 | Core/PFIC context. | structure, physical |
 | `ch32-rs-ch32v203xx-svd` | svd | `https://raw.githubusercontent.com/ch32-rs/ch32-rs/9b4ee66500b956bc87fbf83aa28ad245b39ebd15/svd/vendor/CH32V203xx.svd` | `9b4ee66500b956bc87fbf83aa28ad245b39ebd15` | Conservative structural metadata gap-filler retained from the prior pass. | structure |
-| `ch32-rs-ch32v203c8t6-yaml` | generated | `https://raw.githubusercontent.com/ch32-rs/ch32-data/a515903589cfbc342dc6ad0d13c02b4382da5628/data/chips/CH32V203C8T6.yaml` | `a515903589cfbc342dc6ad0d13c02b4382da5628` | Exact-variant topology source for RCC bindings, interrupt routes, DMA channels, package-filtered pin routes, and remap controls. | structure, physical, semantics, profiles |
+| `ch32-rs-ch32v203c8t6-yaml` | generated | `https://raw.githubusercontent.com/ch32-rs/ch32-data/a515903589cfbc342dc6ad0d13c02b4382da5628/data/chips/CH32V203C8T6.yaml` | `a515903589cfbc342dc6ad0d13c02b4382da5628` | Exact-variant topology source for RCC bindings, interrupt routes, DMA channels, package-filtered pin routes, and remap controls. | structure, physical, semantics, profiles.mcuSoc, profiles.embassyHal |
 
 ## Major Hardware Areas Discovered
 
