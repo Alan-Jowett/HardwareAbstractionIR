@@ -248,6 +248,29 @@ If a conservative normalization can align the records without inventing
 facts or silently reshaping the official-source-derived topology, you
 must do that work before classifying the metadata as omitted.
 
+When approved structured sources decompose a shared-base peripheral
+differently from the current official-source-derived HAIR topology, you
+must run an **overlay-preserving reconciliation pass** before calling
+the metadata unmappable. At minimum:
+
+1. identify the current HAIR overlay views and the approved-source views
+2. compare register offsets, widths, and role semantics register by
+   register
+3. import metadata only where it can be attached without renaming,
+   merging, or reshaping the current topology
+4. leave every residual mismatch as an explicit per-register or
+   per-field unresolved item with a concrete reason
+
+Conservative import from approved **transitive structured fragments**
+reachable from a manifest-listed source is allowed only when:
+
+1. provenance still cites the manifest-listed source
+2. the report records the transitive fragment path used to reach the
+   imported metadata
+3. the import preserves the current topology rather than replacing it
+4. the imported metadata survives the same normalization challenge you
+   would apply to direct approved-source overlap
+
 When the evidence shows that one register location has multiple
 mode-dependent field layouts, model that explicitly as **alternate
 register views** rather than flattening the fields into one register.
@@ -311,6 +334,8 @@ The draft report must also include:
 
 8. a **Normalization and Completeness Matrix**
 9. an **Unresolved Differences Inventory**
+10. an **Overlay Reconciliation Table** whenever any shared-base overlay
+    family required reconciliation
 
 In the Normalization and Completeness Matrix, record for each approved
 source and relevant metadata class:
@@ -328,6 +353,17 @@ source and relevant metadata class:
 
 You must not leave any remaining difference in an implicit
 "uninvestigated" state.
+
+In the Overlay Reconciliation Table, record for each shared-base overlay
+family:
+
+- the HAIR overlay view
+- the approved-source view or fragment
+- the comparison basis: exact / alias / array/template /
+  overlay-preserving
+- which metadata classes were imported
+- the explicit residual unmapped registers or fields
+- the reason each residual gap remains
 
 #### 2.7 Blocking ambiguity policy
 
@@ -350,6 +386,9 @@ Stop and ask targeted clarification questions before continuing when:
 - approved evidence shows multiple same-offset register interpretations,
   but the draft still flattens them into one register instead of using
   explicit alternate-register views
+- approved structured sources exist for a shared-base overlay family,
+  but you have not yet completed an overlay-preserving reconciliation
+  pass or per-register residual-gap inventory
 
 ### Critical Rule
 
@@ -574,6 +613,12 @@ In `## Metadata Coverage and Gaps`, explicitly distinguish:
 In `## Normalization and Completeness Matrix`, record for each approved
 source and relevant metadata class whether normalization was required and
 which root cause explains every remaining difference.
+
+When any shared-base overlay family required reconciliation, add
+`## Overlay Reconciliation Table` and record the HAIR views,
+approved-source views, transitive fragment path when used, the match
+basis, imported metadata classes, and every residual unmapped register
+or field with its reason.
 
 In `## Unresolved Differences Inventory`, enumerate the concrete
 peripherals, cluster families, register families, field families, or

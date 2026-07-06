@@ -250,6 +250,24 @@ If the omission disappears after conservative normalization, do not file
 it as a missing-data finding; classify it as a representational
 difference instead.
 
+When the HAIR document contains shared-base overlay peripherals and the
+approved evidence includes structured machine-readable sources for the
+same hardware, you must run an **overlay-preserving reconciliation
+challenge** before accepting any broad claim that the metadata is
+"unmappable" or "intentionally omitted." At minimum:
+
+1. identify the HAIR overlay views and the approved-source views
+2. compare the register offsets, widths, and role semantics register by
+   register
+3. determine whether metadata could have been imported without renaming,
+   merging, or reshaping the current topology
+4. require a per-register or per-field residual-gap inventory for every
+   remaining unmapped item
+
+If the extraction report does not include that reconciliation, treat the
+missing analysis itself as an audit finding rather than accepting the
+family-level omission rationale.
+
 When the approved evidence shows that one register location has multiple
 mode-dependent field layouts, explicitly test whether the HAIR should
 use **alternate register views**. A model that flattens incompatible
@@ -284,6 +302,14 @@ Run a **translation-gap check** whenever generation tooling exists:
 Do not let the audit stop at "the generated artifact is thinner" without
 attributing which boundary introduced the loss.
 
+For partially mappable shared-base overlay families, you must attribute
+each remaining gap to one of:
+
+- missing in HAIR after reconciliation
+- lost during generation
+- truly ambiguous after reconciliation
+- unsupported by approved evidence
+
 #### 2.5 Root-cause classification
 
 For every disproven claim, major gap, or weak spot, classify the likely
@@ -309,10 +335,12 @@ In parallel with the audit findings, build a Markdown report with:
 7. unsupported / weakly supported claims
 8. root-cause classification
 9. normalization and translation attribution matrix
-10. unresolved differences inventory
-11. coverage statement
-12. limitations
-13. draft verdict
+10. overlay reconciliation findings when shared-base overlays are in
+    scope
+11. unresolved differences inventory
+12. coverage statement
+13. limitations
+14. draft verdict
 
 ### Critical Rule
 
@@ -325,6 +353,9 @@ Do **not** proceed to Phase 3 until:
 - you have explicitly attributed whether each major difference originates
   in the source evidence, the HAIR extraction, normalization choices, or
   downstream generation
+- you have challenged every broad "unmappable overlay metadata" claim
+  against a per-register overlay-preserving reconciliation when approved
+  structured sources exist
 
 The only permitted outputs of this phase are the draft findings, the draft
 report, and blocking clarification questions. Do **not** claim final audit
@@ -392,6 +423,10 @@ PASS-WITH-LIMITATIONS conclusion:
 - explicitly investigate whether remaining differences are eliminated by
   conservative normalization of aliases, arrays, clusters, aggregate
   fields, or overlays before treating them as true omissions
+- when approved structured sources exist for a shared-base overlay
+  family, explicitly investigate whether a per-register
+  overlay-preserving reconciliation eliminates some or most of the
+  claimed gap before accepting a broad "unmappable" conclusion
 - explicitly investigate whether same-offset register-layout differences
   should instead be modeled as alternate-register views using
   `alternateOfRef`
@@ -452,6 +487,9 @@ Final output requirements:
 - The report must make clear how the audit tried to prove the IR wrong.
 - If full-device coverage could not be established, do not present the
   HAIR document as complete.
+- If a shared-base overlay family was written off as unmappable without a
+  per-register reconciliation against approved structured sources, do
+  not emit `PASS` or `PASS-WITH-LIMITATIONS`.
 
 ## Output Expectations
 
