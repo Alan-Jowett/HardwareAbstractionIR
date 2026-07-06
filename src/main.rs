@@ -1675,8 +1675,26 @@ impl EmbassyGenerationModel {
             .iter()
             .map(|peripheral| (peripheral.id.clone(), peripheral.name.clone()))
             .collect::<HashMap<_, _>>();
-        let registers = collect_register_map(&document.structure.device.peripherals)?;
-        let fields = collect_field_map(&registers)?;
+        let register_owners = collect_register_owner_map(&document.structure.device.peripherals)?;
+        let register_scope = EmbassyRegisterScopeInputs {
+            clock_bindings: &clock_bindings,
+            reset_bindings: &reset_bindings,
+            interrupt_routes: &interrupt_routes,
+            dma_routes: &dma_routes,
+            pin_routes: &pin_routes,
+            operations: &operations,
+            state_machines: &state_machines,
+            register_owners: &register_owners,
+        };
+        let required_peripherals =
+            collect_embassy_register_scope(&embassy.driver_instances, &register_scope)?;
+        let required_fields =
+            collect_embassy_field_scope(&embassy.driver_instances, &operations, &state_machines)?;
+        let registers = collect_register_map(
+            &document.structure.device.peripherals,
+            &required_peripherals,
+        )?;
+        let fields = collect_field_map(&registers, &required_fields)?;
 
         let mut drivers = Vec::with_capacity(embassy.driver_instances.len());
         for driver in &embassy.driver_instances {
@@ -3485,9 +3503,307 @@ fn render_register_write_statement(
     }
 }
 
-fn collect_register_map(peripherals: &[Peripheral]) -> Result<HashMap<String, ResolvedRegister>> {
+struct EmbassyRegisterScopeInputs<'a> {
+    clock_bindings: &'a HashMap<&'a str, McuClockBinding>,
+    reset_bindings: &'a HashMap<&'a str, McuResetBinding>,
+    interrupt_routes: &'a HashMap<&'a str, McuInterruptRoute>,
+    dma_routes: &'a HashMap<&'a str, McuDmaRoute>,
+    pin_routes: &'a HashMap<&'a str, McuPinRoute>,
+    operations: &'a HashMap<&'a str, SemanticOperation>,
+    state_machines: &'a HashMap<&'a str, SemanticStateMachine>,
+    register_owners: &'a HashMap<String, Vec<String>>,
+}
+
+fn collect_embassy_register_scope(
+    drivers: &[EmbassyDriverInstance],
+    scope: &EmbassyRegisterScopeInputs<'_>,
+) -> Result<HashSet<String>> {
+    let mut required = HashSet::new();
+    for driver in drivers {
+        collect_control_register_peripherals(
+            &mut required,
+            scope.register_owners,
+            driver
+                .clock_binding_refs
+                .iter()
+                .filter_map(|item| scope.clock_bindings.get(item.as_str()))
+                .flat_map(|binding| binding.control_refs.iter()),
+        );
+        collect_control_register_peripherals(
+            &mut required,
+            scope.register_owners,
+            driver
+                .reset_binding_refs
+                .iter()
+                .filter_map(|item| scope.reset_bindings.get(item.as_str()))
+                .flat_map(|binding| binding.control_refs.iter()),
+        );
+        collect_control_register_peripherals(
+            &mut required,
+            scope.register_owners,
+            driver
+                .interrupt_route_refs
+                .iter()
+                .filter_map(|item| scope.interrupt_routes.get(item.as_str()))
+                .flat_map(|route| route.control_refs.iter()),
+        );
+        collect_control_register_peripherals(
+            &mut required,
+            scope.register_owners,
+            driver
+                .dma_route_refs
+                .iter()
+                .filter_map(|item| scope.dma_routes.get(item.as_str()))
+                .flat_map(|route| route.control_refs.iter()),
+        );
+        collect_control_register_peripherals(
+            &mut required,
+            scope.register_owners,
+            driver
+                .pin_roles
+                .iter()
+                .flat_map(|pin_role| pin_role.route_refs.iter())
+                .filter_map(|item| scope.pin_routes.get(item.as_str()))
+                .flat_map(|route| route.control_refs.iter()),
+        );
+        for operation_ref in &driver.init_operation_refs {
+            let operation = scope
+                .operations
+                .get(operation_ref.as_str())
+                .ok_or_else(|| {
+                    anyhow!(
+                        "operation reference {} on driver {} could not be resolved",
+                        operation_ref,
+                        driver.id
+                    )
+                })?;
+            collect_operation_target_peripherals(&mut required, scope.register_owners, operation);
+        }
+        for state_machine_ref in &driver.state_machine_refs {
+            let state_machine = scope
+                .state_machines
+                .get(state_machine_ref.as_str())
+                .ok_or_else(|| {
+                    anyhow!(
+                        "state machine reference {} on driver {} could not be resolved",
+                        state_machine_ref,
+                        driver.id
+                    )
+                })?;
+            collect_state_machine_target_peripherals(
+                &mut required,
+                scope.register_owners,
+                state_machine,
+            );
+        }
+    }
+    Ok(required)
+}
+
+fn collect_control_register_peripherals<'a, I>(
+    required: &mut HashSet<String>,
+    register_owners: &HashMap<String, Vec<String>>,
+    refs: I,
+) where
+    I: IntoIterator<Item = &'a String>,
+{
+    for register_ref in refs {
+        if let Some(owners) = register_owners.get(register_ref) {
+            required.extend(owners.iter().cloned());
+        }
+    }
+}
+
+fn collect_register_owner_map(peripherals: &[Peripheral]) -> Result<HashMap<String, Vec<String>>> {
+    let mut owners = HashMap::new();
+    for peripheral in peripherals {
+        collect_register_member_owners(&mut owners, peripheral.id.as_str(), &peripheral.registers)?;
+    }
+    Ok(owners)
+}
+
+fn collect_register_member_owners(
+    owners: &mut HashMap<String, Vec<String>>,
+    peripheral_ref: &str,
+    members: &[RegisterBlockMember],
+) -> Result<()> {
+    for member in members {
+        match member {
+            RegisterBlockMember::Register(register) => {
+                if owners
+                    .insert(register.id.clone(), vec![peripheral_ref.to_string()])
+                    .is_some()
+                {
+                    bail!("duplicate register {} is not supported", register.id);
+                }
+                for field in &register.fields {
+                    owners
+                        .entry(field.id.clone())
+                        .or_default()
+                        .push(peripheral_ref.to_string());
+                }
+            }
+            RegisterBlockMember::Cluster(cluster) => {
+                collect_register_member_owners(owners, peripheral_ref, &cluster.members)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn collect_operation_target_peripherals(
+    required: &mut HashSet<String>,
+    register_owners: &HashMap<String, Vec<String>>,
+    operation: &SemanticOperation,
+) {
+    for predicate in operation
+        .preconditions
+        .iter()
+        .chain(operation.postconditions.iter())
+    {
+        collect_semantic_target_peripheral(
+            required,
+            register_owners,
+            predicate.target_ref.as_deref(),
+        );
+    }
+    for step in &operation.steps {
+        collect_semantic_target_peripheral(required, register_owners, step.target_ref.as_deref());
+    }
+}
+
+fn collect_embassy_field_scope(
+    drivers: &[EmbassyDriverInstance],
+    operations: &HashMap<&str, SemanticOperation>,
+    state_machines: &HashMap<&str, SemanticStateMachine>,
+) -> Result<HashSet<String>> {
+    let mut required = HashSet::new();
+    for driver in drivers {
+        for operation_ref in &driver.init_operation_refs {
+            let operation = operations.get(operation_ref.as_str()).ok_or_else(|| {
+                anyhow!(
+                    "operation reference {} on driver {} could not be resolved",
+                    operation_ref,
+                    driver.id
+                )
+            })?;
+            collect_operation_field_refs(&mut required, operation);
+        }
+        for state_machine_ref in &driver.state_machine_refs {
+            let state_machine =
+                state_machines
+                    .get(state_machine_ref.as_str())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "state machine reference {} on driver {} could not be resolved",
+                            state_machine_ref,
+                            driver.id
+                        )
+                    })?;
+            collect_state_machine_field_refs(&mut required, state_machine);
+        }
+    }
+    Ok(required)
+}
+
+fn collect_state_machine_target_peripherals(
+    required: &mut HashSet<String>,
+    register_owners: &HashMap<String, Vec<String>>,
+    state_machine: &SemanticStateMachine,
+) {
+    for state in &state_machine.states {
+        for predicate in &state.invariants {
+            collect_semantic_target_peripheral(
+                required,
+                register_owners,
+                predicate.target_ref.as_deref(),
+            );
+        }
+    }
+    for transition in &state_machine.transitions {
+        for predicate in &transition.conditions {
+            collect_semantic_target_peripheral(
+                required,
+                register_owners,
+                predicate.target_ref.as_deref(),
+            );
+        }
+        for effect in &transition.effects {
+            collect_semantic_target_peripheral(
+                required,
+                register_owners,
+                effect.target_ref.as_deref(),
+            );
+        }
+    }
+}
+
+fn collect_operation_field_refs(required: &mut HashSet<String>, operation: &SemanticOperation) {
+    for predicate in operation
+        .preconditions
+        .iter()
+        .chain(operation.postconditions.iter())
+    {
+        collect_semantic_field_ref(required, predicate.target_ref.as_deref());
+    }
+    for step in &operation.steps {
+        collect_semantic_field_ref(required, step.target_ref.as_deref());
+    }
+}
+
+fn collect_state_machine_field_refs(
+    required: &mut HashSet<String>,
+    state_machine: &SemanticStateMachine,
+) {
+    for state in &state_machine.states {
+        for predicate in &state.invariants {
+            collect_semantic_field_ref(required, predicate.target_ref.as_deref());
+        }
+    }
+    for transition in &state_machine.transitions {
+        for predicate in &transition.conditions {
+            collect_semantic_field_ref(required, predicate.target_ref.as_deref());
+        }
+        for effect in &transition.effects {
+            collect_semantic_field_ref(required, effect.target_ref.as_deref());
+        }
+    }
+}
+
+fn collect_semantic_target_peripheral(
+    required: &mut HashSet<String>,
+    register_owners: &HashMap<String, Vec<String>>,
+    target_ref: Option<&str>,
+) {
+    let Some(target_ref) = target_ref else {
+        return;
+    };
+    if !target_ref.starts_with("reg.") && !target_ref.starts_with("field.") {
+        return;
+    }
+    if let Some(owners) = register_owners.get(target_ref) {
+        required.extend(owners.iter().cloned());
+    }
+}
+
+fn collect_semantic_field_ref(required: &mut HashSet<String>, target_ref: Option<&str>) {
+    let Some(target_ref) = target_ref else {
+        return;
+    };
+    if target_ref.starts_with("field.") {
+        required.insert(target_ref.to_string());
+    }
+}
+
+fn collect_register_map(
+    peripherals: &[Peripheral],
+    allowed_peripheral_refs: &HashSet<String>,
+) -> Result<HashMap<String, ResolvedRegister>> {
     let mut registers = HashMap::new();
     for peripheral in peripherals {
+        if !allowed_peripheral_refs.contains(peripheral.id.as_str()) {
+            continue;
+        }
         if peripheral.registers.is_empty() {
             continue;
         }
@@ -3510,10 +3826,14 @@ fn collect_register_map(peripherals: &[Peripheral]) -> Result<HashMap<String, Re
 
 fn collect_field_map(
     registers: &HashMap<String, ResolvedRegister>,
+    required_field_refs: &HashSet<String>,
 ) -> Result<HashMap<String, ResolvedFieldTarget>> {
     let mut fields = HashMap::new();
     for register in registers.values() {
         for field in &register.fields {
+            if !required_field_refs.contains(&field.id) {
+                continue;
+            }
             let resolved = ResolvedFieldTarget {
                 peripheral_ref: register.peripheral_ref.clone(),
                 register_id: register.id.clone(),
@@ -6718,6 +7038,27 @@ mod tests {
                 }
             ]),
         );
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        let tim1_enable = operations
+            .iter_mut()
+            .find(|item| item.get("id").and_then(Value::as_str) == Some("op.tim1.enable"))
+            .and_then(Value::as_object_mut)
+            .expect("tim1 enable operation");
+        tim1_enable
+            .get_mut("steps")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 enable steps")[0]
+            .as_object_mut()
+            .expect("tim1 enable step")
+            .insert("targetRef".to_string(), serde_json::json!("reg.tim1.ccr"));
 
         let file = write_temp_json(&document);
         let validated = load_validated_hair_document(file.path(), &repo_root)
@@ -6730,6 +7071,61 @@ mod tests {
                 .to_string()
                 .contains("cluster CH uses arrayed instances")
         );
+    }
+
+    #[test]
+    fn generate_embassy_ignores_unclaimed_arrayed_clusters() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        peripherals.push(serde_json::json!({
+            "id": "periph.can1",
+            "name": "CAN1",
+            "kind": "peripheral",
+            "type": "CAN",
+            "baseAddress": 1073893376u64,
+            "registers": [
+                {
+                    "id": "cluster.can1.txmailbox",
+                    "kind": "cluster",
+                    "name": "TxMailBox",
+                    "offsetBytes": 384,
+                    "array": { "axes": [{ "name": "mailbox", "count": 3, "strideBytes": 16 }] },
+                    "members": [
+                        {
+                            "kind": "register",
+                            "id": "reg.can1.tir",
+                            "name": "TIR",
+                            "offsetBytes": 0,
+                            "widthBits": 32,
+                            "fields": [
+                                { "id": "field.can1.tir.txrq", "name": "TXRQ", "bitRange": { "lsb": 0, "msb": 0 } }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("fixture with unrelated CAN cluster should validate");
+        let temp = tempdir().expect("tempdir");
+        generate_embassy_crate(&validated, temp.path())
+            .expect("generation should ignore unrelated arrayed clusters");
     }
 
     #[test]
@@ -6782,6 +7178,27 @@ mod tests {
                 }
             ]),
         );
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        let tim1_enable = operations
+            .iter_mut()
+            .find(|item| item.get("id").and_then(Value::as_str) == Some("op.tim1.enable"))
+            .and_then(Value::as_object_mut)
+            .expect("tim1 enable operation");
+        tim1_enable
+            .get_mut("steps")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 enable steps")[0]
+            .as_object_mut()
+            .expect("tim1 enable step")
+            .insert("targetRef".to_string(), serde_json::json!("reg.tim1.ccr"));
 
         let file = write_temp_json(&document);
         let validated = load_validated_hair_document(file.path(), &repo_root)

@@ -32,6 +32,8 @@ None identified.
 | `openwch-ch32v20x-sdk` | `sdk` | https://github.com/openwch/ch32v20x/tree/804daf39a21af99be64c5abe0ea4bdaf361eb2e4 | official | family-level | high | Official WCH repository with SDK/examples and package-specific project assets. Useful for cross-checking names and implementation-facing details. |
 | `openwch-ch32v20x-header` | `vendor-header` | https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h | official | family-level with exact D6 subgroup mapping | high | Header explicitly maps `CH32V20x_D6` to `CH32V203C8`, which is the strongest variant-near machine-readable source found. |
 | `openwch-ch32v20x-startup-d6` | `source-code` | https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Startup/startup_ch32v20x_D6.S | official | family-level with exact D6 subgroup mapping | medium | Useful cross-check for vector table ordering and handler names; narrower value than the header or manuals. |
+| `openwch-ch32v20x-adc-dma-example` | `source-code` | https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/ADC/ADC_DMA/User/main.c | official | family-level narrow functional example | medium | Official ADC DMA example that grounds ADC1 regular-conversion DMA on DMA1 Channel 1 in peripheral-to-memory direction, but does not demonstrate ADC2 DMA. |
+| `openwch-ch32v20x-tim-dma-example` | `source-code` | https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/TIM/TIM_DMA/User/main.c | official | family-level narrow functional example | medium | Official timer DMA example that grounds TIM1 update-triggered DMA on DMA1 Channel 5 in memory-to-peripheral direction for PWM output, but does not cover the full timer DMA matrix. |
 | `qingke-v4-processor-manual` | `other` | https://www.wch-ic.com/downloads/QingKeV4_Processor_Manual_PDF.html | official | architecture-level | medium | Useful when the family docs leave core/exception details underspecified. |
 | `ch32-rs-ch32v203xx-svd` | `svd` | `https://raw.githubusercontent.com/ch32-rs/ch32-rs/9b4ee66500b956bc87fbf83aa28ad245b39ebd15/svd/vendor/CH32V203xx.svd` | community | family-level exact-family fit | high | Community-maintained CH32V203 family SVD with rich register/field descriptions, many reset values, and field access annotations; useful as a metadata gap-filler, not as an official replacement. |
 | `ch32-rs-ch32v203c8t6-yaml` | `generated` | `https://raw.githubusercontent.com/ch32-rs/ch32-data/a515903589cfbc342dc6ad0d13c02b4382da5628/data/chips/CH32V203C8T6.yaml` | community | exact-variant | medium | Community-curated exact-variant YAML that names CH32V203C8T6 directly and records family/peripheral composition; useful as a structured cross-check and provenance trail for community-derived metadata. |
@@ -52,6 +54,8 @@ None identified.
 | Source ID | Why it belongs | Exact variant or family-level | Falsification result |
 | --- | --- | --- | --- |
 | `openwch-ch32v20x-startup-d6` | Best official source found for interrupt vector ordering and handler naming. | Family-level with exact D6 subgroup mapping | **Kept.** It is somewhat redundant with the header, but still adds independent evidence for vector order. |
+| `openwch-ch32v20x-adc-dma-example` | Best official narrow-scope source found for an auditable ADC DMA transfer direction and channel assignment on this family. | Family-level narrow functional example | **Kept.** It does not prove ADC2 DMA, but it does prove the official ADC1 DMA path and direction without relying on community inference. |
+| `openwch-ch32v20x-tim-dma-example` | Best official narrow-scope source found for an auditable timer DMA transfer direction and channel assignment on this family. | Family-level narrow functional example | **Kept.** It does not cover every timer DMA request line, but it does prove a concrete TIM1 update DMA route and direction from an official WCH example. |
 | `qingke-v4-processor-manual` | Useful architecture-level backstop for CPU/exceptions if the family docs are thin or ambiguous. | Architecture-level | **Kept.** I tried to remove it as redundant, but it remains the only explicit architecture manual referenced by the official openwch datasheet README. |
 | `ch32-rs-ch32v203xx-svd` | Best auditable metadata-rich gap-filler found for register descriptions, many reset values, field descriptions, and some access annotations. | Family-level exact-family fit | **Kept.** I tried to reject it as unofficial, but it directly fits the CH32V203 family, is commit-pinned, and clearly adds the exact metadata classes missing from the official-source-only pass. |
 | `ch32-rs-ch32v203c8t6-yaml` | Structured exact-variant community cross-check that records the concrete C8T6 package/device identity and composition. | Exact-variant | **Kept.** I tried to reject it as redundant with the SVD, but it adds exact-variant scoping and an explicit statement of its upstream source mix (official datasheets, MRS SVDs, and openwch material). |
@@ -62,6 +66,7 @@ None identified.
 | --- | --- | --- |
 | Separate official errata document | No official CH32V203 errata document was found during discovery. | Use datasheet/manual revisions until a real errata source is found. |
 | Official standalone SVD / ATDF / IP-XACT / SystemRDL download | No stable official standalone machine-readable register artifact was found from WCH or `openwch`, even though community projects report that MounRiver Studio ships internal SVDs. | Use the WCH manuals plus official header/startup code, and optionally the approved community gap-fillers below. |
+| Indirect MounRiver Studio SVD reference from `CH32V203C8T6++.launch` | Useful only as evidence that the official IDE expects a bundled `CH32V203xx.svd`; it does not expose the SVD contents or give an auditable artifact URI by itself. | Acquire the actual bundled SVD file from a local MounRiver Studio installation before approving it as evidence. |
 | Claimed GitHub datasheet PDF mirror under `openwch/ch32v20x/Datasheet/...` | The repository tree does not actually contain the claimed PDF, so it is not auditable as a real source. | Use the official WCH download pages instead. |
 | `SCHPCB/CH32V203C8T6-R0.pdf` board/example schematic | Official, but board-specific and lower-value for core MCU extraction than the manuals and headers. | Keep it out of the initial manifest unless a later extraction gap specifically needs board-context clues. |
 | `ch32-rs-ch32f203xx-svd` | Rich metadata, but it targets the Cortex-M CH32F203 family rather than the QingKe V4B CH32V203 family. | Prefer the exact-family `ch32-rs-ch32v203xx-svd` instead. |
@@ -70,8 +75,10 @@ None identified.
 
 - No official errata source identified yet.
 - No stable official standalone SVD / ATDF / IP-XACT / SystemRDL source identified yet.
+- The official MounRiver launch configuration points at a bundled `CH32V203xx.svd`, but the actual SVD artifact has not yet been acquired and pinned as evidence.
 - Family-level manuals may still leave some package-specific nuances implicit rather than explicit.
-- Even with the new community gap-fillers, provenance for richer metadata such as reset values and field descriptions still traces back through community curation rather than directly to a vendor-published machine-readable artifact.
+- The newly added official DMA examples improve grounding for ADC1 DMA and one TIM1 update DMA path, but they still do not establish ADC2 DMA or the full timer DMA request-direction matrix.
+- Even with the community gap-fillers, provenance for richer metadata such as reset values and many field descriptions still traces back through community curation rather than directly to a vendor-published machine-readable artifact.
 
 ## Coverage
 
@@ -82,6 +89,7 @@ None identified.
 
 ## Follow-Up Recommendations
 
-1. If you later obtain local PDFs or an installed MounRiver Studio tree, add them as local `path` sources so extraction does not depend on live vendor URLs.
-2. During extraction, use the community SVD and YAML only as gap-fillers cross-checked against the official datasheet, RM, and openwch header/startup material.
-3. Re-run discovery if WCH publishes an official errata document or a standalone machine-readable register description for CH32V203.
+1. If you later obtain local PDFs or an installed MounRiver Studio tree, add them as local `path` sources so extraction does not depend on live vendor URLs; if available, prioritize acquiring the bundled `CH32V203xx.svd` directly rather than relying on indirect launch-file references.
+2. During extraction, use the community SVD and YAML only as gap-fillers cross-checked against the official datasheet, RM, header/startup material, and the narrow official DMA examples where they apply.
+3. Treat the official ADC/TIM DMA examples as partial functional evidence: they can justify specific grounded DMA routes and directions, but not a blanket claim for every timer or ADC2 DMA path.
+4. Re-run discovery if WCH publishes an official errata document or a standalone machine-readable register description for CH32V203.
