@@ -76,6 +76,38 @@ First-cut exclusions:
 - silent widening of first-cut GPIO support into alternate-function or EXTI helpers when the approved profile did not request or justify them
 - pretending that generic schema validity alone is enough for Embassy generation readiness
 
+## Repository automation contract
+
+The CLI commands above are also the repository-owned regeneration surface for
+checked-in generated reference artifacts.
+
+When the repository chooses to track generated outputs for a specific MCU, the
+automation contract is:
+
+1. run `hair generate svd` from the approved HAIR document and compare the
+   result with the committed SVD artifact
+2. run `hair generate embassy` from the same HAIR document and compare the
+   result with the committed Embassy HAL crate
+3. regenerate the committed PAC crate from the generated SVD and fail if the
+   checked-in PAC no longer matches
+4. build the regenerated PAC and Embassy HAL crates
+5. run the associated smoke test for that MCU when its workflow configuration
+   declares smoke mode `required`
+6. report the smoke step as intentionally unsupported when that MCU declares
+   smoke mode `unsupported`, while still requiring successful regeneration,
+   drift checking, and PAC/HAL builds
+
+This contract is **workflow-level**, not a promise that `hair` directly emits a
+PAC crate today. The PAC remains a downstream artifact derived from the
+generated SVD, while the repository workflow is responsible for replaying that
+derivation deterministically and treating drift as a failure.
+
+Supported MCUs for this automation surface should be enumerated explicitly in a
+top-level workflow that calls a reusable per-MCU verification workflow, rather
+than inferred implicitly from the repository layout. That reusable workflow
+should take an explicit smoke-support mode rather than inferring support from
+missing files or silently skipping execution.
+
 ### `hair diff`
 
 `diff` compares two HAIR document revisions and reports structural differences.

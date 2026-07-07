@@ -148,6 +148,27 @@ The extraction flow is intentionally conservative:
 4. audit the extracted HAIR model against the approved evidence and full-device completeness expectations
 5. adversarially challenge claims before treating the result as final
 
+### Generated reference-artifact verification
+
+The repository may also track **checked-in generated reference artifacts** for
+specific MCU variants when those outputs are being used as audited regression
+fixtures.
+
+For each such MCU, repository automation is expected to:
+
+1. regenerate the checked-in SVD and Embassy HAL outputs from the approved
+   HAIR document, then replay PAC generation from the regenerated SVD
+2. fail if the regenerated results differ from the committed reference outputs
+3. build the generated PAC and Embassy HAL crates
+4. run the associated smoke test when that MCU declares smoke support, or
+   report the smoke step as intentionally unsupported when QEMU-backed
+   execution is not yet available for that target
+
+The workflow contract is intentionally **per-MCU and explicit**. A top-level
+workflow should enumerate supported MCU jobs directly and route each job through
+one reusable verification workflow so future MCU bring-up remains reviewable and
+does not silently widen scope.
+
 ## Normalization Rules
 
 HAIR includes a normalization layer so downstream tooling can work from a stable semantic model rather than vendor-specific quirks.

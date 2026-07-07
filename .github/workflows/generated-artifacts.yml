@@ -1,0 +1,21 @@
+name: Generated artifact verification
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+jobs:
+  stm32f405rgt6:
+    name: stm32f405rgt6
+    uses: ./.github/workflows/verify-generated-mcu.yml
+    with:
+      mcu-name: stm32f405rgt6
+      hair-path: evidence/st/stm32f405rgt6/hair.json
+      svd-path: evidence/st/stm32f405rgt6/generated/stm32f405rgt6.svd
+      pac-dir: evidence/st/stm32f405rgt6/generated/pac
+      embassy-dir: evidence/st/stm32f405rgt6/generated/embassy
+      rust-target: thumbv7em-none-eabihf
+      smoke-mode: required
+      smoke-dir: evidence/st/stm32f405rgt6/generated/embassy-smoke
+      smoke-command: qemu-system-arm -M netduinoplus2 -nographic -semihosting-config enable=on,target=native -kernel "$SMOKE_BINARY"
