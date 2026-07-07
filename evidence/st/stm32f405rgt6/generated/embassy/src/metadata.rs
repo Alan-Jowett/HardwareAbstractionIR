@@ -229,8 +229,27 @@ pub struct GeneratedMetadata {
     pub provenance_evidence: &'static [ProvenanceEvidence],
 }
 
-pub const GENERATED_PROVENANCE_SOURCE_IDS: &[&str] = &["olimex-stm32-h405-product-page", "st-stm32f405-datasheet", "st-rm0090", "st-cmsis-device-header", "st-cmsis-startup", "st-stm32f4-svd-bundle", "stm32-rs-stm32f405-patch", "embassy-rs-stm32f405rg-json", "embassy-rs-embassy-stm32-cargo"];
-pub const GENERATED_PROVENANCE_EVIDENCE_IDS: &[&str] = &["e_olimex_target", "e_cmsis_cpu", "e_cmsis_irq_inventory", "e_startup_vectors", "e_st_svd_register_model", "e_stm32_rs_patch", "e_embassy_chip_topology", "e_embassy_feature_flag"];
+pub const GENERATED_PROVENANCE_SOURCE_IDS: &[&str] = &[
+    "olimex-stm32-h405-product-page",
+    "st-stm32f405-datasheet",
+    "st-rm0090",
+    "st-cmsis-device-header",
+    "st-cmsis-startup",
+    "st-stm32f4-svd-bundle",
+    "stm32-rs-stm32f405-patch",
+    "embassy-rs-stm32f405rg-json",
+    "embassy-rs-embassy-stm32-cargo",
+];
+pub const GENERATED_PROVENANCE_EVIDENCE_IDS: &[&str] = &[
+    "e_olimex_target",
+    "e_cmsis_cpu",
+    "e_cmsis_irq_inventory",
+    "e_startup_vectors",
+    "e_st_svd_register_model",
+    "e_stm32_rs_patch",
+    "e_embassy_chip_topology",
+    "e_embassy_feature_flag",
+];
 
 pub const GENERATED_METADATA: GeneratedMetadata = GeneratedMetadata {
     document_title: "ST STM32F405RGT6",
@@ -238,6 +257,150 @@ pub const GENERATED_METADATA: GeneratedMetadata = GeneratedMetadata {
     device_name: "STM32F405RGT6",
     target_architecture: None,
     feature_flags: &["stm32f405rg"],
-    provenance_sources: &[ProvenanceSource { id: "olimex-stm32-h405-product-page", name: "STM32-H405 product page", kind: Some("other"), path: None }, ProvenanceSource { id: "st-stm32f405-datasheet", name: "DM00037051", kind: Some("datasheet"), path: None }, ProvenanceSource { id: "st-rm0090", name: "DM00031020", kind: Some("reference-manual"), path: None }, ProvenanceSource { id: "st-cmsis-device-header", name: "stm32f405xx.h", kind: Some("vendor-header"), path: None }, ProvenanceSource { id: "st-cmsis-startup", name: "startup_stm32f405xx.s", kind: Some("source-code"), path: None }, ProvenanceSource { id: "st-stm32f4-svd-bundle", name: "en.stm32f4-svd.zip", kind: Some("svd"), path: None }, ProvenanceSource { id: "stm32-rs-stm32f405-patch", name: "stm32f405.yaml", kind: Some("generated"), path: None }, ProvenanceSource { id: "embassy-rs-stm32f405rg-json", name: "STM32F405RG.json", kind: Some("generated"), path: None }, ProvenanceSource { id: "embassy-rs-embassy-stm32-cargo", name: "embassy-stm32/Cargo.toml", kind: Some("hal"), path: None }],
-    provenance_evidence: &[ProvenanceEvidence { id: "e_olimex_target", name: "Olimex STM32-H405 target page", source_ref: "olimex-stm32-h405-product-page", normalized_claim: Some("The Olimex STM32-H405 product page identifies the board as an STM32-H405 Cortex-M4 board and separately notes a later GD32 substitution path."), extraction_method: Some("manual"), confidence: Some(0.9f64), locator: None }, ProvenanceEvidence { id: "e_cmsis_cpu", name: "CMSIS CPU macros", source_ref: "st-cmsis-device-header", normalized_claim: Some("The official STM32F405 header defines __CM4_REV=0x0001U, __MPU_PRESENT=1, __FPU_PRESENT=1, __NVIC_PRIO_BITS=4, and __Vendor_SysTickConfig=0."), extraction_method: Some("parser"), confidence: Some(0.99f64), locator: None }, ProvenanceEvidence { id: "e_cmsis_irq_inventory", name: "CMSIS IRQ inventory", source_ref: "st-cmsis-device-header", normalized_claim: Some("The official header enumerates the external IRQ inventory for STM32F405xx-class devices."), extraction_method: Some("parser"), confidence: Some(0.98f64), locator: None }, ProvenanceEvidence { id: "e_startup_vectors", name: "Startup vector ordering", source_ref: "st-cmsis-startup", normalized_claim: Some("The official startup file lists the external vector ordering from WWDG through FPU for STM32F405xx."), extraction_method: Some("parser"), confidence: Some(0.97f64), locator: None }, ProvenanceEvidence { id: "e_st_svd_register_model", name: "Official ST SVD register model", source_ref: "st-stm32f4-svd-bundle", normalized_claim: Some("STM32F405.svd in the official ST SVD bundle provides the primary register-bearing structural model for the device family."), extraction_method: Some("imported"), confidence: Some(0.95f64), locator: None }, ProvenanceEvidence { id: "e_stm32_rs_patch", name: "stm32-rs STM32F405 patch notes", source_ref: "stm32-rs-stm32f405-patch", normalized_claim: Some("The stm32-rs device patch documents known family-level SVD cleanup for STM32F405, including Ethernet removals and naming fixes."), extraction_method: Some("manual"), confidence: Some(0.88f64), locator: None }, ProvenanceEvidence { id: "e_embassy_chip_topology", name: "Exact-chip package topology", source_ref: "embassy-rs-stm32f405rg-json", normalized_claim: Some("The exact-chip STM32F405RG JSON provides package-filtered pin mappings, peripheral RCC bindings, interrupt links, and DMA route candidates."), extraction_method: Some("imported"), confidence: Some(0.9f64), locator: None }, ProvenanceEvidence { id: "e_embassy_feature_flag", name: "Embassy stm32f405rg feature", source_ref: "embassy-rs-embassy-stm32-cargo", normalized_claim: Some("The embassy-stm32 crate exposes the stm32f405rg feature in its supported chip list."), extraction_method: Some("parser"), confidence: Some(0.96f64), locator: None }],
+    provenance_sources: &[
+        ProvenanceSource {
+            id: "olimex-stm32-h405-product-page",
+            name: "STM32-H405 product page",
+            kind: Some("other"),
+            path: None,
+        },
+        ProvenanceSource {
+            id: "st-stm32f405-datasheet",
+            name: "DM00037051",
+            kind: Some("datasheet"),
+            path: None,
+        },
+        ProvenanceSource {
+            id: "st-rm0090",
+            name: "DM00031020",
+            kind: Some("reference-manual"),
+            path: None,
+        },
+        ProvenanceSource {
+            id: "st-cmsis-device-header",
+            name: "stm32f405xx.h",
+            kind: Some("vendor-header"),
+            path: None,
+        },
+        ProvenanceSource {
+            id: "st-cmsis-startup",
+            name: "startup_stm32f405xx.s",
+            kind: Some("source-code"),
+            path: None,
+        },
+        ProvenanceSource {
+            id: "st-stm32f4-svd-bundle",
+            name: "en.stm32f4-svd.zip",
+            kind: Some("svd"),
+            path: None,
+        },
+        ProvenanceSource {
+            id: "stm32-rs-stm32f405-patch",
+            name: "stm32f405.yaml",
+            kind: Some("generated"),
+            path: None,
+        },
+        ProvenanceSource {
+            id: "embassy-rs-stm32f405rg-json",
+            name: "STM32F405RG.json",
+            kind: Some("generated"),
+            path: None,
+        },
+        ProvenanceSource {
+            id: "embassy-rs-embassy-stm32-cargo",
+            name: "embassy-stm32/Cargo.toml",
+            kind: Some("hal"),
+            path: None,
+        },
+    ],
+    provenance_evidence: &[
+        ProvenanceEvidence {
+            id: "e_olimex_target",
+            name: "Olimex STM32-H405 target page",
+            source_ref: "olimex-stm32-h405-product-page",
+            normalized_claim: Some(
+                "The Olimex STM32-H405 product page identifies the board as an STM32-H405 Cortex-M4 board and separately notes a later GD32 substitution path.",
+            ),
+            extraction_method: Some("manual"),
+            confidence: Some(0.9f64),
+            locator: None,
+        },
+        ProvenanceEvidence {
+            id: "e_cmsis_cpu",
+            name: "CMSIS CPU macros",
+            source_ref: "st-cmsis-device-header",
+            normalized_claim: Some(
+                "The official STM32F405 header defines __CM4_REV=0x0001U, __MPU_PRESENT=1, __FPU_PRESENT=1, __NVIC_PRIO_BITS=4, and __Vendor_SysTickConfig=0.",
+            ),
+            extraction_method: Some("parser"),
+            confidence: Some(0.99f64),
+            locator: None,
+        },
+        ProvenanceEvidence {
+            id: "e_cmsis_irq_inventory",
+            name: "CMSIS IRQ inventory",
+            source_ref: "st-cmsis-device-header",
+            normalized_claim: Some(
+                "The official header enumerates the external IRQ inventory for STM32F405xx-class devices.",
+            ),
+            extraction_method: Some("parser"),
+            confidence: Some(0.98f64),
+            locator: None,
+        },
+        ProvenanceEvidence {
+            id: "e_startup_vectors",
+            name: "Startup vector ordering",
+            source_ref: "st-cmsis-startup",
+            normalized_claim: Some(
+                "The official startup file lists the external vector ordering from WWDG through FPU for STM32F405xx.",
+            ),
+            extraction_method: Some("parser"),
+            confidence: Some(0.97f64),
+            locator: None,
+        },
+        ProvenanceEvidence {
+            id: "e_st_svd_register_model",
+            name: "Official ST SVD register model",
+            source_ref: "st-stm32f4-svd-bundle",
+            normalized_claim: Some(
+                "STM32F405.svd in the official ST SVD bundle provides the primary register-bearing structural model for the device family.",
+            ),
+            extraction_method: Some("imported"),
+            confidence: Some(0.95f64),
+            locator: None,
+        },
+        ProvenanceEvidence {
+            id: "e_stm32_rs_patch",
+            name: "stm32-rs STM32F405 patch notes",
+            source_ref: "stm32-rs-stm32f405-patch",
+            normalized_claim: Some(
+                "The stm32-rs device patch documents known family-level SVD cleanup for STM32F405, including Ethernet removals and naming fixes.",
+            ),
+            extraction_method: Some("manual"),
+            confidence: Some(0.88f64),
+            locator: None,
+        },
+        ProvenanceEvidence {
+            id: "e_embassy_chip_topology",
+            name: "Exact-chip package topology",
+            source_ref: "embassy-rs-stm32f405rg-json",
+            normalized_claim: Some(
+                "The exact-chip STM32F405RG JSON provides package-filtered pin mappings, peripheral RCC bindings, interrupt links, and DMA route candidates.",
+            ),
+            extraction_method: Some("imported"),
+            confidence: Some(0.9f64),
+            locator: None,
+        },
+        ProvenanceEvidence {
+            id: "e_embassy_feature_flag",
+            name: "Embassy stm32f405rg feature",
+            source_ref: "embassy-rs-embassy-stm32-cargo",
+            normalized_claim: Some(
+                "The embassy-stm32 crate exposes the stm32f405rg feature in its supported chip list.",
+            ),
+            extraction_method: Some("parser"),
+            confidence: Some(0.96f64),
+            locator: None,
+        },
+    ],
 };

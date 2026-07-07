@@ -63,6 +63,7 @@ First-cut behavior:
 - consume the hardware facts from the core layers plus the canonical MCU topology in `profiles.mcuSoc`
 - require an explicit `profiles.embassyHal` contract for the supported generated drivers
 - derive the emitted Rust API surface from the approved topology and semantic lowering inputs in the HAIR document rather than from fixed placeholder signatures per driver kind
+- allow a `gpio-port` driver instance to lower into a per-pin GPIO API surface when the approved HAIR routes and structural controls justify that shape
 - preserve the generator-relevant structured subset of referenced topology and semantic inputs in the emitted Rust metadata so downstream code does not lose control refs, remap data, or executable semantic structure that the approved HAIR document already provides
 - emit register-level code only for methods that can be justified by explicit HAIR lowering inputs, and fail explicitly when the requested or implied behavior is underspecified
 - fail explicitly when the input document falls outside the documented supported subset or omits generator-required topology, semantics, or bindings documented in `docs/embassy-hal-profile.md`
@@ -72,6 +73,7 @@ First-cut exclusions:
 - silent fallback from unsupported hardware to placeholder stubs
 - fixed success-return driver methods that are disconnected from the input document's approved lowering data
 - inference of driver contracts purely from vendor naming without the approved profile data
+- silent widening of first-cut GPIO support into alternate-function or EXTI helpers when the approved profile did not request or justify them
 - pretending that generic schema validity alone is enough for Embassy generation readiness
 
 ### `hair diff`

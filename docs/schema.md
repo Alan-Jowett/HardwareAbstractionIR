@@ -283,6 +283,11 @@ The Embassy HAL profile is an optional generation-oriented layer mounted at `pro
 
 It exists to describe how a concrete HAIR document lowers into an Embassy-style HAL crate **without** pushing Embassy-specific structure into the core hardware layers.
 
+For example, a `gpio-port` driver instance may still lower into a generated
+per-pin API surface when the approved `pinTopology.routes` and reachable
+structural controls justify that shape; the profile stays rooted in the
+hardware block rather than inventing separate pin-only top-level drivers.
+
 It currently carries:
 
 - crate/package metadata for generated output
