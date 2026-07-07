@@ -200,7 +200,7 @@
               "uniqueItems": true
             },
             "capabilityTags": {
-              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support when the document explicitly carries the required tick-source and interrupt-path lowering data.",
+              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique interrupt driver instance that provides generated SysTick-backed Embassy async timing support when the document explicitly carries the required interrupt-path and startup lowering data.",
               "type": "array",
               "items": {
                 "type": "string"

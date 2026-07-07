@@ -4,6 +4,7 @@ use crate::metadata;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Irq {
+    SysTick = -1,
     WWDG = 0,
     PVD = 1,
     TAMPSTAMP = 2,
@@ -1748,6 +1749,15 @@ pub const DRV_NVIC_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[
         source_ref: "periph.usb_otg_hs",
         producer_ref: None,
         kind: "peripheral",
+        flag_refs: &[],
+        clear_operation_refs: &[],
+    },
+    metadata::InterruptSource {
+        id: "isrc.systick",
+        name: "SysTick source",
+        source_ref: "block.cpu0",
+        producer_ref: Some("block.cpu0"),
+        kind: "timer",
         flag_refs: &[],
         clear_operation_refs: &[],
     },
@@ -4158,6 +4168,19 @@ pub const DRV_NVIC_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[
         controller_ref: "block.nvic",
         cpu_target_ref: None,
         line_index: Some(76),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: None,
+    },
+    metadata::InterruptRoute {
+        id: "iroute.systick",
+        name: "SysTick route",
+        source_ref: "isrc.systick",
+        interrupt_ref: "irq.systick",
+        controller_ref: "block.nvic",
+        cpu_target_ref: Some("block.cpu0"),
+        line_index: None,
         route_type: "hardwired",
         control_refs: &[],
         acknowledge_operation_refs: &[],

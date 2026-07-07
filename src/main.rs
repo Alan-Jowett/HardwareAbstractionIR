@@ -1616,6 +1616,15 @@ fn has_time_driver_tag(tags: &[String]) -> bool {
     tags.iter().any(|tag| tag == EMBASSY_TIME_DRIVER_TAG)
 }
 
+fn is_systick_interrupt_ref(interrupt_ref: &str) -> bool {
+    interrupt_ref.eq_ignore_ascii_case("int.systick")
+        || interrupt_ref.eq_ignore_ascii_case("irq.systick")
+        || interrupt_ref
+            .rsplit('.')
+            .next()
+            .is_some_and(|segment| segment.eq_ignore_ascii_case("systick"))
+}
+
 #[allow(dead_code)]
 #[derive(Debug)]
 struct EmbassyGenerationModel {
@@ -2202,53 +2211,38 @@ fn validate_capability_tag_contracts(drivers: &[ResolvedDriverInstance]) -> Resu
         );
     }
     if let Some(driver) = time_drivers.first() {
-        match driver.driver_kind.as_str() {
-            "timer" | "pwm" => {
-                if driver.interrupt_routes.is_empty() {
-                    bail!(
-                        "driver {} claims capability tag {} but has no interrupt routes for async timing delivery",
-                        driver.id,
-                        EMBASSY_TIME_DRIVER_TAG
-                    );
-                }
-                if driver.init_operations.is_empty() {
-                    bail!(
-                        "driver {} claims capability tag {} but has no init operations for async timing startup",
-                        driver.id,
-                        EMBASSY_TIME_DRIVER_TAG
-                    );
-                }
-                if driver.state_machines.is_empty() {
-                    bail!(
-                        "driver {} claims capability tag {} but has no state machines for async timing progression",
-                        driver.id,
-                        EMBASSY_TIME_DRIVER_TAG
-                    );
-                }
-            }
-            "interrupt" => {
-                if driver.target.block_class != "interrupt-controller" {
-                    bail!(
-                        "driver {} claims capability tag {} with interrupt lowering, but target block {} is not an interrupt-controller",
-                        driver.id,
-                        EMBASSY_TIME_DRIVER_TAG,
-                        driver.target.id
-                    );
-                }
-                if driver.interrupt_routes.is_empty() {
-                    bail!(
-                        "driver {} claims capability tag {} but has no interrupt routes for async timing delivery",
-                        driver.id,
-                        EMBASSY_TIME_DRIVER_TAG
-                    );
-                }
-            }
-            other => bail!(
-                "driver {} claims capability tag {} but has unsupported driver kind {}; first-cut generated async timing requires timer, pwm, or interrupt lowering",
+        if driver.driver_kind != "interrupt" {
+            bail!(
+                "driver {} claims capability tag {} but has unsupported driver kind {}; first-cut generated async timing currently requires interrupt lowering bound to SysTick",
                 driver.id,
                 EMBASSY_TIME_DRIVER_TAG,
-                other
-            ),
+                driver.driver_kind
+            );
+        }
+        if driver.target.block_class != "interrupt-controller" {
+            bail!(
+                "driver {} claims capability tag {} with interrupt lowering, but target block {} is not an interrupt-controller",
+                driver.id,
+                EMBASSY_TIME_DRIVER_TAG,
+                driver.target.id
+            );
+        }
+        if driver.interrupt_routes.len() != 1 {
+            bail!(
+                "driver {} claims capability tag {} but must reference exactly one SysTick interrupt route",
+                driver.id,
+                EMBASSY_TIME_DRIVER_TAG
+            );
+        }
+        let route = &driver.interrupt_routes[0];
+        if !is_systick_interrupt_ref(&route.interrupt_ref) {
+            bail!(
+                "driver {} claims capability tag {} but route {} targets {}; first-cut generated async timing currently requires the SysTick exception",
+                driver.id,
+                EMBASSY_TIME_DRIVER_TAG,
+                route.id,
+                route.interrupt_ref
+            );
         }
     }
     Ok(())
@@ -10020,6 +10014,61 @@ mod tests {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let fixture = write_embassy_fixture(false);
         let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let interrupts = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("interrupts")
+            .and_then(Value::as_array_mut)
+            .expect("interrupts");
+        interrupts.push(serde_json::json!({
+            "id": "irq.systick",
+            "name": "SysTick",
+            "number": -1,
+            "controllerRef": "ic.nvic"
+        }));
+        let mcu = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object");
+        let interrupt_topology = mcu
+            .get_mut("interruptTopology")
+            .and_then(Value::as_object_mut)
+            .expect("interrupt topology");
+        interrupt_topology
+            .get_mut("sources")
+            .and_then(Value::as_array_mut)
+            .expect("interrupt sources")
+            .push(serde_json::json!({
+                "id": "isrc.systick",
+                "name": "SysTick source",
+                "sourceRef": "block.cpu0",
+                "producerRef": "block.cpu0",
+                "kind": "timer"
+            }));
+        interrupt_topology
+            .get_mut("routes")
+            .and_then(Value::as_array_mut)
+            .expect("interrupt routes")
+            .push(serde_json::json!({
+                "id": "iroute.systick",
+                "name": "SysTick route",
+                "sourceRef": "isrc.systick",
+                "interruptRef": "irq.systick",
+                "controllerRef": "block.pfic",
+                "cpuTargetRef": "block.cpu0",
+                "routeType": "hardwired"
+            }));
         let drivers = document
             .as_object_mut()
             .expect("document object")
@@ -10048,6 +10097,10 @@ mod tests {
         time_driver.insert("name".to_string(), Value::String("Time".to_string()));
         time_driver.insert("modulePath".to_string(), Value::String("time".to_string()));
         time_driver.insert(
+            "interruptRouteRefs".to_string(),
+            serde_json::json!(["iroute.systick"]),
+        );
+        time_driver.insert(
             "capabilityTags".to_string(),
             serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
         );
@@ -10074,7 +10127,7 @@ mod tests {
     }
 
     #[test]
-    fn generate_embassy_supports_internal_time_driver_timer_without_pin_roles() {
+    fn generate_embassy_rejects_timer_scoped_time_driver() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let fixture = write_embassy_fixture(false);
         let mut document = load_json_file(fixture.path()).expect("fixture json");
@@ -10101,12 +10154,14 @@ mod tests {
         let file = write_temp_json(&document);
         let validated = load_validated_hair_document(file.path(), &repo_root)
             .expect("time-driver timer fixture should validate");
-        let output_dir = tempdir().expect("tempdir");
-        generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
-
-        let time_rs = std::fs::read_to_string(output_dir.path().join("src").join("time.rs"))
-            .expect("generated time module");
-        assert!(time_rs.contains("pub struct Tim1"));
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("currently requires interrupt lowering bound to SysTick")
+        );
     }
 
     #[test]
@@ -10163,13 +10218,13 @@ mod tests {
             .get_mut("driverInstances")
             .and_then(Value::as_array_mut)
             .expect("driverInstances");
-        let tim1 = drivers[5].as_object_mut().expect("timer driver");
-        tim1.insert(
+        let interrupt = drivers[9].as_object_mut().expect("interrupt driver");
+        interrupt.insert("modulePath".to_string(), Value::String("time".to_string()));
+        interrupt.insert(
             "capabilityTags".to_string(),
             serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
         );
-        tim1.insert("interruptRouteRefs".to_string(), serde_json::json!([]));
-        tim1.insert("pinRoles".to_string(), serde_json::json!([]));
+        interrupt.insert("interruptRouteRefs".to_string(), serde_json::json!([]));
         let file = write_temp_json(&document);
         let validated = load_validated_hair_document(file.path(), &repo_root)
             .expect("time-driver without interrupt fixture should validate");
@@ -10179,7 +10234,7 @@ mod tests {
         assert!(
             error
                 .to_string()
-                .contains("no interrupt routes for async timing delivery")
+                .contains("interrupt driver drv.pfic requires interrupt routes")
         );
     }
 

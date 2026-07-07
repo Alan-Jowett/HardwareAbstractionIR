@@ -89,7 +89,7 @@ The repository now includes a layered JSON Schema set under `schema\`:
 
 The core HAIR document can optionally include `profiles.mcuSoc` to classify common embedded concepts such as GPIO ports, timer classes, interrupt controllers, GPIO matrices, IO muxes, flash controllers, and other SoC infrastructure blocks.
 
-When a document is intended to drive Embassy-style HAL generation, it can also include `profiles.embassyHal` to bind supported driver instances to the audited clock/reset, interrupt, DMA, pin-routing, and semantic-operation records they require. That same profile layer may also carry the explicit contract for generated support surfaces such as an Embassy async time driver when the document provides the required tick-source, interrupt-path, and startup-lowering data.
+When a document is intended to drive Embassy-style HAL generation, it can also include `profiles.embassyHal` to bind supported driver instances to the audited clock/reset, interrupt, DMA, pin-routing, and semantic-operation records they require. That same profile layer may also carry the explicit contract for generated support surfaces such as an Embassy async time driver when the document provides the required SysTick interrupt-path and startup-lowering data.
 
 ## Provenance and Auditability
 
