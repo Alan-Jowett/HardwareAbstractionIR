@@ -105,8 +105,12 @@ fn smoke_usart1() {
 }
 
 async fn smoke_embassy_time() {
+    note("smoke_embassy_time:start");
     let time = Time::new(DRV_TIME_RESOURCES).unwrap();
-    expect(time.bind().len() == 1);
+    expect(
+        "FAIL: embassy time binding count mismatch",
+        time.bind().len() == 1,
+    );
     time.init_time_driver().unwrap();
 
     Timer::after(Duration::from_ticks(8)).await;
@@ -114,6 +118,7 @@ async fn smoke_embassy_time() {
     let mut ticker = Ticker::every(Duration::from_ticks(4));
     ticker.next().await;
     ticker.next().await;
+    note("smoke_embassy_time:ok");
 }
 
 #[embassy_executor::main]
