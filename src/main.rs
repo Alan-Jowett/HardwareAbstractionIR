@@ -3213,8 +3213,9 @@ fn render_usart_methods(
     methods.push(GeneratedMethod {
         name: "set_baud_divider".to_string(),
         code: format!(
-            "    pub fn set_baud_divider(&self, mantissa: u16, fraction: u8) -> Result<(), metadata::Error> {{\n        if u32::from(mantissa) > 0x{mantissa_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"USART baud mantissa exceeds modeled field width\"));\n        }}\n        if u32::from(fraction) > 0x{fraction_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"USART baud fraction exceeds modeled field width\"));\n        }}\n        modify_u32(0x{brr_address:X}u64, 0x{mantissa_clear_mask:08X}u32, (u32::from(mantissa) & 0x{mantissa_value_mask:X}u32) << {mantissa_lsb})?;\n        modify_u32(0x{brr_address:X}u64, 0x{fraction_clear_mask:08X}u32, (u32::from(fraction) & 0x{fraction_value_mask:X}u32) << {fraction_lsb})?;\n        Ok(())\n    }}\n",
+            "    pub fn set_baud_divider(&self, mantissa: u16, fraction: u8) -> Result<(), metadata::Error> {{\n        if u32::from(mantissa) > 0x{mantissa_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"USART baud mantissa exceeds modeled field width\"));\n        }}\n        if u32::from(fraction) > 0x{fraction_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"USART baud fraction exceeds modeled field width\"));\n        }}\n        modify_u32(0x{brr_address:X}u64, 0x{combined_clear_mask:08X}u32, ((u32::from(mantissa) & 0x{mantissa_value_mask:X}u32) << {mantissa_lsb}) | ((u32::from(fraction) & 0x{fraction_value_mask:X}u32) << {fraction_lsb}))?;\n        Ok(())\n    }}\n",
             brr_address = brr.absolute_address,
+            combined_clear_mask = mantissa_clear_mask | fraction_clear_mask,
             mantissa_lsb = div_mantissa.lsb,
             fraction_lsb = div_fraction.lsb,
         ),
@@ -3486,7 +3487,15 @@ fn resolve_target_register_by_name(
         )
     })?;
     let template = find_register_template_peripheral(model, target)?;
-    resolve_target_register_from_template(target, target_base, template, register_name)
+    try_resolve_target_register_from_template(target, target_base, template, register_name)?.ok_or_else(
+        || {
+            anyhow!(
+                "peripheral {} does not expose register {} through its explicit structural template",
+                target.id,
+                register_name
+            )
+        },
+    )
 }
 
 fn try_resolve_target_register_by_name(
@@ -3509,15 +3518,15 @@ fn try_resolve_target_register_by_name(
     let Some(template) = try_find_register_template_peripheral(model, target)? else {
         return Ok(None);
     };
-    resolve_target_register_from_template(target, target_base, template, register_name).map(Some)
+    try_resolve_target_register_from_template(target, target_base, template, register_name)
 }
 
-fn resolve_target_register_from_template(
+fn try_resolve_target_register_from_template(
     target: &Peripheral,
     target_base: u64,
     template: &Peripheral,
     register_name: &str,
-) -> Result<ResolvedRegister> {
+) -> Result<Option<ResolvedRegister>> {
     let template_base = template.base_address.ok_or_else(|| {
         anyhow!(
             "template peripheral {} is missing baseAddress required for register lookup",
@@ -3538,11 +3547,7 @@ fn resolve_target_register_from_template(
         .filter(|register| register.name.eq_ignore_ascii_case(register_name))
         .collect::<Vec<_>>();
     if matches.is_empty() {
-        bail!(
-            "peripheral {} does not expose register {} through its explicit structural template",
-            target.id,
-            register_name
-        );
+        return Ok(None);
     }
     if matches.len() > 1 {
         bail!(
@@ -3569,7 +3574,7 @@ fn resolve_target_register_from_template(
         offset,
         &format!("derived register {} on {}", register_name, target.id),
     )?;
-    Ok(resolved)
+    Ok(Some(resolved))
 }
 
 fn try_find_register_template_peripheral<'a>(
@@ -7012,6 +7017,7 @@ mod tests {
         assert!(uart_rs.contains("pub fn release_reset"));
         assert!(uart_rs.contains("pub fn configure_8n1"));
         assert!(uart_rs.contains("pub fn set_baud_divider"));
+        assert!(uart_rs.contains(") | ((u32::from(fraction) & 0xFu32) << 0))?;"));
         assert!(uart_rs.contains("pub fn write_byte"));
         assert!(uart_rs.contains("pub fn write_bytes"));
         assert!(uart_rs.contains("pub fn read_byte"));
@@ -8904,6 +8910,48 @@ mod tests {
         let temp = tempdir().expect("tempdir");
         generate_embassy_crate(&validated, temp.path())
             .expect("uart generation should keep clock/reset helpers without template");
+        let uart_rs =
+            std::fs::read_to_string(temp.path().join("src").join("uart.rs")).expect("uart.rs");
+        assert!(uart_rs.contains("pub fn enable_clock"));
+        assert!(uart_rs.contains("pub fn release_reset"));
+        assert!(!uart_rs.contains("pub fn configure_8n1"));
+    }
+
+    #[test]
+    fn generate_embassy_keeps_clock_reset_helpers_when_uart_cr1_is_missing() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let device = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object");
+        let peripherals = device
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let usart_template = peripherals
+            .iter_mut()
+            .find(|peripheral| peripheral["id"] == "periph.usart6")
+            .and_then(Value::as_object_mut)
+            .expect("usart6 peripheral");
+        let registers = usart_template
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("usart6 registers");
+        registers.retain(|register| register["name"] != "CR1");
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("uart-without-cr1 fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        generate_embassy_crate(&validated, temp.path())
+            .expect("uart generation should keep clock/reset helpers without cr1");
         let uart_rs =
             std::fs::read_to_string(temp.path().join("src").join("uart.rs")).expect("uart.rs");
         assert!(uart_rs.contains("pub fn enable_clock"));

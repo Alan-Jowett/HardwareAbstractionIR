@@ -200,8 +200,7 @@ impl Usart1 {
         if u32::from(fraction) > 0xFu32 {
             return Err(metadata::Error::Unsupported("USART baud fraction exceeds modeled field width"));
         }
-        modify_u32(0x40011008u64, 0x0000FFF0u32, (u32::from(mantissa) & 0xFFFu32) << 4)?;
-        modify_u32(0x40011008u64, 0x0000000Fu32, (u32::from(fraction) & 0xFu32) << 0)?;
+        modify_u32(0x40011008u64, 0x0000FFFFu32, ((u32::from(mantissa) & 0xFFFu32) << 4) | ((u32::from(fraction) & 0xFu32) << 0))?;
         Ok(())
     }
 
@@ -413,8 +412,7 @@ impl Usart2 {
         if u32::from(fraction) > 0xFu32 {
             return Err(metadata::Error::Unsupported("USART baud fraction exceeds modeled field width"));
         }
-        modify_u32(0x40004408u64, 0x0000FFF0u32, (u32::from(mantissa) & 0xFFFu32) << 4)?;
-        modify_u32(0x40004408u64, 0x0000000Fu32, (u32::from(fraction) & 0xFu32) << 0)?;
+        modify_u32(0x40004408u64, 0x0000FFFFu32, ((u32::from(mantissa) & 0xFFFu32) << 4) | ((u32::from(fraction) & 0xFu32) << 0))?;
         Ok(())
     }
 
@@ -602,8 +600,7 @@ impl Usart3 {
         if u32::from(fraction) > 0xFu32 {
             return Err(metadata::Error::Unsupported("USART baud fraction exceeds modeled field width"));
         }
-        modify_u32(0x40004808u64, 0x0000FFF0u32, (u32::from(mantissa) & 0xFFFu32) << 4)?;
-        modify_u32(0x40004808u64, 0x0000000Fu32, (u32::from(fraction) & 0xFu32) << 0)?;
+        modify_u32(0x40004808u64, 0x0000FFFFu32, ((u32::from(mantissa) & 0xFFFu32) << 4) | ((u32::from(fraction) & 0xFu32) << 0))?;
         Ok(())
     }
 
@@ -789,8 +786,7 @@ impl Usart6 {
         if u32::from(fraction) > 0xFu32 {
             return Err(metadata::Error::Unsupported("USART baud fraction exceeds modeled field width"));
         }
-        modify_u32(0x40011408u64, 0x0000FFF0u32, (u32::from(mantissa) & 0xFFFu32) << 4)?;
-        modify_u32(0x40011408u64, 0x0000000Fu32, (u32::from(fraction) & 0xFu32) << 0)?;
+        modify_u32(0x40011408u64, 0x0000FFFFu32, ((u32::from(mantissa) & 0xFFFu32) << 4) | ((u32::from(fraction) & 0xFu32) << 0))?;
         Ok(())
     }
 
