@@ -1,0 +1,128 @@
+{
+  "documentKind": "hair-evidence-manifest",
+  "schemaVersion": "0.1.0",
+  "targetDevice": {
+    "id": "LM3S6965",
+    "name": "LM3S6965",
+    "vendor": "Texas Instruments",
+    "family": "Stellaris",
+    "architecture": "ARM Cortex-M3",
+    "notes": "Concrete MCU target selected to match the QEMU lm3s6965evb machine supported by the user's WSL2 QEMU 11.0.50. Board- and QEMU-level sources are included only to anchor the requested evaluation-board model to this MCU and to constrain emulated coverage; MCU silicon facts still come from TI and Arm primary sources."
+  },
+  "sources": [
+    {
+      "id": "ti-lm3s6965-product-page",
+      "kind": "other",
+      "uri": "https://www.ti.com/product/LM3S6965",
+      "notes": "Official TI landing page for the exact MCU. Used to anchor current vendor ownership and the primary TI documentation set."
+    },
+    {
+      "id": "ti-lm3s6965-datasheet",
+      "kind": "datasheet",
+      "uri": "https://www.ti.com/lit/ds/symlink/lm3s6965.pdf",
+      "version": "Rev. I",
+      "notes": "Primary TI source for device identity, memory capacities, peripheral inventory, memory map, and MCU-specific structural facts."
+    },
+    {
+      "id": "arm-cortex-m3-trm",
+      "kind": "reference-manual",
+      "uri": "https://developer.arm.com/documentation/100165/0201/",
+      "version": "r2p1",
+      "notes": "Official Arm Cortex-M3 technical reference manual for CPU-core-owned facts including NVIC and SysTick behavior and register definitions."
+    },
+    {
+      "id": "ti-sw-drl",
+      "kind": "sdk",
+      "uri": "https://www.ti.com/tool/SW-DRL",
+      "notes": "Official TI Stellaris Peripheral Driver Library package page. TI explicitly states this package includes per-device headers for direct register access."
+    },
+    {
+      "id": "ti-stellaris-driverlib-guide",
+      "kind": "other",
+      "uri": "https://www.ti.com/lit/ug/spmu019p/spmu019p.pdf",
+      "notes": "Official TI Driver Library user's guide covering direct-register and driver-model usage for GPIO, UART, SSI, I2C, timers, flash, watchdog, and related peripheral-control semantics."
+    },
+    {
+      "id": "ti-lm3s6965evb-user-guide",
+      "kind": "other",
+      "uri": "https://www.ti.com/lit/ug/spmu029a/spmu029a.pdf",
+      "version": "Rev. A",
+      "notes": "Official TI evaluation-board user's manual used only to anchor the requested LM3S6965EVB/QEMU board target to the LM3S6965 MCU and associated board context."
+    },
+    {
+      "id": "ti-lm3s-class-errata",
+      "kind": "errata",
+      "uri": "https://www.ti.com/lit/er/spmz850g/spmz850g.pdf",
+      "version": "Rev. G",
+      "notes": "Official TI errata for the relevant Stellaris LM3S device class. Used to challenge unsupported or contradicted silicon claims during extraction."
+    },
+    {
+      "id": "cmsis-lm3s6965-header-mirror",
+      "kind": "vendor-header",
+      "uri": "https://raw.githubusercontent.com/speters/CMSIS/master/Device/TI/LM3S/Include/LM3S6965.h",
+      "notes": "Community-accessible mirror of an LM3S6965 CMSIS device header. Included as a gap-filler because the official TI SDK is legacy-packaged, while this file is directly consumable and contains IRQ and register definitions useful for cross-checking extraction."
+    },
+    {
+      "id": "ti-driverlib-mirror-hw-gpio",
+      "kind": "vendor-header",
+      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/LM3S-LM4F-9453/inc/hw_gpio.h",
+      "version": "Stellaris Firmware Development Package rev 9453 (mirror)",
+      "notes": "Community-accessible mirror of TI's legacy DriverLib GPIO hardware header with register offsets and bit-field masks. Approved as a field-level gap-filler because the official TI package is legacy-gated."
+    },
+    {
+      "id": "ti-driverlib-mirror-hw-sysctl",
+      "kind": "vendor-header",
+      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/LM3S-LM4F-9453/inc/hw_sysctl.h",
+      "version": "Stellaris Firmware Development Package rev 9453 (mirror)",
+      "notes": "Community-accessible mirror of TI's legacy DriverLib System Control hardware header with register addresses and bit-field masks for clocking, resets, and capability registers."
+    },
+    {
+      "id": "ti-driverlib-mirror-hw-uart",
+      "kind": "vendor-header",
+      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/LM3S-LM4F-9453/inc/hw_uart.h",
+      "version": "Stellaris Firmware Development Package rev 9453 (mirror)",
+      "notes": "Community-accessible mirror of TI's legacy DriverLib UART hardware header with register offsets and field masks."
+    },
+    {
+      "id": "ti-driverlib-mirror-hw-ssi",
+      "kind": "vendor-header",
+      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/LM3S-LM4F-9453/inc/hw_ssi.h",
+      "version": "Stellaris Firmware Development Package rev 9453 (mirror)",
+      "notes": "Community-accessible mirror of TI's legacy DriverLib SSI hardware header with register offsets and field masks."
+    },
+    {
+      "id": "ti-driverlib-mirror-hw-i2c",
+      "kind": "vendor-header",
+      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/LM3S-LM4F-9453/inc/hw_i2c.h",
+      "version": "Stellaris Firmware Development Package rev 9453 (mirror)",
+      "notes": "Community-accessible mirror of TI's legacy DriverLib I2C hardware header with register offsets and field masks."
+    },
+    {
+      "id": "ti-driverlib-mirror-hw-timer",
+      "kind": "vendor-header",
+      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/LM3S-LM4F-9453/inc/hw_timer.h",
+      "version": "Stellaris Firmware Development Package rev 9453 (mirror)",
+      "notes": "Community-accessible mirror of TI's legacy DriverLib GPTM timer hardware header with register offsets and field masks."
+    },
+    {
+      "id": "ti-driverlib-mirror-hw-watchdog",
+      "kind": "vendor-header",
+      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/LM3S-LM4F-9453/inc/hw_watchdog.h",
+      "version": "Stellaris Firmware Development Package rev 9453 (mirror)",
+      "notes": "Community-accessible mirror of TI's legacy DriverLib watchdog hardware header with register offsets and field masks."
+    },
+    {
+      "id": "ti-driverlib-mirror-hw-nvic",
+      "kind": "vendor-header",
+      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/LM3S-LM4F-9453/inc/hw_nvic.h",
+      "version": "Stellaris Firmware Development Package rev 9453 (mirror)",
+      "notes": "Community-accessible mirror of TI's legacy DriverLib NVIC hardware header with register offsets and interrupt-control field masks."
+    },
+    {
+      "id": "qemu-stellaris-docs",
+      "kind": "other",
+      "uri": "https://www.qemu.org/docs/master/system/arm/stellaris.html",
+      "notes": "Official QEMU documentation confirming that the user's installed QEMU model lm3s6965evb targets a Stellaris LM3S6965EVB with Cortex-M3, 256 KB flash, 64 KB SRAM, and timers/UART/ADC/I2C/SSI coverage. Use only to constrain emulator-target alignment, not as silicon authority."
+    }
+  ]
+}
