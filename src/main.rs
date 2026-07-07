@@ -2849,7 +2849,10 @@ fn render_driver_module(
         render_comment_text(&model.device_name),
         render_mmio_helpers()
     );
-    if module_name == "gpio" {
+    if drivers
+        .iter()
+        .any(|driver| driver.driver_kind == "gpio-port")
+    {
         out.push_str(render_gpio_module_prelude());
     }
     out.push_str(&render_module_provenance_const(module_name));
@@ -3322,7 +3325,7 @@ fn render_gpio_support_items(
     let output_type = format!("{}Output", driver.type_name);
     let mut out = String::new();
 
-    out.push_str("#[derive(Debug, Clone, Copy)]\n");
+    out.push_str("#[derive(Debug, Clone)]\n");
     out.push_str(&format!("pub struct {flex_type} {{\n"));
     out.push_str(&format!("    resources: {}Resources,\n", driver.type_name));
     out.push_str("    role: &'static metadata::PinRole,\n");
@@ -3343,12 +3346,12 @@ fn render_gpio_support_items(
     out.push_str("    bsrr_reset_mask: u32,\n");
     out.push_str("}\n\n");
 
-    out.push_str("#[derive(Debug, Clone, Copy)]\n");
+    out.push_str("#[derive(Debug, Clone)]\n");
     out.push_str(&format!("pub struct {input_type} {{\n"));
     out.push_str(&format!("    pin: {flex_type},\n"));
     out.push_str("}\n\n");
 
-    out.push_str("#[derive(Debug, Clone, Copy)]\n");
+    out.push_str("#[derive(Debug, Clone)]\n");
     out.push_str(&format!("pub struct {output_type} {{\n"));
     out.push_str(&format!("    pin: {flex_type},\n"));
     out.push_str("}\n\n");
@@ -7664,6 +7667,12 @@ mod tests {
         assert!(gpio_rs.contains("pub struct GpioAFlex"));
         assert!(gpio_rs.contains("pub struct GpioAInput"));
         assert!(gpio_rs.contains("pub struct GpioAOutput"));
+        assert!(gpio_rs.contains("#[derive(Debug, Clone)]\npub struct GpioAFlex"));
+        assert!(gpio_rs.contains("#[derive(Debug, Clone)]\npub struct GpioAInput"));
+        assert!(gpio_rs.contains("#[derive(Debug, Clone)]\npub struct GpioAOutput"));
+        assert!(!gpio_rs.contains("#[derive(Debug, Clone, Copy)]\npub struct GpioAFlex"));
+        assert!(!gpio_rs.contains("#[derive(Debug, Clone, Copy)]\npub struct GpioAInput"));
+        assert!(!gpio_rs.contains("#[derive(Debug, Clone, Copy)]\npub struct GpioAOutput"));
         assert!(gpio_rs.contains("pub fn pa0(&self) -> GpioAFlex"));
         assert!(gpio_rs.contains("pub fn into_input(self, pull: Pull)"));
         assert!(gpio_rs.contains("pub fn into_output(self, initial_level: Level)"));
@@ -7699,6 +7708,57 @@ mod tests {
         assert!(adc_rs.contains("pub fn apply_calibrate"));
         assert!(adc_rs.contains("modify_u32("));
         assert!(dma_rs.contains("pub fn enable_clock"));
+    }
+
+    #[test]
+    fn generate_embassy_injects_gpio_prelude_for_non_gpio_module_path() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let driver_instances = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let gpio_driver = driver_instances
+            .iter_mut()
+            .find(|driver| driver["id"] == "drv.gpioa")
+            .and_then(Value::as_object_mut)
+            .expect("gpio driver");
+        gpio_driver.insert("modulePath".to_string(), Value::String("porta".to_string()));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("fixture with custom gpio module path should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
+
+        let porta_rs = std::fs::read_to_string(output_dir.path().join("src").join("porta.rs"))
+            .expect("porta.rs");
+        assert!(porta_rs.contains("pub enum Pull"));
+        assert!(porta_rs.contains("pub enum Level"));
+        assert!(porta_rs.contains("pub struct GpioAFlex"));
+
+        let cargo_output = Command::new("cargo")
+            .arg("check")
+            .current_dir(output_dir.path())
+            .output()
+            .expect("cargo check");
+        assert!(
+            cargo_output.status.success(),
+            "generated crate should compile:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&cargo_output.stdout),
+            String::from_utf8_lossy(&cargo_output.stderr)
+        );
     }
 
     #[test]

@@ -443,25 +443,25 @@ impl GpioA {
     pub fn resources(&self) -> GpioAResources {
         self.resources
     }
-    /// Enable the GpioA clock gate.
+    /// Enable the GPIOA clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40023830u64, 0x00000001u32, 0x00000001u32)?;
         Ok(())
     }
 
-    /// Disable the GpioA clock gate.
+    /// Disable the GPIOA clock gate.
     pub fn disable_clock(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40023830u64, 0x00000001u32, 0x00000000u32)?;
         Ok(())
     }
 
-    /// Assert reset for GpioA.
+    /// Assert reset for GPIOA.
     pub fn assert_reset(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40023810u64, 0x00000001u32, 0x00000001u32)?;
         Ok(())
     }
 
-    /// Release reset for GpioA.
+    /// Release reset for GPIOA.
     pub fn release_reset(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40023810u64, 0x00000001u32, 0x00000000u32)?;
         Ok(())
@@ -836,7 +836,7 @@ impl GpioA {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GpioAFlex {
     resources: GpioAResources,
     role: &'static metadata::PinRole,
@@ -857,12 +857,12 @@ pub struct GpioAFlex {
     bsrr_reset_mask: u32,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GpioAInput {
     pin: GpioAFlex,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GpioAOutput {
     pin: GpioAFlex,
 }
@@ -1792,7 +1792,7 @@ impl GpioB {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GpioBFlex {
     resources: GpioBResources,
     role: &'static metadata::PinRole,
@@ -1813,12 +1813,12 @@ pub struct GpioBFlex {
     bsrr_reset_mask: u32,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GpioBInput {
     pin: GpioBFlex,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GpioBOutput {
     pin: GpioBFlex,
 }
@@ -2748,7 +2748,7 @@ impl GpioC {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GpioCFlex {
     resources: GpioCResources,
     role: &'static metadata::PinRole,
@@ -2769,12 +2769,12 @@ pub struct GpioCFlex {
     bsrr_reset_mask: u32,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GpioCInput {
     pin: GpioCFlex,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GpioCOutput {
     pin: GpioCFlex,
 }
@@ -3087,7 +3087,7 @@ impl GpioD {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GpioDFlex {
     resources: GpioDResources,
     role: &'static metadata::PinRole,
@@ -3108,12 +3108,12 @@ pub struct GpioDFlex {
     bsrr_reset_mask: u32,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GpioDInput {
     pin: GpioDFlex,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GpioDOutput {
     pin: GpioDFlex,
 }
@@ -3469,7 +3469,7 @@ impl GpioH {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GpioHFlex {
     resources: GpioHResources,
     role: &'static metadata::PinRole,
@@ -3490,12 +3490,12 @@ pub struct GpioHFlex {
     bsrr_reset_mask: u32,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GpioHInput {
     pin: GpioHFlex,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GpioHOutput {
     pin: GpioHFlex,
 }
