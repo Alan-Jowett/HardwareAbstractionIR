@@ -35,6 +35,10 @@ on:
         required: false
         type: string
         default: ""
+      qemu_artifact_name:
+        required: false
+        type: string
+        default: ""
 
 jobs:
   verify:
@@ -56,6 +60,7 @@ jobs:
           SMOKE_MODE_INPUT: ${{ inputs.smoke_mode }}
           SMOKE_DIR_INPUT: ${{ inputs.smoke_dir }}
           SMOKE_COMMAND_INPUT: ${{ inputs.smoke_command }}
+          QEMU_ARTIFACT_INPUT: ${{ inputs.qemu_artifact_name }}
         shell: bash
         run: |
           set -euo pipefail
@@ -74,6 +79,10 @@ jobs:
                 echo "smoke_command is required when smoke_mode=required" >&2
                 exit 1
               }
+              test -n "$QEMU_ARTIFACT_INPUT" || {
+                echo "qemu_artifact_name is required when smoke_mode=required" >&2
+                exit 1
+              }
               ;;
             unsupported)
               test -z "$SMOKE_DIR_INPUT" || {
@@ -82,6 +91,10 @@ jobs:
               }
               test -z "$SMOKE_COMMAND_INPUT" || {
                 echo "smoke_command must be empty when smoke_mode=unsupported" >&2
+                exit 1
+              }
+              test -z "$QEMU_ARTIFACT_INPUT" || {
+                echo "qemu_artifact_name must be empty when smoke_mode=unsupported" >&2
                 exit 1
               }
               ;;
@@ -95,13 +108,24 @@ jobs:
         shell: bash
         run: cargo install --locked --force svd2rust --version 0.37.1
 
-      - name: Install QEMU
+      - name: Download custom QEMU
+        if: ${{ inputs.smoke_mode == 'required' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.qemu_artifact_name }}
+          path: ${{ runner.temp }}/custom-qemu
+
+      - name: Add custom QEMU to PATH
         if: ${{ inputs.smoke_mode == 'required' }}
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --yes qemu-system-arm
+          qemu_system_arm="$(find "$RUNNER_TEMP/custom-qemu" -type f -name qemu-system-arm | head -n 1)"
+          test -n "$qemu_system_arm" || {
+            echo "qemu-system-arm not found in downloaded artifact ${{ inputs.qemu_artifact_name }}" >&2
+            exit 1
+          }
+          dirname "$qemu_system_arm" >> "$GITHUB_PATH"
 
       - name: Regenerate SVD
         shell: bash

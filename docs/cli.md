@@ -97,6 +97,21 @@ automation contract is:
    smoke mode `unsupported`, while still requiring successful regeneration,
    drift checking, and PAC/HAL builds
 
+When smoke mode is `required`, the workflow may provision QEMU through a
+repository-owned build prerequisite instead of the runner's system package. In
+that mode, the workflow contract is:
+
+1. resolve the configured upstream QEMU source revision
+2. restore a cached build artifact for that exact upstream revision when one is
+   available
+3. otherwise build QEMU from that upstream revision, publish the resulting
+   cache entry, and make the built emulator available to downstream smoke steps
+4. invalidate and rebuild that cache only when the upstream QEMU revision
+   changes
+
+This keeps smoke execution pinned to a repository-chosen QEMU source while
+avoiding redundant emulator rebuilds across CI runs.
+
 This contract is **workflow-level**, not a promise that `hair` directly emits a
 PAC crate today. The PAC remains a downstream artifact derived from the
 generated SVD, while the repository workflow is responsible for replaying that

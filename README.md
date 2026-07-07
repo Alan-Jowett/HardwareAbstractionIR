@@ -164,6 +164,12 @@ For each such MCU, repository automation is expected to:
    report the smoke step as intentionally unsupported when QEMU-backed
    execution is not yet available for that target
 
+For smoke-capable targets, the workflow may satisfy the QEMU dependency by
+building a repository-owned QEMU from an explicit upstream source as a
+pipeline prerequisite rather than relying on the runner's packaged QEMU. When
+it does so, the built QEMU should be cached and reused until that upstream QEMU
+source changes, so repeated CI runs do not rebuild the same emulator revision.
+
 The workflow contract is intentionally **per-MCU and explicit**. A top-level
 workflow should enumerate supported MCU jobs directly and route each job through
 one reusable verification workflow so future MCU bring-up remains reviewable and
