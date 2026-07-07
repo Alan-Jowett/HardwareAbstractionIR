@@ -1,3 +1,5 @@
+//! Generated Embassy-style interrupt module for LM3S6965.
+
 use crate::metadata;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

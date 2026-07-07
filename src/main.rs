@@ -2840,8 +2840,9 @@ fn render_interrupt_module(
     model: &EmbassyGenerationModel,
     drivers: &[&ResolvedDriverInstance],
 ) -> Result<String> {
-    let mut out = String::from(
-        "use crate::metadata;\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Irq {\n",
+    let mut out = format!(
+        "//! Generated Embassy-style interrupt module for {}.\n\nuse crate::metadata;\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Irq {{\n",
+        render_comment_text(&model.device_name)
     );
     for interrupt in &model.interrupts {
         out.push_str(&format!(
@@ -9544,10 +9545,17 @@ mod tests {
                 .expect("metadata.rs");
         let uart_rs = std::fs::read_to_string(output_dir.path().join("src").join("uart.rs"))
             .expect("uart.rs");
+        let interrupt_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("interrupt.rs"))
+                .expect("interrupt.rs");
         assert!(
             metadata_rs.contains("//! Generated Embassy-style HAL metadata for Fixture Title ")
         );
         assert!(uart_rs.contains("//! Generated Embassy-style uart module for FIXTURE DEVICE "));
+        assert!(
+            interrupt_rs
+                .contains("//! Generated Embassy-style interrupt module for FIXTURE DEVICE ")
+        );
     }
 
     #[test]
