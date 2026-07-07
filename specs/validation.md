@@ -243,7 +243,98 @@ powershell -ExecutionPolicy Bypass -File evidence\texas-instruments\lm3s6965\emb
 - This is an environment-dependent smoke check, not a universal repository
   precondition.
 
-## 6. Requirement traceability matrix
+## 6. Requirement-specific validation coverage
+
+### 6.1 RQ-001 validation coverage
+
+RQ-001 is validated by V-002, V-006, and V-007. Together these checks confirm
+that HAIR examples validate as one-document device descriptions and that the
+reference manifests and HAIR documents identify one concrete target variant.
+
+### 6.2 RQ-002 validation coverage
+
+RQ-002 is validated by V-007 and V-012. Reference HAIR review checks the
+composition model in concrete device bundles, and governing-spec review checks
+that shared-document composition remains traceable in the repository baseline.
+
+### 6.3 RQ-003 validation coverage
+
+RQ-003 is validated by V-001, V-002, and V-007. The regression suite and HAIR
+schema validation exercise the layered model structurally, while reference HAIR
+review confirms that real device bundles use the layered document shape.
+
+### 6.4 RQ-004 validation coverage
+
+RQ-004 is validated by V-001 and V-002. The schema-loader and validation path
+depend on the shared common vocabulary remaining consistent across the schema
+set.
+
+### 6.5 RQ-005 validation coverage
+
+RQ-005 is validated by V-007, V-010, and V-011. Reference HAIR review,
+extraction review, and audit review together check that provenance remains
+embedded, evidence-backed, and usable for adversarial challenge.
+
+### 6.6 RQ-006 validation coverage
+
+RQ-006 is validated by V-006, V-009, and V-010. These activities check that
+manifests remain explicit and single-target, that source discovery justifies
+the approved evidence set, and that extraction stays scoped to that evidence.
+
+### 6.7 RQ-007 validation coverage
+
+RQ-007 is validated by V-009, V-010, V-011, and V-012. These reviews verify
+that the staged workflow outputs and governance reviews remain distinct and
+traceable.
+
+### 6.8 RQ-008 validation coverage
+
+RQ-008 is validated by V-001, V-007, and V-010. The regression suite and
+reference artifact reviews confirm that optional profiles remain additive to
+the core model rather than replacements for it.
+
+### 6.9 RQ-009 validation coverage
+
+RQ-009 is validated by V-001, V-004, V-005, V-008, and V-011. The regression
+suite, generator runs, generated-output inspection, and audit review together
+check deterministic lowering and explicit failure behavior.
+
+### 6.10 RQ-010 validation coverage
+
+RQ-010 is validated by V-001, V-002, V-003, V-004, and V-005. These automated
+checks exercise the implemented CLI surface and its command-specific contracts.
+
+### 6.11 RQ-011 validation coverage
+
+RQ-011 is validated by V-001, V-002, and V-011. Schema validation confirms the
+implemented CLI boundary, while audit review reinforces that schema validity
+alone is not treated as full semantic readiness.
+
+### 6.12 RQ-012 validation coverage
+
+RQ-012 is validated by V-001, V-004, and V-008. The regression suite, SVD
+generation path, and generated-output inspection verify the current SVD
+lowering contract on reference artifacts.
+
+### 6.13 RQ-013 validation coverage
+
+RQ-013 is validated by V-001, V-005, V-008, V-010, and V-011. The regression
+suite, Embassy generation path, generated crate inspection, extraction review,
+and audit review jointly test the profile-derived Embassy contract.
+
+### 6.14 RQ-014 validation coverage
+
+RQ-014 is validated by V-001 and V-003. The regression suite and identical-doc
+diff command check the structural diff behavior and stable path reporting
+contract.
+
+### 6.15 RQ-015 validation coverage
+
+RQ-015 is validated by V-001, V-002, V-003, V-004, and V-005. These command
+checks cover successful execution and check-failure boundaries across the
+implemented CLI surface.
+
+## 7. Requirement traceability matrix
 
 | Requirement | Validation activities |
 | --- | --- |
@@ -263,7 +354,7 @@ powershell -ExecutionPolicy Bypass -File evidence\texas-instruments\lm3s6965\emb
 | RQ-014 | V-001, V-003 |
 | RQ-015 | V-001, V-002, V-003, V-004, V-005 |
 
-## 7. Current validation limits
+## 8. Current validation limits
 
 The current validation baseline intentionally does not claim:
 

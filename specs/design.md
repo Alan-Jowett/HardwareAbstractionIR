@@ -305,7 +305,102 @@ workflows, and tooling grounded in real device artifacts.
 
 **Supports:** RQ-006, RQ-007, RQ-009
 
-## 9. Requirement traceability
+## 9. Requirement-specific design coverage
+
+### 9.1 RQ-001 design coverage
+
+RQ-001 is realized by the top-level HAIR composition in Section 2 and the
+structural-layer rules in Section 3.3. The design keeps one concrete device in
+`structure.device` and treats the enclosing document as the unit of ownership.
+
+### 9.2 RQ-002 design coverage
+
+RQ-002 is realized by the explicit `imports` composition model in Section 2 and
+the structural reuse model in Section 3.3. Shared hardware can be referenced,
+but the importing document remains the concrete device definition.
+
+### 9.3 RQ-003 design coverage
+
+RQ-003 is realized by the layered schema architecture described in Sections 2
+and 3. The repository separates provenance, structure, semantics, physical,
+normalization, validation, and optional profiles into distinct layers.
+
+### 9.4 RQ-004 design coverage
+
+RQ-004 is realized by the common-layer design in Section 3.1. Shared
+identifiers, references, expressions, literals, and entity metadata are
+defined once and reused across the schema set.
+
+### 9.5 RQ-005 design coverage
+
+RQ-005 is realized by the provenance-layer design in Section 3.2 and by the
+workflow architecture in Section 5. The repository embeds provenance inside
+HAIR documents and carries it through extraction and audit workflows.
+
+### 9.6 RQ-006 design coverage
+
+RQ-006 is realized by the evidence-manifest input model in Sections 1, 2, and
+5.1-5.2, plus the artifact layout in Section 7. The repository starts
+extraction from one approved manifest and carries that evidence boundary into
+device bundles under `evidence\`.
+
+### 9.7 RQ-007 design coverage
+
+RQ-007 is realized by the staged workflow architecture in Section 5 and the
+artifact responsibilities in Section 7. Source discovery, extraction, audit,
+bootstrap, evolve, and maintain are distinct review-gated steps.
+
+### 9.8 RQ-008 design coverage
+
+RQ-008 is realized by the optional-profile design in Section 4. The MCU/SoC
+and Embassy profile layers specialize the core model without replacing the core
+hardware facts.
+
+### 9.9 RQ-009 design coverage
+
+RQ-009 is realized by the generator-facing schema and CLI design in Sections
+3.4-3.7, 4.2, 6.4, and 6.5. Lowering depends on explicit topology, semantics,
+and structural reachability, and unsupported cases fail explicitly.
+
+### 9.10 RQ-010 design coverage
+
+RQ-010 is realized by the Rust CLI command-surface design in Section 6.1 and
+by the command-specific designs in Sections 6.3-6.6. The implemented command
+surface is intentionally limited to validate, generate svd, generate embassy,
+and diff.
+
+### 9.11 RQ-011 design coverage
+
+RQ-011 is realized by the validation-layer design in Section 3.7 and the CLI
+schema-loader design in Sections 6.2-6.3. Declarative validation rules exist
+in the model, while the implemented CLI currently enforces schema conformance.
+
+### 9.12 RQ-012 design coverage
+
+RQ-012 is realized by the structural-layer interrupt and CPU metadata design in
+Section 3.3 and the SVD lowering design in Section 6.4. The SVD path depends
+on explicit device-level interrupt inventory and explicit CPU metadata.
+
+### 9.13 RQ-013 design coverage
+
+RQ-013 is realized by the MCU/SoC and Embassy profile designs in Section 4 and
+the Embassy CLI path in Section 6.5. Embassy generation resolves driver
+instances from explicit canonical topology and profile-declared lowering
+contracts.
+
+### 9.14 RQ-014 design coverage
+
+RQ-014 is realized by the diff command design in Section 6.6. The repository
+loads JSON operands from either filesystem paths or git selectors and reports
+stable structural differences.
+
+### 9.15 RQ-015 design coverage
+
+RQ-015 is realized by the CLI command architecture in Section 6, where commands
+return normalized success, check-failure, and operational-failure exit
+semantics.
+
+## 10. Requirement traceability
 
 | Design area | Primary requirements |
 | --- | --- |
@@ -317,7 +412,7 @@ workflows, and tooling grounded in real device artifacts.
 | CLI architecture | RQ-010, RQ-011, RQ-012, RQ-013, RQ-014, RQ-015 |
 | Evidence and generated artifacts | RQ-006, RQ-007, RQ-009 |
 
-## 10. Current design limits
+## 11. Current design limits
 
 The current design intentionally leaves these areas outside the stable
 baseline:
