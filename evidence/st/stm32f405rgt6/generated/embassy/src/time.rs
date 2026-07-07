@@ -225,9 +225,10 @@ impl EmbassyTimeDriver for GeneratedSystickTimeDriver {
 
 embassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedSystickTimeDriver = GeneratedSystickTimeDriver::new());
 
+#[allow(dead_code)]
 #[allow(non_snake_case)]
 #[unsafe(no_mangle)]
-fn SysTick() {
+extern "C" fn SysTick() {
     GENERATED_TIME_DRIVER.on_systick();
 }
 
