@@ -21,4 +21,4 @@ jobs:
       rust-target: thumbv7em-none-eabihf
       smoke-mode: required
       smoke-dir: evidence/st/stm32f405rgt6/generated/embassy-smoke
-      smoke-command: qemu-system-arm -M netduinoplus2 -nographic -semihosting-config enable=on,target=native -kernel "$SMOKE_BINARY"
+      smoke-command: qemu-system-arm -M netduinoplus2 -nographic -semihosting -kernel "$SMOKE_BINARY"
