@@ -403,12 +403,16 @@ checks while drafting rather than waiting for the final lowering pass:
   **register** (`reg.*`), not the individual field. The lowering code
   resolves the field from register contents plus the binding/route subject.
 - Do not assume a driver kind is portable across MCU families just because
-  the high-level resource inventory matches. For example, the current
-  `gpio-port` lowering expects a STM32-like GPIO structural contract
-  (`MODER` plus `AFRL/AFRH`-style alternate-function fields). A device that
-  only exposes `DIR` / `DEN` / `AFSEL`-style GPIO control is not currently
-  executable-ready for that driver kind unless the generator gains an
-  explicit lowering path for that topology.
+  the high-level resource inventory matches. For example, `gpio-port`
+  executable readiness depends on the target exposing a supported GPIO
+  register layout. The current generator supports at least:
+  - indexed-field GPIO layouts such as `MODER` / `PUPDR` / `IDR` / `ODR` /
+    `BSRR`
+  - bitmask-register GPIO layouts such as `DIR` / `DEN` / `AFSEL` / `PUR` /
+    `PDR` / `DATA`
+  If the in-scope device exposes some other GPIO topology, classify that
+  driver as non-executable-ready unless the generator gains an explicit
+  lowering path for the observed register contract.
 - If a peripheral family shares one CMSIS/header type across multiple
   instances, do not assume template inheritance alone is sufficient for
   executable refs. When same-peripheral validation or explicit local refs

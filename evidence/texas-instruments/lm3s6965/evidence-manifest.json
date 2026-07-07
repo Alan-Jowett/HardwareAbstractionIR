@@ -59,63 +59,63 @@
     {
       "id": "cmsis-lm3s6965-header-mirror",
       "kind": "vendor-header",
-      "uri": "https://raw.githubusercontent.com/speters/CMSIS/master/Device/TI/LM3S/Include/LM3S6965.h",
-      "notes": "Community-accessible mirror of an LM3S6965 CMSIS device header. Included as a gap-filler because the official TI SDK is legacy-packaged, while this file is directly consumable and contains IRQ and register definitions useful for cross-checking extraction."
+      "uri": "https://raw.githubusercontent.com/speters/CMSIS/c5da166f32162dd8ddccf9e9e2fdbd961b0f53c2/Device/TI/LM3S/Include/LM3S6965.h",
+      "notes": "Community-accessible mirror of an LM3S6965 CMSIS device header pinned to commit c5da166f32162dd8ddccf9e9e2fdbd961b0f53c2. Included as a gap-filler because the official TI SDK is legacy-packaged, while this file is directly consumable and contains IRQ and register definitions useful for cross-checking extraction."
     },
     {
       "id": "ti-driverlib-mirror-hw-gpio",
       "kind": "vendor-header",
-      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/LM3S-LM4F-9453/inc/hw_gpio.h",
-      "version": "Stellaris Firmware Development Package rev 9453 (mirror)",
+      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/f3a614b90ff1817cbc55f4f1f01582ba039f144c/inc/hw_gpio.h",
+      "version": "Stellaris Firmware Development Package rev 9453 mirror commit f3a614b90ff1817cbc55f4f1f01582ba039f144c",
       "notes": "Community-accessible mirror of TI's legacy DriverLib GPIO hardware header with register offsets and bit-field masks. Approved as a field-level gap-filler because the official TI package is legacy-gated."
     },
     {
       "id": "ti-driverlib-mirror-hw-sysctl",
       "kind": "vendor-header",
-      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/LM3S-LM4F-9453/inc/hw_sysctl.h",
-      "version": "Stellaris Firmware Development Package rev 9453 (mirror)",
+      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/f3a614b90ff1817cbc55f4f1f01582ba039f144c/inc/hw_sysctl.h",
+      "version": "Stellaris Firmware Development Package rev 9453 mirror commit f3a614b90ff1817cbc55f4f1f01582ba039f144c",
       "notes": "Community-accessible mirror of TI's legacy DriverLib System Control hardware header with register addresses and bit-field masks for clocking, resets, and capability registers."
     },
     {
       "id": "ti-driverlib-mirror-hw-uart",
       "kind": "vendor-header",
-      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/LM3S-LM4F-9453/inc/hw_uart.h",
-      "version": "Stellaris Firmware Development Package rev 9453 (mirror)",
+      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/f3a614b90ff1817cbc55f4f1f01582ba039f144c/inc/hw_uart.h",
+      "version": "Stellaris Firmware Development Package rev 9453 mirror commit f3a614b90ff1817cbc55f4f1f01582ba039f144c",
       "notes": "Community-accessible mirror of TI's legacy DriverLib UART hardware header with register offsets and field masks."
     },
     {
       "id": "ti-driverlib-mirror-hw-ssi",
       "kind": "vendor-header",
-      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/LM3S-LM4F-9453/inc/hw_ssi.h",
-      "version": "Stellaris Firmware Development Package rev 9453 (mirror)",
+      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/f3a614b90ff1817cbc55f4f1f01582ba039f144c/inc/hw_ssi.h",
+      "version": "Stellaris Firmware Development Package rev 9453 mirror commit f3a614b90ff1817cbc55f4f1f01582ba039f144c",
       "notes": "Community-accessible mirror of TI's legacy DriverLib SSI hardware header with register offsets and field masks."
     },
     {
       "id": "ti-driverlib-mirror-hw-i2c",
       "kind": "vendor-header",
-      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/LM3S-LM4F-9453/inc/hw_i2c.h",
-      "version": "Stellaris Firmware Development Package rev 9453 (mirror)",
+      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/f3a614b90ff1817cbc55f4f1f01582ba039f144c/inc/hw_i2c.h",
+      "version": "Stellaris Firmware Development Package rev 9453 mirror commit f3a614b90ff1817cbc55f4f1f01582ba039f144c",
       "notes": "Community-accessible mirror of TI's legacy DriverLib I2C hardware header with register offsets and field masks."
     },
     {
       "id": "ti-driverlib-mirror-hw-timer",
       "kind": "vendor-header",
-      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/LM3S-LM4F-9453/inc/hw_timer.h",
-      "version": "Stellaris Firmware Development Package rev 9453 (mirror)",
+      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/f3a614b90ff1817cbc55f4f1f01582ba039f144c/inc/hw_timer.h",
+      "version": "Stellaris Firmware Development Package rev 9453 mirror commit f3a614b90ff1817cbc55f4f1f01582ba039f144c",
       "notes": "Community-accessible mirror of TI's legacy DriverLib GPTM timer hardware header with register offsets and field masks."
     },
     {
       "id": "ti-driverlib-mirror-hw-watchdog",
       "kind": "vendor-header",
-      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/LM3S-LM4F-9453/inc/hw_watchdog.h",
-      "version": "Stellaris Firmware Development Package rev 9453 (mirror)",
+      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/f3a614b90ff1817cbc55f4f1f01582ba039f144c/inc/hw_watchdog.h",
+      "version": "Stellaris Firmware Development Package rev 9453 mirror commit f3a614b90ff1817cbc55f4f1f01582ba039f144c",
       "notes": "Community-accessible mirror of TI's legacy DriverLib watchdog hardware header with register offsets and field masks."
     },
     {
       "id": "ti-driverlib-mirror-hw-nvic",
       "kind": "vendor-header",
-      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/LM3S-LM4F-9453/inc/hw_nvic.h",
-      "version": "Stellaris Firmware Development Package rev 9453 (mirror)",
+      "uri": "https://raw.githubusercontent.com/kroesche/ti_driverlib/f3a614b90ff1817cbc55f4f1f01582ba039f144c/inc/hw_nvic.h",
+      "version": "Stellaris Firmware Development Package rev 9453 mirror commit f3a614b90ff1817cbc55f4f1f01582ba039f144c",
       "notes": "Community-accessible mirror of TI's legacy DriverLib NVIC hardware header with register offsets and interrupt-control field masks."
     },
     {

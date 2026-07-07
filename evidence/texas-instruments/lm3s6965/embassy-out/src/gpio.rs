@@ -174,7 +174,7 @@ impl GPIOA {
             den_addr: 0x4000451Cu64,
             pur_addr: 0x40004510u64,
             pdr_addr: 0x40004514u64,
-            data_addr: 0x400043FCu64,
+            data_alias_addr: 0x40004004u64,
             bit_mask: 0x00000001u32,
         }
     }
@@ -190,7 +190,7 @@ impl GPIOA {
             den_addr: 0x4000451Cu64,
             pur_addr: 0x40004510u64,
             pdr_addr: 0x40004514u64,
-            data_addr: 0x400043FCu64,
+            data_alias_addr: 0x40004008u64,
             bit_mask: 0x00000002u32,
         }
     }
@@ -206,7 +206,7 @@ impl GPIOA {
             den_addr: 0x4000451Cu64,
             pur_addr: 0x40004510u64,
             pdr_addr: 0x40004514u64,
-            data_addr: 0x400043FCu64,
+            data_alias_addr: 0x40004010u64,
             bit_mask: 0x00000004u32,
         }
     }
@@ -222,7 +222,7 @@ impl GPIOA {
             den_addr: 0x4000451Cu64,
             pur_addr: 0x40004510u64,
             pdr_addr: 0x40004514u64,
-            data_addr: 0x400043FCu64,
+            data_alias_addr: 0x40004020u64,
             bit_mask: 0x00000008u32,
         }
     }
@@ -238,7 +238,7 @@ impl GPIOA {
             den_addr: 0x4000451Cu64,
             pur_addr: 0x40004510u64,
             pdr_addr: 0x40004514u64,
-            data_addr: 0x400043FCu64,
+            data_alias_addr: 0x40004040u64,
             bit_mask: 0x00000010u32,
         }
     }
@@ -254,7 +254,7 @@ impl GPIOA {
             den_addr: 0x4000451Cu64,
             pur_addr: 0x40004510u64,
             pdr_addr: 0x40004514u64,
-            data_addr: 0x400043FCu64,
+            data_alias_addr: 0x40004080u64,
             bit_mask: 0x00000020u32,
         }
     }
@@ -270,7 +270,7 @@ impl GPIOA {
             den_addr: 0x4000451Cu64,
             pur_addr: 0x40004510u64,
             pdr_addr: 0x40004514u64,
-            data_addr: 0x400043FCu64,
+            data_alias_addr: 0x40004100u64,
             bit_mask: 0x00000040u32,
         }
     }
@@ -286,7 +286,7 @@ impl GPIOA {
             den_addr: 0x4000451Cu64,
             pur_addr: 0x40004510u64,
             pdr_addr: 0x40004514u64,
-            data_addr: 0x400043FCu64,
+            data_alias_addr: 0x40004200u64,
             bit_mask: 0x00000080u32,
         }
     }
@@ -304,7 +304,7 @@ pub struct GPIOAFlex {
     den_addr: u64,
     pur_addr: u64,
     pdr_addr: u64,
-    data_addr: u64,
+    data_alias_addr: u64,
     bit_mask: u32,
 }
 
@@ -376,7 +376,7 @@ impl GPIOAFlex {
     }
 
     pub fn is_high(&self) -> Result<bool, metadata::Error> {
-        Ok((read_u32(self.data_addr)? & self.bit_mask) != 0)
+        Ok(read_u32(self.data_alias_addr)? != 0)
     }
 
     pub fn is_low(&self) -> Result<bool, metadata::Error> {
@@ -400,12 +400,12 @@ impl GPIOAFlex {
     }
 
     pub fn set_high(&self) -> Result<(), metadata::Error> {
-        modify_u32(self.data_addr, self.bit_mask, self.bit_mask)?;
+        write_u32(self.data_alias_addr, self.bit_mask)?;
         Ok(())
     }
 
     pub fn set_low(&self) -> Result<(), metadata::Error> {
-        modify_u32(self.data_addr, self.bit_mask, 0x00000000u32)?;
+        write_u32(self.data_alias_addr, 0x00000000u32)?;
         Ok(())
     }
 
@@ -584,7 +584,7 @@ impl GPIOB {
             den_addr: 0x4000551Cu64,
             pur_addr: 0x40005510u64,
             pdr_addr: 0x40005514u64,
-            data_addr: 0x400053FCu64,
+            data_alias_addr: 0x40005004u64,
             bit_mask: 0x00000001u32,
         }
     }
@@ -600,7 +600,7 @@ impl GPIOB {
             den_addr: 0x4000551Cu64,
             pur_addr: 0x40005510u64,
             pdr_addr: 0x40005514u64,
-            data_addr: 0x400053FCu64,
+            data_alias_addr: 0x40005008u64,
             bit_mask: 0x00000002u32,
         }
     }
@@ -616,7 +616,7 @@ impl GPIOB {
             den_addr: 0x4000551Cu64,
             pur_addr: 0x40005510u64,
             pdr_addr: 0x40005514u64,
-            data_addr: 0x400053FCu64,
+            data_alias_addr: 0x40005010u64,
             bit_mask: 0x00000004u32,
         }
     }
@@ -632,7 +632,7 @@ impl GPIOB {
             den_addr: 0x4000551Cu64,
             pur_addr: 0x40005510u64,
             pdr_addr: 0x40005514u64,
-            data_addr: 0x400053FCu64,
+            data_alias_addr: 0x40005020u64,
             bit_mask: 0x00000008u32,
         }
     }
@@ -648,7 +648,7 @@ impl GPIOB {
             den_addr: 0x4000551Cu64,
             pur_addr: 0x40005510u64,
             pdr_addr: 0x40005514u64,
-            data_addr: 0x400053FCu64,
+            data_alias_addr: 0x40005040u64,
             bit_mask: 0x00000010u32,
         }
     }
@@ -664,7 +664,7 @@ impl GPIOB {
             den_addr: 0x4000551Cu64,
             pur_addr: 0x40005510u64,
             pdr_addr: 0x40005514u64,
-            data_addr: 0x400053FCu64,
+            data_alias_addr: 0x40005080u64,
             bit_mask: 0x00000020u32,
         }
     }
@@ -680,7 +680,7 @@ impl GPIOB {
             den_addr: 0x4000551Cu64,
             pur_addr: 0x40005510u64,
             pdr_addr: 0x40005514u64,
-            data_addr: 0x400053FCu64,
+            data_alias_addr: 0x40005100u64,
             bit_mask: 0x00000040u32,
         }
     }
@@ -696,7 +696,7 @@ impl GPIOB {
             den_addr: 0x4000551Cu64,
             pur_addr: 0x40005510u64,
             pdr_addr: 0x40005514u64,
-            data_addr: 0x400053FCu64,
+            data_alias_addr: 0x40005200u64,
             bit_mask: 0x00000080u32,
         }
     }
@@ -714,7 +714,7 @@ pub struct GPIOBFlex {
     den_addr: u64,
     pur_addr: u64,
     pdr_addr: u64,
-    data_addr: u64,
+    data_alias_addr: u64,
     bit_mask: u32,
 }
 
@@ -786,7 +786,7 @@ impl GPIOBFlex {
     }
 
     pub fn is_high(&self) -> Result<bool, metadata::Error> {
-        Ok((read_u32(self.data_addr)? & self.bit_mask) != 0)
+        Ok(read_u32(self.data_alias_addr)? != 0)
     }
 
     pub fn is_low(&self) -> Result<bool, metadata::Error> {
@@ -810,12 +810,12 @@ impl GPIOBFlex {
     }
 
     pub fn set_high(&self) -> Result<(), metadata::Error> {
-        modify_u32(self.data_addr, self.bit_mask, self.bit_mask)?;
+        write_u32(self.data_alias_addr, self.bit_mask)?;
         Ok(())
     }
 
     pub fn set_low(&self) -> Result<(), metadata::Error> {
-        modify_u32(self.data_addr, self.bit_mask, 0x00000000u32)?;
+        write_u32(self.data_alias_addr, 0x00000000u32)?;
         Ok(())
     }
 
@@ -994,7 +994,7 @@ impl GPIOC {
             den_addr: 0x4000651Cu64,
             pur_addr: 0x40006510u64,
             pdr_addr: 0x40006514u64,
-            data_addr: 0x400063FCu64,
+            data_alias_addr: 0x40006004u64,
             bit_mask: 0x00000001u32,
         }
     }
@@ -1010,7 +1010,7 @@ impl GPIOC {
             den_addr: 0x4000651Cu64,
             pur_addr: 0x40006510u64,
             pdr_addr: 0x40006514u64,
-            data_addr: 0x400063FCu64,
+            data_alias_addr: 0x40006008u64,
             bit_mask: 0x00000002u32,
         }
     }
@@ -1026,7 +1026,7 @@ impl GPIOC {
             den_addr: 0x4000651Cu64,
             pur_addr: 0x40006510u64,
             pdr_addr: 0x40006514u64,
-            data_addr: 0x400063FCu64,
+            data_alias_addr: 0x40006010u64,
             bit_mask: 0x00000004u32,
         }
     }
@@ -1042,7 +1042,7 @@ impl GPIOC {
             den_addr: 0x4000651Cu64,
             pur_addr: 0x40006510u64,
             pdr_addr: 0x40006514u64,
-            data_addr: 0x400063FCu64,
+            data_alias_addr: 0x40006020u64,
             bit_mask: 0x00000008u32,
         }
     }
@@ -1058,7 +1058,7 @@ impl GPIOC {
             den_addr: 0x4000651Cu64,
             pur_addr: 0x40006510u64,
             pdr_addr: 0x40006514u64,
-            data_addr: 0x400063FCu64,
+            data_alias_addr: 0x40006040u64,
             bit_mask: 0x00000010u32,
         }
     }
@@ -1074,7 +1074,7 @@ impl GPIOC {
             den_addr: 0x4000651Cu64,
             pur_addr: 0x40006510u64,
             pdr_addr: 0x40006514u64,
-            data_addr: 0x400063FCu64,
+            data_alias_addr: 0x40006080u64,
             bit_mask: 0x00000020u32,
         }
     }
@@ -1090,7 +1090,7 @@ impl GPIOC {
             den_addr: 0x4000651Cu64,
             pur_addr: 0x40006510u64,
             pdr_addr: 0x40006514u64,
-            data_addr: 0x400063FCu64,
+            data_alias_addr: 0x40006100u64,
             bit_mask: 0x00000040u32,
         }
     }
@@ -1106,7 +1106,7 @@ impl GPIOC {
             den_addr: 0x4000651Cu64,
             pur_addr: 0x40006510u64,
             pdr_addr: 0x40006514u64,
-            data_addr: 0x400063FCu64,
+            data_alias_addr: 0x40006200u64,
             bit_mask: 0x00000080u32,
         }
     }
@@ -1124,7 +1124,7 @@ pub struct GPIOCFlex {
     den_addr: u64,
     pur_addr: u64,
     pdr_addr: u64,
-    data_addr: u64,
+    data_alias_addr: u64,
     bit_mask: u32,
 }
 
@@ -1196,7 +1196,7 @@ impl GPIOCFlex {
     }
 
     pub fn is_high(&self) -> Result<bool, metadata::Error> {
-        Ok((read_u32(self.data_addr)? & self.bit_mask) != 0)
+        Ok(read_u32(self.data_alias_addr)? != 0)
     }
 
     pub fn is_low(&self) -> Result<bool, metadata::Error> {
@@ -1220,12 +1220,12 @@ impl GPIOCFlex {
     }
 
     pub fn set_high(&self) -> Result<(), metadata::Error> {
-        modify_u32(self.data_addr, self.bit_mask, self.bit_mask)?;
+        write_u32(self.data_alias_addr, self.bit_mask)?;
         Ok(())
     }
 
     pub fn set_low(&self) -> Result<(), metadata::Error> {
-        modify_u32(self.data_addr, self.bit_mask, 0x00000000u32)?;
+        write_u32(self.data_alias_addr, 0x00000000u32)?;
         Ok(())
     }
 
@@ -1404,7 +1404,7 @@ impl GPIOD {
             den_addr: 0x4000751Cu64,
             pur_addr: 0x40007510u64,
             pdr_addr: 0x40007514u64,
-            data_addr: 0x400073FCu64,
+            data_alias_addr: 0x40007004u64,
             bit_mask: 0x00000001u32,
         }
     }
@@ -1420,7 +1420,7 @@ impl GPIOD {
             den_addr: 0x4000751Cu64,
             pur_addr: 0x40007510u64,
             pdr_addr: 0x40007514u64,
-            data_addr: 0x400073FCu64,
+            data_alias_addr: 0x40007008u64,
             bit_mask: 0x00000002u32,
         }
     }
@@ -1436,7 +1436,7 @@ impl GPIOD {
             den_addr: 0x4000751Cu64,
             pur_addr: 0x40007510u64,
             pdr_addr: 0x40007514u64,
-            data_addr: 0x400073FCu64,
+            data_alias_addr: 0x40007010u64,
             bit_mask: 0x00000004u32,
         }
     }
@@ -1452,7 +1452,7 @@ impl GPIOD {
             den_addr: 0x4000751Cu64,
             pur_addr: 0x40007510u64,
             pdr_addr: 0x40007514u64,
-            data_addr: 0x400073FCu64,
+            data_alias_addr: 0x40007020u64,
             bit_mask: 0x00000008u32,
         }
     }
@@ -1468,7 +1468,7 @@ impl GPIOD {
             den_addr: 0x4000751Cu64,
             pur_addr: 0x40007510u64,
             pdr_addr: 0x40007514u64,
-            data_addr: 0x400073FCu64,
+            data_alias_addr: 0x40007040u64,
             bit_mask: 0x00000010u32,
         }
     }
@@ -1484,7 +1484,7 @@ impl GPIOD {
             den_addr: 0x4000751Cu64,
             pur_addr: 0x40007510u64,
             pdr_addr: 0x40007514u64,
-            data_addr: 0x400073FCu64,
+            data_alias_addr: 0x40007080u64,
             bit_mask: 0x00000020u32,
         }
     }
@@ -1500,7 +1500,7 @@ impl GPIOD {
             den_addr: 0x4000751Cu64,
             pur_addr: 0x40007510u64,
             pdr_addr: 0x40007514u64,
-            data_addr: 0x400073FCu64,
+            data_alias_addr: 0x40007100u64,
             bit_mask: 0x00000040u32,
         }
     }
@@ -1516,7 +1516,7 @@ impl GPIOD {
             den_addr: 0x4000751Cu64,
             pur_addr: 0x40007510u64,
             pdr_addr: 0x40007514u64,
-            data_addr: 0x400073FCu64,
+            data_alias_addr: 0x40007200u64,
             bit_mask: 0x00000080u32,
         }
     }
@@ -1534,7 +1534,7 @@ pub struct GPIODFlex {
     den_addr: u64,
     pur_addr: u64,
     pdr_addr: u64,
-    data_addr: u64,
+    data_alias_addr: u64,
     bit_mask: u32,
 }
 
@@ -1606,7 +1606,7 @@ impl GPIODFlex {
     }
 
     pub fn is_high(&self) -> Result<bool, metadata::Error> {
-        Ok((read_u32(self.data_addr)? & self.bit_mask) != 0)
+        Ok(read_u32(self.data_alias_addr)? != 0)
     }
 
     pub fn is_low(&self) -> Result<bool, metadata::Error> {
@@ -1630,12 +1630,12 @@ impl GPIODFlex {
     }
 
     pub fn set_high(&self) -> Result<(), metadata::Error> {
-        modify_u32(self.data_addr, self.bit_mask, self.bit_mask)?;
+        write_u32(self.data_alias_addr, self.bit_mask)?;
         Ok(())
     }
 
     pub fn set_low(&self) -> Result<(), metadata::Error> {
-        modify_u32(self.data_addr, self.bit_mask, 0x00000000u32)?;
+        write_u32(self.data_alias_addr, 0x00000000u32)?;
         Ok(())
     }
 
@@ -1810,7 +1810,7 @@ impl GPIOE {
             den_addr: 0x4002451Cu64,
             pur_addr: 0x40024510u64,
             pdr_addr: 0x40024514u64,
-            data_addr: 0x400243FCu64,
+            data_alias_addr: 0x40024004u64,
             bit_mask: 0x00000001u32,
         }
     }
@@ -1826,7 +1826,7 @@ impl GPIOE {
             den_addr: 0x4002451Cu64,
             pur_addr: 0x40024510u64,
             pdr_addr: 0x40024514u64,
-            data_addr: 0x400243FCu64,
+            data_alias_addr: 0x40024008u64,
             bit_mask: 0x00000002u32,
         }
     }
@@ -1842,7 +1842,7 @@ impl GPIOE {
             den_addr: 0x4002451Cu64,
             pur_addr: 0x40024510u64,
             pdr_addr: 0x40024514u64,
-            data_addr: 0x400243FCu64,
+            data_alias_addr: 0x40024010u64,
             bit_mask: 0x00000004u32,
         }
     }
@@ -1858,7 +1858,7 @@ impl GPIOE {
             den_addr: 0x4002451Cu64,
             pur_addr: 0x40024510u64,
             pdr_addr: 0x40024514u64,
-            data_addr: 0x400243FCu64,
+            data_alias_addr: 0x40024020u64,
             bit_mask: 0x00000008u32,
         }
     }
@@ -1876,7 +1876,7 @@ pub struct GPIOEFlex {
     den_addr: u64,
     pur_addr: u64,
     pdr_addr: u64,
-    data_addr: u64,
+    data_alias_addr: u64,
     bit_mask: u32,
 }
 
@@ -1948,7 +1948,7 @@ impl GPIOEFlex {
     }
 
     pub fn is_high(&self) -> Result<bool, metadata::Error> {
-        Ok((read_u32(self.data_addr)? & self.bit_mask) != 0)
+        Ok(read_u32(self.data_alias_addr)? != 0)
     }
 
     pub fn is_low(&self) -> Result<bool, metadata::Error> {
@@ -1972,12 +1972,12 @@ impl GPIOEFlex {
     }
 
     pub fn set_high(&self) -> Result<(), metadata::Error> {
-        modify_u32(self.data_addr, self.bit_mask, self.bit_mask)?;
+        write_u32(self.data_alias_addr, self.bit_mask)?;
         Ok(())
     }
 
     pub fn set_low(&self) -> Result<(), metadata::Error> {
-        modify_u32(self.data_addr, self.bit_mask, 0x00000000u32)?;
+        write_u32(self.data_alias_addr, 0x00000000u32)?;
         Ok(())
     }
 
@@ -2152,7 +2152,7 @@ impl GPIOF {
             den_addr: 0x4002551Cu64,
             pur_addr: 0x40025510u64,
             pdr_addr: 0x40025514u64,
-            data_addr: 0x400253FCu64,
+            data_alias_addr: 0x40025004u64,
             bit_mask: 0x00000001u32,
         }
     }
@@ -2168,7 +2168,7 @@ impl GPIOF {
             den_addr: 0x4002551Cu64,
             pur_addr: 0x40025510u64,
             pdr_addr: 0x40025514u64,
-            data_addr: 0x400253FCu64,
+            data_alias_addr: 0x40025008u64,
             bit_mask: 0x00000002u32,
         }
     }
@@ -2184,7 +2184,7 @@ impl GPIOF {
             den_addr: 0x4002551Cu64,
             pur_addr: 0x40025510u64,
             pdr_addr: 0x40025514u64,
-            data_addr: 0x400253FCu64,
+            data_alias_addr: 0x40025010u64,
             bit_mask: 0x00000004u32,
         }
     }
@@ -2200,7 +2200,7 @@ impl GPIOF {
             den_addr: 0x4002551Cu64,
             pur_addr: 0x40025510u64,
             pdr_addr: 0x40025514u64,
-            data_addr: 0x400253FCu64,
+            data_alias_addr: 0x40025020u64,
             bit_mask: 0x00000008u32,
         }
     }
@@ -2218,7 +2218,7 @@ pub struct GPIOFFlex {
     den_addr: u64,
     pur_addr: u64,
     pdr_addr: u64,
-    data_addr: u64,
+    data_alias_addr: u64,
     bit_mask: u32,
 }
 
@@ -2290,7 +2290,7 @@ impl GPIOFFlex {
     }
 
     pub fn is_high(&self) -> Result<bool, metadata::Error> {
-        Ok((read_u32(self.data_addr)? & self.bit_mask) != 0)
+        Ok(read_u32(self.data_alias_addr)? != 0)
     }
 
     pub fn is_low(&self) -> Result<bool, metadata::Error> {
@@ -2314,12 +2314,12 @@ impl GPIOFFlex {
     }
 
     pub fn set_high(&self) -> Result<(), metadata::Error> {
-        modify_u32(self.data_addr, self.bit_mask, self.bit_mask)?;
+        write_u32(self.data_alias_addr, self.bit_mask)?;
         Ok(())
     }
 
     pub fn set_low(&self) -> Result<(), metadata::Error> {
-        modify_u32(self.data_addr, self.bit_mask, 0x00000000u32)?;
+        write_u32(self.data_alias_addr, 0x00000000u32)?;
         Ok(())
     }
 

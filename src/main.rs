@@ -1456,7 +1456,7 @@ struct GeneratedMethod {
 }
 
 #[derive(Debug, Clone)]
-struct ResolvedStm32GpioPinLowering {
+struct ResolvedIndexedFieldGpioPinLowering {
     role_index: usize,
     pin_name: String,
     accessor_name: String,
@@ -1472,31 +1472,31 @@ struct ResolvedStm32GpioPinLowering {
 }
 
 #[derive(Debug, Clone)]
-struct ResolvedStellarisGpioPinLowering {
+struct ResolvedBitmaskGpioPinLowering {
     role_index: usize,
     pin_name: String,
     accessor_name: String,
     bit_mask: u32,
+    data_alias_address: u64,
 }
 
 #[derive(Debug, Clone)]
 enum ResolvedGpioPortLowering {
-    Stm32Like {
+    IndexedFields {
         moder: ResolvedRegister,
         pupdr: ResolvedRegister,
         idr: ResolvedRegister,
         odr: ResolvedRegister,
         bsrr: ResolvedRegister,
-        pins: Vec<ResolvedStm32GpioPinLowering>,
+        pins: Vec<ResolvedIndexedFieldGpioPinLowering>,
     },
-    StellarisLike {
+    BitmaskRegisters {
         dir: ResolvedRegister,
         afsel: ResolvedRegister,
         den: ResolvedRegister,
         pur: ResolvedRegister,
         pdr: ResolvedRegister,
-        data: ResolvedRegister,
-        pins: Vec<ResolvedStellarisGpioPinLowering>,
+        pins: Vec<ResolvedBitmaskGpioPinLowering>,
     },
 }
 
@@ -3293,7 +3293,7 @@ fn render_gpio_methods(
     let flex_type = format!("{}Flex", driver.type_name);
     let mut methods = Vec::new();
     match &lowering {
-        ResolvedGpioPortLowering::Stm32Like {
+        ResolvedGpioPortLowering::IndexedFields {
             moder,
             pupdr,
             idr,
@@ -3338,13 +3338,12 @@ fn render_gpio_methods(
                 });
             }
         }
-        ResolvedGpioPortLowering::StellarisLike {
+        ResolvedGpioPortLowering::BitmaskRegisters {
             dir,
             afsel,
             den,
             pur,
             pdr,
-            data,
             pins,
         } => {
             for pin in pins {
@@ -3358,7 +3357,7 @@ fn render_gpio_methods(
                     pin.accessor_name, flex_type
                 ));
                 code.push_str(&format!(
-                    "        {} {{\n            resources: self.resources,\n            role: &self.resources.pins[{}],\n            pin_name: {},\n            dir_addr: 0x{:X}u64,\n            afsel_addr: 0x{:X}u64,\n            den_addr: 0x{:X}u64,\n            pur_addr: 0x{:X}u64,\n            pdr_addr: 0x{:X}u64,\n            data_addr: 0x{:X}u64,\n            bit_mask: 0x{:08X}u32,\n        }}\n",
+                    "        {} {{\n            resources: self.resources,\n            role: &self.resources.pins[{}],\n            pin_name: {},\n            dir_addr: 0x{:X}u64,\n            afsel_addr: 0x{:X}u64,\n            den_addr: 0x{:X}u64,\n            pur_addr: 0x{:X}u64,\n            pdr_addr: 0x{:X}u64,\n            data_alias_addr: 0x{:X}u64,\n            bit_mask: 0x{:08X}u32,\n        }}\n",
                     flex_type,
                     pin.role_index,
                     render_rust_string(&pin.pin_name),
@@ -3367,7 +3366,7 @@ fn render_gpio_methods(
                     den.absolute_address,
                     pur.absolute_address,
                     pdr.absolute_address,
-                    data.absolute_address,
+                    pin.data_alias_address,
                     pin.bit_mask,
                 ));
                 code.push_str("    }\n");
@@ -3400,8 +3399,8 @@ fn render_gpio_support_items(
     out.push_str(&format!("    resources: {}Resources,\n", driver.type_name));
     out.push_str("    role: &'static metadata::PinRole,\n");
     out.push_str("    pin_name: &'static str,\n");
-    match lowering {
-        ResolvedGpioPortLowering::Stm32Like { .. } => {
+    match &lowering {
+        ResolvedGpioPortLowering::IndexedFields { .. } => {
             out.push_str("    moder_addr: u64,\n");
             out.push_str("    moder_clear_mask: u32,\n");
             out.push_str("    moder_output_mask: u32,\n");
@@ -3417,13 +3416,13 @@ fn render_gpio_support_items(
             out.push_str("    bsrr_set_mask: u32,\n");
             out.push_str("    bsrr_reset_mask: u32,\n");
         }
-        ResolvedGpioPortLowering::StellarisLike { .. } => {
+        ResolvedGpioPortLowering::BitmaskRegisters { .. } => {
             out.push_str("    dir_addr: u64,\n");
             out.push_str("    afsel_addr: u64,\n");
             out.push_str("    den_addr: u64,\n");
             out.push_str("    pur_addr: u64,\n");
             out.push_str("    pdr_addr: u64,\n");
-            out.push_str("    data_addr: u64,\n");
+            out.push_str("    data_alias_addr: u64,\n");
             out.push_str("    bit_mask: u32,\n");
         }
     }
@@ -3459,8 +3458,8 @@ fn render_gpio_support_items(
     out.push_str("        self.set_as_output(initial_level)?;\n");
     out.push_str(&format!("        Ok({output_type} {{ pin: self }})\n"));
     out.push_str("    }\n\n");
-    match lowering {
-        ResolvedGpioPortLowering::Stm32Like { .. } => {
+    match &lowering {
+        ResolvedGpioPortLowering::IndexedFields { .. } => {
             out.push_str(
                 "    pub fn set_as_input(&self, pull: Pull) -> Result<(), metadata::Error> {\n",
             );
@@ -3523,7 +3522,7 @@ fn render_gpio_support_items(
             out.push_str("        Ok(())\n");
             out.push_str("    }\n\n");
         }
-        ResolvedGpioPortLowering::StellarisLike { .. } => {
+        ResolvedGpioPortLowering::BitmaskRegisters { .. } => {
             out.push_str(
                 "    pub fn set_as_input(&self, pull: Pull) -> Result<(), metadata::Error> {\n",
             );
@@ -3574,7 +3573,7 @@ fn render_gpio_support_items(
             out.push_str("        Ok(())\n");
             out.push_str("    }\n\n");
             out.push_str("    pub fn is_high(&self) -> Result<bool, metadata::Error> {\n");
-            out.push_str("        Ok((read_u32(self.data_addr)? & self.bit_mask) != 0)\n");
+            out.push_str("        Ok(read_u32(self.data_alias_addr)? != 0)\n");
             out.push_str("    }\n\n");
             out.push_str("    pub fn is_low(&self) -> Result<bool, metadata::Error> {\n");
             out.push_str("        Ok(!self.is_high()?)\n");
@@ -3594,11 +3593,11 @@ fn render_gpio_support_items(
             out.push_str("        self.get_level()\n");
             out.push_str("    }\n\n");
             out.push_str("    pub fn set_high(&self) -> Result<(), metadata::Error> {\n");
-            out.push_str("        modify_u32(self.data_addr, self.bit_mask, self.bit_mask)?;\n");
+            out.push_str("        write_u32(self.data_alias_addr, self.bit_mask)?;\n");
             out.push_str("        Ok(())\n");
             out.push_str("    }\n\n");
             out.push_str("    pub fn set_low(&self) -> Result<(), metadata::Error> {\n");
-            out.push_str("        modify_u32(self.data_addr, self.bit_mask, 0x00000000u32)?;\n");
+            out.push_str("        write_u32(self.data_alias_addr, 0x00000000u32)?;\n");
             out.push_str("        Ok(())\n");
             out.push_str("    }\n\n");
         }
@@ -3659,13 +3658,38 @@ fn resolve_gpio_port_lowering(
     driver: &ResolvedDriverInstance,
 ) -> Result<ResolvedGpioPortLowering> {
     let target_ref = driver.target.target_ref.as_str();
-    if try_resolve_target_register_by_name(model, target_ref, "MODER")?.is_some() {
-        return resolve_stm32_gpio_port_lowering(model, driver);
+    if supports_gpio_register_layout(model, target_ref, &["MODER", "PUPDR", "IDR", "ODR", "BSRR"])?
+    {
+        return resolve_indexed_field_gpio_port_lowering(model, driver);
     }
-    resolve_stellaris_gpio_port_lowering(model, driver)
+    if supports_gpio_register_layout(
+        model,
+        target_ref,
+        &["DIR", "AFSEL", "DEN", "PUR", "PDR", "DATA"],
+    )? {
+        return resolve_bitmask_gpio_port_lowering(model, driver);
+    }
+    bail!(
+        "gpio-port driver {} target {} does not expose a supported GPIO register layout; expected either indexed-field registers [MODER, PUPDR, IDR, ODR, BSRR] or bitmask registers [DIR, AFSEL, DEN, PUR, PDR, DATA]",
+        driver.id,
+        target_ref
+    );
 }
 
-fn resolve_stm32_gpio_port_lowering(
+fn supports_gpio_register_layout(
+    model: &EmbassyGenerationModel,
+    target_ref: &str,
+    register_names: &[&str],
+) -> Result<bool> {
+    for register_name in register_names {
+        if try_resolve_target_register_by_name(model, target_ref, register_name)?.is_none() {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn resolve_indexed_field_gpio_port_lowering(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
 ) -> Result<ResolvedGpioPortLowering> {
@@ -3737,7 +3761,7 @@ fn resolve_stm32_gpio_port_lowering(
         let moder_shift = moder_field.lsb;
         let pupdr_shift = pupdr_field.lsb;
 
-        pins.push(ResolvedStm32GpioPinLowering {
+        pins.push(ResolvedIndexedFieldGpioPinLowering {
             role_index,
             pin_name: pin.name.clone(),
             accessor_name,
@@ -3753,7 +3777,7 @@ fn resolve_stm32_gpio_port_lowering(
         });
     }
 
-    Ok(ResolvedGpioPortLowering::Stm32Like {
+    Ok(ResolvedGpioPortLowering::IndexedFields {
         moder,
         pupdr,
         idr,
@@ -3763,7 +3787,7 @@ fn resolve_stm32_gpio_port_lowering(
     })
 }
 
-fn resolve_stellaris_gpio_port_lowering(
+fn resolve_bitmask_gpio_port_lowering(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
 ) -> Result<ResolvedGpioPortLowering> {
@@ -3825,7 +3849,7 @@ fn resolve_stellaris_gpio_port_lowering(
             );
         }
 
-        let bit_mask = resolve_stellaris_gpio_bit_mask(&dir, pin_index, driver, "DIR")?;
+        let bit_mask = resolve_bitmask_gpio_bit_mask(&dir, pin_index, driver, "DIR")?;
         for (register, name) in [
             (&afsel, "AFSEL"),
             (&den, "DEN"),
@@ -3833,24 +3857,25 @@ fn resolve_stellaris_gpio_port_lowering(
             (&pdr, "PDR"),
             (&data, "DATA"),
         ] {
-            let _ = resolve_stellaris_gpio_bit_mask(register, pin_index, driver, name)?;
+            let _ = resolve_bitmask_gpio_bit_mask(register, pin_index, driver, name)?;
         }
+        let data_alias_address = resolve_bitmask_gpio_data_alias_address(&data, bit_mask, driver)?;
 
-        pins.push(ResolvedStellarisGpioPinLowering {
+        pins.push(ResolvedBitmaskGpioPinLowering {
             role_index,
             pin_name: pin.name.clone(),
             accessor_name,
             bit_mask,
+            data_alias_address,
         });
     }
 
-    Ok(ResolvedGpioPortLowering::StellarisLike {
+    Ok(ResolvedGpioPortLowering::BitmaskRegisters {
         dir,
         afsel,
         den,
         pur,
         pdr,
-        data,
         pins,
     })
 }
@@ -3882,7 +3907,7 @@ fn resolve_gpio_register32(
     Ok(register)
 }
 
-fn resolve_stellaris_gpio_bit_mask(
+fn resolve_bitmask_gpio_bit_mask(
     register: &ResolvedRegister,
     pin_index: u32,
     driver: &ResolvedDriverInstance,
@@ -3918,6 +3943,26 @@ fn resolve_stellaris_gpio_bit_mask(
             register_name
         )
     })
+}
+
+fn resolve_bitmask_gpio_data_alias_address(
+    data_register: &ResolvedRegister,
+    bit_mask: u32,
+    driver: &ResolvedDriverInstance,
+) -> Result<u64> {
+    let base_address = data_register.absolute_address.checked_sub(0x3FC).ok_or_else(|| {
+        anyhow!(
+            "gpio-port driver {} data register {} does not use the expected bitmask-alias layout",
+            driver.id,
+            data_register.id
+        )
+    })?;
+    checked_offset_add(
+        base_address,
+        (bit_mask as u64) << 2,
+        "bitmask GPIO DATA alias address",
+    )
+    .map_err(|error| anyhow!("gpio-port driver {}: {}", driver.id, error))
 }
 
 fn validate_field_width(
@@ -8122,11 +8167,15 @@ mod tests {
         let temp = tempdir().expect("tempdir");
         let error =
             generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
-        assert!(error.to_string().contains("requires PUPDR"));
+        assert!(
+            error
+                .to_string()
+                .contains("does not expose a supported GPIO register layout")
+        );
     }
 
     #[test]
-    fn generate_embassy_supports_stellaris_style_gpio_ports() {
+    fn generate_embassy_supports_bitmask_gpio_ports() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let fixture = write_embassy_fixture(false);
         let mut document = load_json_file(fixture.path()).expect("fixture json");
@@ -8173,11 +8222,11 @@ mod tests {
                 { "id": "field.gpioa.den.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
             ] }
         ]))
-        .expect("stellaris gpio registers");
+        .expect("bitmask gpio registers");
 
         let file = write_temp_json(&document);
         let validated = load_validated_hair_document(file.path(), &repo_root)
-            .expect("fixture with stellaris gpio should validate");
+            .expect("fixture with bitmask gpio should validate");
         let output_dir = tempdir().expect("tempdir");
         generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
 
@@ -8185,7 +8234,9 @@ mod tests {
             .expect("generated gpio module");
         assert!(gpioa_rs.contains("dir_addr: u64"));
         assert!(gpioa_rs.contains("afsel_addr: u64"));
+        assert!(gpioa_rs.contains("data_alias_addr: u64"));
         assert!(gpioa_rs.contains("modify_u32(self.dir_addr, self.bit_mask, self.bit_mask)?;"));
+        assert!(gpioa_rs.contains("write_u32(self.data_alias_addr, self.bit_mask)?;"));
 
         let cargo_output = Command::new("cargo")
             .arg("check")

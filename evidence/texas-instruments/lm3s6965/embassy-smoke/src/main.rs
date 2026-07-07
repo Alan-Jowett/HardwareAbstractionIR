@@ -75,7 +75,8 @@ const TIMER_CTL_OFFSET: u32 = 0x00C;
 const TIMER_ICR_OFFSET: u32 = 0x024;
 const TIMER_TAILR_OFFSET: u32 = 0x028;
 const TIMER_TAMR_PERIODIC: u32 = 0x2;
-const TIMER_TA_TIMEOUT: u32 = 1 << 0;
+const TIMER_CTL_TAEN: u32 = 1 << 0;
+const TIMER_ICR_TATOCINT: u32 = 1 << 0;
 
 const WATCHDOG_LOAD: u32 = 0x4000_0000;
 const WATCHDOG_VALUE: u32 = 0x4000_0004;
@@ -489,14 +490,14 @@ fn smoke_one_timer(base: u32, label: &str, enable: impl FnOnce()) {
     write_u32(base + TIMER_CFG_OFFSET, 0);
     write_u32(base + TIMER_TAMR_OFFSET, TIMER_TAMR_PERIODIC);
     write_u32(base + TIMER_TAILR_OFFSET, 1024);
-    write_u32(base + TIMER_ICR_OFFSET, TIMER_TA_TIMEOUT);
+    write_u32(base + TIMER_ICR_OFFSET, TIMER_ICR_TATOCINT);
     enable();
     expect(
         label,
         read_u32(base + TIMER_CFG_OFFSET) == 0
             && (read_u32(base + TIMER_TAMR_OFFSET) & 0x3) == TIMER_TAMR_PERIODIC
             && read_u32(base + TIMER_TAILR_OFFSET) == 1024
-            && (read_u32(base + TIMER_CTL_OFFSET) & TIMER_TA_TIMEOUT) != 0,
+            && (read_u32(base + TIMER_CTL_OFFSET) & TIMER_CTL_TAEN) != 0,
     );
 }
 
@@ -515,7 +516,7 @@ fn smoke_timers() {
     timer0.transition_running_to_disabled().unwrap();
     expect(
         "timer0 disabled",
-        (read_u32(0x4003_0000 + TIMER_CTL_OFFSET) & TIMER_TA_TIMEOUT) == 0,
+        (read_u32(0x4003_0000 + TIMER_CTL_OFFSET) & TIMER_CTL_TAEN) == 0,
     );
 
     timer1.enable_clock().unwrap();
@@ -527,7 +528,7 @@ fn smoke_timers() {
     timer1.transition_running_to_disabled().unwrap();
     expect(
         "timer1 disabled",
-        (read_u32(0x4003_1000 + TIMER_CTL_OFFSET) & TIMER_TA_TIMEOUT) == 0,
+        (read_u32(0x4003_1000 + TIMER_CTL_OFFSET) & TIMER_CTL_TAEN) == 0,
     );
 
     timer2.enable_clock().unwrap();
@@ -539,7 +540,7 @@ fn smoke_timers() {
     timer2.transition_running_to_disabled().unwrap();
     expect(
         "timer2 disabled",
-        (read_u32(0x4003_2000 + TIMER_CTL_OFFSET) & TIMER_TA_TIMEOUT) == 0,
+        (read_u32(0x4003_2000 + TIMER_CTL_OFFSET) & TIMER_CTL_TAEN) == 0,
     );
 
     timer3.enable_clock().unwrap();
@@ -551,7 +552,7 @@ fn smoke_timers() {
     timer3.transition_running_to_disabled().unwrap();
     expect(
         "timer3 disabled",
-        (read_u32(0x4003_3000 + TIMER_CTL_OFFSET) & TIMER_TA_TIMEOUT) == 0,
+        (read_u32(0x4003_3000 + TIMER_CTL_OFFSET) & TIMER_CTL_TAEN) == 0,
     );
 }
 
