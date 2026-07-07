@@ -1,0 +1,76 @@
+{
+  "documentKind": "hair-evidence-manifest",
+  "schemaVersion": "0.1.0",
+  "targetDevice": {
+    "id": "STM32F405RGT6",
+    "name": "STM32F405RGT6",
+    "vendor": "STMicroelectronics",
+    "family": "STM32F405/415",
+    "variant": "RGT6",
+    "package": "LQFP64",
+    "architecture": "ARM Cortex-M4F",
+    "notes": "Concrete Cortex-M4 target for the Olimex STM32-H405 board extraction. Community topology sources are package-filtered to STM32F405RG/STM32F405RGTx and are used only where the official ST sources are sparse."
+  },
+  "sources": [
+    {
+      "id": "olimex-stm32-h405-product-page",
+      "kind": "other",
+      "uri": "https://www.olimex.com/Products/ARM/ST/STM32-H405/",
+      "notes": "Board-level target identity and board context. The page also notes later GD32 substitutions; this extraction intentionally targets the STM32F405RGT6 path requested by the user."
+    },
+    {
+      "id": "st-stm32f405-datasheet",
+      "kind": "datasheet",
+      "uri": "https://www.st.com/resource/en/datasheet/DM00037051.pdf",
+      "notes": "Official STM32F405/415 family datasheet referenced by the exact-chip community metadata."
+    },
+    {
+      "id": "st-rm0090",
+      "kind": "reference-manual",
+      "uri": "https://www.st.com/resource/en/reference_manual/DM00031020.pdf",
+      "notes": "Official reference manual for STM32F405/415 and related STM32F4 devices."
+    },
+    {
+      "id": "st-cmsis-device-header",
+      "kind": "vendor-header",
+      "uri": "https://raw.githubusercontent.com/STMicroelectronics/cmsis-device-f4/3c77349ce04c8af401454cc51f85ea9a50e34fc1/Include/stm32f405xx.h",
+      "version": "3c77349ce04c8af401454cc51f85ea9a50e34fc1",
+      "notes": "Official ST CMSIS device header for CPU feature flags, memory-base macros, and IRQ numbers."
+    },
+    {
+      "id": "st-cmsis-startup",
+      "kind": "source-code",
+      "uri": "https://raw.githubusercontent.com/STMicroelectronics/cmsis-device-f4/3b64b7b0b546cefe84f13c65508126eea58b97d8/Source/Templates/gcc/startup_stm32f405xx.s",
+      "version": "3b64b7b0b546cefe84f13c65508126eea58b97d8",
+      "notes": "Official ST startup vector source for interrupt ordering cross-check."
+    },
+    {
+      "id": "st-stm32f4-svd-bundle",
+      "kind": "svd",
+      "uri": "https://raw.githubusercontent.com/stm32-rs/stm32-rs/9887ffa9fb4f30fc0e928d9a2278d563eeb383c0/svd/vendor/en.stm32f4-svd.zip",
+      "version": "9887ffa9fb4f30fc0e928d9a2278d563eeb383c0",
+      "notes": "Commit-pinned snapshot of ST's STM32F4 SVD bundle as vendored by stm32-rs. Used as the primary structural register source via STM32F405.svd."
+    },
+    {
+      "id": "stm32-rs-stm32f405-patch",
+      "kind": "generated",
+      "uri": "https://raw.githubusercontent.com/stm32-rs/stm32-rs/9887ffa9fb4f30fc0e928d9a2278d563eeb383c0/devices/stm32f405.yaml",
+      "version": "9887ffa9fb4f30fc0e928d9a2278d563eeb383c0",
+      "notes": "Community patch recipe documenting known STM32F405 adjustments relative to the base SVD."
+    },
+    {
+      "id": "embassy-rs-stm32f405rg-json",
+      "kind": "generated",
+      "uri": "https://raw.githubusercontent.com/embassy-rs/stm32-data-generated/8b94783cd40d22c6f3dd1e8105568f16ddb62fc7/data/chips/STM32F405RG.json",
+      "version": "8b94783cd40d22c6f3dd1e8105568f16ddb62fc7",
+      "notes": "Exact-chip structured topology for package-filtered pins, peripheral RCC bindings, interrupt routes, and DMA route candidates."
+    },
+    {
+      "id": "embassy-rs-embassy-stm32-cargo",
+      "kind": "hal",
+      "uri": "https://raw.githubusercontent.com/embassy-rs/embassy/50ea4f72e54d9cdaa1f1108ba2a08fa2fa4dbdf9/embassy-stm32/Cargo.toml",
+      "version": "50ea4f72e54d9cdaa1f1108ba2a08fa2fa4dbdf9",
+      "notes": "Commit-pinned Embassy HAL manifest showing the stm32f405rg feature in the supported chip list."
+    }
+  ]
+}

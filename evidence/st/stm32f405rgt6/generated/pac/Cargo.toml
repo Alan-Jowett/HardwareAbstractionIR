@@ -1,0 +1,18 @@
+[package]
+name = "stm32f405rgt6-pac"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "lib.rs"
+
+[features]
+default = ["critical-section"]
+critical-section = []
+rt = ["dep:cortex-m-rt", "cortex-m-rt/device"]
+
+[dependencies]
+critical-section = "1.2"
+cortex-m = "0.7"
+cortex-m-rt = { version = "0.7", optional = true }
+vcell = "0.1"
