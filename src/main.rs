@@ -1455,6 +1455,32 @@ struct GeneratedMethod {
     code: String,
 }
 
+#[derive(Debug, Clone)]
+struct ResolvedGpioPinLowering {
+    role_index: usize,
+    pin_name: String,
+    accessor_name: String,
+    moder_clear_mask: u32,
+    moder_output_mask: u32,
+    pupdr_clear_mask: u32,
+    pupdr_up_mask: u32,
+    pupdr_down_mask: u32,
+    idr_mask: u32,
+    odr_mask: u32,
+    bsrr_set_mask: u32,
+    bsrr_reset_mask: u32,
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedGpioPortLowering {
+    moder: ResolvedRegister,
+    pupdr: ResolvedRegister,
+    idr: ResolvedRegister,
+    odr: ResolvedRegister,
+    bsrr: ResolvedRegister,
+    pins: Vec<ResolvedGpioPinLowering>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct EmbassyHalProfile {
@@ -2823,6 +2849,12 @@ fn render_driver_module(
         render_comment_text(&model.device_name),
         render_mmio_helpers()
     );
+    if drivers
+        .iter()
+        .any(|driver| driver.driver_kind == "gpio-port")
+    {
+        out.push_str(render_gpio_module_prelude());
+    }
     out.push_str(&render_module_provenance_const(module_name));
     for driver in drivers {
         out.push_str(&render_driver_instance(model, driver)?);
@@ -2835,6 +2867,7 @@ fn render_driver_instance(
     driver: &ResolvedDriverInstance,
 ) -> Result<String> {
     let const_prefix = to_rust_const_name(&driver.id);
+    let support_items = render_driver_support_items(model, driver)?;
     let mut out = String::new();
     out.push_str(&format!(
         "// Driver instance: {} ({}) from canonical block {} -> {}\n",
@@ -2890,12 +2923,23 @@ fn render_driver_instance(
         render_named_entity_slice(&driver.capability_tags)
     ));
     out.push_str(&format!(
-        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n",
+        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n{support_items}",
         type_name = driver.type_name,
         const_prefix = const_prefix,
-        methods = render_driver_methods(model, driver)?
+        methods = render_driver_methods(model, driver)?,
+        support_items = support_items
     ));
     Ok(out)
+}
+
+fn render_driver_support_items(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    match driver.driver_kind.as_str() {
+        "gpio-port" => render_gpio_support_items(model, driver),
+        _ => Ok(String::new()),
+    }
 }
 
 fn render_driver_methods(
@@ -2912,6 +2956,7 @@ fn render_driver_methods(
     let mut methods = Vec::new();
     methods.extend(render_clock_binding_methods(model, driver)?);
     methods.extend(render_reset_binding_methods(model, driver)?);
+    methods.extend(render_gpio_methods(model, driver)?);
     methods.extend(render_pin_route_methods(model, driver)?);
     methods.extend(render_usart_methods(model, driver)?);
     methods.extend(render_operation_methods(model, driver)?);
@@ -2943,6 +2988,10 @@ fn render_driver_methods(
 
 fn render_mmio_helpers() -> &'static str {
     "#[allow(dead_code)]\nfn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {\n    let address = usize::try_from(address)\n        .map_err(|_| metadata::Error::Unsupported(\"MMIO address does not fit usize on this target\"))?;\n    if address % align != 0 {\n        return Err(metadata::Error::Unsupported(\"MMIO address is not naturally aligned for the target register width\"));\n    }\n    Ok(address)\n}\n\n#[allow(dead_code)]\nfn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u8>())?;\n    unsafe {\n        let current = read_volatile(address as *const u8);\n        write_volatile(address as *mut u8, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u16>())?;\n    unsafe {\n        let current = read_volatile(address as *const u16);\n        write_volatile(address as *mut u16, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        let current = read_volatile(address as *const u32);\n        write_volatile(address as *mut u32, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn read_u32(address: u64) -> Result<u32, metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe { Ok(read_volatile(address as *const u32)) }\n}\n\n#[allow(dead_code)]\nfn write_u32(address: u64, value: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        write_volatile(address as *mut u32, value);\n    }\n    Ok(())\n}\n"
+}
+
+fn render_gpio_module_prelude() -> &'static str {
+    "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Level {\n    Low,\n    High,\n}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Pull {\n    None,\n    Up,\n    Down,\n}\n\n"
 }
 
 fn render_clock_binding_methods(
@@ -3211,6 +3260,367 @@ fn render_muxed_pin_route_method(
         name: method_name,
         code,
     }))
+}
+
+fn render_gpio_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    if driver.driver_kind != "gpio-port" {
+        return Ok(Vec::new());
+    }
+
+    let lowering = resolve_gpio_port_lowering(model, driver)?;
+    let flex_type = format!("{}Flex", driver.type_name);
+    let mut methods = Vec::new();
+    for pin in &lowering.pins {
+        let mut code = format!(
+            "    /// Access the {} pin on {}.\n",
+            render_comment_text(&pin.pin_name),
+            render_comment_text(&driver.name)
+        );
+        code.push_str(&format!(
+            "    pub fn {}(&self) -> {} {{\n",
+            pin.accessor_name, flex_type
+        ));
+        code.push_str(&format!(
+            "        {} {{\n            resources: self.resources,\n            role: &self.resources.pins[{}],\n            pin_name: {},\n            moder_addr: 0x{:X}u64,\n            moder_clear_mask: 0x{:08X}u32,\n            moder_output_mask: 0x{:08X}u32,\n            pupdr_addr: 0x{:X}u64,\n            pupdr_clear_mask: 0x{:08X}u32,\n            pupdr_up_mask: 0x{:08X}u32,\n            pupdr_down_mask: 0x{:08X}u32,\n            idr_addr: 0x{:X}u64,\n            idr_mask: 0x{:08X}u32,\n            odr_addr: 0x{:X}u64,\n            odr_mask: 0x{:08X}u32,\n            bsrr_addr: 0x{:X}u64,\n            bsrr_set_mask: 0x{:08X}u32,\n            bsrr_reset_mask: 0x{:08X}u32,\n        }}\n",
+            flex_type,
+            pin.role_index,
+            render_rust_string(&pin.pin_name),
+            lowering.moder.absolute_address,
+            pin.moder_clear_mask,
+            pin.moder_output_mask,
+            lowering.pupdr.absolute_address,
+            pin.pupdr_clear_mask,
+            pin.pupdr_up_mask,
+            pin.pupdr_down_mask,
+            lowering.idr.absolute_address,
+            pin.idr_mask,
+            lowering.odr.absolute_address,
+            pin.odr_mask,
+            lowering.bsrr.absolute_address,
+            pin.bsrr_set_mask,
+            pin.bsrr_reset_mask,
+        ));
+        code.push_str("    }\n");
+        methods.push(GeneratedMethod {
+            name: pin.accessor_name.clone(),
+            code,
+        });
+    }
+    Ok(methods)
+}
+
+fn render_gpio_support_items(
+    _model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    if driver.driver_kind != "gpio-port" {
+        return Ok(String::new());
+    }
+
+    let flex_type = format!("{}Flex", driver.type_name);
+    let input_type = format!("{}Input", driver.type_name);
+    let output_type = format!("{}Output", driver.type_name);
+    let mut out = String::new();
+
+    out.push_str("#[derive(Debug, Clone)]\n");
+    out.push_str(&format!("pub struct {flex_type} {{\n"));
+    out.push_str(&format!("    resources: {}Resources,\n", driver.type_name));
+    out.push_str("    role: &'static metadata::PinRole,\n");
+    out.push_str("    pin_name: &'static str,\n");
+    out.push_str("    moder_addr: u64,\n");
+    out.push_str("    moder_clear_mask: u32,\n");
+    out.push_str("    moder_output_mask: u32,\n");
+    out.push_str("    pupdr_addr: u64,\n");
+    out.push_str("    pupdr_clear_mask: u32,\n");
+    out.push_str("    pupdr_up_mask: u32,\n");
+    out.push_str("    pupdr_down_mask: u32,\n");
+    out.push_str("    idr_addr: u64,\n");
+    out.push_str("    idr_mask: u32,\n");
+    out.push_str("    odr_addr: u64,\n");
+    out.push_str("    odr_mask: u32,\n");
+    out.push_str("    bsrr_addr: u64,\n");
+    out.push_str("    bsrr_set_mask: u32,\n");
+    out.push_str("    bsrr_reset_mask: u32,\n");
+    out.push_str("}\n\n");
+
+    out.push_str("#[derive(Debug, Clone)]\n");
+    out.push_str(&format!("pub struct {input_type} {{\n"));
+    out.push_str(&format!("    pin: {flex_type},\n"));
+    out.push_str("}\n\n");
+
+    out.push_str("#[derive(Debug, Clone)]\n");
+    out.push_str(&format!("pub struct {output_type} {{\n"));
+    out.push_str(&format!("    pin: {flex_type},\n"));
+    out.push_str("}\n\n");
+
+    out.push_str(&format!("impl {flex_type} {{\n"));
+    out.push_str(&format!(
+        "    pub fn resources(&self) -> {}Resources {{\n",
+        driver.type_name
+    ));
+    out.push_str("        self.resources\n    }\n\n");
+    out.push_str("    pub fn role(&self) -> &'static metadata::PinRole {\n");
+    out.push_str("        self.role\n    }\n\n");
+    out.push_str("    pub fn pin_name(&self) -> &'static str {\n");
+    out.push_str("        self.pin_name\n    }\n\n");
+    out.push_str(&format!(
+        "    pub fn into_input(self, pull: Pull) -> Result<{input_type}, metadata::Error> {{\n"
+    ));
+    out.push_str("        self.set_as_input(pull)?;\n");
+    out.push_str(&format!("        Ok({input_type} {{ pin: self }})\n"));
+    out.push_str("    }\n\n");
+    out.push_str(&format!("    pub fn into_output(self, initial_level: Level) -> Result<{output_type}, metadata::Error> {{\n"));
+    out.push_str("        self.set_as_output(initial_level)?;\n");
+    out.push_str(&format!("        Ok({output_type} {{ pin: self }})\n"));
+    out.push_str("    }\n\n");
+    out.push_str("    pub fn set_as_input(&self, pull: Pull) -> Result<(), metadata::Error> {\n");
+    out.push_str("        self.set_pull(pull)?;\n");
+    out.push_str("        modify_u32(self.moder_addr, self.moder_clear_mask, 0x00000000u32)?;\n");
+    out.push_str("        Ok(())\n");
+    out.push_str("    }\n\n");
+    out.push_str(
+        "    pub fn set_as_output(&self, initial_level: Level) -> Result<(), metadata::Error> {\n",
+    );
+    out.push_str("        self.set_level(initial_level)?;\n");
+    out.push_str(
+        "        modify_u32(self.moder_addr, self.moder_clear_mask, self.moder_output_mask)?;\n",
+    );
+    out.push_str("        Ok(())\n");
+    out.push_str("    }\n\n");
+    out.push_str("    pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {\n");
+    out.push_str("        let set_mask = match pull {\n");
+    out.push_str("            Pull::None => 0x00000000u32,\n");
+    out.push_str("            Pull::Up => self.pupdr_up_mask,\n");
+    out.push_str("            Pull::Down => self.pupdr_down_mask,\n");
+    out.push_str("        };\n");
+    out.push_str("        modify_u32(self.pupdr_addr, self.pupdr_clear_mask, set_mask)?;\n");
+    out.push_str("        Ok(())\n");
+    out.push_str("    }\n\n");
+    out.push_str("    pub fn is_high(&self) -> Result<bool, metadata::Error> {\n");
+    out.push_str("        Ok((read_u32(self.idr_addr)? & self.idr_mask) != 0)\n");
+    out.push_str("    }\n\n");
+    out.push_str("    pub fn is_low(&self) -> Result<bool, metadata::Error> {\n");
+    out.push_str("        Ok(!self.is_high()?)\n");
+    out.push_str("    }\n\n");
+    out.push_str("    pub fn get_level(&self) -> Result<Level, metadata::Error> {\n");
+    out.push_str("        Ok(if self.is_high()? { Level::High } else { Level::Low })\n");
+    out.push_str("    }\n\n");
+    out.push_str("    pub fn is_set_high(&self) -> Result<bool, metadata::Error> {\n");
+    out.push_str("        Ok((read_u32(self.odr_addr)? & self.odr_mask) != 0)\n");
+    out.push_str("    }\n\n");
+    out.push_str("    pub fn is_set_low(&self) -> Result<bool, metadata::Error> {\n");
+    out.push_str("        Ok(!self.is_set_high()?)\n");
+    out.push_str("    }\n\n");
+    out.push_str("    pub fn get_output_level(&self) -> Result<Level, metadata::Error> {\n");
+    out.push_str("        Ok(if self.is_set_high()? { Level::High } else { Level::Low })\n");
+    out.push_str("    }\n\n");
+    out.push_str("    pub fn set_high(&self) -> Result<(), metadata::Error> {\n");
+    out.push_str("        write_u32(self.bsrr_addr, self.bsrr_set_mask)?;\n");
+    out.push_str("        Ok(())\n");
+    out.push_str("    }\n\n");
+    out.push_str("    pub fn set_low(&self) -> Result<(), metadata::Error> {\n");
+    out.push_str("        write_u32(self.bsrr_addr, self.bsrr_reset_mask)?;\n");
+    out.push_str("        Ok(())\n");
+    out.push_str("    }\n\n");
+    out.push_str("    pub fn set_level(&self, level: Level) -> Result<(), metadata::Error> {\n");
+    out.push_str("        match level {\n");
+    out.push_str("            Level::Low => self.set_low(),\n");
+    out.push_str("            Level::High => self.set_high(),\n");
+    out.push_str("        }\n");
+    out.push_str("    }\n");
+    out.push_str("}\n\n");
+
+    out.push_str(&format!("impl {input_type} {{\n"));
+    out.push_str(&format!("    pub fn into_flex(self) -> {flex_type} {{\n"));
+    out.push_str("        self.pin\n    }\n\n");
+    out.push_str("    pub fn pin_name(&self) -> &'static str {\n");
+    out.push_str("        self.pin.pin_name()\n    }\n\n");
+    out.push_str("    pub fn role(&self) -> &'static metadata::PinRole {\n");
+    out.push_str("        self.pin.role()\n    }\n\n");
+    out.push_str("    pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {\n");
+    out.push_str("        self.pin.set_pull(pull)\n    }\n\n");
+    out.push_str("    pub fn is_high(&self) -> Result<bool, metadata::Error> {\n");
+    out.push_str("        self.pin.is_high()\n    }\n\n");
+    out.push_str("    pub fn is_low(&self) -> Result<bool, metadata::Error> {\n");
+    out.push_str("        self.pin.is_low()\n    }\n\n");
+    out.push_str("    pub fn get_level(&self) -> Result<Level, metadata::Error> {\n");
+    out.push_str("        self.pin.get_level()\n    }\n");
+    out.push_str("}\n\n");
+
+    out.push_str(&format!("impl {output_type} {{\n"));
+    out.push_str(&format!("    pub fn into_flex(self) -> {flex_type} {{\n"));
+    out.push_str("        self.pin\n    }\n\n");
+    out.push_str("    pub fn pin_name(&self) -> &'static str {\n");
+    out.push_str("        self.pin.pin_name()\n    }\n\n");
+    out.push_str("    pub fn role(&self) -> &'static metadata::PinRole {\n");
+    out.push_str("        self.pin.role()\n    }\n\n");
+    out.push_str("    pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {\n");
+    out.push_str("        self.pin.set_pull(pull)\n    }\n\n");
+    out.push_str("    pub fn set_high(&self) -> Result<(), metadata::Error> {\n");
+    out.push_str("        self.pin.set_high()\n    }\n\n");
+    out.push_str("    pub fn set_low(&self) -> Result<(), metadata::Error> {\n");
+    out.push_str("        self.pin.set_low()\n    }\n\n");
+    out.push_str("    pub fn set_level(&self, level: Level) -> Result<(), metadata::Error> {\n");
+    out.push_str("        self.pin.set_level(level)\n    }\n\n");
+    out.push_str("    pub fn is_set_high(&self) -> Result<bool, metadata::Error> {\n");
+    out.push_str("        self.pin.is_set_high()\n    }\n\n");
+    out.push_str("    pub fn is_set_low(&self) -> Result<bool, metadata::Error> {\n");
+    out.push_str("        self.pin.is_set_low()\n    }\n\n");
+    out.push_str("    pub fn get_output_level(&self) -> Result<Level, metadata::Error> {\n");
+    out.push_str("        self.pin.get_output_level()\n    }\n");
+    out.push_str("}\n\n");
+
+    Ok(out)
+}
+
+fn resolve_gpio_port_lowering(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<ResolvedGpioPortLowering> {
+    let target_ref = driver.target.target_ref.as_str();
+    let moder = resolve_gpio_register32(model, target_ref, "MODER", driver)?;
+    let pupdr = resolve_gpio_register32(model, target_ref, "PUPDR", driver)?;
+    let idr = resolve_gpio_register32(model, target_ref, "IDR", driver)?;
+    let odr = resolve_gpio_register32(model, target_ref, "ODR", driver)?;
+    let bsrr = resolve_gpio_register32(model, target_ref, "BSRR", driver)?;
+    let mut pins = Vec::with_capacity(driver.pin_roles.len());
+    let mut seen_accessors = BTreeSet::new();
+
+    for (role_index, pin_role) in driver.pin_roles.iter().enumerate() {
+        let [route] = pin_role.routes.as_slice() else {
+            bail!(
+                "gpio-port driver {} pin role {} requires exactly one route for first-cut per-pin lowering, found {}",
+                driver.id,
+                pin_role.role,
+                pin_role.routes.len()
+            );
+        };
+        if route.peripheral_ref != target_ref {
+            bail!(
+                "gpio-port driver {} pin role {} references pin route {} for {} instead of {}",
+                driver.id,
+                pin_role.role,
+                route.id,
+                route.peripheral_ref,
+                target_ref
+            );
+        }
+        let pin = model
+            .pins
+            .iter()
+            .find(|candidate| candidate.id == route.pin_ref)
+            .ok_or_else(|| {
+                anyhow!(
+                    "gpio-port driver {} route {} references unknown physical pin {}",
+                    driver.id,
+                    route.id,
+                    route.pin_ref
+                )
+            })?;
+        let pin_index = pin.index.ok_or_else(|| {
+            anyhow!(
+                "gpio-port driver {} route {} references pin {} without an index required for lowering",
+                driver.id,
+                route.id,
+                pin.id
+            )
+        })?;
+        let accessor_name = to_rust_method_name(&pin.name);
+        if !seen_accessors.insert(accessor_name.clone()) {
+            bail!(
+                "gpio-port driver {} would generate duplicate pin accessor {}",
+                driver.id,
+                accessor_name
+            );
+        }
+
+        let moder_field = resolve_register_field(&moder, &format!("MODER{pin_index}"))?;
+        validate_field_width(&moder_field, &moder, 2)?;
+        let pupdr_field = resolve_register_field(&pupdr, &format!("PUPDR{pin_index}"))?;
+        validate_field_width(&pupdr_field, &pupdr, 2)?;
+        let idr_field = resolve_register_field(&idr, &format!("IDR{pin_index}"))?;
+        let odr_field = resolve_register_field(&odr, &format!("ODR{pin_index}"))?;
+        let bs_field = resolve_register_field(&bsrr, &format!("BS{pin_index}"))?;
+        let br_field = resolve_register_field(&bsrr, &format!("BR{pin_index}"))?;
+        let moder_shift = moder_field.lsb;
+        let pupdr_shift = pupdr_field.lsb;
+
+        pins.push(ResolvedGpioPinLowering {
+            role_index,
+            pin_name: pin.name.clone(),
+            accessor_name,
+            moder_clear_mask: shifted_field_mask(&moder_field, &moder)?,
+            moder_output_mask: 1u32 << moder_shift,
+            pupdr_clear_mask: shifted_field_mask(&pupdr_field, &pupdr)?,
+            pupdr_up_mask: 1u32 << pupdr_shift,
+            pupdr_down_mask: 2u32 << pupdr_shift,
+            idr_mask: field_bit_mask(&idr_field, &idr)?,
+            odr_mask: field_bit_mask(&odr_field, &odr)?,
+            bsrr_set_mask: field_bit_mask(&bs_field, &bsrr)?,
+            bsrr_reset_mask: field_bit_mask(&br_field, &bsrr)?,
+        });
+    }
+
+    Ok(ResolvedGpioPortLowering {
+        moder,
+        pupdr,
+        idr,
+        odr,
+        bsrr,
+        pins,
+    })
+}
+
+fn resolve_gpio_register32(
+    model: &EmbassyGenerationModel,
+    target_ref: &str,
+    register_name: &str,
+    driver: &ResolvedDriverInstance,
+) -> Result<ResolvedRegister> {
+    let register = try_resolve_target_register_by_name(model, target_ref, register_name)?
+        .ok_or_else(|| {
+            anyhow!(
+                "gpio-port driver {} requires {} on target {} for first-cut lowering",
+                driver.id,
+                register_name,
+                target_ref
+            )
+        })?;
+    if register.width_bits != 32 {
+        bail!(
+            "gpio-port driver {} requires 32-bit {} but {} uses width {}",
+            driver.id,
+            register_name,
+            register.id,
+            register.width_bits
+        );
+    }
+    Ok(register)
+}
+
+fn validate_field_width(
+    field: &ResolvedField,
+    register: &ResolvedRegister,
+    expected_width: u32,
+) -> Result<()> {
+    let actual_width = field
+        .msb
+        .checked_sub(field.lsb)
+        .and_then(|delta| delta.checked_add(1))
+        .ok_or_else(|| anyhow!("field {} has an invalid bit range", field.name))?;
+    if actual_width != expected_width {
+        bail!(
+            "field {} on register {} uses width {} but first-cut lowering requires {}",
+            field.name,
+            register.id,
+            actual_width,
+            expected_width
+        );
+    }
+    Ok(())
 }
 
 fn render_usart_methods(
@@ -7252,6 +7662,26 @@ mod tests {
         assert!(rcc_rs.contains("pub fn apply_init"));
         assert!(gpio_rs.contains("pub fn enable_clock"));
         assert!(gpio_rs.contains("pub fn assert_reset"));
+        assert!(gpio_rs.contains("pub enum Pull"));
+        assert!(gpio_rs.contains("pub enum Level"));
+        assert!(gpio_rs.contains("pub struct GpioAFlex"));
+        assert!(gpio_rs.contains("pub struct GpioAInput"));
+        assert!(gpio_rs.contains("pub struct GpioAOutput"));
+        assert!(gpio_rs.contains("#[derive(Debug, Clone)]\npub struct GpioAFlex"));
+        assert!(gpio_rs.contains("#[derive(Debug, Clone)]\npub struct GpioAInput"));
+        assert!(gpio_rs.contains("#[derive(Debug, Clone)]\npub struct GpioAOutput"));
+        assert!(!gpio_rs.contains("#[derive(Debug, Clone, Copy)]\npub struct GpioAFlex"));
+        assert!(!gpio_rs.contains("#[derive(Debug, Clone, Copy)]\npub struct GpioAInput"));
+        assert!(!gpio_rs.contains("#[derive(Debug, Clone, Copy)]\npub struct GpioAOutput"));
+        assert!(gpio_rs.contains("pub fn pa0(&self) -> GpioAFlex"));
+        assert!(gpio_rs.contains("pub fn into_input(self, pull: Pull)"));
+        assert!(gpio_rs.contains("pub fn into_output(self, initial_level: Level)"));
+        assert!(gpio_rs.contains("pub fn set_pull(&self, pull: Pull)"));
+        assert!(gpio_rs.contains("pub fn is_high(&self) -> Result<bool, metadata::Error>"));
+        assert!(
+            gpio_rs.contains("pub fn get_output_level(&self) -> Result<Level, metadata::Error>")
+        );
+        assert!(gpio_rs.contains("write_u32(self.bsrr_addr, self.bsrr_set_mask)?;"));
         assert!(uart_rs.contains("pub fn enable_clock"));
         assert!(uart_rs.contains("pub fn release_reset"));
         assert!(uart_rs.contains("pub fn configure_tx_pa9_route"));
@@ -7278,6 +7708,144 @@ mod tests {
         assert!(adc_rs.contains("pub fn apply_calibrate"));
         assert!(adc_rs.contains("modify_u32("));
         assert!(dma_rs.contains("pub fn enable_clock"));
+    }
+
+    #[test]
+    fn generate_embassy_injects_gpio_prelude_for_non_gpio_module_path() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let driver_instances = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let gpio_driver = driver_instances
+            .iter_mut()
+            .find(|driver| driver["id"] == "drv.gpioa")
+            .and_then(Value::as_object_mut)
+            .expect("gpio driver");
+        gpio_driver.insert("modulePath".to_string(), Value::String("porta".to_string()));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("fixture with custom gpio module path should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
+
+        let porta_rs = std::fs::read_to_string(output_dir.path().join("src").join("porta.rs"))
+            .expect("porta.rs");
+        assert!(porta_rs.contains("pub enum Pull"));
+        assert!(porta_rs.contains("pub enum Level"));
+        assert!(porta_rs.contains("pub struct GpioAFlex"));
+
+        let cargo_output = Command::new("cargo")
+            .arg("check")
+            .current_dir(output_dir.path())
+            .output()
+            .expect("cargo check");
+        assert!(
+            cargo_output.status.success(),
+            "generated crate should compile:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&cargo_output.stdout),
+            String::from_utf8_lossy(&cargo_output.stderr)
+        );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_gpio_driver_without_required_pull_register() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let gpioa_registers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals")
+            .iter_mut()
+            .find_map(|peripheral| {
+                let peripheral = peripheral.as_object_mut()?;
+                (peripheral.get("id").and_then(Value::as_str) == Some("periph.gpioa"))
+                    .then_some(peripheral)
+            })
+            .expect("gpioa peripheral")
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("gpioa registers");
+        gpioa_registers.retain(|register| {
+            register
+                .as_object()
+                .and_then(|register| register.get("name"))
+                .and_then(Value::as_str)
+                != Some("PUPDR")
+        });
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("fixture without pupdr should still validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("requires PUPDR"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_gpio_driver_with_route_for_other_port() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let routes = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("pinTopology")
+            .and_then(Value::as_object_mut)
+            .expect("pinTopology object")
+            .get_mut("routes")
+            .and_then(Value::as_array_mut)
+            .expect("routes");
+        let gpio_route = routes
+            .iter_mut()
+            .find(|route| route["id"] == "pinroute.gpioa.pa0")
+            .and_then(Value::as_object_mut)
+            .expect("gpio route");
+        gpio_route.insert(
+            "peripheralRef".to_string(),
+            serde_json::json!("periph.gpiob"),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("fixture with mismatched gpio route should still validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains(
+            "references pin route pinroute.gpioa.pa0 for periph.gpiob instead of periph.gpioa"
+        ));
     }
 
     #[test]
@@ -9327,7 +9895,21 @@ mod tests {
                                 { "id": "field.gpioa.moder.moder11", "name": "MODER11", "bitRange": { "lsb": 22, "msb": 23 } },
                                 { "id": "field.gpioa.moder.moder10", "name": "MODER10", "bitRange": { "lsb": 20, "msb": 21 } },
                                 { "id": "field.gpioa.moder.moder9", "name": "MODER9", "bitRange": { "lsb": 18, "msb": 19 } },
-                                { "id": "field.gpioa.moder.moder8", "name": "MODER8", "bitRange": { "lsb": 16, "msb": 17 } }
+                                { "id": "field.gpioa.moder.moder8", "name": "MODER8", "bitRange": { "lsb": 16, "msb": 17 } },
+                                { "id": "field.gpioa.moder.moder0", "name": "MODER0", "bitRange": { "lsb": 0, "msb": 1 } }
+                            ] },
+                            { "id": "reg.gpioa.pupdr", "name": "PUPDR", "kind": "register", "offsetBytes": 12, "widthBits": 32, "fields": [
+                                { "id": "field.gpioa.pupdr.pupdr0", "name": "PUPDR0", "bitRange": { "lsb": 0, "msb": 1 } }
+                            ] },
+                            { "id": "reg.gpioa.idr", "name": "IDR", "kind": "register", "offsetBytes": 16, "widthBits": 32, "fields": [
+                                { "id": "field.gpioa.idr.idr0", "name": "IDR0", "bitRange": { "lsb": 0, "msb": 0 } }
+                            ] },
+                            { "id": "reg.gpioa.odr", "name": "ODR", "kind": "register", "offsetBytes": 20, "widthBits": 32, "fields": [
+                                { "id": "field.gpioa.odr.odr0", "name": "ODR0", "bitRange": { "lsb": 0, "msb": 0 } }
+                            ] },
+                            { "id": "reg.gpioa.bsrr", "name": "BSRR", "kind": "register", "offsetBytes": 24, "widthBits": 32, "fields": [
+                                { "id": "field.gpioa.bsrr.bs0", "name": "BS0", "bitRange": { "lsb": 0, "msb": 0 } },
+                                { "id": "field.gpioa.bsrr.br0", "name": "BR0", "bitRange": { "lsb": 16, "msb": 16 } }
                             ] },
                             { "id": "reg.gpioa.afrh", "name": "AFRH", "kind": "register", "offsetBytes": 36, "widthBits": 32, "fields": [
                                 { "id": "field.gpioa.afrh.afrh12", "name": "AFRH12", "bitRange": { "lsb": 16, "msb": 19 } },

@@ -6,7 +6,7 @@
 - **Package:** LQFP64 (`STM32F405RGTx` exact-chip topology source)
 - **Requested profile scope:** core HAIR + `profiles.mcuSoc` + `profiles.embassyHal`
 - **Requested Embassy driver scope:** as much of the supported first-cut subset as the evidence can defend
-- **Status:** Full register-bearing structure was imported from the official STM32F405 SVD snapshot; Embassy profile coverage is limited to executable first-cut `uart`/`usart`, `spi`, `i2c`, and `interrupt` drivers, while `profiles.mcuSoc` still preserves the supporting RCC/DMA/pin/interrupt topology used to defend those bindings.
+- **Status:** Full register-bearing structure was imported from the official STM32F405 SVD snapshot; Embassy profile coverage now includes executable first-cut `gpio-port`, `uart`/`usart`, `spi`, `i2c`, and `interrupt` drivers, while `profiles.mcuSoc` still preserves the supporting RCC/DMA/pin/interrupt topology used to defend those bindings. Alternate-function GPIO helpers, EXTI, and host-driven GPIO input stimulation remain out of scope for this pass.
 
 ## Source Inventory
 | Source ID | Kind | Location | Version | Notes | Likely HAIR layers |
@@ -26,7 +26,7 @@
 - Full register-bearing MMIO model imported for 66 peripherals from the STM32F405 SVD snapshot
 - Package-filtered pin inventory and alternate-function routing for the LQFP64 exact-chip variant
 - RCC-based clock/reset bindings, interrupt routing, and DMA route candidates from exact-chip community topology
-- Embassy HAL driver instances for the evidence-defended first-cut subset: uart/usart, spi, i2c, and interrupt
+- Embassy HAL driver instances for the evidence-defended first-cut subset: gpio-port, uart/usart, spi, i2c, and interrupt
 
 ## Component Inventory
 | Subsystem | Components discovered |
@@ -43,13 +43,14 @@
 
 | Metadata class | Extraction status | Supporting evidence |
 | --- | --- | --- |
-| Peripheral/register/field topology | Extracted for 66 peripherals, 986 registers, and 7311 fields. | Official ST SVD bundle snapshot. |
+| Peripheral/register/field topology | Extracted for 66 peripherals, 777 registers, and 6318 fields. | Official ST SVD bundle snapshot. |
 | CPU flags and IRQ numbers | Extracted. | Official CMSIS header plus startup vector cross-check. |
 | Exact-package pin map and AF routes | Extracted. | `STM32F405RG.json`. |
 | RCC clock/reset bindings | Extracted for topology-carrying peripherals. | `STM32F405RG.json` plus SVD-resolved RCC field references. |
 | Interrupt routes | Extracted for community-topology-described peripheral signals and DMA streams. | `STM32F405RG.json`, CMSIS header, startup file. |
 | DMA route candidates with RX/TX direction | Extracted conservatively, with USART1 driver-local `dmaRouteRefs` and route `controlRefs` added for executable lowering. | `STM32F405RG.json` plus STM32F405 register structure. |
 | USART1 lowering selectors | Extracted for the executable USART path, including pin-route `controlRefs` and driver DMA bindings. | `STM32F405RG.json` plus STM32F405 register structure. |
+| GPIO lowering selectors | Extracted for executable GPIO ports, including package-bonded per-pin routes plus the register-bearing controls needed for mode, pull, input, and output lowering. | `STM32F405RG.json` plus STM32F405 register structure. |
 
 ### Metadata present in approved evidence but not extracted
 
@@ -97,15 +98,15 @@
 ## Unresolved Differences Inventory
 - The physical/topology model is exact-package-filtered, but the core register-bearing structure remains family-level because the official ST SVD is family-level.
 - DMA request selector values are preserved textually in `dmaTopology.routes[].description`, not as a dedicated structured property.
-- `profiles.embassyHal` intentionally excludes `rcc`, `gpio-port`, `dma`, `timer`, `pwm`, and `adc` driver instances from the final executable subset; the supporting topology remains in `profiles.mcuSoc`, and USART1 now carries the richer lowering selectors needed for generated polling/interrupt/DMA helpers.
+- `profiles.embassyHal` intentionally excludes `rcc`, `dma`, `timer`, `pwm`, and `adc` driver instances from the final executable subset; the supporting topology remains in `profiles.mcuSoc`, GPIO ports now carry the per-pin lowering inputs for generated input/output/pull helpers, and USART1 carries the richer lowering selectors needed for generated polling/interrupt/DMA helpers.
 
 ## Coverage
 - **Examined**: manifest, repository schemas/docs, official CMSIS header, official startup file, official STM32F405 SVD bundle snapshot, stm32-rs STM32F405 patch recipe, Embassy exact-chip JSON, Embassy chip feature manifest, and Olimex product page
 - **Method**: manifest authoring, scoped source reads, SVD-to-HAIR structural import, package-filtered topology import, executable-readiness enrichment for requested drivers, conservative Embassy profile synthesis, schema validation, and downstream generation
-- **Excluded**: GD32 substitution path, non-Embassy-supported peripheral classes, and Embassy `rcc`/`gpio-port`/`dma`/`timer`/`pwm`/`adc` drivers that did not survive executable-lowering checks
+- **Excluded**: GD32 substitution path, non-Embassy-supported peripheral classes, and Embassy `rcc`/`dma`/`timer`/`pwm`/`adc` drivers that did not survive executable-lowering checks
 - **Limitations**: ST PDF documents were referenced through approved source metadata, but this pass primarily operationalized the official header/startup/SVD and exact-chip structured topology because those were immediately machine-readable and auditable
 
 ## Limitations
 - The top-level device is concrete to STM32F405RGT6, but several official ST inputs are family-level STM32F405/415 documents.
 - The SVD import does not recover rich enumerated values for the STM32F405 field set.
-- Embassy `rcc`, `gpio-port`, and `dma` driver instances were defensible at the topology level but did not survive the current executable-lowering contract; `timer`, `pwm`, and `adc` remain out of scope until a dedicated semantics pass grounds their operations and state machines.
+- Embassy `gpio-port` now survives the current executable-lowering contract for per-pin input/output/pull helpers, but alternate-function GPIO helpers, EXTI, and host-driven GPIO input stimulation remain out of scope; `rcc`, `dma`, `timer`, `pwm`, and `adc` still need additional lowering contracts before they can join the executable subset.

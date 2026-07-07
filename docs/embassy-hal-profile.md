@@ -116,7 +116,7 @@ The first Embassy generator cut is expected to support this driver subset:
 | `driverKind` | First-cut status | Notes |
 | --- | --- | --- |
 | `rcc` | supported | Generates clock/reset bring-up support from `clockResetTopology` and referenced operations. |
-| `gpio-port` | supported | Generates GPIO port and pin-level alternate-function support from `pinTopology.routes`. |
+| `gpio-port` | supported | Generates a canonical per-pin GPIO API from a `gpio-port` driver instance. The first cut covers input/output mode, pull configuration, output writes, and level/state reads when those behaviors are backed by explicit lowering inputs; alternate-function setup and EXTI remain out of scope. |
 | `uart` / `usart` | supported | Requires explicit pin-routing data. Interrupt and DMA routes are required for async DMA-backed transfers and may be omitted for pure polling-mode instances. |
 | `spi` | supported | Requires explicit pin-routing data and any claimed DMA bindings. |
 | `i2c` | supported | Requires explicit pin-routing data and any claimed interrupt/DMA bindings. |
@@ -144,7 +144,7 @@ hoc name matching.
 | `driverKind` | Minimum required supporting data |
 | --- | --- |
 | `rcc` | `profiles.mcuSoc.clockResetTopology`; referenced `clockBindingRefs` / `resetBindingRefs`; binding `controlRefs` plus field-level structure for emitted clock/reset helpers; and referenced semantic operations for any additional emitted RCC operation helpers |
-| `gpio-port` | `profiles.mcuSoc.pinTopology.routes`; clock and/or reset bindings for emitted bring-up helpers in the first cut; and any referenced route `controlRefs` plus structural register/field data for emitted mode/remap/output helpers |
+| `gpio-port` | `profiles.mcuSoc.pinTopology.routes`; clock and/or reset bindings for emitted bring-up helpers in the first cut; and any referenced route `controlRefs` plus structural register/field data for emitted per-pin input/output/pull helpers and output/input readback. For STM32-class lowering paths, the reachable structure typically includes mode, output-latch, output-write, input-sample, and pull-configuration registers/fields (for example `MODER`, `ODR`, `BSRR`, `IDR`, and `PUPDR` when the emitted API claims them). |
 | `uart` / `usart` | `pinTopology.routes` always; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted enable/configure/read/write path; `interruptTopology.routes` and `dmaTopology.routes` only for emitted interrupt-driven or DMA-backed APIs |
 | `spi` | `pinTopology.routes`; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted configuration or transfer path; interrupt/DMA routes only when the emitted API claims them |
 | `i2c` | `pinTopology.routes`; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted bus transaction path; interrupt/DMA routes only when the emitted API claims them |
@@ -162,7 +162,7 @@ exact naming contract:
 | `driverKind` | Intended emitted API categories |
 | --- | --- |
 | `rcc` | Per-binding clock-enable / clock-disable / reset-assert / reset-release helpers when justified by the resolved topology and lowering inputs |
-| `gpio-port` | Clock/reset bring-up helpers in the first cut, plus pin- and route-oriented configuration helpers only for modes/remaps that can be lowered from explicit route controls plus register/field structure |
+| `gpio-port` | Clock/reset bring-up helpers plus per-pin `Input` / `Output` / `Flex`-style configuration and state helpers only for the behaviors that can be lowered from explicit route controls plus register/field structure. In the first cut that means input/output mode selection, pull configuration, output set/clear, output-state reads, and input-level reads; alternate-function setup and EXTI helpers remain out of scope. |
 | `uart` / `usart` | Bring-up helpers and only those polling / interrupt / DMA TX/RX methods whose control/data paths are explicitly modeled |
 | `spi` | Bring-up helpers and only those transfer/control methods whose clocking, enable, and data paths are explicitly modeled |
 | `i2c` | Bring-up helpers and only those bus transaction methods whose start/address/data/stop behavior is explicitly modeled |
@@ -190,6 +190,7 @@ driver contract.
 5. Unsupported optional hardware must produce an explicit generator error, not a stub or silently degraded driver.
 6. `initOperationRefs` and `stateMachineRefs` should be treated as executable lowering inputs, not as documentation-only labels.
 7. A driver instance should not be interpreted as claiming every imaginable operation for its `driverKind`; it only claims the subset that the referenced topology and semantics can justify.
+8. A `gpio-port` driver instance may still lower to a per-pin generated API surface; the HAIR contract stays rooted at the port block while each emitted pin helper must remain traceable to explicit `pinRoles`, routes, and reachable structural controls for that pin.
 
 ## Failure contract
 
