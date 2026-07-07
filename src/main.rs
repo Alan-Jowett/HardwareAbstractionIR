@@ -3495,6 +3495,16 @@ fn resolve_gpio_port_lowering(
                 pin_role.routes.len()
             );
         };
+        if route.peripheral_ref != target_ref {
+            bail!(
+                "gpio-port driver {} pin role {} references pin route {} for {} instead of {}",
+                driver.id,
+                pin_role.role,
+                route.id,
+                route.peripheral_ref,
+                target_ref
+            );
+        }
         let pin = model
             .pins
             .iter()
@@ -7734,6 +7744,48 @@ mod tests {
         let error =
             generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
         assert!(error.to_string().contains("requires PUPDR"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_gpio_driver_with_route_for_other_port() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let routes = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("pinTopology")
+            .and_then(Value::as_object_mut)
+            .expect("pinTopology object")
+            .get_mut("routes")
+            .and_then(Value::as_array_mut)
+            .expect("routes");
+        let gpio_route = routes
+            .iter_mut()
+            .find(|route| route["id"] == "pinroute.gpioa.pa0")
+            .and_then(Value::as_object_mut)
+            .expect("gpio route");
+        gpio_route.insert(
+            "peripheralRef".to_string(),
+            serde_json::json!("periph.gpiob"),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("fixture with mismatched gpio route should still validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains(
+            "references pin route pinroute.gpioa.pa0 for periph.gpiob instead of periph.gpioa"
+        ));
     }
 
     #[test]
