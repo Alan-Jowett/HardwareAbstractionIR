@@ -52,8 +52,7 @@ fn pass() -> ! {
     }
 }
 
-#[embassy_executor::main]
-async fn main(_spawner: Spawner) {
+fn smoke_gpioa() {
     let gpioa = GpioA::new(DRV_GPIOA_RESOURCES).unwrap();
     gpioa.enable_clock().unwrap();
     expect((read_reg(RCC_AHB1ENR) & GPIOA_ENABLE_BIT) != 0);
@@ -81,7 +80,9 @@ async fn main(_spawner: Spawner) {
     expect((read_reg(GPIOA_MODER) & GPIOA_PIN0_MODE_MASK) == 0);
     expect((read_reg(GPIOA_PUPDR) & GPIOA_PIN0_PUPDR_MASK) == GPIOA_PIN0_PUPDR_DOWN);
     expect(pa0_input.is_low().unwrap());
+}
 
+fn smoke_usart1() {
     let usart1 = Usart1::new(DRV_USART1_RESOURCES).unwrap();
     usart1.enable_clock().unwrap();
     usart1.assert_reset().unwrap();
@@ -94,10 +95,13 @@ async fn main(_spawner: Spawner) {
         .unwrap();
     usart1.enable_transmitter().unwrap();
     usart1.enable().unwrap();
-    usart1
-        .write_bytes(b"GPIO + USART smoke passed\r\n")
-        .unwrap();
+    usart1.write_bytes(b"Hello, USART1 from QEMU!\r\n").unwrap();
     usart1.flush().unwrap();
+}
 
+#[embassy_executor::main]
+async fn main(_spawner: Spawner) {
+    smoke_gpioa();
+    smoke_usart1();
     pass();
 }
