@@ -49,17 +49,21 @@ jobs:
           targets: ${{ inputs.rust-target }}
 
       - name: Validate reusable workflow inputs
+        env:
+          SMOKE_MODE_INPUT: ${{ inputs.smoke-mode }}
+          SMOKE_DIR_INPUT: ${{ inputs.smoke-dir }}
+          SMOKE_COMMAND_INPUT: ${{ inputs.smoke-command }}
         shell: bash
         run: |
           set -euo pipefail
 
-          case "${{ inputs.smoke-mode }}" in
+          case "$SMOKE_MODE_INPUT" in
             required)
-              test -n "${{ inputs.smoke-dir }}" || {
+              test -n "$SMOKE_DIR_INPUT" || {
                 echo "smoke-dir is required when smoke-mode=required" >&2
                 exit 1
               }
-              test -n "${{ inputs.smoke-command }}" || {
+              test -n "$SMOKE_COMMAND_INPUT" || {
                 echo "smoke-command is required when smoke-mode=required" >&2
                 exit 1
               }
@@ -67,7 +71,7 @@ jobs:
             unsupported)
               ;;
             *)
-              echo "unsupported smoke-mode: ${{ inputs.smoke-mode }}" >&2
+              echo "unsupported smoke-mode: $SMOKE_MODE_INPUT" >&2
               exit 1
               ;;
           esac
