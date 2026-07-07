@@ -146,13 +146,16 @@ jobs:
           if [[ -f "${{ inputs.pac-dir }}/Cargo.lock" ]]; then
             cp "${{ inputs.pac-dir }}/Cargo.lock" "$RUNNER_TEMP/generated-pac/Cargo.lock"
           fi
-          cargo check --target "${{ inputs.rust-target }}" --manifest-path "$RUNNER_TEMP/generated-pac/Cargo.toml"
+          cargo check --locked --target "${{ inputs.rust-target }}" --manifest-path "$RUNNER_TEMP/generated-pac/Cargo.toml"
 
       - name: Build regenerated Embassy HAL crate
         shell: bash
         run: |
           set -euo pipefail
-          cargo check --target "${{ inputs.rust-target }}" --manifest-path "$RUNNER_TEMP/generated-embassy/Cargo.toml"
+          if [[ -f "${{ inputs.embassy-dir }}/Cargo.lock" ]]; then
+            cp "${{ inputs.embassy-dir }}/Cargo.lock" "$RUNNER_TEMP/generated-embassy/Cargo.lock"
+          fi
+          cargo check --locked --target "${{ inputs.rust-target }}" --manifest-path "$RUNNER_TEMP/generated-embassy/Cargo.toml"
 
       - name: Report intentionally unsupported smoke target
         if: ${{ inputs.smoke-mode == 'unsupported' }}
@@ -165,7 +168,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo build --target "${{ inputs.rust-target }}"
+          cargo build --locked --target "${{ inputs.rust-target }}"
 
       - name: Run smoke harness
         if: ${{ inputs.smoke-mode == 'required' }}
