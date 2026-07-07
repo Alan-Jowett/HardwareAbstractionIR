@@ -7272,7 +7272,7 @@ fn render_embassy_host_driver_emulator(
     }
     if driver.driver_kind == "interrupt" {
         out.push_str(
-            "    pub fn trigger(&self, irq: Irq) {\n        metadata::set_irq_pending_for(&self.state, irq as i32, true)\n    }\n\n    pub fn clear(&self, irq: Irq) {\n        metadata::set_irq_pending_for(&self.state, irq as i32, false)\n    }\n\n    pub fn is_pending(&self, irq: Irq) -> bool {\n        metadata::is_irq_pending_for(&self.state, irq as i32)\n    }\n\n",
+            "    pub fn trigger(&self, irq: crate::interrupt::Irq) {\n        metadata::set_irq_pending_for(&self.state, irq as i32, true)\n    }\n\n    pub fn clear(&self, irq: crate::interrupt::Irq) {\n        metadata::set_irq_pending_for(&self.state, irq as i32, false)\n    }\n\n    pub fn is_pending(&self, irq: crate::interrupt::Irq) -> bool {\n        metadata::is_irq_pending_for(&self.state, irq as i32)\n    }\n\n",
         );
     }
     if driver.driver_kind == "dma" {
@@ -8775,6 +8775,18 @@ fn host_emulator_wires_hal_and_companion_state() {
         assert!(time_rs.contains("init_time_driver"));
         assert!(time_rs.contains("advance_drv_time_time_driver"));
         assert!(time_rs.contains("time_driver_impl!"));
+
+        let cargo_output = Command::new("cargo")
+            .arg("check")
+            .current_dir(output_dir.path())
+            .output()
+            .expect("cargo check");
+        assert!(
+            cargo_output.status.success(),
+            "generated time-driver host crate should compile:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&cargo_output.stdout),
+            String::from_utf8_lossy(&cargo_output.stderr)
+        );
     }
 
     #[test]
