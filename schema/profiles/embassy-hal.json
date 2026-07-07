@@ -130,6 +130,7 @@
         },
         {
           "type": "object",
+          "description": "A generator-facing driver instance. Executable behavior must be justified by the referenced topology and semantic records plus structural register/field data reachable either directly or through explicit resolvable structural relationships.",
           "properties": {
             "targetRef": {
               "description": "For the first Embassy generator cut, this should resolve to a canonical block in profiles.mcuSoc that the driver instance lowers from.",

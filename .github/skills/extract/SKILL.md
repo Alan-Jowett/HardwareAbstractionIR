@@ -355,6 +355,30 @@ where applicable:
 - `profiles.embassyHal.crate`
 - `profiles.embassyHal.driverInstances`
 
+For any requested driver set that is expected to support **executable**
+generation, do not stop at resource discovery. Gather the lowering-critical
+facts generically for the in-scope peripherals, including where
+applicable:
+
+- topology selectors and controls such as route or binding `controlRefs`,
+  controller/channel/CPU-target selectors, and reset-default route choice
+- semantic operations and state machines for the claimed enable,
+  configure, transfer, acknowledge, conversion, or mode-transition paths
+- structural register and field data reachable from the claimed lowering
+  path, either directly or through explicit resolvable structural
+  relationships such as `derivedFromRef`
+
+If the approved evidence supports clocks, pins, interrupts, DMA channels,
+or semantic labels for a requested driver but does **not** support the
+controls, operations, or structural reachability needed for executable
+lowering, classify that driver as not executable-ready and record the root
+cause instead of presenting it as Embassy-ready. Do not emit that driver
+instance in `profiles.embassyHal.driverInstances` unless the user has
+explicitly approved a narrower non-executable scope for it. When a
+specifically requested driver instance fails this gate and the user has
+not pre-approved omission, stop and ask whether to narrow scope rather
+than silently dropping it.
+
 Do not invent an Embassy-ready driver inventory from vendor naming alone.
 If the requested driver set is unclear or the evidence cannot support the
 required bindings, stop and ask the user to narrow scope or provide more
@@ -384,6 +408,8 @@ The draft report must also include:
     - requested driver/profile scope
     - driver instances extracted
     - required supporting topology/semantic records
+    - lowering-critical selectors / controls / operations captured or missing
+    - whether required structural lowering data is direct or inherited but resolvable
     - unresolved readiness blockers and their root causes
 
 In the Normalization and Completeness Matrix, record for each approved
@@ -547,6 +573,9 @@ Run consistency checks across the JSON:
 - any same-offset alternate-register views preserve aligned
   offset/width/access/reset semantics and use `alternateOfRef` rather
   than flattening incompatible field layouts into one register
+- any requested executable driver scope has explicit lowering-critical
+  controls, operations, and structurally reachable register/field data for
+  each claimed behavior, or is called out as not executable-ready
 
 Run a **structural + metadata completeness gate** before allowing final
 emission:
@@ -566,12 +595,20 @@ emission:
 - explicitly investigate whether any register-level overlay evidence
   should be represented as alternate-register views with
   `alternateOfRef` rather than as one flattened register
+- explicitly investigate whether any requested executable driver depends on
+  structural data that is only reachable through inheritance or shared-base
+  topology, and verify that the relationship is recorded explicitly and
+  remains resolvable without guessing
 - if the register pass was skipped, incomplete, or only partially
   normalized, treat that as a blocker and stop instead of emitting final
   deliverables
 - if evidence-supported metadata was omitted, treat that as a blocker and
   stop instead of describing the result as a complete full-device
   extraction
+- if an in-scope executable driver is described with resource metadata but
+  lacks the controls, semantic operations, or structural reachability
+  required for real lowering, treat that as a blocker for claiming that
+  driver is Embassy-ready
 
 If a material entry cannot survive falsification, remove it or stop and
 ask the user. Do not leave unsupported claims in the final JSON.

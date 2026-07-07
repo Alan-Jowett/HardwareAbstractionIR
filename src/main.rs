@@ -1407,6 +1407,8 @@ struct McuPinTopology {
 struct McuPinRoute {
     id: String,
     name: String,
+    #[serde(default)]
+    description: Option<String>,
     pin_ref: String,
     peripheral_ref: String,
     signal: String,
@@ -1424,6 +1426,7 @@ struct McuPinRoute {
 #[derive(Debug, Clone)]
 struct ResolvedRegister {
     id: String,
+    name: String,
     peripheral_ref: String,
     absolute_address: u64,
     width_bits: u32,
@@ -1574,7 +1577,9 @@ struct EmbassyGenerationModel {
     interrupts: Vec<Interrupt>,
     pins: Vec<PhysicalPin>,
     drivers: Vec<ResolvedDriverInstance>,
+    peripherals: HashMap<String, Peripheral>,
     peripheral_names: HashMap<String, String>,
+    register_owners: HashMap<String, Vec<String>>,
     registers: HashMap<String, ResolvedRegister>,
     fields: HashMap<String, ResolvedFieldTarget>,
     provenance: HairProvenance,
@@ -1675,6 +1680,13 @@ impl EmbassyGenerationModel {
             .peripherals
             .iter()
             .map(|peripheral| (peripheral.id.clone(), peripheral.name.clone()))
+            .collect::<HashMap<_, _>>();
+        let peripherals = document
+            .structure
+            .device
+            .peripherals
+            .iter()
+            .map(|peripheral| (peripheral.id.clone(), peripheral.clone()))
             .collect::<HashMap<_, _>>();
         let register_owners = collect_register_owner_map(&document.structure.device.peripherals)?;
         let register_scope = EmbassyRegisterScopeInputs {
@@ -1846,7 +1858,9 @@ impl EmbassyGenerationModel {
             interrupts: document.structure.device.interrupts.clone(),
             pins: document.physical.pins.clone(),
             drivers,
+            peripherals,
             peripheral_names,
+            register_owners,
             registers,
             fields,
             provenance: document.provenance.clone(),
@@ -2898,6 +2912,8 @@ fn render_driver_methods(
     let mut methods = Vec::new();
     methods.extend(render_clock_binding_methods(model, driver)?);
     methods.extend(render_reset_binding_methods(model, driver)?);
+    methods.extend(render_pin_route_methods(model, driver)?);
+    methods.extend(render_usart_methods(model, driver)?);
     methods.extend(render_operation_methods(model, driver)?);
     methods.extend(render_state_machine_methods(model, driver)?);
 
@@ -2926,7 +2942,7 @@ fn render_driver_methods(
 }
 
 fn render_mmio_helpers() -> &'static str {
-    "#[allow(dead_code)]\nfn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {\n    let address = usize::try_from(address)\n        .map_err(|_| metadata::Error::Unsupported(\"MMIO address does not fit usize on this target\"))?;\n    if address % align != 0 {\n        return Err(metadata::Error::Unsupported(\"MMIO address is not naturally aligned for the target register width\"));\n    }\n    Ok(address)\n}\n\n#[allow(dead_code)]\nfn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u8>())?;\n    unsafe {\n        let current = read_volatile(address as *const u8);\n        write_volatile(address as *mut u8, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u16>())?;\n    unsafe {\n        let current = read_volatile(address as *const u16);\n        write_volatile(address as *mut u16, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        let current = read_volatile(address as *const u32);\n        write_volatile(address as *mut u32, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n"
+    "#[allow(dead_code)]\nfn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {\n    let address = usize::try_from(address)\n        .map_err(|_| metadata::Error::Unsupported(\"MMIO address does not fit usize on this target\"))?;\n    if address % align != 0 {\n        return Err(metadata::Error::Unsupported(\"MMIO address is not naturally aligned for the target register width\"));\n    }\n    Ok(address)\n}\n\n#[allow(dead_code)]\nfn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u8>())?;\n    unsafe {\n        let current = read_volatile(address as *const u8);\n        write_volatile(address as *mut u8, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u16>())?;\n    unsafe {\n        let current = read_volatile(address as *const u16);\n        write_volatile(address as *mut u16, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        let current = read_volatile(address as *const u32);\n        write_volatile(address as *mut u32, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn read_u32(address: u64) -> Result<u32, metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe { Ok(read_volatile(address as *const u32)) }\n}\n\n#[allow(dead_code)]\nfn write_u32(address: u64, value: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        write_volatile(address as *mut u32, value);\n    }\n    Ok(())\n}\n"
 }
 
 fn render_clock_binding_methods(
@@ -3092,6 +3108,371 @@ fn binding_method_name(prefix: &str, subject: &str, suffix: Option<&str>, noun: 
     }
 }
 
+fn render_pin_route_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    if !matches!(driver.driver_kind.as_str(), "uart" | "usart") {
+        return Ok(Vec::new());
+    }
+
+    let mut methods = Vec::new();
+    for pin_role in &driver.pin_roles {
+        for route in &pin_role.routes {
+            if let Some(method) = render_muxed_pin_route_method(model, driver, pin_role, route)? {
+                methods.push(method);
+            }
+        }
+    }
+    Ok(methods)
+}
+
+fn render_muxed_pin_route_method(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+    pin_role: &ResolvedEmbassyPinRole,
+    route: &McuPinRoute,
+) -> Result<Option<GeneratedMethod>> {
+    if route.route_type != "muxed" {
+        return Ok(None);
+    }
+
+    let Some(description) = route.description.as_deref() else {
+        return Ok(None);
+    };
+    let Some(alternate_function) = extract_alternate_function_index(description) else {
+        return Ok(None);
+    };
+
+    let Some(pin) = model.pins.iter().find(|pin| pin.id == route.pin_ref) else {
+        return Ok(None);
+    };
+    let Some(pin_index) = pin.index else {
+        return Ok(None);
+    };
+
+    let mut moder_register = None;
+    let mut afr_register = None;
+    for control_ref in &route.control_refs {
+        let Some(register) = try_resolve_register_by_ref(model, control_ref)? else {
+            continue;
+        };
+        match normalize_search_text(&register.name).as_str() {
+            "MODER" => moder_register = Some(register),
+            "AFRL" | "AFRH" => afr_register = Some(register),
+            _ => {}
+        }
+    }
+
+    let (Some(moder_register), Some(afr_register)) = (moder_register, afr_register) else {
+        return Ok(None);
+    };
+    let Some(moder_field) =
+        try_resolve_register_field(&moder_register, &format!("MODER{pin_index}"))
+    else {
+        return Ok(None);
+    };
+    let afr_field_name = if pin_index < 8 {
+        format!("AFRL{pin_index}")
+    } else {
+        format!("AFRH{pin_index}")
+    };
+    let Some(afr_field) = try_resolve_register_field(&afr_register, &afr_field_name) else {
+        return Ok(None);
+    };
+
+    let mut code = format!(
+        "    /// Configure the {} {} route on {}.\n",
+        render_comment_text(&driver.name),
+        render_comment_text(&route.signal),
+        render_comment_text(&pin.name),
+    );
+    let method_name = format!(
+        "configure_{}_route",
+        to_rust_method_name(&format!("{}_{}", pin_role.role, pin.name))
+    );
+    code.push_str(&format!(
+        "    pub fn {method_name}(&self) -> Result<(), metadata::Error> {{\n"
+    ));
+    code.push_str(&render_register_write_statement(
+        &moder_register,
+        &moder_field,
+        0b10,
+        "        ",
+    )?);
+    code.push_str(&render_register_write_statement(
+        &afr_register,
+        &afr_field,
+        alternate_function,
+        "        ",
+    )?);
+    code.push_str("        Ok(())\n    }\n");
+    Ok(Some(GeneratedMethod {
+        name: method_name,
+        code,
+    }))
+}
+
+fn render_usart_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    if !matches!(driver.driver_kind.as_str(), "uart" | "usart") {
+        return Ok(Vec::new());
+    }
+
+    let target_ref = driver.target.target_ref.as_str();
+    let has_tx = driver.pin_roles.iter().any(|role| role.signal == "TX");
+    let has_rx = driver.pin_roles.iter().any(|role| role.signal == "RX");
+    let has_irq = !driver.interrupt_routes.is_empty();
+    let has_tx_dma = driver
+        .dma_routes
+        .iter()
+        .any(|route| route.signal.as_deref() == Some("TX"));
+    let has_rx_dma = driver
+        .dma_routes
+        .iter()
+        .any(|route| route.signal.as_deref() == Some("RX"));
+
+    let Some(cr1) = try_resolve_target_register_by_name(model, target_ref, "CR1")? else {
+        return Ok(Vec::new());
+    };
+    let Some(brr) = try_resolve_target_register_by_name(model, target_ref, "BRR")? else {
+        return Ok(Vec::new());
+    };
+    let Some(cr2) = try_resolve_target_register_by_name(model, target_ref, "CR2")? else {
+        return Ok(Vec::new());
+    };
+
+    let div_mantissa = resolve_register_field(&brr, "DIV_Mantissa")?;
+    let div_fraction = resolve_register_field(&brr, "DIV_Fraction")?;
+    let ue = resolve_register_field(&cr1, "UE")?;
+    let te = resolve_register_field(&cr1, "TE")?;
+    let re = resolve_register_field(&cr1, "RE")?;
+    let over8 = resolve_register_field(&cr1, "OVER8")?;
+    let word_length = resolve_register_field(&cr1, "M")?;
+    let parity_enable = try_resolve_register_field(&cr1, "PCE");
+    let parity_select = try_resolve_register_field(&cr1, "PS");
+    let stop = resolve_register_field(&cr2, "STOP")?;
+    let mantissa_value_mask = field_value_mask(&div_mantissa)?;
+    let fraction_value_mask = field_value_mask(&div_fraction)?;
+    let mantissa_clear_mask = shifted_field_mask(&div_mantissa, &brr)?;
+    let fraction_clear_mask = shifted_field_mask(&div_fraction, &brr)?;
+
+    let mut methods = Vec::new();
+    methods.push(render_register_write_method(
+        "enable".to_string(),
+        &cr1,
+        &ue,
+        1,
+        &format!("Enable {}.", driver.name),
+    )?);
+    methods.push(render_register_write_method(
+        "disable".to_string(),
+        &cr1,
+        &ue,
+        0,
+        &format!("Disable {}.", driver.name),
+    )?);
+    methods.push(render_register_write_method(
+        "enable_transmitter".to_string(),
+        &cr1,
+        &te,
+        1,
+        &format!("Enable the {} transmitter.", driver.name),
+    )?);
+    methods.push(render_register_write_method(
+        "disable_transmitter".to_string(),
+        &cr1,
+        &te,
+        0,
+        &format!("Disable the {} transmitter.", driver.name),
+    )?);
+    methods.push(render_register_write_method(
+        "enable_receiver".to_string(),
+        &cr1,
+        &re,
+        1,
+        &format!("Enable the {} receiver.", driver.name),
+    )?);
+    methods.push(render_register_write_method(
+        "disable_receiver".to_string(),
+        &cr1,
+        &re,
+        0,
+        &format!("Disable the {} receiver.", driver.name),
+    )?);
+
+    let mut configure_code =
+        "    pub fn configure_8n1(&self) -> Result<(), metadata::Error> {\n".to_string();
+    configure_code.push_str(&render_register_write_statement(&cr1, &ue, 0, "        ")?);
+    configure_code.push_str(&render_register_write_statement(&cr1, &te, 0, "        ")?);
+    configure_code.push_str(&render_register_write_statement(&cr1, &re, 0, "        ")?);
+    configure_code.push_str(&render_register_write_statement(
+        &cr1, &over8, 0, "        ",
+    )?);
+    configure_code.push_str(&render_register_write_statement(
+        &cr1,
+        &word_length,
+        0,
+        "        ",
+    )?);
+    if let Some(parity_enable) = parity_enable {
+        configure_code.push_str(&render_register_write_statement(
+            &cr1,
+            &parity_enable,
+            0,
+            "        ",
+        )?);
+    }
+    if let Some(parity_select) = parity_select {
+        configure_code.push_str(&render_register_write_statement(
+            &cr1,
+            &parity_select,
+            0,
+            "        ",
+        )?);
+    }
+    configure_code.push_str(&render_register_write_statement(
+        &cr2, &stop, 0, "        ",
+    )?);
+    configure_code.push_str("        Ok(())\n    }\n");
+    methods.push(GeneratedMethod {
+        name: "configure_8n1".to_string(),
+        code: configure_code,
+    });
+
+    methods.push(GeneratedMethod {
+        name: "set_baud_divider".to_string(),
+        code: format!(
+            "    pub fn set_baud_divider(&self, mantissa: u16, fraction: u8) -> Result<(), metadata::Error> {{\n        if u32::from(mantissa) > 0x{mantissa_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"USART baud mantissa exceeds modeled field width\"));\n        }}\n        if u32::from(fraction) > 0x{fraction_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"USART baud fraction exceeds modeled field width\"));\n        }}\n        modify_u32(0x{brr_address:X}u64, 0x{combined_clear_mask:08X}u32, ((u32::from(mantissa) & 0x{mantissa_value_mask:X}u32) << {mantissa_lsb}) | ((u32::from(fraction) & 0x{fraction_value_mask:X}u32) << {fraction_lsb}))?;\n        Ok(())\n    }}\n",
+            brr_address = brr.absolute_address,
+            combined_clear_mask = mantissa_clear_mask | fraction_clear_mask,
+            mantissa_lsb = div_mantissa.lsb,
+            fraction_lsb = div_fraction.lsb,
+        ),
+    });
+
+    if has_tx {
+        let sr = resolve_target_register_by_name(model, target_ref, "SR")?;
+        let dr = resolve_target_register_by_name(model, target_ref, "DR")?;
+        let txe = resolve_register_field(&sr, "TXE")?;
+        let tc = resolve_register_field(&sr, "TC")?;
+        let txe_mask = field_bit_mask(&txe, &sr)?;
+        let tc_mask = field_bit_mask(&tc, &sr)?;
+
+        methods.push(GeneratedMethod {
+            name: "write_byte".to_string(),
+            code: format!(
+                "    pub fn write_byte(&self, byte: u8) -> Result<(), metadata::Error> {{\n        while (read_u32(0x{sr_address:X}u64)? & 0x{txe_mask:08X}u32) == 0 {{}}\n        write_u32(0x{dr_address:X}u64, u32::from(byte))?;\n        Ok(())\n    }}\n",
+                sr_address = sr.absolute_address,
+                dr_address = dr.absolute_address,
+            ),
+        });
+        methods.push(GeneratedMethod {
+            name: "write_bytes".to_string(),
+            code: "    pub fn write_bytes(&self, bytes: &[u8]) -> Result<(), metadata::Error> {\n        for &byte in bytes {\n            self.write_byte(byte)?;\n        }\n        Ok(())\n    }\n"
+                .to_string(),
+        });
+        methods.push(GeneratedMethod {
+            name: "flush".to_string(),
+            code: format!(
+                "    pub fn flush(&self) -> Result<(), metadata::Error> {{\n        while (read_u32(0x{sr_address:X}u64)? & 0x{tc_mask:08X}u32) == 0 {{}}\n        Ok(())\n    }}\n",
+                sr_address = sr.absolute_address,
+            ),
+        });
+    }
+
+    if has_rx {
+        let sr = resolve_target_register_by_name(model, target_ref, "SR")?;
+        let dr = resolve_target_register_by_name(model, target_ref, "DR")?;
+        let rxne = resolve_register_field(&sr, "RXNE")?;
+        let rxne_mask = field_bit_mask(&rxne, &sr)?;
+
+        methods.push(GeneratedMethod {
+            name: "read_byte".to_string(),
+            code: format!(
+                "    pub fn read_byte(&self) -> Result<u8, metadata::Error> {{\n        while (read_u32(0x{sr_address:X}u64)? & 0x{rxne_mask:08X}u32) == 0 {{}}\n        Ok((read_u32(0x{dr_address:X}u64)? & 0xFFu32) as u8)\n    }}\n",
+                sr_address = sr.absolute_address,
+                dr_address = dr.absolute_address,
+            ),
+        });
+    }
+
+    if has_irq {
+        let txeie = resolve_register_field(&cr1, "TXEIE")?;
+        let rxneie = resolve_register_field(&cr1, "RXNEIE")?;
+        methods.push(render_register_write_method(
+            "enable_txe_interrupt".to_string(),
+            &cr1,
+            &txeie,
+            1,
+            &format!("Enable the {} TXE interrupt.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_txe_interrupt".to_string(),
+            &cr1,
+            &txeie,
+            0,
+            &format!("Disable the {} TXE interrupt.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "enable_rxne_interrupt".to_string(),
+            &cr1,
+            &rxneie,
+            1,
+            &format!("Enable the {} RXNE interrupt.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_rxne_interrupt".to_string(),
+            &cr1,
+            &rxneie,
+            0,
+            &format!("Disable the {} RXNE interrupt.", driver.name),
+        )?);
+    }
+
+    if has_tx_dma {
+        let cr3 = resolve_target_register_by_name(model, target_ref, "CR3")?;
+        let dmat = resolve_register_field(&cr3, "DMAT")?;
+        methods.push(render_register_write_method(
+            "enable_tx_dma".to_string(),
+            &cr3,
+            &dmat,
+            1,
+            &format!("Enable the {} TX DMA path.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_tx_dma".to_string(),
+            &cr3,
+            &dmat,
+            0,
+            &format!("Disable the {} TX DMA path.", driver.name),
+        )?);
+    }
+
+    if has_rx_dma {
+        let cr3 = resolve_target_register_by_name(model, target_ref, "CR3")?;
+        let dmar = resolve_register_field(&cr3, "DMAR")?;
+        methods.push(render_register_write_method(
+            "enable_rx_dma".to_string(),
+            &cr3,
+            &dmar,
+            1,
+            &format!("Enable the {} RX DMA path.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_rx_dma".to_string(),
+            &cr3,
+            &dmar,
+            0,
+            &format!("Disable the {} RX DMA path.", driver.name),
+        )?);
+    }
+
+    Ok(methods)
+}
+
 fn render_operation_methods(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
@@ -3218,6 +3599,240 @@ fn render_state_machine_methods(
         }
     }
     Ok(methods)
+}
+
+fn resolve_target_register_by_name(
+    model: &EmbassyGenerationModel,
+    target_ref: &str,
+    register_name: &str,
+) -> Result<ResolvedRegister> {
+    let target = model.peripherals.get(target_ref).ok_or_else(|| {
+        anyhow!(
+            "driver target peripheral {} could not be resolved for register lookup",
+            target_ref
+        )
+    })?;
+    let target_base = target.base_address.ok_or_else(|| {
+        anyhow!(
+            "peripheral {} is missing baseAddress required for derived register lookup",
+            target.id
+        )
+    })?;
+    let template = find_register_template_peripheral(model, target)?;
+    try_resolve_target_register_from_template(target, target_base, template, register_name)?.ok_or_else(
+        || {
+            anyhow!(
+                "peripheral {} does not expose register {} through its explicit structural template",
+                target.id,
+                register_name
+            )
+        },
+    )
+}
+
+fn try_resolve_target_register_by_name(
+    model: &EmbassyGenerationModel,
+    target_ref: &str,
+    register_name: &str,
+) -> Result<Option<ResolvedRegister>> {
+    let target = model.peripherals.get(target_ref).ok_or_else(|| {
+        anyhow!(
+            "driver target peripheral {} could not be resolved for register lookup",
+            target_ref
+        )
+    })?;
+    let target_base = target.base_address.ok_or_else(|| {
+        anyhow!(
+            "peripheral {} is missing baseAddress required for derived register lookup",
+            target.id
+        )
+    })?;
+    let Some(template) = try_find_register_template_peripheral(model, target)? else {
+        return Ok(None);
+    };
+    try_resolve_target_register_from_template(target, target_base, template, register_name)
+}
+
+fn try_resolve_register_by_ref(
+    model: &EmbassyGenerationModel,
+    register_ref: &str,
+) -> Result<Option<ResolvedRegister>> {
+    let Some(owners) = model.register_owners.get(register_ref) else {
+        return Ok(None);
+    };
+    for owner_ref in owners {
+        let Some(peripheral) = model.peripherals.get(owner_ref) else {
+            continue;
+        };
+        let Some(target_base) = peripheral.base_address else {
+            continue;
+        };
+        let Some(template) = try_find_register_template_peripheral(model, peripheral)? else {
+            continue;
+        };
+        if let Some(register) = try_resolve_target_register_from_template_by_ref(
+            peripheral,
+            target_base,
+            template,
+            register_ref,
+        )? {
+            return Ok(Some(register));
+        }
+    }
+    Ok(None)
+}
+
+fn try_resolve_target_register_from_template(
+    target: &Peripheral,
+    target_base: u64,
+    template: &Peripheral,
+    register_name: &str,
+) -> Result<Option<ResolvedRegister>> {
+    let template_base = template.base_address.ok_or_else(|| {
+        anyhow!(
+            "template peripheral {} is missing baseAddress required for register lookup",
+            template.id
+        )
+    })?;
+
+    let mut registers = HashMap::new();
+    collect_register_members(
+        &mut registers,
+        template.id.as_str(),
+        template_base,
+        0,
+        &template.registers,
+    )?;
+    let mut matches = registers
+        .into_values()
+        .filter(|register| register.name.eq_ignore_ascii_case(register_name))
+        .collect::<Vec<_>>();
+    if matches.is_empty() {
+        return Ok(None);
+    }
+    if matches.len() > 1 {
+        bail!(
+            "peripheral {} exposes multiple registers named {} through its structural template",
+            target.id,
+            register_name
+        );
+    }
+
+    let mut resolved = matches.pop().expect("one matching register");
+    let offset = resolved
+        .absolute_address
+        .checked_sub(template_base)
+        .ok_or_else(|| {
+            anyhow!(
+                "register {} absolute address underflowed relative to template peripheral {}",
+                resolved.id,
+                template.id
+            )
+        })?;
+    resolved.peripheral_ref = target.id.clone();
+    resolved.absolute_address = checked_offset_add(
+        target_base,
+        offset,
+        &format!("derived register {} on {}", register_name, target.id),
+    )?;
+    Ok(Some(resolved))
+}
+
+fn try_resolve_target_register_from_template_by_ref(
+    target: &Peripheral,
+    target_base: u64,
+    template: &Peripheral,
+    register_ref: &str,
+) -> Result<Option<ResolvedRegister>> {
+    let template_base = template.base_address.ok_or_else(|| {
+        anyhow!(
+            "template peripheral {} is missing baseAddress required for register lookup",
+            template.id
+        )
+    })?;
+
+    let mut registers = HashMap::new();
+    collect_register_members(
+        &mut registers,
+        template.id.as_str(),
+        template_base,
+        0,
+        &template.registers,
+    )?;
+    let mut matches = registers
+        .into_values()
+        .filter(|register| register.id == register_ref)
+        .collect::<Vec<_>>();
+    if matches.is_empty() {
+        return Ok(None);
+    }
+    if matches.len() > 1 {
+        bail!(
+            "peripheral {} exposes multiple registers with id {} through its structural template",
+            target.id,
+            register_ref
+        );
+    }
+
+    let mut resolved = matches.pop().expect("one matching register");
+    let offset = resolved
+        .absolute_address
+        .checked_sub(template_base)
+        .ok_or_else(|| {
+            anyhow!(
+                "register {} absolute address underflowed relative to template peripheral {}",
+                resolved.id,
+                template.id
+            )
+        })?;
+    resolved.peripheral_ref = target.id.clone();
+    resolved.absolute_address = checked_offset_add(
+        target_base,
+        offset,
+        &format!("derived register {register_ref} on {}", target.id),
+    )?;
+    Ok(Some(resolved))
+}
+
+fn try_find_register_template_peripheral<'a>(
+    model: &'a EmbassyGenerationModel,
+    target: &'a Peripheral,
+) -> Result<Option<&'a Peripheral>> {
+    let mut current = target;
+    let mut seen = HashSet::new();
+    loop {
+        if !seen.insert(current.id.clone()) {
+            bail!(
+                "peripheral {} has a derivedFromRef cycle while resolving structural template",
+                target.id
+            );
+        }
+        if !current.registers.is_empty() {
+            return Ok(Some(current));
+        }
+        let Some(derived_from) = current.derived_from_ref.as_deref() else {
+            return Ok(None);
+        };
+        current = model.peripherals.get(derived_from).ok_or_else(|| {
+            anyhow!(
+                "peripheral {} references unknown derivedFromRef {}",
+                current.id,
+                derived_from
+            )
+        })?;
+    }
+}
+
+fn find_register_template_peripheral<'a>(
+    model: &'a EmbassyGenerationModel,
+    target: &'a Peripheral,
+) -> Result<&'a Peripheral> {
+    try_find_register_template_peripheral(model, target)?.ok_or_else(|| {
+        anyhow!(
+            "peripheral {} has no explicit registers and no derivedFromRef template",
+            target.id
+        )
+    })
 }
 
 fn resolve_transition_effect_write<'a>(
@@ -3353,6 +3968,18 @@ fn resolve_register_field(register: &ResolvedRegister, field_name: &str) -> Resu
                 field_name
             )
         })
+}
+
+fn try_resolve_register_field(
+    register: &ResolvedRegister,
+    field_name: &str,
+) -> Option<ResolvedField> {
+    let normalized_name = normalize_search_text(field_name);
+    register
+        .fields
+        .iter()
+        .find(|field| normalize_search_text(&field.name) == normalized_name)
+        .cloned()
 }
 
 fn render_register_write_method(
@@ -3501,6 +4128,72 @@ fn render_register_write_statement(
             ))
         }
         _ => unreachable!("unsupported widths are rejected before mask computation"),
+    }
+}
+
+fn field_value_mask(field: &ResolvedField) -> Result<u64> {
+    let field_width = field
+        .msb
+        .checked_sub(field.lsb)
+        .and_then(|delta| delta.checked_add(1))
+        .ok_or_else(|| anyhow!("field {} has an invalid bit range", field.name))?;
+    if field_width > 64 {
+        bail!(
+            "field {} width {} exceeds the 64-bit mask limit for first-cut lowering",
+            field.name,
+            field_width
+        );
+    }
+    Ok(if field_width == 64 {
+        u64::MAX
+    } else {
+        (1u64 << field_width) - 1
+    })
+}
+
+fn shifted_field_mask(field: &ResolvedField, register: &ResolvedRegister) -> Result<u32> {
+    if field.msb >= register.width_bits || field.lsb >= register.width_bits {
+        bail!(
+            "field {} bit range {}..={} exceeds register {} width {}",
+            field.name,
+            field.lsb,
+            field.msb,
+            register.id,
+            register.width_bits
+        );
+    }
+    let mask = field_value_mask(field)? << field.lsb;
+    u32::try_from(mask).map_err(|_| {
+        anyhow!(
+            "field {} on register {} requires a mask wider than the 32-bit limit for first-cut lowering",
+            field.name,
+            register.id,
+        )
+    })
+}
+
+fn field_bit_mask(field: &ResolvedField, register: &ResolvedRegister) -> Result<u32> {
+    let raw_mask = field_value_mask(field)?;
+    if raw_mask.count_ones() != 1 {
+        bail!(
+            "field {} on register {} is not a single-bit flag",
+            field.name,
+            register.id
+        );
+    }
+    shifted_field_mask(field, register)
+}
+
+fn extract_alternate_function_index(description: &str) -> Option<u64> {
+    let af_offset = description.find("AF")?;
+    let digits = description[af_offset + 2..]
+        .chars()
+        .take_while(|ch| ch.is_ascii_digit())
+        .collect::<String>();
+    if digits.is_empty() {
+        None
+    } else {
+        digits.parse().ok()
     }
 }
 
@@ -3871,6 +4564,7 @@ fn collect_register_members(
                 )?;
                 let resolved = ResolvedRegister {
                     id: register.id.clone(),
+                    name: register.name.clone(),
                     peripheral_ref: peripheral_ref.to_string(),
                     absolute_address,
                     width_bits: register.width_bits,
@@ -6560,6 +7254,21 @@ mod tests {
         assert!(gpio_rs.contains("pub fn assert_reset"));
         assert!(uart_rs.contains("pub fn enable_clock"));
         assert!(uart_rs.contains("pub fn release_reset"));
+        assert!(uart_rs.contains("pub fn configure_tx_pa9_route"));
+        assert!(uart_rs.contains("pub fn configure_rx_pa10_route"));
+        assert!(uart_rs.contains("pub fn configure_8n1"));
+        assert!(uart_rs.contains("0x00000400u32"));
+        assert!(uart_rs.contains("0x00000200u32"));
+        assert!(uart_rs.contains("pub fn set_baud_divider"));
+        assert!(uart_rs.contains(") | ((u32::from(fraction) & 0xFu32) << 0))?;"));
+        assert!(uart_rs.contains("pub fn write_byte"));
+        assert!(uart_rs.contains("pub fn write_bytes"));
+        assert!(uart_rs.contains("pub fn read_byte"));
+        assert!(uart_rs.contains("pub fn flush"));
+        assert!(uart_rs.contains("pub fn enable_txe_interrupt"));
+        assert!(uart_rs.contains("pub fn enable_rxne_interrupt"));
+        assert!(uart_rs.contains("pub fn enable_tx_dma"));
+        assert!(uart_rs.contains("pub fn enable_rx_dma"));
         assert!(!uart_rs.contains("pub async fn read"));
         assert!(!uart_rs.contains("pub async fn write"));
         assert!(timer_rs.contains("pub fn apply_enable"));
@@ -6696,19 +7405,7 @@ mod tests {
         let fixture = write_embassy_fixture(false);
         let mut document = load_json_file(fixture.path()).expect("fixture json");
 
-        let peripherals = document
-            .as_object_mut()
-            .expect("document object")
-            .get_mut("structure")
-            .and_then(Value::as_object_mut)
-            .expect("structure object")
-            .get_mut("device")
-            .and_then(Value::as_object_mut)
-            .expect("device object")
-            .get_mut("peripherals")
-            .and_then(Value::as_array_mut)
-            .expect("peripherals");
-        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        let tim1 = fixture_peripheral_mut(&mut document, "periph.tim1");
         let registers = tim1
             .get_mut("registers")
             .and_then(Value::as_array_mut)
@@ -6937,19 +7634,7 @@ mod tests {
         let fixture = write_embassy_fixture(false);
         let mut document = load_json_file(fixture.path()).expect("fixture json");
 
-        let peripherals = document
-            .as_object_mut()
-            .expect("document object")
-            .get_mut("structure")
-            .and_then(Value::as_object_mut)
-            .expect("structure object")
-            .get_mut("device")
-            .and_then(Value::as_object_mut)
-            .expect("device object")
-            .get_mut("peripherals")
-            .and_then(Value::as_array_mut)
-            .expect("peripherals");
-        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        let tim1 = fixture_peripheral_mut(&mut document, "periph.tim1");
         let registers = tim1
             .get_mut("registers")
             .and_then(Value::as_array_mut)
@@ -6978,19 +7663,7 @@ mod tests {
         let fixture = write_embassy_fixture(false);
         let mut document = load_json_file(fixture.path()).expect("fixture json");
 
-        let peripherals = document
-            .as_object_mut()
-            .expect("document object")
-            .get_mut("structure")
-            .and_then(Value::as_object_mut)
-            .expect("structure object")
-            .get_mut("device")
-            .and_then(Value::as_object_mut)
-            .expect("device object")
-            .get_mut("peripherals")
-            .and_then(Value::as_array_mut)
-            .expect("peripherals");
-        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        let tim1 = fixture_peripheral_mut(&mut document, "periph.tim1");
         tim1.insert("baseAddress".to_string(), serde_json::json!(u64::MAX));
         let registers = tim1
             .get_mut("registers")
@@ -7020,19 +7693,7 @@ mod tests {
         let fixture = write_embassy_fixture(false);
         let mut document = load_json_file(fixture.path()).expect("fixture json");
 
-        let peripherals = document
-            .as_object_mut()
-            .expect("document object")
-            .get_mut("structure")
-            .and_then(Value::as_object_mut)
-            .expect("structure object")
-            .get_mut("device")
-            .and_then(Value::as_object_mut)
-            .expect("device object")
-            .get_mut("peripherals")
-            .and_then(Value::as_array_mut)
-            .expect("peripherals");
-        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        let tim1 = fixture_peripheral_mut(&mut document, "periph.tim1");
         tim1.insert(
             "registers".to_string(),
             serde_json::json!([
@@ -7153,19 +7814,7 @@ mod tests {
         let fixture = write_embassy_fixture(false);
         let mut document = load_json_file(fixture.path()).expect("fixture json");
 
-        let peripherals = document
-            .as_object_mut()
-            .expect("document object")
-            .get_mut("structure")
-            .and_then(Value::as_object_mut)
-            .expect("structure object")
-            .get_mut("device")
-            .and_then(Value::as_object_mut)
-            .expect("device object")
-            .get_mut("peripherals")
-            .and_then(Value::as_array_mut)
-            .expect("peripherals");
-        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        let tim1 = fixture_peripheral_mut(&mut document, "periph.tim1");
         tim1.insert(
             "registers".to_string(),
             serde_json::json!([
@@ -7423,19 +8072,7 @@ mod tests {
         let fixture = write_embassy_fixture(false);
         let mut document = load_json_file(fixture.path()).expect("fixture json");
 
-        let peripherals = document
-            .as_object_mut()
-            .expect("document object")
-            .get_mut("structure")
-            .and_then(Value::as_object_mut)
-            .expect("structure object")
-            .get_mut("device")
-            .and_then(Value::as_object_mut)
-            .expect("device object")
-            .get_mut("peripherals")
-            .and_then(Value::as_array_mut)
-            .expect("peripherals");
-        let tim1 = peripherals[5].as_object_mut().expect("tim1 peripheral");
+        let tim1 = fixture_peripheral_mut(&mut document, "periph.tim1");
         let registers = tim1
             .get_mut("registers")
             .and_then(Value::as_array_mut)
@@ -8351,6 +8988,260 @@ mod tests {
             .expect("polling uart generation should succeed");
     }
 
+    #[test]
+    fn generate_embassy_allows_polling_uart_without_irq_or_dma_registers() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let device = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object");
+        let peripherals = device
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let usart_template = peripherals
+            .iter_mut()
+            .find(|peripheral| peripheral["id"] == "periph.usart6")
+            .and_then(Value::as_object_mut)
+            .expect("usart6 peripheral");
+        let registers = usart_template
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("usart6 registers");
+        registers.retain(|register| register["name"] != "CR3");
+        let cr1_fields = registers
+            .iter_mut()
+            .find(|register| register["name"] == "CR1")
+            .and_then(Value::as_object_mut)
+            .expect("cr1 register")
+            .get_mut("fields")
+            .and_then(Value::as_array_mut)
+            .expect("cr1 fields");
+        cr1_fields.retain(|field| field["name"] != "TXEIE" && field["name"] != "RXNEIE");
+
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let uart = drivers[2].as_object_mut().expect("uart driver");
+        uart.remove("interruptRouteRefs");
+        uart.remove("dmaRouteRefs");
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("polling uart fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        generate_embassy_crate(&validated, temp.path())
+            .expect("polling uart generation should succeed without irq/dma registers");
+    }
+
+    #[test]
+    fn generate_embassy_keeps_clock_reset_helpers_when_uart_template_is_missing() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let device = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object");
+        let peripherals = device
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let usart = peripherals
+            .iter_mut()
+            .find(|peripheral| peripheral["id"] == "periph.usart1")
+            .and_then(Value::as_object_mut)
+            .expect("usart1 peripheral");
+        usart.remove("derivedFromRef");
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("uart-without-template fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        generate_embassy_crate(&validated, temp.path())
+            .expect("uart generation should keep clock/reset helpers without template");
+        let uart_rs =
+            std::fs::read_to_string(temp.path().join("src").join("uart.rs")).expect("uart.rs");
+        assert!(uart_rs.contains("pub fn enable_clock"));
+        assert!(uart_rs.contains("pub fn release_reset"));
+        assert!(!uart_rs.contains("pub fn configure_8n1"));
+    }
+
+    #[test]
+    fn generate_embassy_keeps_clock_reset_helpers_when_uart_cr1_is_missing() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let device = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object");
+        let peripherals = device
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let usart_template = peripherals
+            .iter_mut()
+            .find(|peripheral| peripheral["id"] == "periph.usart6")
+            .and_then(Value::as_object_mut)
+            .expect("usart6 peripheral");
+        let registers = usart_template
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("usart6 registers");
+        registers.retain(|register| register["name"] != "CR1");
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("uart-without-cr1 fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        generate_embassy_crate(&validated, temp.path())
+            .expect("uart generation should keep clock/reset helpers without cr1");
+        let uart_rs =
+            std::fs::read_to_string(temp.path().join("src").join("uart.rs")).expect("uart.rs");
+        assert!(uart_rs.contains("pub fn enable_clock"));
+        assert!(uart_rs.contains("pub fn release_reset"));
+        assert!(!uart_rs.contains("pub fn configure_8n1"));
+    }
+
+    #[test]
+    fn generate_embassy_keeps_clock_reset_helpers_when_uart_brr_is_missing() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let usart_template = fixture_peripheral_mut(&mut document, "periph.usart6");
+        let registers = usart_template
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("usart6 registers");
+        registers.retain(|register| register["name"] != "BRR");
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("uart-without-brr fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        generate_embassy_crate(&validated, temp.path())
+            .expect("uart generation should keep clock/reset helpers without brr");
+        let uart_rs =
+            std::fs::read_to_string(temp.path().join("src").join("uart.rs")).expect("uart.rs");
+        assert!(uart_rs.contains("pub fn enable_clock"));
+        assert!(uart_rs.contains("pub fn release_reset"));
+        assert!(!uart_rs.contains("pub fn configure_8n1"));
+    }
+
+    #[test]
+    fn generate_embassy_keeps_clock_reset_helpers_when_uart_cr2_is_missing() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let usart_template = fixture_peripheral_mut(&mut document, "periph.usart6");
+        let registers = usart_template
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("usart6 registers");
+        registers.retain(|register| register["name"] != "CR2");
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("uart-without-cr2 fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        generate_embassy_crate(&validated, temp.path())
+            .expect("uart generation should keep clock/reset helpers without cr2");
+        let uart_rs =
+            std::fs::read_to_string(temp.path().join("src").join("uart.rs")).expect("uart.rs");
+        assert!(uart_rs.contains("pub fn enable_clock"));
+        assert!(uart_rs.contains("pub fn release_reset"));
+        assert!(!uart_rs.contains("pub fn configure_8n1"));
+    }
+
+    #[test]
+    fn field_value_mask_rejects_fields_wider_than_u64() {
+        let error = field_value_mask(&ResolvedField {
+            id: "field.test.wide".to_string(),
+            name: "WIDE".to_string(),
+            description: None,
+            lsb: 0,
+            msb: 64,
+        })
+        .expect_err("wider-than-u64 field mask should be rejected");
+        assert!(error.to_string().contains("exceeds the 64-bit mask limit"));
+    }
+
+    #[test]
+    fn shifted_field_mask_reports_32_bit_lowering_limit() {
+        let register = ResolvedRegister {
+            id: "reg.test.wide".to_string(),
+            name: "WIDE".to_string(),
+            peripheral_ref: "periph.test".to_string(),
+            absolute_address: 0,
+            width_bits: 64,
+            fields: Vec::new(),
+        };
+        let field = ResolvedField {
+            id: "field.test.high".to_string(),
+            name: "HIGH".to_string(),
+            description: None,
+            lsb: 32,
+            msb: 33,
+        };
+
+        let error = shifted_field_mask(&field, &register)
+            .expect_err("mask above bit 31 should be rejected for first-cut lowering");
+        assert!(
+            error
+                .to_string()
+                .contains("requires a mask wider than the 32-bit limit for first-cut lowering")
+        );
+    }
+
+    fn fixture_peripheral_mut<'a>(
+        document: &'a mut Value,
+        peripheral_id: &str,
+    ) -> &'a mut Map<String, Value> {
+        document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals")
+            .iter_mut()
+            .find(|peripheral| peripheral["id"] == peripheral_id)
+            .and_then(Value::as_object_mut)
+            .unwrap_or_else(|| panic!("missing fixture peripheral {peripheral_id}"))
+    }
+
     fn write_embassy_fixture(use_custom_driver: bool) -> NamedTempFile {
         let file = NamedTempFile::new().expect("temp file");
         let uart_driver_kind = if use_custom_driver { "custom" } else { "usart" };
@@ -8430,8 +9321,65 @@ mod tests {
                                 { "id": "field.rcc.apb1prstr.i2c1rst", "name": "I2C1RST", "description": "I2C1 reset", "bitRange": { "lsb": 21, "msb": 21 } }
                             ] }
                         ] },
-                        { "id": "periph.gpioa", "name": "GPIOA", "kind": "peripheral", "type": "GPIO" },
-                        { "id": "periph.usart1", "name": "USART1", "kind": "peripheral", "type": "USART", "interruptRefs": ["irq.usart1"] },
+                        { "id": "periph.gpioa", "name": "GPIOA", "kind": "peripheral", "type": "GPIO", "baseAddress": 1073876992u64, "registers": [
+                            { "id": "reg.gpioa.moder", "name": "MODER", "kind": "register", "offsetBytes": 0, "widthBits": 32, "fields": [
+                                { "id": "field.gpioa.moder.moder12", "name": "MODER12", "bitRange": { "lsb": 24, "msb": 25 } },
+                                { "id": "field.gpioa.moder.moder11", "name": "MODER11", "bitRange": { "lsb": 22, "msb": 23 } },
+                                { "id": "field.gpioa.moder.moder10", "name": "MODER10", "bitRange": { "lsb": 20, "msb": 21 } },
+                                { "id": "field.gpioa.moder.moder9", "name": "MODER9", "bitRange": { "lsb": 18, "msb": 19 } },
+                                { "id": "field.gpioa.moder.moder8", "name": "MODER8", "bitRange": { "lsb": 16, "msb": 17 } }
+                            ] },
+                            { "id": "reg.gpioa.afrh", "name": "AFRH", "kind": "register", "offsetBytes": 36, "widthBits": 32, "fields": [
+                                { "id": "field.gpioa.afrh.afrh12", "name": "AFRH12", "bitRange": { "lsb": 16, "msb": 19 } },
+                                { "id": "field.gpioa.afrh.afrh11", "name": "AFRH11", "bitRange": { "lsb": 12, "msb": 15 } },
+                                { "id": "field.gpioa.afrh.afrh10", "name": "AFRH10", "bitRange": { "lsb": 8, "msb": 11 } },
+                                { "id": "field.gpioa.afrh.afrh9", "name": "AFRH9", "bitRange": { "lsb": 4, "msb": 7 } },
+                                { "id": "field.gpioa.afrh.afrh8", "name": "AFRH8", "bitRange": { "lsb": 0, "msb": 3 } }
+                            ] }
+                        ] },
+                        { "id": "periph.gpiob", "name": "GPIOB", "kind": "peripheral", "type": "GPIO", "baseAddress": 1073878016u64, "registers": [
+                            { "id": "reg.gpiob.moder", "name": "MODER", "kind": "register", "offsetBytes": 0, "widthBits": 32, "fields": [
+                                { "id": "field.gpiob.moder.moder7", "name": "MODER7", "bitRange": { "lsb": 14, "msb": 15 } },
+                                { "id": "field.gpiob.moder.moder6", "name": "MODER6", "bitRange": { "lsb": 12, "msb": 13 } }
+                            ] },
+                            { "id": "reg.gpiob.afrl", "name": "AFRL", "kind": "register", "offsetBytes": 32, "widthBits": 32, "fields": [
+                                { "id": "field.gpiob.afrl.afrl7", "name": "AFRL7", "bitRange": { "lsb": 28, "msb": 31 } },
+                                { "id": "field.gpiob.afrl.afrl6", "name": "AFRL6", "bitRange": { "lsb": 24, "msb": 27 } }
+                            ] }
+                        ] },
+                        { "id": "periph.usart6", "name": "USART6", "kind": "peripheral", "type": "USART", "baseAddress": 1073815552u64, "registers": [
+                            { "id": "reg.usart6.sr", "name": "SR", "kind": "register", "offsetBytes": 0, "widthBits": 32, "fields": [
+                                { "id": "field.usart6.sr.txe", "name": "TXE", "description": "Transmit data register empty", "bitRange": { "lsb": 7, "msb": 7 } },
+                                { "id": "field.usart6.sr.tc", "name": "TC", "description": "Transmission complete", "bitRange": { "lsb": 6, "msb": 6 } },
+                                { "id": "field.usart6.sr.rxne", "name": "RXNE", "description": "Read data register not empty", "bitRange": { "lsb": 5, "msb": 5 } }
+                            ] },
+                            { "id": "reg.usart6.dr", "name": "DR", "kind": "register", "offsetBytes": 4, "widthBits": 32, "fields": [
+                                { "id": "field.usart6.dr.dr", "name": "DR", "description": "Data value", "bitRange": { "lsb": 0, "msb": 8 } }
+                            ] },
+                            { "id": "reg.usart6.brr", "name": "BRR", "kind": "register", "offsetBytes": 8, "widthBits": 32, "fields": [
+                                { "id": "field.usart6.brr.div_mantissa", "name": "DIV_Mantissa", "description": "Mantissa of USARTDIV", "bitRange": { "lsb": 4, "msb": 15 } },
+                                { "id": "field.usart6.brr.div_fraction", "name": "DIV_Fraction", "description": "Fraction of USARTDIV", "bitRange": { "lsb": 0, "msb": 3 } }
+                            ] },
+                            { "id": "reg.usart6.cr1", "name": "CR1", "kind": "register", "offsetBytes": 12, "widthBits": 32, "fields": [
+                                { "id": "field.usart6.cr1.over8", "name": "OVER8", "description": "Oversampling mode", "bitRange": { "lsb": 15, "msb": 15 } },
+                                { "id": "field.usart6.cr1.ue", "name": "UE", "description": "USART enable", "bitRange": { "lsb": 13, "msb": 13 } },
+                                { "id": "field.usart6.cr1.m", "name": "M", "description": "Word length", "bitRange": { "lsb": 12, "msb": 12 } },
+                                { "id": "field.usart6.cr1.pce", "name": "PCE", "description": "Parity control enable", "bitRange": { "lsb": 10, "msb": 10 } },
+                                { "id": "field.usart6.cr1.ps", "name": "PS", "description": "Parity selection", "bitRange": { "lsb": 9, "msb": 9 } },
+                                { "id": "field.usart6.cr1.txeie", "name": "TXEIE", "description": "TXE interrupt enable", "bitRange": { "lsb": 7, "msb": 7 } },
+                                { "id": "field.usart6.cr1.rxneie", "name": "RXNEIE", "description": "RXNE interrupt enable", "bitRange": { "lsb": 5, "msb": 5 } },
+                                { "id": "field.usart6.cr1.te", "name": "TE", "description": "Transmitter enable", "bitRange": { "lsb": 3, "msb": 3 } },
+                                { "id": "field.usart6.cr1.re", "name": "RE", "description": "Receiver enable", "bitRange": { "lsb": 2, "msb": 2 } }
+                            ] },
+                            { "id": "reg.usart6.cr2", "name": "CR2", "kind": "register", "offsetBytes": 16, "widthBits": 32, "fields": [
+                                { "id": "field.usart6.cr2.stop", "name": "STOP", "description": "STOP bits", "bitRange": { "lsb": 12, "msb": 13 } }
+                            ] },
+                            { "id": "reg.usart6.cr3", "name": "CR3", "kind": "register", "offsetBytes": 20, "widthBits": 32, "fields": [
+                                { "id": "field.usart6.cr3.dmat", "name": "DMAT", "description": "DMA enable transmitter", "bitRange": { "lsb": 7, "msb": 7 } },
+                                { "id": "field.usart6.cr3.dmar", "name": "DMAR", "description": "DMA enable receiver", "bitRange": { "lsb": 6, "msb": 6 } }
+                            ] }
+                        ] },
+                        { "id": "periph.usart1", "name": "USART1", "kind": "peripheral", "type": "USART", "baseAddress": 1073811456u64, "derivedFromRef": "periph.usart6", "interruptRefs": ["irq.usart1"] },
                         { "id": "periph.spi1", "name": "SPI1", "kind": "peripheral", "type": "SPI", "interruptRefs": ["irq.spi1"] },
                         { "id": "periph.i2c1", "name": "I2C1", "kind": "peripheral", "type": "I2C", "interruptRefs": ["irq.i2c1"] },
                         { "id": "periph.tim1", "name": "TIM1", "kind": "peripheral", "type": "TIM", "interruptRefs": ["irq.tim1"], "baseAddress": 1073812480u64, "registers": [
@@ -8477,6 +9425,8 @@ mod tests {
                     { "id": "pin.pa5", "name": "PA5", "modes": ["alternate-function"], "port": "A", "index": 5 },
                     { "id": "pin.pa6", "name": "PA6", "modes": ["alternate-function"], "port": "A", "index": 6 },
                     { "id": "pin.pa7", "name": "PA7", "modes": ["alternate-function"], "port": "A", "index": 7 },
+                    { "id": "pin.pb6", "name": "PB6", "modes": ["alternate-function"], "port": "B", "index": 6 },
+                    { "id": "pin.pb7", "name": "PB7", "modes": ["alternate-function"], "port": "B", "index": 7 },
                     { "id": "pin.pa8", "name": "PA8", "modes": ["alternate-function"], "port": "A", "index": 8 },
                     { "id": "pin.pa9", "name": "PA9", "modes": ["alternate-function"], "port": "A", "index": 9 },
                     { "id": "pin.pa10", "name": "PA10", "modes": ["alternate-function"], "port": "A", "index": 10 }
@@ -8549,8 +9499,8 @@ mod tests {
                     "pinTopology": {
                         "routes": [
                             { "id": "pinroute.gpioa.pa0", "name": "GPIOA PA0", "pinRef": "pin.pa0", "peripheralRef": "periph.gpioa", "signal": "GPIO0", "routeType": "hardwired", "defaultAfterReset": true },
-                            { "id": "pinroute.usart1.tx", "name": "USART1 TX", "pinRef": "pin.pa9", "peripheralRef": "periph.usart1", "signal": "TX", "routeType": "hardwired", "controlRefs": ["reg.rcc.apb2pcenr"] },
-                            { "id": "pinroute.usart1.rx", "name": "USART1 RX", "pinRef": "pin.pa10", "peripheralRef": "periph.usart1", "signal": "RX", "routeType": "hardwired", "defaultAfterReset": true },
+                            { "id": "pinroute.usart1.tx", "name": "USART1 TX", "description": "Alternate-function route AF7.", "pinRef": "pin.pa9", "peripheralRef": "periph.usart1", "signal": "TX", "routeType": "muxed", "controlRefs": ["reg.gpioa.moder", "reg.gpioa.afrh"] },
+                            { "id": "pinroute.usart1.rx", "name": "USART1 RX", "description": "Alternate-function route AF7.", "pinRef": "pin.pa10", "peripheralRef": "periph.usart1", "signal": "RX", "routeType": "muxed", "controlRefs": ["reg.gpioa.moder", "reg.gpioa.afrh"], "defaultAfterReset": true },
                             { "id": "pinroute.spi1.sck", "name": "SPI1 SCK", "pinRef": "pin.pa5", "peripheralRef": "periph.spi1", "signal": "SCK", "routeType": "hardwired" },
                             { "id": "pinroute.spi1.mosi", "name": "SPI1 MOSI", "pinRef": "pin.pa7", "peripheralRef": "periph.spi1", "signal": "MOSI", "routeType": "hardwired" },
                             { "id": "pinroute.spi1.miso", "name": "SPI1 MISO", "pinRef": "pin.pa6", "peripheralRef": "periph.spi1", "signal": "MISO", "routeType": "hardwired" },

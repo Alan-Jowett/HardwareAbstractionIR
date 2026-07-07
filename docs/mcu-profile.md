@@ -184,6 +184,11 @@ It can describe:
 
 This matters because Embassy-style async drivers need auditable DMA bindings rather than best-effort name matching.
 
+When a generator-facing profile intends to emit executable DMA-backed code,
+the relevant DMA routes should preserve any lowering-significant
+`controlRefs` rather than reducing the route to a peripheral/channel name
+pair alone.
+
 ## `interruptTopology`
 
 This section models interrupt behavior beyond a flat list of interrupt definitions.
@@ -201,6 +206,11 @@ This matters for:
 - classic NVIC-style MCU interrupt models
 - PLIC-style controllers
 - interrupt matrices and crossbars
+
+For executable profiles, interrupt routes are not just inventory links.
+They may need to preserve route controls, CPU targets, and acknowledge or
+clear operations so emitted IRQ helpers can be traced back to explicit
+approved inputs.
 
 ## `clockResetTopology`
 
@@ -241,6 +251,11 @@ The MCU/SoC profile adds a more canonical topological summary of:
 - named pin routes that bind pins, peripheral signals, remap controls, and electrical-constraint references together
 
 This makes it easier to reason about classic fixed-pin MCUs and matrix-routed SoCs using the same conceptual layer.
+
+For generator-facing profiles, these routes should preserve the actual
+lowering selectors when evidence supports them, including remap or mux
+`controlRefs` and whether a route is the reset default, rather than
+collapsing executable routing choices into plain-text notes.
 
 ## `lowPowerTopology`
 
@@ -303,6 +318,11 @@ That distinction is especially important for downstream HAL generation:
 1. the core layers still hold the underlying hardware facts
 2. `profiles.mcuSoc` gives those facts stable names and topological relationships that generators can reference directly
 3. generator-specific policy can then live in a separate profile such as `profiles.embassyHal` without duplicating the hardware model
+
+If an executable profile depends on structural facts that are inherited or
+shared through the core structural model, that dependency must remain
+explicit and resolvable; the profile layer should not force generators to
+guess where the real register-level lowering data lives.
 
 ## How to use it
 

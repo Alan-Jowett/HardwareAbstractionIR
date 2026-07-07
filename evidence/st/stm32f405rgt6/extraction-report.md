@@ -48,7 +48,8 @@
 | Exact-package pin map and AF routes | Extracted. | `STM32F405RG.json`. |
 | RCC clock/reset bindings | Extracted for topology-carrying peripherals. | `STM32F405RG.json` plus SVD-resolved RCC field references. |
 | Interrupt routes | Extracted for community-topology-described peripheral signals and DMA streams. | `STM32F405RG.json`, CMSIS header, startup file. |
-| DMA route candidates with RX/TX direction | Extracted conservatively. | `STM32F405RG.json`. |
+| DMA route candidates with RX/TX direction | Extracted conservatively, with USART1 driver-local `dmaRouteRefs` and route `controlRefs` added for executable lowering. | `STM32F405RG.json` plus STM32F405 register structure. |
+| USART1 lowering selectors | Extracted for the executable USART path, including pin-route `controlRefs` and driver DMA bindings. | `STM32F405RG.json` plus STM32F405 register structure. |
 
 ### Metadata present in approved evidence but not extracted
 
@@ -70,7 +71,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | `st-stm32f4-svd-bundle` | Register-bearing structural model | Yes | Yes | Minor SVD -> HAIR identifier normalization | Core peripheral views such as NVIC are not present in the vendor SVD. | Source scope limitation. |
 | `embassy-rs-stm32f405rg-json` | Package pin topology | Yes | Yes | Yes | Alternate-function routes for unbonded package pads are already filtered out by the exact-chip JSON. | Exact-package community topology projection. |
-| `embassy-rs-stm32f405rg-json` | DMA routes | Partially | Partially | Yes | DMA topology was preserved in `profiles.mcuSoc`, but DMA-backed Embassy driver lowering was excluded from the final executable subset because the current generator required additional executable inputs beyond the defended topology. | Generator limitation boundary. |
+| `embassy-rs-stm32f405rg-json` | DMA routes | Partially | Partially | Yes | Generic DMA topology is still preserved primarily in `profiles.mcuSoc`, but USART1 now also carries driver-local DMA route bindings and control selectors needed for executable lowering. | Schema expressiveness plus partial extraction scope. |
 | `st-cmsis-device-header` + `st-cmsis-startup` | IRQ inventory | Yes | Yes | No | None identified. | None. |
 
 ## Epistemic Claims Ledger
@@ -96,11 +97,11 @@
 ## Unresolved Differences Inventory
 - The physical/topology model is exact-package-filtered, but the core register-bearing structure remains family-level because the official ST SVD is family-level.
 - DMA request selector values are preserved textually in `dmaTopology.routes[].description`, not as a dedicated structured property.
-- `profiles.embassyHal` intentionally excludes `rcc`, `gpio-port`, `dma`, `timer`, `pwm`, and `adc` driver instances from the final executable subset; the supporting topology remains in `profiles.mcuSoc`.
+- `profiles.embassyHal` intentionally excludes `rcc`, `gpio-port`, `dma`, `timer`, `pwm`, and `adc` driver instances from the final executable subset; the supporting topology remains in `profiles.mcuSoc`, and USART1 now carries the richer lowering selectors needed for generated polling/interrupt/DMA helpers.
 
 ## Coverage
 - **Examined**: manifest, repository schemas/docs, official CMSIS header, official startup file, official STM32F405 SVD bundle snapshot, stm32-rs STM32F405 patch recipe, Embassy exact-chip JSON, Embassy chip feature manifest, and Olimex product page
-- **Method**: manifest authoring, scoped source reads, SVD-to-HAIR structural import, package-filtered topology import, conservative Embassy profile synthesis, schema validation, and downstream generation
+- **Method**: manifest authoring, scoped source reads, SVD-to-HAIR structural import, package-filtered topology import, executable-readiness enrichment for requested drivers, conservative Embassy profile synthesis, schema validation, and downstream generation
 - **Excluded**: GD32 substitution path, non-Embassy-supported peripheral classes, and Embassy `rcc`/`gpio-port`/`dma`/`timer`/`pwm`/`adc` drivers that did not survive executable-lowering checks
 - **Limitations**: ST PDF documents were referenced through approved source metadata, but this pass primarily operationalized the official header/startup/SVD and exact-chip structured topology because those were immediately machine-readable and auditable
 

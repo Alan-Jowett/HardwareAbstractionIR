@@ -43,6 +43,21 @@ fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metada
     Ok(())
 }
 
+#[allow(dead_code)]
+fn read_u32(address: u64) -> Result<u32, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u32>())?;
+    unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u32(address: u64, value: u32) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u32>())?;
+    unsafe {
+        write_volatile(address as *mut u32, value);
+    }
+    Ok(())
+}
+
 pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProvenance {
     module_name: "i2c",
     document_title: metadata::GENERATED_METADATA.document_title,
