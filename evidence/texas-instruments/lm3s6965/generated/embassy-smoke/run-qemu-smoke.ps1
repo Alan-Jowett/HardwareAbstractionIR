@@ -16,7 +16,7 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-$elfPath = Join-Path $PSScriptRoot "target\thumbv7m-none-eabi\$profile\lm3s-embassy-smoke"
+$elfPath = Join-Path $PSScriptRoot "target\thumbv7m-none-eabi\$profile\embassy-smoke"
 if (-not (Test-Path $elfPath)) {
     throw "Expected ELF not found at $elfPath"
 }

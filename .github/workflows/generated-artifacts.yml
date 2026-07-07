@@ -123,3 +123,20 @@ jobs:
       smoke_dir: evidence/st/stm32f405rgt6/generated/embassy-smoke
       smoke_command: qemu-system-arm -M netduinoplus2 -nographic -semihosting -kernel "$SMOKE_BINARY"
       qemu_artifact_name: ${{ needs.qemu.outputs.artifact_name }}
+
+  lm3s6965:
+    name: lm3s6965
+    needs:
+      - qemu
+    uses: ./.github/workflows/verify-generated-mcu.yml
+    with:
+      mcu_name: lm3s6965
+      hair_path: evidence/texas-instruments/lm3s6965/hair.json
+      svd_path: evidence/texas-instruments/lm3s6965/generated/lm3s6965.svd
+      pac_dir: evidence/texas-instruments/lm3s6965/generated/pac
+      embassy_dir: evidence/texas-instruments/lm3s6965/generated/embassy
+      rust_target: thumbv7m-none-eabi
+      smoke_mode: required
+      smoke_dir: evidence/texas-instruments/lm3s6965/generated/embassy-smoke
+      smoke_command: qemu-system-arm -M lm3s6965evb -display none -monitor none -serial stdio -semihosting-config enable=on,target=native -kernel "$SMOKE_BINARY"
+      qemu_artifact_name: ${{ needs.qemu.outputs.artifact_name }}
