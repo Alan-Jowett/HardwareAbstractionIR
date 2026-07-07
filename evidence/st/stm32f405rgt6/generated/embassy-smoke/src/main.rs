@@ -27,7 +27,7 @@ fn read_reg(address: *const u32) -> u32 {
 }
 
 fn note(message: &str) {
-    let _ = hprintln!("{}", message);
+    hprintln!("{}", message);
 }
 
 fn expect(label: &str, condition: bool) {
