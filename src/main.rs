@@ -7059,6 +7059,21 @@ mod tests {
     }
 
     #[test]
+    fn write_text_element_escapes_ampersands_once() {
+        let mut xml = XmlWriter::new(XmlOptions {
+            indent: xmlwriter::Indent::None,
+            ..XmlOptions::default()
+        });
+        xml.start_element("root");
+        write_text_element(&mut xml, "description", "clock control & status <ok>");
+        xml.end_element();
+        let rendered = xml.end_document();
+
+        assert!(rendered.contains("clock control &amp; status &lt;ok&gt;"));
+        assert!(!rendered.contains("&amp;amp;"));
+    }
+
+    #[test]
     fn generate_embassy_allows_control_chars_in_strings_without_breaking_codegen() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let fixture = write_embassy_fixture(false);
