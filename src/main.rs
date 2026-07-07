@@ -3903,10 +3903,17 @@ fn field_value_mask(field: &ResolvedField) -> Result<u64> {
         .checked_sub(field.lsb)
         .and_then(|delta| delta.checked_add(1))
         .ok_or_else(|| anyhow!("field {} has an invalid bit range", field.name))?;
+    if field_width > 64 {
+        bail!(
+            "field {} width {} exceeds the 64-bit mask limit for first-cut lowering",
+            field.name,
+            field_width
+        );
+    }
     Ok(if field_width == 64 {
         u64::MAX
     } else {
-        ((1u128 << field_width) - 1) as u64
+        (1u64 << field_width) - 1
     })
 }
 
@@ -8902,6 +8909,19 @@ mod tests {
         assert!(uart_rs.contains("pub fn enable_clock"));
         assert!(uart_rs.contains("pub fn release_reset"));
         assert!(!uart_rs.contains("pub fn configure_8n1"));
+    }
+
+    #[test]
+    fn field_value_mask_rejects_fields_wider_than_u64() {
+        let error = field_value_mask(&ResolvedField {
+            id: "field.test.wide".to_string(),
+            name: "WIDE".to_string(),
+            description: None,
+            lsb: 0,
+            msb: 64,
+        })
+        .expect_err("wider-than-u64 field mask should be rejected");
+        assert!(error.to_string().contains("exceeds the 64-bit mask limit"));
     }
 
     fn write_embassy_fixture(use_custom_driver: bool) -> NamedTempFile {
