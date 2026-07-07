@@ -3950,6 +3950,14 @@ fn resolve_bitmask_gpio_data_alias_address(
     bit_mask: u32,
     driver: &ResolvedDriverInstance,
 ) -> Result<u64> {
+    if bit_mask > 0xFF {
+        bail!(
+            "gpio-port driver {} data register {} produced unsupported bit mask 0x{:X}; expected the Stellaris/Tiva masked DATA alias window to use only bits 0..7",
+            driver.id,
+            data_register.id,
+            bit_mask
+        );
+    }
     let base_address = data_register.absolute_address.checked_sub(0x3FC).ok_or_else(|| {
         anyhow!(
             "gpio-port driver {} data register {} does not use the expected bitmask-alias layout",
@@ -8316,6 +8324,65 @@ mod tests {
         let error =
             generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
         assert!(error.to_string().contains("unaligned GPIO base address"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_bitmask_gpio_data_mask_outside_alias_window() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let gpioa_registers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals")
+            .iter_mut()
+            .find_map(|peripheral| {
+                let peripheral = peripheral.as_object_mut()?;
+                (peripheral.get("id").and_then(Value::as_str) == Some("periph.gpioa"))
+                    .then_some(peripheral)
+            })
+            .expect("gpioa peripheral")
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("gpioa registers");
+        *gpioa_registers = serde_json::from_value(serde_json::json!([
+            { "id": "reg.gpioa.data", "name": "DATA", "kind": "register", "offsetBytes": 1020, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.data.gpio", "name": "GPIO", "bitRange": { "lsb": 8, "msb": 15 } }
+            ] },
+            { "id": "reg.gpioa.dir", "name": "DIR", "kind": "register", "offsetBytes": 1024, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.dir.gpio", "name": "GPIO", "bitRange": { "lsb": 8, "msb": 15 } }
+            ] },
+            { "id": "reg.gpioa.afsel", "name": "AFSEL", "kind": "register", "offsetBytes": 1056, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.afsel.gpio", "name": "GPIO", "bitRange": { "lsb": 8, "msb": 15 } }
+            ] },
+            { "id": "reg.gpioa.pur", "name": "PUR", "kind": "register", "offsetBytes": 1296, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.pur.gpio", "name": "GPIO", "bitRange": { "lsb": 8, "msb": 15 } }
+            ] },
+            { "id": "reg.gpioa.pdr", "name": "PDR", "kind": "register", "offsetBytes": 1300, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.pdr.gpio", "name": "GPIO", "bitRange": { "lsb": 8, "msb": 15 } }
+            ] },
+            { "id": "reg.gpioa.den", "name": "DEN", "kind": "register", "offsetBytes": 1308, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.den.gpio", "name": "GPIO", "bitRange": { "lsb": 8, "msb": 15 } }
+            ] }
+        ]))
+        .expect("bitmask gpio registers");
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("fixture with out-of-window bitmask should still validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("masked DATA alias window"));
     }
 
     #[test]
