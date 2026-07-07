@@ -147,6 +147,55 @@ impl Usart1 {
         Ok(())
     }
 
+    /// Configure the Usart1 TX route on PA9.
+    pub fn configure_tx_pa9_route(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40020000u64, 0x000C0000u32, 0x00080000u32)?;
+        modify_u32(0x40020024u64, 0x000000F0u32, 0x00000070u32)?;
+        Ok(())
+    }
+
+    /// Configure the Usart1 TX route on PB6.
+    pub fn configure_tx_pb6_route(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40020400u64, 0x00003000u32, 0x00002000u32)?;
+        modify_u32(0x40020420u64, 0x0F000000u32, 0x07000000u32)?;
+        Ok(())
+    }
+
+    /// Configure the Usart1 RX route on PA10.
+    pub fn configure_rx_pa10_route(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40020000u64, 0x00300000u32, 0x00200000u32)?;
+        modify_u32(0x40020024u64, 0x00000F00u32, 0x00000700u32)?;
+        Ok(())
+    }
+
+    /// Configure the Usart1 RX route on PB7.
+    pub fn configure_rx_pb7_route(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40020400u64, 0x0000C000u32, 0x00008000u32)?;
+        modify_u32(0x40020420u64, 0xF0000000u32, 0x70000000u32)?;
+        Ok(())
+    }
+
+    /// Configure the Usart1 CK route on PA8.
+    pub fn configure_ck_pa8_route(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40020000u64, 0x00030000u32, 0x00020000u32)?;
+        modify_u32(0x40020024u64, 0x0000000Fu32, 0x00000007u32)?;
+        Ok(())
+    }
+
+    /// Configure the Usart1 CTS route on PA11.
+    pub fn configure_cts_pa11_route(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40020000u64, 0x00C00000u32, 0x00800000u32)?;
+        modify_u32(0x40020024u64, 0x0000F000u32, 0x00007000u32)?;
+        Ok(())
+    }
+
+    /// Configure the Usart1 RTS route on PA12.
+    pub fn configure_rts_pa12_route(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40020000u64, 0x03000000u32, 0x02000000u32)?;
+        modify_u32(0x40020024u64, 0x000F0000u32, 0x00070000u32)?;
+        Ok(())
+    }
+
     /// Enable Usart1.
     pub fn enable(&self) -> Result<(), metadata::Error> {
         modify_u32(0x4001100Cu64, 0x00002000u32, 0x00002000u32)?;
@@ -189,6 +238,8 @@ impl Usart1 {
         modify_u32(0x4001100Cu64, 0x00000004u32, 0x00000000u32)?;
         modify_u32(0x4001100Cu64, 0x00008000u32, 0x00000000u32)?;
         modify_u32(0x4001100Cu64, 0x00001000u32, 0x00000000u32)?;
+        modify_u32(0x4001100Cu64, 0x00000400u32, 0x00000000u32)?;
+        modify_u32(0x4001100Cu64, 0x00000200u32, 0x00000000u32)?;
         modify_u32(0x40011010u64, 0x00003000u32, 0x00000000u32)?;
         Ok(())
     }
@@ -401,6 +452,8 @@ impl Usart2 {
         modify_u32(0x4000440Cu64, 0x00000004u32, 0x00000000u32)?;
         modify_u32(0x4000440Cu64, 0x00008000u32, 0x00000000u32)?;
         modify_u32(0x4000440Cu64, 0x00001000u32, 0x00000000u32)?;
+        modify_u32(0x4000440Cu64, 0x00000400u32, 0x00000000u32)?;
+        modify_u32(0x4000440Cu64, 0x00000200u32, 0x00000000u32)?;
         modify_u32(0x40004410u64, 0x00003000u32, 0x00000000u32)?;
         Ok(())
     }
@@ -589,6 +642,8 @@ impl Usart3 {
         modify_u32(0x4000480Cu64, 0x00000004u32, 0x00000000u32)?;
         modify_u32(0x4000480Cu64, 0x00008000u32, 0x00000000u32)?;
         modify_u32(0x4000480Cu64, 0x00001000u32, 0x00000000u32)?;
+        modify_u32(0x4000480Cu64, 0x00000400u32, 0x00000000u32)?;
+        modify_u32(0x4000480Cu64, 0x00000200u32, 0x00000000u32)?;
         modify_u32(0x40004810u64, 0x00003000u32, 0x00000000u32)?;
         Ok(())
     }
@@ -775,6 +830,8 @@ impl Usart6 {
         modify_u32(0x4001140Cu64, 0x00000004u32, 0x00000000u32)?;
         modify_u32(0x4001140Cu64, 0x00008000u32, 0x00000000u32)?;
         modify_u32(0x4001140Cu64, 0x00001000u32, 0x00000000u32)?;
+        modify_u32(0x4001140Cu64, 0x00000400u32, 0x00000000u32)?;
+        modify_u32(0x4001140Cu64, 0x00000200u32, 0x00000000u32)?;
         modify_u32(0x40011410u64, 0x00003000u32, 0x00000000u32)?;
         Ok(())
     }

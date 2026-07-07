@@ -14,6 +14,8 @@ async fn main(_spawner: Spawner) {
     let usart1 = Usart1::new(DRV_USART1_RESOURCES).unwrap();
 
     usart1.enable_clock().unwrap();
+    usart1.configure_tx_pa9_route().unwrap();
+    usart1.configure_rx_pa10_route().unwrap();
     usart1.configure_8n1().unwrap();
     usart1
         .set_baud_divider(
