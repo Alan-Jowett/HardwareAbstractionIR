@@ -1,3 +1,5 @@
+//! Generated Embassy-style interrupt module for STM32F405RGT6.
+
 use crate::metadata;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

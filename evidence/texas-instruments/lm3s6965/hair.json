@@ -21110,6 +21110,31 @@
             "status": "verified",
             "confidence": 0.9
           }
+        },
+        {
+          "id": "drv.time",
+          "name": "Time",
+          "targetRef": "block.nvic",
+          "driverKind": "interrupt",
+          "modulePath": "time",
+          "interruptRouteRefs": [
+            "iroute.systick"
+          ],
+          "capabilityTags": [
+            "embassy-time-driver"
+          ],
+          "provenance": {
+            "sourceRefs": [
+              "cmsis-lm3s6965-header-mirror",
+              "arm-cortex-m3-trm"
+            ],
+            "evidenceRefs": [
+              "e_irq_inventory",
+              "e_cpu_core"
+            ],
+            "status": "verified",
+            "confidence": 0.9
+          }
         }
       ]
     }

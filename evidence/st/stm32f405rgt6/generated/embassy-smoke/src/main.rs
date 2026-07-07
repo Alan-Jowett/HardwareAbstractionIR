@@ -6,8 +6,10 @@ use core::ptr::read_volatile;
 use cortex_m::asm::nop;
 use cortex_m_semihosting::debug;
 use embassy_executor::Spawner;
+use embassy_time::{Duration, Ticker, Timer};
 use panic_halt as _;
 use stm32_h405_generated::gpio::{DRV_GPIOA_RESOURCES, GpioA, Level, Pull};
+use stm32_h405_generated::time::{DRV_TIME_RESOURCES, Time};
 use stm32_h405_generated::usart::{DRV_USART1_RESOURCES, Usart1};
 
 const BRR_MANTISSA_115200_AT_16MHZ: u16 = 8;
@@ -99,9 +101,22 @@ fn smoke_usart1() {
     usart1.flush().unwrap();
 }
 
+async fn smoke_embassy_time() {
+    let time = Time::new(DRV_TIME_RESOURCES).unwrap();
+    expect(time.bind().len() == 1);
+    time.init_time_driver().unwrap();
+
+    Timer::after(Duration::from_ticks(8)).await;
+
+    let mut ticker = Ticker::every(Duration::from_ticks(4));
+    ticker.next().await;
+    ticker.next().await;
+}
+
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) {
     smoke_gpioa();
     smoke_usart1();
+    smoke_embassy_time().await;
     pass();
 }

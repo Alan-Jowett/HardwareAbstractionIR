@@ -5,10 +5,13 @@ use core::ptr::{read_volatile, write_volatile};
 
 #[allow(dead_code)]
 fn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {
-    let address = usize::try_from(address)
-        .map_err(|_| metadata::Error::Unsupported("MMIO address does not fit usize on this target"))?;
+    let address = usize::try_from(address).map_err(|_| {
+        metadata::Error::Unsupported("MMIO address does not fit usize on this target")
+    })?;
     if address % align != 0 {
-        return Err(metadata::Error::Unsupported("MMIO address is not naturally aligned for the target register width"));
+        return Err(metadata::Error::Unsupported(
+            "MMIO address is not naturally aligned for the target register width",
+        ));
     }
     Ok(address)
 }
@@ -67,15 +70,90 @@ pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProven
 };
 
 // Driver instance: I2C0 (i2c) from canonical block block.i2c0 -> i2c
-pub const DRV_I2C0_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.i2c0", name: "I2C0", consumer_ref: "periph.i2c0", clock_ref: "clock.sysclk", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.sysctl.rcgc1"], enable_operation_refs: &[], disable_operation_refs: &[] }];
-pub const DRV_I2C0_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.i2c0", name: "I2C0", target_ref: "periph.i2c0", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rd.software"), binding_kind: "software", control_refs: &["reg.sysctl.srcr1"], assert_operation_refs: &[], release_operation_refs: &[] }];
-pub const DRV_I2C0_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource { id: "isrc.i2c0", name: "I2C0 interrupt source", source_ref: "periph.i2c0", producer_ref: Some("periph.i2c0"), kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }];
-pub const DRV_I2C0_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute { id: "iroute.i2c0", name: "I2C0 interrupt source route", source_ref: "isrc.i2c0", interrupt_ref: "int.i2c0", controller_ref: "block.nvic", cpu_target_ref: Some("block.cpu0"), line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }];
+pub const DRV_I2C0_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding {
+    id: "clk.i2c0",
+    name: "I2C0",
+    consumer_ref: "periph.i2c0",
+    clock_ref: "clock.sysclk",
+    controller_ref: Some("block.rcc"),
+    binding_kind: "gated",
+    control_refs: &["reg.sysctl.rcgc1"],
+    enable_operation_refs: &[],
+    disable_operation_refs: &[],
+}];
+pub const DRV_I2C0_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding {
+    id: "rst.i2c0",
+    name: "I2C0",
+    target_ref: "periph.i2c0",
+    controller_ref: Some("block.rcc"),
+    reset_domain_ref: Some("rd.software"),
+    binding_kind: "software",
+    control_refs: &["reg.sysctl.srcr1"],
+    assert_operation_refs: &[],
+    release_operation_refs: &[],
+}];
+pub const DRV_I2C0_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource {
+    id: "isrc.i2c0",
+    name: "I2C0 interrupt source",
+    source_ref: "periph.i2c0",
+    producer_ref: Some("periph.i2c0"),
+    kind: "peripheral",
+    flag_refs: &[],
+    clear_operation_refs: &[],
+}];
+pub const DRV_I2C0_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute {
+    id: "iroute.i2c0",
+    name: "I2C0 interrupt source route",
+    source_ref: "isrc.i2c0",
+    interrupt_ref: "int.i2c0",
+    controller_ref: "block.nvic",
+    cpu_target_ref: Some("block.cpu0"),
+    line_index: None,
+    route_type: "hardwired",
+    control_refs: &[],
+    acknowledge_operation_refs: &[],
+    shared_group: None,
+}];
 pub const DRV_I2C0_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_I2C0_DMA_ROUTES: &[metadata::DmaRoute] = &[];
-pub const DRV_I2C0_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.i2c0.scl.pb2", name: "I2C0 SCL on PB2", pin_ref: "pin.pb2", peripheral_ref: "periph.i2c0", signal: "SCL", route_type: "hardwired", control_refs: &["reg.gpiob.afsel", "reg.gpiob.den", "reg.gpiob.odr"], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(false) }];
-pub const DRV_I2C0_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.i2c0.sda.pb3", name: "I2C0 SDA on PB3", pin_ref: "pin.pb3", peripheral_ref: "periph.i2c0", signal: "SDA", route_type: "hardwired", control_refs: &["reg.gpiob.afsel", "reg.gpiob.den", "reg.gpiob.odr"], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(false) }];
-pub const DRV_I2C0_PIN_ROLES: &[metadata::PinRole] = &[metadata::PinRole { role: "scl", signal: "SCL", routes: DRV_I2C0_PIN_ROLE_0_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "sda", signal: "SDA", routes: DRV_I2C0_PIN_ROLE_1_ROUTES, requirement: metadata::ResourceRequirement::Required }];
+pub const DRV_I2C0_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.i2c0.scl.pb2",
+    name: "I2C0 SCL on PB2",
+    pin_ref: "pin.pb2",
+    peripheral_ref: "periph.i2c0",
+    signal: "SCL",
+    route_type: "hardwired",
+    control_refs: &["reg.gpiob.afsel", "reg.gpiob.den", "reg.gpiob.odr"],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(false),
+}];
+pub const DRV_I2C0_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.i2c0.sda.pb3",
+    name: "I2C0 SDA on PB3",
+    pin_ref: "pin.pb3",
+    peripheral_ref: "periph.i2c0",
+    signal: "SDA",
+    route_type: "hardwired",
+    control_refs: &["reg.gpiob.afsel", "reg.gpiob.den", "reg.gpiob.odr"],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(false),
+}];
+pub const DRV_I2C0_PIN_ROLES: &[metadata::PinRole] = &[
+    metadata::PinRole {
+        role: "scl",
+        signal: "SCL",
+        routes: DRV_I2C0_PIN_ROLE_0_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "sda",
+        signal: "SDA",
+        routes: DRV_I2C0_PIN_ROLE_1_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+];
 pub const DRV_I2C0_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_I2C0_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_I2C0_CAPABILITY_TAGS: &[&str] = &[];
@@ -143,7 +221,4 @@ impl I2C0 {
         modify_u32(0x400FE040u64, 0x00001000u32, 0x00000000u32)?;
         Ok(())
     }
-
-
 }
-

@@ -5,10 +5,13 @@ use core::ptr::{read_volatile, write_volatile};
 
 #[allow(dead_code)]
 fn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {
-    let address = usize::try_from(address)
-        .map_err(|_| metadata::Error::Unsupported("MMIO address does not fit usize on this target"))?;
+    let address = usize::try_from(address).map_err(|_| {
+        metadata::Error::Unsupported("MMIO address does not fit usize on this target")
+    })?;
     if address % align != 0 {
-        return Err(metadata::Error::Unsupported("MMIO address is not naturally aligned for the target register width"));
+        return Err(metadata::Error::Unsupported(
+            "MMIO address is not naturally aligned for the target register width",
+        ));
     }
     Ok(address)
 }
@@ -80,21 +83,178 @@ pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProven
 };
 
 // Driver instance: GPIOA (gpio-port) from canonical block block.gpioa -> gpio-port
-pub const DRV_GPIOA_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.gpioa", name: "GPIOA", consumer_ref: "periph.gpioa", clock_ref: "clock.sysclk", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.sysctl.rcgc2"], enable_operation_refs: &[], disable_operation_refs: &[] }];
-pub const DRV_GPIOA_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.gpioa", name: "GPIOA", target_ref: "periph.gpioa", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rd.software"), binding_kind: "software", control_refs: &["reg.sysctl.srcr2"], assert_operation_refs: &[], release_operation_refs: &[] }];
+pub const DRV_GPIOA_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding {
+    id: "clk.gpioa",
+    name: "GPIOA",
+    consumer_ref: "periph.gpioa",
+    clock_ref: "clock.sysclk",
+    controller_ref: Some("block.rcc"),
+    binding_kind: "gated",
+    control_refs: &["reg.sysctl.rcgc2"],
+    enable_operation_refs: &[],
+    disable_operation_refs: &[],
+}];
+pub const DRV_GPIOA_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding {
+    id: "rst.gpioa",
+    name: "GPIOA",
+    target_ref: "periph.gpioa",
+    controller_ref: Some("block.rcc"),
+    reset_domain_ref: Some("rd.software"),
+    binding_kind: "software",
+    control_refs: &["reg.sysctl.srcr2"],
+    assert_operation_refs: &[],
+    release_operation_refs: &[],
+}];
 pub const DRV_GPIOA_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];
 pub const DRV_GPIOA_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];
 pub const DRV_GPIOA_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_GPIOA_DMA_ROUTES: &[metadata::DmaRoute] = &[];
-pub const DRV_GPIOA_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioa.pa0", name: "GPIOA PA0", pin_ref: "pin.pa0", peripheral_ref: "periph.gpioa", signal: "GPIO0", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOA_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioa.pa1", name: "GPIOA PA1", pin_ref: "pin.pa1", peripheral_ref: "periph.gpioa", signal: "GPIO1", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOA_PIN_ROLE_2_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioa.pa2", name: "GPIOA PA2", pin_ref: "pin.pa2", peripheral_ref: "periph.gpioa", signal: "GPIO2", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOA_PIN_ROLE_3_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioa.pa3", name: "GPIOA PA3", pin_ref: "pin.pa3", peripheral_ref: "periph.gpioa", signal: "GPIO3", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOA_PIN_ROLE_4_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioa.pa4", name: "GPIOA PA4", pin_ref: "pin.pa4", peripheral_ref: "periph.gpioa", signal: "GPIO4", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOA_PIN_ROLE_5_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioa.pa5", name: "GPIOA PA5", pin_ref: "pin.pa5", peripheral_ref: "periph.gpioa", signal: "GPIO5", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOA_PIN_ROLE_6_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioa.pa6", name: "GPIOA PA6", pin_ref: "pin.pa6", peripheral_ref: "periph.gpioa", signal: "GPIO6", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOA_PIN_ROLE_7_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioa.pa7", name: "GPIOA PA7", pin_ref: "pin.pa7", peripheral_ref: "periph.gpioa", signal: "GPIO7", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOA_PIN_ROLES: &[metadata::PinRole] = &[metadata::PinRole { role: "gpio0", signal: "GPIO0", routes: DRV_GPIOA_PIN_ROLE_0_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio1", signal: "GPIO1", routes: DRV_GPIOA_PIN_ROLE_1_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio2", signal: "GPIO2", routes: DRV_GPIOA_PIN_ROLE_2_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio3", signal: "GPIO3", routes: DRV_GPIOA_PIN_ROLE_3_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio4", signal: "GPIO4", routes: DRV_GPIOA_PIN_ROLE_4_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio5", signal: "GPIO5", routes: DRV_GPIOA_PIN_ROLE_5_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio6", signal: "GPIO6", routes: DRV_GPIOA_PIN_ROLE_6_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio7", signal: "GPIO7", routes: DRV_GPIOA_PIN_ROLE_7_ROUTES, requirement: metadata::ResourceRequirement::Required }];
+pub const DRV_GPIOA_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioa.pa0",
+    name: "GPIOA PA0",
+    pin_ref: "pin.pa0",
+    peripheral_ref: "periph.gpioa",
+    signal: "GPIO0",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOA_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioa.pa1",
+    name: "GPIOA PA1",
+    pin_ref: "pin.pa1",
+    peripheral_ref: "periph.gpioa",
+    signal: "GPIO1",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOA_PIN_ROLE_2_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioa.pa2",
+    name: "GPIOA PA2",
+    pin_ref: "pin.pa2",
+    peripheral_ref: "periph.gpioa",
+    signal: "GPIO2",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOA_PIN_ROLE_3_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioa.pa3",
+    name: "GPIOA PA3",
+    pin_ref: "pin.pa3",
+    peripheral_ref: "periph.gpioa",
+    signal: "GPIO3",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOA_PIN_ROLE_4_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioa.pa4",
+    name: "GPIOA PA4",
+    pin_ref: "pin.pa4",
+    peripheral_ref: "periph.gpioa",
+    signal: "GPIO4",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOA_PIN_ROLE_5_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioa.pa5",
+    name: "GPIOA PA5",
+    pin_ref: "pin.pa5",
+    peripheral_ref: "periph.gpioa",
+    signal: "GPIO5",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOA_PIN_ROLE_6_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioa.pa6",
+    name: "GPIOA PA6",
+    pin_ref: "pin.pa6",
+    peripheral_ref: "periph.gpioa",
+    signal: "GPIO6",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOA_PIN_ROLE_7_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioa.pa7",
+    name: "GPIOA PA7",
+    pin_ref: "pin.pa7",
+    peripheral_ref: "periph.gpioa",
+    signal: "GPIO7",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOA_PIN_ROLES: &[metadata::PinRole] = &[
+    metadata::PinRole {
+        role: "gpio0",
+        signal: "GPIO0",
+        routes: DRV_GPIOA_PIN_ROLE_0_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio1",
+        signal: "GPIO1",
+        routes: DRV_GPIOA_PIN_ROLE_1_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio2",
+        signal: "GPIO2",
+        routes: DRV_GPIOA_PIN_ROLE_2_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio3",
+        signal: "GPIO3",
+        routes: DRV_GPIOA_PIN_ROLE_3_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio4",
+        signal: "GPIO4",
+        routes: DRV_GPIOA_PIN_ROLE_4_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio5",
+        signal: "GPIO5",
+        routes: DRV_GPIOA_PIN_ROLE_5_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio6",
+        signal: "GPIO6",
+        routes: DRV_GPIOA_PIN_ROLE_6_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio7",
+        signal: "GPIO7",
+        routes: DRV_GPIOA_PIN_ROLE_7_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+];
 pub const DRV_GPIOA_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_GPIOA_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_GPIOA_CAPABILITY_TAGS: &[&str] = &[];
@@ -290,8 +450,6 @@ impl GPIOA {
             bit_mask: 0x00000080u32,
         }
     }
-
-
 }
 
 #[derive(Debug, Clone)]
@@ -384,7 +542,11 @@ impl GPIOAFlex {
     }
 
     pub fn get_level(&self) -> Result<Level, metadata::Error> {
-        Ok(if self.is_high()? { Level::High } else { Level::Low })
+        Ok(if self.is_high()? {
+            Level::High
+        } else {
+            Level::Low
+        })
     }
 
     pub fn is_set_high(&self) -> Result<bool, metadata::Error> {
@@ -490,21 +652,178 @@ impl GPIOAOutput {
 }
 
 // Driver instance: GPIOB (gpio-port) from canonical block block.gpiob -> gpio-port
-pub const DRV_GPIOB_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.gpiob", name: "GPIOB", consumer_ref: "periph.gpiob", clock_ref: "clock.sysclk", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.sysctl.rcgc2"], enable_operation_refs: &[], disable_operation_refs: &[] }];
-pub const DRV_GPIOB_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.gpiob", name: "GPIOB", target_ref: "periph.gpiob", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rd.software"), binding_kind: "software", control_refs: &["reg.sysctl.srcr2"], assert_operation_refs: &[], release_operation_refs: &[] }];
+pub const DRV_GPIOB_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding {
+    id: "clk.gpiob",
+    name: "GPIOB",
+    consumer_ref: "periph.gpiob",
+    clock_ref: "clock.sysclk",
+    controller_ref: Some("block.rcc"),
+    binding_kind: "gated",
+    control_refs: &["reg.sysctl.rcgc2"],
+    enable_operation_refs: &[],
+    disable_operation_refs: &[],
+}];
+pub const DRV_GPIOB_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding {
+    id: "rst.gpiob",
+    name: "GPIOB",
+    target_ref: "periph.gpiob",
+    controller_ref: Some("block.rcc"),
+    reset_domain_ref: Some("rd.software"),
+    binding_kind: "software",
+    control_refs: &["reg.sysctl.srcr2"],
+    assert_operation_refs: &[],
+    release_operation_refs: &[],
+}];
 pub const DRV_GPIOB_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];
 pub const DRV_GPIOB_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];
 pub const DRV_GPIOB_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_GPIOB_DMA_ROUTES: &[metadata::DmaRoute] = &[];
-pub const DRV_GPIOB_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiob.pb0", name: "GPIOB PB0", pin_ref: "pin.pb0", peripheral_ref: "periph.gpiob", signal: "GPIO0", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOB_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiob.pb1", name: "GPIOB PB1", pin_ref: "pin.pb1", peripheral_ref: "periph.gpiob", signal: "GPIO1", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOB_PIN_ROLE_2_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiob.pb2", name: "GPIOB PB2", pin_ref: "pin.pb2", peripheral_ref: "periph.gpiob", signal: "GPIO2", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOB_PIN_ROLE_3_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiob.pb3", name: "GPIOB PB3", pin_ref: "pin.pb3", peripheral_ref: "periph.gpiob", signal: "GPIO3", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOB_PIN_ROLE_4_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiob.pb4", name: "GPIOB PB4", pin_ref: "pin.pb4", peripheral_ref: "periph.gpiob", signal: "GPIO4", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOB_PIN_ROLE_5_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiob.pb5", name: "GPIOB PB5", pin_ref: "pin.pb5", peripheral_ref: "periph.gpiob", signal: "GPIO5", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOB_PIN_ROLE_6_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiob.pb6", name: "GPIOB PB6", pin_ref: "pin.pb6", peripheral_ref: "periph.gpiob", signal: "GPIO6", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOB_PIN_ROLE_7_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiob.pb7", name: "GPIOB PB7", pin_ref: "pin.pb7", peripheral_ref: "periph.gpiob", signal: "GPIO7", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOB_PIN_ROLES: &[metadata::PinRole] = &[metadata::PinRole { role: "gpio0", signal: "GPIO0", routes: DRV_GPIOB_PIN_ROLE_0_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio1", signal: "GPIO1", routes: DRV_GPIOB_PIN_ROLE_1_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio2", signal: "GPIO2", routes: DRV_GPIOB_PIN_ROLE_2_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio3", signal: "GPIO3", routes: DRV_GPIOB_PIN_ROLE_3_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio4", signal: "GPIO4", routes: DRV_GPIOB_PIN_ROLE_4_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio5", signal: "GPIO5", routes: DRV_GPIOB_PIN_ROLE_5_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio6", signal: "GPIO6", routes: DRV_GPIOB_PIN_ROLE_6_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio7", signal: "GPIO7", routes: DRV_GPIOB_PIN_ROLE_7_ROUTES, requirement: metadata::ResourceRequirement::Required }];
+pub const DRV_GPIOB_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiob.pb0",
+    name: "GPIOB PB0",
+    pin_ref: "pin.pb0",
+    peripheral_ref: "periph.gpiob",
+    signal: "GPIO0",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOB_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiob.pb1",
+    name: "GPIOB PB1",
+    pin_ref: "pin.pb1",
+    peripheral_ref: "periph.gpiob",
+    signal: "GPIO1",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOB_PIN_ROLE_2_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiob.pb2",
+    name: "GPIOB PB2",
+    pin_ref: "pin.pb2",
+    peripheral_ref: "periph.gpiob",
+    signal: "GPIO2",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOB_PIN_ROLE_3_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiob.pb3",
+    name: "GPIOB PB3",
+    pin_ref: "pin.pb3",
+    peripheral_ref: "periph.gpiob",
+    signal: "GPIO3",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOB_PIN_ROLE_4_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiob.pb4",
+    name: "GPIOB PB4",
+    pin_ref: "pin.pb4",
+    peripheral_ref: "periph.gpiob",
+    signal: "GPIO4",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOB_PIN_ROLE_5_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiob.pb5",
+    name: "GPIOB PB5",
+    pin_ref: "pin.pb5",
+    peripheral_ref: "periph.gpiob",
+    signal: "GPIO5",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOB_PIN_ROLE_6_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiob.pb6",
+    name: "GPIOB PB6",
+    pin_ref: "pin.pb6",
+    peripheral_ref: "periph.gpiob",
+    signal: "GPIO6",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOB_PIN_ROLE_7_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiob.pb7",
+    name: "GPIOB PB7",
+    pin_ref: "pin.pb7",
+    peripheral_ref: "periph.gpiob",
+    signal: "GPIO7",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOB_PIN_ROLES: &[metadata::PinRole] = &[
+    metadata::PinRole {
+        role: "gpio0",
+        signal: "GPIO0",
+        routes: DRV_GPIOB_PIN_ROLE_0_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio1",
+        signal: "GPIO1",
+        routes: DRV_GPIOB_PIN_ROLE_1_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio2",
+        signal: "GPIO2",
+        routes: DRV_GPIOB_PIN_ROLE_2_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio3",
+        signal: "GPIO3",
+        routes: DRV_GPIOB_PIN_ROLE_3_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio4",
+        signal: "GPIO4",
+        routes: DRV_GPIOB_PIN_ROLE_4_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio5",
+        signal: "GPIO5",
+        routes: DRV_GPIOB_PIN_ROLE_5_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio6",
+        signal: "GPIO6",
+        routes: DRV_GPIOB_PIN_ROLE_6_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio7",
+        signal: "GPIO7",
+        routes: DRV_GPIOB_PIN_ROLE_7_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+];
 pub const DRV_GPIOB_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_GPIOB_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_GPIOB_CAPABILITY_TAGS: &[&str] = &[];
@@ -700,8 +1019,6 @@ impl GPIOB {
             bit_mask: 0x00000080u32,
         }
     }
-
-
 }
 
 #[derive(Debug, Clone)]
@@ -794,7 +1111,11 @@ impl GPIOBFlex {
     }
 
     pub fn get_level(&self) -> Result<Level, metadata::Error> {
-        Ok(if self.is_high()? { Level::High } else { Level::Low })
+        Ok(if self.is_high()? {
+            Level::High
+        } else {
+            Level::Low
+        })
     }
 
     pub fn is_set_high(&self) -> Result<bool, metadata::Error> {
@@ -900,21 +1221,178 @@ impl GPIOBOutput {
 }
 
 // Driver instance: GPIOC (gpio-port) from canonical block block.gpioc -> gpio-port
-pub const DRV_GPIOC_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.gpioc", name: "GPIOC", consumer_ref: "periph.gpioc", clock_ref: "clock.sysclk", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.sysctl.rcgc2"], enable_operation_refs: &[], disable_operation_refs: &[] }];
-pub const DRV_GPIOC_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.gpioc", name: "GPIOC", target_ref: "periph.gpioc", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rd.software"), binding_kind: "software", control_refs: &["reg.sysctl.srcr2"], assert_operation_refs: &[], release_operation_refs: &[] }];
+pub const DRV_GPIOC_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding {
+    id: "clk.gpioc",
+    name: "GPIOC",
+    consumer_ref: "periph.gpioc",
+    clock_ref: "clock.sysclk",
+    controller_ref: Some("block.rcc"),
+    binding_kind: "gated",
+    control_refs: &["reg.sysctl.rcgc2"],
+    enable_operation_refs: &[],
+    disable_operation_refs: &[],
+}];
+pub const DRV_GPIOC_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding {
+    id: "rst.gpioc",
+    name: "GPIOC",
+    target_ref: "periph.gpioc",
+    controller_ref: Some("block.rcc"),
+    reset_domain_ref: Some("rd.software"),
+    binding_kind: "software",
+    control_refs: &["reg.sysctl.srcr2"],
+    assert_operation_refs: &[],
+    release_operation_refs: &[],
+}];
 pub const DRV_GPIOC_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];
 pub const DRV_GPIOC_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];
 pub const DRV_GPIOC_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_GPIOC_DMA_ROUTES: &[metadata::DmaRoute] = &[];
-pub const DRV_GPIOC_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioc.pc0", name: "GPIOC PC0", pin_ref: "pin.pc0", peripheral_ref: "periph.gpioc", signal: "GPIO0", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOC_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioc.pc1", name: "GPIOC PC1", pin_ref: "pin.pc1", peripheral_ref: "periph.gpioc", signal: "GPIO1", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOC_PIN_ROLE_2_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioc.pc2", name: "GPIOC PC2", pin_ref: "pin.pc2", peripheral_ref: "periph.gpioc", signal: "GPIO2", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOC_PIN_ROLE_3_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioc.pc3", name: "GPIOC PC3", pin_ref: "pin.pc3", peripheral_ref: "periph.gpioc", signal: "GPIO3", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOC_PIN_ROLE_4_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioc.pc4", name: "GPIOC PC4", pin_ref: "pin.pc4", peripheral_ref: "periph.gpioc", signal: "GPIO4", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOC_PIN_ROLE_5_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioc.pc5", name: "GPIOC PC5", pin_ref: "pin.pc5", peripheral_ref: "periph.gpioc", signal: "GPIO5", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOC_PIN_ROLE_6_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioc.pc6", name: "GPIOC PC6", pin_ref: "pin.pc6", peripheral_ref: "periph.gpioc", signal: "GPIO6", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOC_PIN_ROLE_7_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioc.pc7", name: "GPIOC PC7", pin_ref: "pin.pc7", peripheral_ref: "periph.gpioc", signal: "GPIO7", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOC_PIN_ROLES: &[metadata::PinRole] = &[metadata::PinRole { role: "gpio0", signal: "GPIO0", routes: DRV_GPIOC_PIN_ROLE_0_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio1", signal: "GPIO1", routes: DRV_GPIOC_PIN_ROLE_1_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio2", signal: "GPIO2", routes: DRV_GPIOC_PIN_ROLE_2_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio3", signal: "GPIO3", routes: DRV_GPIOC_PIN_ROLE_3_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio4", signal: "GPIO4", routes: DRV_GPIOC_PIN_ROLE_4_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio5", signal: "GPIO5", routes: DRV_GPIOC_PIN_ROLE_5_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio6", signal: "GPIO6", routes: DRV_GPIOC_PIN_ROLE_6_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio7", signal: "GPIO7", routes: DRV_GPIOC_PIN_ROLE_7_ROUTES, requirement: metadata::ResourceRequirement::Required }];
+pub const DRV_GPIOC_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioc.pc0",
+    name: "GPIOC PC0",
+    pin_ref: "pin.pc0",
+    peripheral_ref: "periph.gpioc",
+    signal: "GPIO0",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOC_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioc.pc1",
+    name: "GPIOC PC1",
+    pin_ref: "pin.pc1",
+    peripheral_ref: "periph.gpioc",
+    signal: "GPIO1",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOC_PIN_ROLE_2_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioc.pc2",
+    name: "GPIOC PC2",
+    pin_ref: "pin.pc2",
+    peripheral_ref: "periph.gpioc",
+    signal: "GPIO2",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOC_PIN_ROLE_3_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioc.pc3",
+    name: "GPIOC PC3",
+    pin_ref: "pin.pc3",
+    peripheral_ref: "periph.gpioc",
+    signal: "GPIO3",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOC_PIN_ROLE_4_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioc.pc4",
+    name: "GPIOC PC4",
+    pin_ref: "pin.pc4",
+    peripheral_ref: "periph.gpioc",
+    signal: "GPIO4",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOC_PIN_ROLE_5_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioc.pc5",
+    name: "GPIOC PC5",
+    pin_ref: "pin.pc5",
+    peripheral_ref: "periph.gpioc",
+    signal: "GPIO5",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOC_PIN_ROLE_6_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioc.pc6",
+    name: "GPIOC PC6",
+    pin_ref: "pin.pc6",
+    peripheral_ref: "periph.gpioc",
+    signal: "GPIO6",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOC_PIN_ROLE_7_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioc.pc7",
+    name: "GPIOC PC7",
+    pin_ref: "pin.pc7",
+    peripheral_ref: "periph.gpioc",
+    signal: "GPIO7",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOC_PIN_ROLES: &[metadata::PinRole] = &[
+    metadata::PinRole {
+        role: "gpio0",
+        signal: "GPIO0",
+        routes: DRV_GPIOC_PIN_ROLE_0_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio1",
+        signal: "GPIO1",
+        routes: DRV_GPIOC_PIN_ROLE_1_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio2",
+        signal: "GPIO2",
+        routes: DRV_GPIOC_PIN_ROLE_2_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio3",
+        signal: "GPIO3",
+        routes: DRV_GPIOC_PIN_ROLE_3_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio4",
+        signal: "GPIO4",
+        routes: DRV_GPIOC_PIN_ROLE_4_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio5",
+        signal: "GPIO5",
+        routes: DRV_GPIOC_PIN_ROLE_5_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio6",
+        signal: "GPIO6",
+        routes: DRV_GPIOC_PIN_ROLE_6_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio7",
+        signal: "GPIO7",
+        routes: DRV_GPIOC_PIN_ROLE_7_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+];
 pub const DRV_GPIOC_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_GPIOC_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_GPIOC_CAPABILITY_TAGS: &[&str] = &[];
@@ -1110,8 +1588,6 @@ impl GPIOC {
             bit_mask: 0x00000080u32,
         }
     }
-
-
 }
 
 #[derive(Debug, Clone)]
@@ -1204,7 +1680,11 @@ impl GPIOCFlex {
     }
 
     pub fn get_level(&self) -> Result<Level, metadata::Error> {
-        Ok(if self.is_high()? { Level::High } else { Level::Low })
+        Ok(if self.is_high()? {
+            Level::High
+        } else {
+            Level::Low
+        })
     }
 
     pub fn is_set_high(&self) -> Result<bool, metadata::Error> {
@@ -1310,21 +1790,178 @@ impl GPIOCOutput {
 }
 
 // Driver instance: GPIOD (gpio-port) from canonical block block.gpiod -> gpio-port
-pub const DRV_GPIOD_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.gpiod", name: "GPIOD", consumer_ref: "periph.gpiod", clock_ref: "clock.sysclk", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.sysctl.rcgc2"], enable_operation_refs: &[], disable_operation_refs: &[] }];
-pub const DRV_GPIOD_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.gpiod", name: "GPIOD", target_ref: "periph.gpiod", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rd.software"), binding_kind: "software", control_refs: &["reg.sysctl.srcr2"], assert_operation_refs: &[], release_operation_refs: &[] }];
+pub const DRV_GPIOD_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding {
+    id: "clk.gpiod",
+    name: "GPIOD",
+    consumer_ref: "periph.gpiod",
+    clock_ref: "clock.sysclk",
+    controller_ref: Some("block.rcc"),
+    binding_kind: "gated",
+    control_refs: &["reg.sysctl.rcgc2"],
+    enable_operation_refs: &[],
+    disable_operation_refs: &[],
+}];
+pub const DRV_GPIOD_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding {
+    id: "rst.gpiod",
+    name: "GPIOD",
+    target_ref: "periph.gpiod",
+    controller_ref: Some("block.rcc"),
+    reset_domain_ref: Some("rd.software"),
+    binding_kind: "software",
+    control_refs: &["reg.sysctl.srcr2"],
+    assert_operation_refs: &[],
+    release_operation_refs: &[],
+}];
 pub const DRV_GPIOD_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];
 pub const DRV_GPIOD_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];
 pub const DRV_GPIOD_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_GPIOD_DMA_ROUTES: &[metadata::DmaRoute] = &[];
-pub const DRV_GPIOD_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiod.pd0", name: "GPIOD PD0", pin_ref: "pin.pd0", peripheral_ref: "periph.gpiod", signal: "GPIO0", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOD_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiod.pd1", name: "GPIOD PD1", pin_ref: "pin.pd1", peripheral_ref: "periph.gpiod", signal: "GPIO1", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOD_PIN_ROLE_2_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiod.pd2", name: "GPIOD PD2", pin_ref: "pin.pd2", peripheral_ref: "periph.gpiod", signal: "GPIO2", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOD_PIN_ROLE_3_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiod.pd3", name: "GPIOD PD3", pin_ref: "pin.pd3", peripheral_ref: "periph.gpiod", signal: "GPIO3", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOD_PIN_ROLE_4_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiod.pd4", name: "GPIOD PD4", pin_ref: "pin.pd4", peripheral_ref: "periph.gpiod", signal: "GPIO4", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOD_PIN_ROLE_5_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiod.pd5", name: "GPIOD PD5", pin_ref: "pin.pd5", peripheral_ref: "periph.gpiod", signal: "GPIO5", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOD_PIN_ROLE_6_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiod.pd6", name: "GPIOD PD6", pin_ref: "pin.pd6", peripheral_ref: "periph.gpiod", signal: "GPIO6", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOD_PIN_ROLE_7_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiod.pd7", name: "GPIOD PD7", pin_ref: "pin.pd7", peripheral_ref: "periph.gpiod", signal: "GPIO7", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOD_PIN_ROLES: &[metadata::PinRole] = &[metadata::PinRole { role: "gpio0", signal: "GPIO0", routes: DRV_GPIOD_PIN_ROLE_0_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio1", signal: "GPIO1", routes: DRV_GPIOD_PIN_ROLE_1_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio2", signal: "GPIO2", routes: DRV_GPIOD_PIN_ROLE_2_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio3", signal: "GPIO3", routes: DRV_GPIOD_PIN_ROLE_3_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio4", signal: "GPIO4", routes: DRV_GPIOD_PIN_ROLE_4_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio5", signal: "GPIO5", routes: DRV_GPIOD_PIN_ROLE_5_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio6", signal: "GPIO6", routes: DRV_GPIOD_PIN_ROLE_6_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio7", signal: "GPIO7", routes: DRV_GPIOD_PIN_ROLE_7_ROUTES, requirement: metadata::ResourceRequirement::Required }];
+pub const DRV_GPIOD_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiod.pd0",
+    name: "GPIOD PD0",
+    pin_ref: "pin.pd0",
+    peripheral_ref: "periph.gpiod",
+    signal: "GPIO0",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOD_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiod.pd1",
+    name: "GPIOD PD1",
+    pin_ref: "pin.pd1",
+    peripheral_ref: "periph.gpiod",
+    signal: "GPIO1",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOD_PIN_ROLE_2_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiod.pd2",
+    name: "GPIOD PD2",
+    pin_ref: "pin.pd2",
+    peripheral_ref: "periph.gpiod",
+    signal: "GPIO2",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOD_PIN_ROLE_3_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiod.pd3",
+    name: "GPIOD PD3",
+    pin_ref: "pin.pd3",
+    peripheral_ref: "periph.gpiod",
+    signal: "GPIO3",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOD_PIN_ROLE_4_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiod.pd4",
+    name: "GPIOD PD4",
+    pin_ref: "pin.pd4",
+    peripheral_ref: "periph.gpiod",
+    signal: "GPIO4",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOD_PIN_ROLE_5_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiod.pd5",
+    name: "GPIOD PD5",
+    pin_ref: "pin.pd5",
+    peripheral_ref: "periph.gpiod",
+    signal: "GPIO5",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOD_PIN_ROLE_6_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiod.pd6",
+    name: "GPIOD PD6",
+    pin_ref: "pin.pd6",
+    peripheral_ref: "periph.gpiod",
+    signal: "GPIO6",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOD_PIN_ROLE_7_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiod.pd7",
+    name: "GPIOD PD7",
+    pin_ref: "pin.pd7",
+    peripheral_ref: "periph.gpiod",
+    signal: "GPIO7",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOD_PIN_ROLES: &[metadata::PinRole] = &[
+    metadata::PinRole {
+        role: "gpio0",
+        signal: "GPIO0",
+        routes: DRV_GPIOD_PIN_ROLE_0_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio1",
+        signal: "GPIO1",
+        routes: DRV_GPIOD_PIN_ROLE_1_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio2",
+        signal: "GPIO2",
+        routes: DRV_GPIOD_PIN_ROLE_2_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio3",
+        signal: "GPIO3",
+        routes: DRV_GPIOD_PIN_ROLE_3_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio4",
+        signal: "GPIO4",
+        routes: DRV_GPIOD_PIN_ROLE_4_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio5",
+        signal: "GPIO5",
+        routes: DRV_GPIOD_PIN_ROLE_5_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio6",
+        signal: "GPIO6",
+        routes: DRV_GPIOD_PIN_ROLE_6_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio7",
+        signal: "GPIO7",
+        routes: DRV_GPIOD_PIN_ROLE_7_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+];
 pub const DRV_GPIOD_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_GPIOD_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_GPIOD_CAPABILITY_TAGS: &[&str] = &[];
@@ -1520,8 +2157,6 @@ impl GPIOD {
             bit_mask: 0x00000080u32,
         }
     }
-
-
 }
 
 #[derive(Debug, Clone)]
@@ -1614,7 +2249,11 @@ impl GPIODFlex {
     }
 
     pub fn get_level(&self) -> Result<Level, metadata::Error> {
-        Ok(if self.is_high()? { Level::High } else { Level::Low })
+        Ok(if self.is_high()? {
+            Level::High
+        } else {
+            Level::Low
+        })
     }
 
     pub fn is_set_high(&self) -> Result<bool, metadata::Error> {
@@ -1720,17 +2359,106 @@ impl GPIODOutput {
 }
 
 // Driver instance: GPIOE (gpio-port) from canonical block block.gpioe -> gpio-port
-pub const DRV_GPIOE_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.gpioe", name: "GPIOE", consumer_ref: "periph.gpioe", clock_ref: "clock.sysclk", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.sysctl.rcgc2"], enable_operation_refs: &[], disable_operation_refs: &[] }];
-pub const DRV_GPIOE_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.gpioe", name: "GPIOE", target_ref: "periph.gpioe", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rd.software"), binding_kind: "software", control_refs: &["reg.sysctl.srcr2"], assert_operation_refs: &[], release_operation_refs: &[] }];
+pub const DRV_GPIOE_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding {
+    id: "clk.gpioe",
+    name: "GPIOE",
+    consumer_ref: "periph.gpioe",
+    clock_ref: "clock.sysclk",
+    controller_ref: Some("block.rcc"),
+    binding_kind: "gated",
+    control_refs: &["reg.sysctl.rcgc2"],
+    enable_operation_refs: &[],
+    disable_operation_refs: &[],
+}];
+pub const DRV_GPIOE_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding {
+    id: "rst.gpioe",
+    name: "GPIOE",
+    target_ref: "periph.gpioe",
+    controller_ref: Some("block.rcc"),
+    reset_domain_ref: Some("rd.software"),
+    binding_kind: "software",
+    control_refs: &["reg.sysctl.srcr2"],
+    assert_operation_refs: &[],
+    release_operation_refs: &[],
+}];
 pub const DRV_GPIOE_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];
 pub const DRV_GPIOE_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];
 pub const DRV_GPIOE_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_GPIOE_DMA_ROUTES: &[metadata::DmaRoute] = &[];
-pub const DRV_GPIOE_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioe.pe0", name: "GPIOE PE0", pin_ref: "pin.pe0", peripheral_ref: "periph.gpioe", signal: "GPIO0", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOE_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioe.pe1", name: "GPIOE PE1", pin_ref: "pin.pe1", peripheral_ref: "periph.gpioe", signal: "GPIO1", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOE_PIN_ROLE_2_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioe.pe2", name: "GPIOE PE2", pin_ref: "pin.pe2", peripheral_ref: "periph.gpioe", signal: "GPIO2", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOE_PIN_ROLE_3_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpioe.pe3", name: "GPIOE PE3", pin_ref: "pin.pe3", peripheral_ref: "periph.gpioe", signal: "GPIO3", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOE_PIN_ROLES: &[metadata::PinRole] = &[metadata::PinRole { role: "gpio0", signal: "GPIO0", routes: DRV_GPIOE_PIN_ROLE_0_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio1", signal: "GPIO1", routes: DRV_GPIOE_PIN_ROLE_1_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio2", signal: "GPIO2", routes: DRV_GPIOE_PIN_ROLE_2_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio3", signal: "GPIO3", routes: DRV_GPIOE_PIN_ROLE_3_ROUTES, requirement: metadata::ResourceRequirement::Required }];
+pub const DRV_GPIOE_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioe.pe0",
+    name: "GPIOE PE0",
+    pin_ref: "pin.pe0",
+    peripheral_ref: "periph.gpioe",
+    signal: "GPIO0",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOE_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioe.pe1",
+    name: "GPIOE PE1",
+    pin_ref: "pin.pe1",
+    peripheral_ref: "periph.gpioe",
+    signal: "GPIO1",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOE_PIN_ROLE_2_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioe.pe2",
+    name: "GPIOE PE2",
+    pin_ref: "pin.pe2",
+    peripheral_ref: "periph.gpioe",
+    signal: "GPIO2",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOE_PIN_ROLE_3_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpioe.pe3",
+    name: "GPIOE PE3",
+    pin_ref: "pin.pe3",
+    peripheral_ref: "periph.gpioe",
+    signal: "GPIO3",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOE_PIN_ROLES: &[metadata::PinRole] = &[
+    metadata::PinRole {
+        role: "gpio0",
+        signal: "GPIO0",
+        routes: DRV_GPIOE_PIN_ROLE_0_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio1",
+        signal: "GPIO1",
+        routes: DRV_GPIOE_PIN_ROLE_1_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio2",
+        signal: "GPIO2",
+        routes: DRV_GPIOE_PIN_ROLE_2_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio3",
+        signal: "GPIO3",
+        routes: DRV_GPIOE_PIN_ROLE_3_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+];
 pub const DRV_GPIOE_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_GPIOE_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_GPIOE_CAPABILITY_TAGS: &[&str] = &[];
@@ -1862,8 +2590,6 @@ impl GPIOE {
             bit_mask: 0x00000008u32,
         }
     }
-
-
 }
 
 #[derive(Debug, Clone)]
@@ -1956,7 +2682,11 @@ impl GPIOEFlex {
     }
 
     pub fn get_level(&self) -> Result<Level, metadata::Error> {
-        Ok(if self.is_high()? { Level::High } else { Level::Low })
+        Ok(if self.is_high()? {
+            Level::High
+        } else {
+            Level::Low
+        })
     }
 
     pub fn is_set_high(&self) -> Result<bool, metadata::Error> {
@@ -2062,17 +2792,106 @@ impl GPIOEOutput {
 }
 
 // Driver instance: GPIOF (gpio-port) from canonical block block.gpiof -> gpio-port
-pub const DRV_GPIOF_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.gpiof", name: "GPIOF", consumer_ref: "periph.gpiof", clock_ref: "clock.sysclk", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.sysctl.rcgc2"], enable_operation_refs: &[], disable_operation_refs: &[] }];
-pub const DRV_GPIOF_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.gpiof", name: "GPIOF", target_ref: "periph.gpiof", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rd.software"), binding_kind: "software", control_refs: &["reg.sysctl.srcr2"], assert_operation_refs: &[], release_operation_refs: &[] }];
+pub const DRV_GPIOF_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding {
+    id: "clk.gpiof",
+    name: "GPIOF",
+    consumer_ref: "periph.gpiof",
+    clock_ref: "clock.sysclk",
+    controller_ref: Some("block.rcc"),
+    binding_kind: "gated",
+    control_refs: &["reg.sysctl.rcgc2"],
+    enable_operation_refs: &[],
+    disable_operation_refs: &[],
+}];
+pub const DRV_GPIOF_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding {
+    id: "rst.gpiof",
+    name: "GPIOF",
+    target_ref: "periph.gpiof",
+    controller_ref: Some("block.rcc"),
+    reset_domain_ref: Some("rd.software"),
+    binding_kind: "software",
+    control_refs: &["reg.sysctl.srcr2"],
+    assert_operation_refs: &[],
+    release_operation_refs: &[],
+}];
 pub const DRV_GPIOF_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];
 pub const DRV_GPIOF_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];
 pub const DRV_GPIOF_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_GPIOF_DMA_ROUTES: &[metadata::DmaRoute] = &[];
-pub const DRV_GPIOF_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiof.pf0", name: "GPIOF PF0", pin_ref: "pin.pf0", peripheral_ref: "periph.gpiof", signal: "GPIO0", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOF_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiof.pf1", name: "GPIOF PF1", pin_ref: "pin.pf1", peripheral_ref: "periph.gpiof", signal: "GPIO1", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOF_PIN_ROLE_2_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiof.pf2", name: "GPIOF PF2", pin_ref: "pin.pf2", peripheral_ref: "periph.gpiof", signal: "GPIO2", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOF_PIN_ROLE_3_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpiof.pf3", name: "GPIOF PF3", pin_ref: "pin.pf3", peripheral_ref: "periph.gpiof", signal: "GPIO3", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIOF_PIN_ROLES: &[metadata::PinRole] = &[metadata::PinRole { role: "gpio0", signal: "GPIO0", routes: DRV_GPIOF_PIN_ROLE_0_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio1", signal: "GPIO1", routes: DRV_GPIOF_PIN_ROLE_1_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio2", signal: "GPIO2", routes: DRV_GPIOF_PIN_ROLE_2_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio3", signal: "GPIO3", routes: DRV_GPIOF_PIN_ROLE_3_ROUTES, requirement: metadata::ResourceRequirement::Required }];
+pub const DRV_GPIOF_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiof.pf0",
+    name: "GPIOF PF0",
+    pin_ref: "pin.pf0",
+    peripheral_ref: "periph.gpiof",
+    signal: "GPIO0",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOF_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiof.pf1",
+    name: "GPIOF PF1",
+    pin_ref: "pin.pf1",
+    peripheral_ref: "periph.gpiof",
+    signal: "GPIO1",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOF_PIN_ROLE_2_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiof.pf2",
+    name: "GPIOF PF2",
+    pin_ref: "pin.pf2",
+    peripheral_ref: "periph.gpiof",
+    signal: "GPIO2",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOF_PIN_ROLE_3_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpiof.pf3",
+    name: "GPIOF PF3",
+    pin_ref: "pin.pf3",
+    peripheral_ref: "periph.gpiof",
+    signal: "GPIO3",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIOF_PIN_ROLES: &[metadata::PinRole] = &[
+    metadata::PinRole {
+        role: "gpio0",
+        signal: "GPIO0",
+        routes: DRV_GPIOF_PIN_ROLE_0_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio1",
+        signal: "GPIO1",
+        routes: DRV_GPIOF_PIN_ROLE_1_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio2",
+        signal: "GPIO2",
+        routes: DRV_GPIOF_PIN_ROLE_2_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio3",
+        signal: "GPIO3",
+        routes: DRV_GPIOF_PIN_ROLE_3_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+];
 pub const DRV_GPIOF_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_GPIOF_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_GPIOF_CAPABILITY_TAGS: &[&str] = &[];
@@ -2204,8 +3023,6 @@ impl GPIOF {
             bit_mask: 0x00000008u32,
         }
     }
-
-
 }
 
 #[derive(Debug, Clone)]
@@ -2298,7 +3115,11 @@ impl GPIOFFlex {
     }
 
     pub fn get_level(&self) -> Result<Level, metadata::Error> {
-        Ok(if self.is_high()? { Level::High } else { Level::Low })
+        Ok(if self.is_high()? {
+            Level::High
+        } else {
+            Level::Low
+        })
     }
 
     pub fn is_set_high(&self) -> Result<bool, metadata::Error> {
@@ -2402,4 +3223,3 @@ impl GPIOFOutput {
         self.pin.get_output_level()
     }
 }
-

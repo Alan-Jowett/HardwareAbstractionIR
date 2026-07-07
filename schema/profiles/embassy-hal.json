@@ -140,7 +140,7 @@
               "$ref": "#/$defs/driverKind"
             },
             "modulePath": {
-              "description": "Generator-facing Rust module placement for the emitted driver/support code. This does not by itself define a fixed method set; methods must be derived from the referenced lowering inputs.",
+              "description": "Generator-facing Rust module placement for the emitted driver/support code. This does not by itself define a fixed method set; methods must be derived from the referenced lowering inputs. Support-oriented placements such as a generated time module are allowed only when the referenced driver instance carries the explicit lowering contract needed for that support surface.",
               "$ref": "../common.json#/$defs/nonEmptyString"
             },
             "clockBindingRefs": {
@@ -200,7 +200,7 @@
               "uniqueItems": true
             },
             "capabilityTags": {
-              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs.",
+              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support when the document explicitly carries the required tick-source and interrupt-path lowering data.",
               "type": "array",
               "items": {
                 "type": "string"
