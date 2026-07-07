@@ -125,8 +125,13 @@ jobs:
             echo "qemu-system-arm not found in downloaded artifact ${{ inputs.qemu_artifact_name }}" >&2
             exit 1
           }
+          qemu_prefix="$(dirname "$(dirname "$qemu_system_arm")")"
+          qemu_lib_dir="$qemu_prefix/lib"
           chmod +x "$qemu_system_arm"
           dirname "$qemu_system_arm" >> "$GITHUB_PATH"
+          if [[ -d "$qemu_lib_dir" ]]; then
+            echo "LD_LIBRARY_PATH=$qemu_lib_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+          fi
 
       - name: Regenerate SVD
         shell: bash
