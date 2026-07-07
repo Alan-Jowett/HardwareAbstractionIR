@@ -1983,7 +1983,13 @@ impl EmbassyGenerationModel {
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect::<Vec<_>>();
-        if !self.interrupts.is_empty() && !names.iter().any(|name| name == "interrupt") {
+        let has_interrupt_driver = self
+            .drivers
+            .iter()
+            .any(|driver| driver.driver_kind == "interrupt");
+        if (has_interrupt_driver || !self.interrupts.is_empty())
+            && !names.iter().any(|name| name == "interrupt")
+        {
             names.push("interrupt".to_string());
         }
         names.insert(0, "metadata".to_string());
@@ -1995,7 +2001,12 @@ impl EmbassyGenerationModel {
         for driver in &self.drivers {
             groups.insert(driver.module_name.clone());
         }
-        if !self.interrupts.is_empty() {
+        if self
+            .drivers
+            .iter()
+            .any(|driver| driver.driver_kind == "interrupt")
+            || !self.interrupts.is_empty()
+        {
             groups.insert("interrupt".to_string());
         }
 
@@ -7067,7 +7078,7 @@ fn render_embassy_host_metadata_rs(model: &EmbassyGenerationModel) -> Result<Str
     out.push_str(&render_host_indexed_gpio_model_slice(&gpio_models));
     out.push_str(";\n\n");
     out.push_str(
-        "thread_local! {\n    static CURRENT_EMULATOR: RefCell<Option<SharedEmulatorState>> = const { RefCell::new(None) };\n}\n\nfn lock_guard<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {\n    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())\n}\n\npub fn new_emulator_state() -> SharedEmulatorState {\n    Arc::new(GeneratedHostState::default())\n}\n\npub fn install_current_emulator(state: SharedEmulatorState) {\n    CURRENT_EMULATOR.with(|slot| {\n        *slot.borrow_mut() = Some(state);\n    });\n}\n\npub fn initialize_emulator_state(state: &SharedEmulatorState) {\n    let mut registers = lock_guard(&state.registers);\n    for model in SERIAL_REGISTER_MODELS {\n        registers.insert(model.sr_address, model.txe_mask | model.tc_mask);\n        registers.insert(model.dr_address, 0);\n    }\n}\n\nfn current_emulator() -> Result<SharedEmulatorState, Error> {\n    CURRENT_EMULATOR.with(|slot| {\n        slot.borrow()\n            .clone()\n            .ok_or(Error::Unsupported(\"host emulator is not active on this thread\"))\n    })\n}\n\nfn serial_model_for_driver(driver_id: &str) -> Option<&'static SerialRegisterModel> {\n    SERIAL_REGISTER_MODELS.iter().find(|model| model.driver_id == driver_id)\n}\n\nfn serial_model_for_dr_address(address: u64) -> Option<&'static SerialRegisterModel> {\n    SERIAL_REGISTER_MODELS.iter().find(|model| model.dr_address == address)\n}\n\nfn indexed_gpio_model_for_bsrr(address: u64) -> Option<&'static IndexedGpioModel> {\n    INDEXED_GPIO_MODELS.iter().find(|model| model.bsrr_address == address)\n}\n\npub fn read_u32_for(state: &SharedEmulatorState, address: u64) -> Result<u32, Error> {\n    if let Some(model) = serial_model_for_dr_address(address) {\n        let mut serial = lock_guard(&state.serial);\n        let queues = serial.entry(model.driver_id.to_string()).or_default();\n        if let Some(byte) = queues.rx.pop_front() {\n            let mut registers = lock_guard(&state.registers);\n            let entry = registers.entry(model.sr_address).or_insert(model.txe_mask | model.tc_mask);\n            if queues.rx.is_empty() {\n                *entry &= !model.rxne_mask;\n            } else {\n                *entry |= model.rxne_mask;\n            }\n            registers.insert(model.dr_address, u32::from(byte));\n            return Ok(u32::from(byte));\n        }\n    }\n    Ok(*lock_guard(&state.registers).get(&address).unwrap_or(&0))\n}\n\npub fn write_u32_for(state: &SharedEmulatorState, address: u64, value: u32) -> Result<(), Error> {\n    if let Some(model) = serial_model_for_dr_address(address) {\n        let mut serial = lock_guard(&state.serial);\n        let queues = serial.entry(model.driver_id.to_string()).or_default();\n        queues.tx.push_back((value & 0xFF) as u8);\n        let mut registers = lock_guard(&state.registers);\n        registers.insert(model.dr_address, value & 0xFF);\n        let entry = registers.entry(model.sr_address).or_insert(0);\n        *entry |= model.txe_mask | model.tc_mask;\n        return Ok(());\n    }\n    if let Some(model) = indexed_gpio_model_for_bsrr(address) {\n        let mut registers = lock_guard(&state.registers);\n        let odr = registers.entry(model.odr_address).or_insert(0);\n        let set_bits = value & 0xFFFF;\n        let reset_bits = (value >> 16) & 0xFFFF;\n        *odr |= set_bits;\n        *odr &= !reset_bits;\n        registers.insert(address, value);\n        return Ok(());\n    }\n    lock_guard(&state.registers).insert(address, value);\n    Ok(())\n}\n\npub fn modify_u8_for(state: &SharedEmulatorState, address: u64, clear_mask: u8, set_mask: u8) -> Result<(), Error> {\n    let current = read_u32_for(state, address)? as u8;\n    write_u32_for(state, address, u32::from((current & !clear_mask) | set_mask))\n}\n\npub fn modify_u16_for(state: &SharedEmulatorState, address: u64, clear_mask: u16, set_mask: u16) -> Result<(), Error> {\n    let current = read_u32_for(state, address)? as u16;\n    write_u32_for(state, address, u32::from((current & !clear_mask) | set_mask))\n}\n\npub fn modify_u32_for(state: &SharedEmulatorState, address: u64, clear_mask: u32, set_mask: u32) -> Result<(), Error> {\n    let current = read_u32_for(state, address)?;\n    write_u32_for(state, address, (current & !clear_mask) | set_mask)\n}\n\npub fn read_u32(address: u64) -> Result<u32, Error> {\n    let state = current_emulator()?;\n    read_u32_for(&state, address)\n}\n\npub fn write_u32(address: u64, value: u32) -> Result<(), Error> {\n    let state = current_emulator()?;\n    write_u32_for(&state, address, value)\n}\n\npub fn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u8_for(&state, address, clear_mask, set_mask)\n}\n\npub fn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u16_for(&state, address, clear_mask, set_mask)\n}\n\npub fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u32_for(&state, address, clear_mask, set_mask)\n}\n\npub fn push_serial_rx_for(state: &SharedEmulatorState, driver_id: &str, bytes: &[u8]) -> Result<(), Error> {\n    let mut serial = lock_guard(&state.serial);\n    let queues = serial.entry(driver_id.to_string()).or_default();\n    for &byte in bytes {\n        queues.rx.push_back(byte);\n    }\n    drop(serial);\n    if let Some(model) = serial_model_for_driver(driver_id) {\n        let mut registers = lock_guard(&state.registers);\n        let entry = registers.entry(model.sr_address).or_insert(model.txe_mask | model.tc_mask);\n        if !bytes.is_empty() {\n            *entry |= model.rxne_mask;\n        }\n    }\n    Ok(())\n}\n\npub fn take_serial_tx_for(state: &SharedEmulatorState, driver_id: &str) -> Vec<u8> {\n    let mut serial = lock_guard(&state.serial);\n    let queues = serial.entry(driver_id.to_string()).or_default();\n    queues.tx.drain(..).collect()\n}\n\npub fn mark_dma_route_complete_for(state: &SharedEmulatorState, route_id: &str) {\n    let mut dma = lock_guard(&state.dma_completions);\n    *dma.entry(route_id.to_string()).or_default() += 1;\n}\n\npub fn dma_route_completion_count_for(state: &SharedEmulatorState, route_id: &str) -> usize {\n    *lock_guard(&state.dma_completions).get(route_id).unwrap_or(&0)\n}\n\npub fn set_irq_pending_for(state: &SharedEmulatorState, irq_number: i32, pending: bool) {\n    let mut irqs = lock_guard(&state.pending_irqs);\n    if pending {\n        irqs.insert(irq_number);\n    } else {\n        irqs.remove(&irq_number);\n    }\n}\n\npub fn is_irq_pending_for(state: &SharedEmulatorState, irq_number: i32) -> bool {\n    lock_guard(&state.pending_irqs).contains(&irq_number)\n}\n",
+        "thread_local! {\n    static CURRENT_EMULATOR: RefCell<Option<SharedEmulatorState>> = const { RefCell::new(None) };\n}\n\npub struct CurrentEmulatorGuard {\n    previous: Option<SharedEmulatorState>,\n}\n\nimpl Drop for CurrentEmulatorGuard {\n    fn drop(&mut self) {\n        CURRENT_EMULATOR.with(|slot| {\n            *slot.borrow_mut() = self.previous.take();\n        });\n    }\n}\n\nfn lock_guard<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {\n    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())\n}\n\npub fn new_emulator_state() -> SharedEmulatorState {\n    Arc::new(GeneratedHostState::default())\n}\n\npub fn install_current_emulator(state: SharedEmulatorState) {\n    CURRENT_EMULATOR.with(|slot| {\n        *slot.borrow_mut() = Some(state);\n    });\n}\n\npub fn push_current_emulator(state: SharedEmulatorState) -> CurrentEmulatorGuard {\n    let previous = CURRENT_EMULATOR.with(|slot| slot.replace(Some(state)));\n    CurrentEmulatorGuard { previous }\n}\n\npub fn clear_current_emulator() {\n    CURRENT_EMULATOR.with(|slot| {\n        slot.borrow_mut().take();\n    });\n}\n\npub fn clear_current_emulator_if_active(state: &SharedEmulatorState) {\n    CURRENT_EMULATOR.with(|slot| {\n        let mut slot = slot.borrow_mut();\n        if slot\n            .as_ref()\n            .is_some_and(|current| Arc::ptr_eq(current, state))\n        {\n            slot.take();\n        }\n    });\n}\n\npub fn initialize_emulator_state(state: &SharedEmulatorState) {\n    let mut registers = lock_guard(&state.registers);\n    for model in SERIAL_REGISTER_MODELS {\n        registers.insert(model.sr_address, model.txe_mask | model.tc_mask);\n        registers.insert(model.dr_address, 0);\n    }\n}\n\nfn current_emulator() -> Result<SharedEmulatorState, Error> {\n    CURRENT_EMULATOR.with(|slot| {\n        slot.borrow()\n            .clone()\n            .ok_or(Error::Unsupported(\"host emulator is not active on this thread\"))\n    })\n}\n\nfn serial_model_for_driver(driver_id: &str) -> Option<&'static SerialRegisterModel> {\n    SERIAL_REGISTER_MODELS.iter().find(|model| model.driver_id == driver_id)\n}\n\nfn serial_model_for_dr_address(address: u64) -> Option<&'static SerialRegisterModel> {\n    SERIAL_REGISTER_MODELS.iter().find(|model| model.dr_address == address)\n}\n\nfn indexed_gpio_model_for_bsrr(address: u64) -> Option<&'static IndexedGpioModel> {\n    INDEXED_GPIO_MODELS.iter().find(|model| model.bsrr_address == address)\n}\n\npub fn read_u32_for(state: &SharedEmulatorState, address: u64) -> Result<u32, Error> {\n    if let Some(model) = serial_model_for_dr_address(address) {\n        let mut serial = lock_guard(&state.serial);\n        let queues = serial.entry(model.driver_id.to_string()).or_default();\n        if let Some(byte) = queues.rx.pop_front() {\n            let mut registers = lock_guard(&state.registers);\n            let entry = registers.entry(model.sr_address).or_insert(model.txe_mask | model.tc_mask);\n            if queues.rx.is_empty() {\n                *entry &= !model.rxne_mask;\n            } else {\n                *entry |= model.rxne_mask;\n            }\n            registers.insert(model.dr_address, u32::from(byte));\n            return Ok(u32::from(byte));\n        }\n    }\n    Ok(*lock_guard(&state.registers).get(&address).unwrap_or(&0))\n}\n\npub fn write_u32_for(state: &SharedEmulatorState, address: u64, value: u32) -> Result<(), Error> {\n    if let Some(model) = serial_model_for_dr_address(address) {\n        let mut serial = lock_guard(&state.serial);\n        let queues = serial.entry(model.driver_id.to_string()).or_default();\n        queues.tx.push_back((value & 0xFF) as u8);\n        let mut registers = lock_guard(&state.registers);\n        registers.insert(model.dr_address, value & 0xFF);\n        let entry = registers.entry(model.sr_address).or_insert(0);\n        *entry |= model.txe_mask | model.tc_mask;\n        return Ok(());\n    }\n    if let Some(model) = indexed_gpio_model_for_bsrr(address) {\n        let mut registers = lock_guard(&state.registers);\n        let odr = registers.entry(model.odr_address).or_insert(0);\n        let set_bits = value & 0xFFFF;\n        let reset_bits = (value >> 16) & 0xFFFF;\n        *odr |= set_bits;\n        *odr &= !reset_bits;\n        registers.insert(address, value);\n        return Ok(());\n    }\n    lock_guard(&state.registers).insert(address, value);\n    Ok(())\n}\n\npub fn modify_u8_for(state: &SharedEmulatorState, address: u64, clear_mask: u8, set_mask: u8) -> Result<(), Error> {\n    let current = read_u32_for(state, address)? as u8;\n    write_u32_for(state, address, u32::from((current & !clear_mask) | set_mask))\n}\n\npub fn modify_u16_for(state: &SharedEmulatorState, address: u64, clear_mask: u16, set_mask: u16) -> Result<(), Error> {\n    let current = read_u32_for(state, address)? as u16;\n    write_u32_for(state, address, u32::from((current & !clear_mask) | set_mask))\n}\n\npub fn modify_u32_for(state: &SharedEmulatorState, address: u64, clear_mask: u32, set_mask: u32) -> Result<(), Error> {\n    let current = read_u32_for(state, address)?;\n    write_u32_for(state, address, (current & !clear_mask) | set_mask)\n}\n\npub fn read_u32(address: u64) -> Result<u32, Error> {\n    let state = current_emulator()?;\n    read_u32_for(&state, address)\n}\n\npub fn write_u32(address: u64, value: u32) -> Result<(), Error> {\n    let state = current_emulator()?;\n    write_u32_for(&state, address, value)\n}\n\npub fn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u8_for(&state, address, clear_mask, set_mask)\n}\n\npub fn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u16_for(&state, address, clear_mask, set_mask)\n}\n\npub fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u32_for(&state, address, clear_mask, set_mask)\n}\n\npub fn push_serial_rx_for(state: &SharedEmulatorState, driver_id: &str, bytes: &[u8]) -> Result<(), Error> {\n    let mut serial = lock_guard(&state.serial);\n    let queues = serial.entry(driver_id.to_string()).or_default();\n    for &byte in bytes {\n        queues.rx.push_back(byte);\n    }\n    drop(serial);\n    if let Some(model) = serial_model_for_driver(driver_id) {\n        let mut registers = lock_guard(&state.registers);\n        let entry = registers.entry(model.sr_address).or_insert(model.txe_mask | model.tc_mask);\n        if !bytes.is_empty() {\n            *entry |= model.rxne_mask;\n        }\n    }\n    Ok(())\n}\n\npub fn take_serial_tx_for(state: &SharedEmulatorState, driver_id: &str) -> Vec<u8> {\n    let mut serial = lock_guard(&state.serial);\n    let queues = serial.entry(driver_id.to_string()).or_default();\n    queues.tx.drain(..).collect()\n}\n\npub fn mark_dma_route_complete_for(state: &SharedEmulatorState, route_id: &str) {\n    let mut dma = lock_guard(&state.dma_completions);\n    *dma.entry(route_id.to_string()).or_default() += 1;\n}\n\npub fn dma_route_completion_count_for(state: &SharedEmulatorState, route_id: &str) -> usize {\n    *lock_guard(&state.dma_completions).get(route_id).unwrap_or(&0)\n}\n\npub fn set_irq_pending_for(state: &SharedEmulatorState, irq_number: i32, pending: bool) {\n    let mut irqs = lock_guard(&state.pending_irqs);\n    if pending {\n        irqs.insert(irq_number);\n    } else {\n        irqs.remove(&irq_number);\n    }\n}\n\npub fn is_irq_pending_for(state: &SharedEmulatorState, irq_number: i32) -> bool {\n    lock_guard(&state.pending_irqs).contains(&irq_number)\n}\n",
     );
     Ok(out)
 }
@@ -7105,7 +7116,7 @@ fn render_host_indexed_gpio_model_slice(items: &[HostIndexedGpioModel]) -> Strin
 
 fn render_embassy_host_root_rs(model: &EmbassyGenerationModel) -> String {
     let mut out = String::from(
-        "use crate::metadata;\n\n#[derive(Debug, Clone)]\npub struct HostEmulator {\n    state: metadata::SharedEmulatorState,\n}\n\nimpl Default for HostEmulator {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\nimpl HostEmulator {\n    pub fn new() -> Self {\n        let state = metadata::new_emulator_state();\n        metadata::initialize_emulator_state(&state);\n        Self { state }\n    }\n\n    pub fn activate(&self) {\n        metadata::install_current_emulator(self.state.clone());\n    }\n\n    pub fn state(&self) -> metadata::SharedEmulatorState {\n        self.state.clone()\n    }\n",
+        "use crate::metadata;\n\n#[derive(Debug, Clone)]\npub struct HostEmulator {\n    state: metadata::SharedEmulatorState,\n}\n\nimpl Default for HostEmulator {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\nimpl Drop for HostEmulator {\n    fn drop(&mut self) {\n        metadata::clear_current_emulator_if_active(&self.state);\n    }\n}\n\nimpl HostEmulator {\n    pub fn new() -> Self {\n        let state = metadata::new_emulator_state();\n        metadata::initialize_emulator_state(&state);\n        Self { state }\n    }\n\n    pub fn activate(&self) {\n        metadata::install_current_emulator(self.state.clone());\n    }\n\n    pub fn activate_scoped(&self) -> metadata::CurrentEmulatorGuard {\n        metadata::push_current_emulator(self.state.clone())\n    }\n\n    pub fn clear_active(&self) {\n        metadata::clear_current_emulator_if_active(&self.state);\n    }\n\n    pub fn state(&self) -> metadata::SharedEmulatorState {\n        self.state.clone()\n    }\n",
     );
     for driver in &model.drivers {
         let accessor = to_rust_method_name(&driver.name);
@@ -8744,7 +8755,12 @@ mod tests {
         assert!(!i2c_rs.contains("push_received_bytes"));
         assert!(!i2c_rs.contains("take_transmitted_bytes"));
         assert!(metadata_rs.contains("thread_local!"));
+        assert!(metadata_rs.contains("pub struct CurrentEmulatorGuard"));
+        assert!(metadata_rs.contains("pub fn clear_current_emulator()"));
         assert!(metadata_rs.contains("host emulator is not active on this thread"));
+        assert!(host_rs.contains("pub fn activate_scoped(&self)"));
+        assert!(host_rs.contains("pub fn clear_active(&self)"));
+        assert!(host_rs.contains("impl Drop for HostEmulator"));
 
         let tests_dir = output_dir.path().join("tests");
         fs::create_dir_all(&tests_dir).expect("create tests dir");
@@ -8756,34 +8772,54 @@ use fixture_embassy_hal_host::interrupt::Irq;
 
 #[test]
 fn host_emulator_wires_hal_and_companion_state() {
-    let host = HostEmulator::new();
+    assert!(fixture_embassy_hal_host::metadata::read_u32(0).is_err());
 
-    let gpio = host.gpio_a().expect("gpio");
-    let gpio_emulator = host.gpio_a_emulator();
-    let pin = gpio.pa0();
-    gpio_emulator.set_input_level("PA0", true).expect("set input high");
-    assert!(pin.is_high().expect("pin high"));
-    let output = pin.into_output(Level::Low).expect("output");
-    output.set_high().expect("set high");
-    assert!(gpio_emulator.output_level("PA0").expect("read output"));
+    {
+        let host = HostEmulator::new();
 
-    let usart = host.usart1().expect("usart");
-    let usart_emulator = host.usart1_emulator();
-    usart_emulator.push_received_bytes(b"A").expect("inject rx");
-    assert_eq!(usart.read_byte().expect("read byte"), b'A');
-    usart.write_byte(b'B').expect("write byte");
-    assert_eq!(usart_emulator.take_transmitted_bytes(), b"B");
+        let gpio = host.gpio_a().expect("gpio");
+        let gpio_emulator = host.gpio_a_emulator();
+        let pin = gpio.pa0();
+        gpio_emulator.set_input_level("PA0", true).expect("set input high");
+        assert!(pin.is_high().expect("pin high"));
+        let output = pin.into_output(Level::Low).expect("output");
+        output.set_high().expect("set high");
+        assert!(gpio_emulator.output_level("PA0").expect("read output"));
 
-    let dma = host.dma1_emulator();
-    dma.mark_route_complete("dmaroute.usart1_tx");
-    assert_eq!(dma.completion_count("dmaroute.usart1_tx"), 1);
+        let usart = host.usart1().expect("usart");
+        let usart_emulator = host.usart1_emulator();
+        usart_emulator.push_received_bytes(b"A").expect("inject rx");
+        assert_eq!(usart.read_byte().expect("read byte"), b'A');
+        usart.write_byte(b'B').expect("write byte");
+        assert_eq!(usart_emulator.take_transmitted_bytes(), b"B");
 
-    let interrupt = host.pfic_emulator();
-    interrupt.trigger(Irq::USART1);
-    assert!(interrupt.is_pending(Irq::USART1));
-    interrupt.clear(Irq::USART1);
-    assert!(!interrupt.is_pending(Irq::USART1));
+        let dma = host.dma1_emulator();
+        dma.mark_route_complete("dmaroute.usart1_tx");
+        assert_eq!(dma.completion_count("dmaroute.usart1_tx"), 1);
 
+        let interrupt = host.pfic_emulator();
+        interrupt.trigger(Irq::USART1);
+        assert!(interrupt.is_pending(Irq::USART1));
+        interrupt.clear(Irq::USART1);
+        assert!(!interrupt.is_pending(Irq::USART1));
+
+        let host2 = HostEmulator::new();
+        let gpio2 = host2.gpio_a_emulator();
+        gpio_emulator.write_register(0x1234, 1).expect("write state 1");
+        gpio2.write_register(0x1234, 2).expect("write state 2");
+
+        let _guard1 = host.activate_scoped();
+        assert_eq!(fixture_embassy_hal_host::metadata::read_u32(0x1234).expect("read host1"), 1);
+        {
+            let _guard2 = host2.activate_scoped();
+            assert_eq!(fixture_embassy_hal_host::metadata::read_u32(0x1234).expect("read host2"), 2);
+        }
+        assert_eq!(fixture_embassy_hal_host::metadata::read_u32(0x1234).expect("restore host1"), 1);
+        host.clear_active();
+        assert!(fixture_embassy_hal_host::metadata::read_u32(0x1234).is_err());
+    }
+
+    assert!(fixture_embassy_hal_host::metadata::read_u32(0).is_err());
 }
 "#,
         )
@@ -8935,6 +8971,29 @@ fn host_emulator_wires_hal_and_companion_state() {
             String::from_utf8_lossy(&cargo_output.stdout),
             String::from_utf8_lossy(&cargo_output.stderr)
         );
+    }
+
+    #[test]
+    fn embassy_generation_model_keeps_interrupt_module_when_interrupt_driver_moves() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let document = load_validated_hair_document(fixture.path(), &repo_root)
+            .expect("embassy fixture should validate");
+        let mut model = EmbassyGenerationModel::from_document(&document).expect("generation model");
+        model.interrupts.clear();
+        let interrupt_driver = model
+            .drivers
+            .iter_mut()
+            .find(|driver| driver.driver_kind == "interrupt")
+            .expect("interrupt driver");
+        interrupt_driver.module_name = "irqctl".to_string();
+
+        let module_names = model.module_names();
+        let driver_groups = model.driver_groups();
+
+        assert!(module_names.iter().any(|name| name == "interrupt"));
+        assert!(driver_groups.iter().any(|(name, _)| name == "interrupt"));
+        assert!(driver_groups.iter().any(|(name, _)| name == "irqctl"));
     }
 
     #[test]
