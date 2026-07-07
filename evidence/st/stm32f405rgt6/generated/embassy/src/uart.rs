@@ -43,6 +43,21 @@ fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metada
     Ok(())
 }
 
+#[allow(dead_code)]
+fn read_u32(address: u64) -> Result<u32, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u32>())?;
+    unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u32(address: u64, value: u32) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u32>())?;
+    unsafe {
+        write_volatile(address as *mut u32, value);
+    }
+    Ok(())
+}
+
 pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProvenance {
     module_name: "uart",
     document_title: metadata::GENERATED_METADATA.document_title,
@@ -129,6 +144,111 @@ impl Uart4 {
         Ok(())
     }
 
+    /// Enable Uart4.
+    pub fn enable(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40004C0Cu64, 0x00002000u32, 0x00002000u32)?;
+        Ok(())
+    }
+
+    /// Disable Uart4.
+    pub fn disable(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40004C0Cu64, 0x00002000u32, 0x00000000u32)?;
+        Ok(())
+    }
+
+    /// Enable the Uart4 transmitter.
+    pub fn enable_transmitter(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40004C0Cu64, 0x00000008u32, 0x00000008u32)?;
+        Ok(())
+    }
+
+    /// Disable the Uart4 transmitter.
+    pub fn disable_transmitter(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40004C0Cu64, 0x00000008u32, 0x00000000u32)?;
+        Ok(())
+    }
+
+    /// Enable the Uart4 receiver.
+    pub fn enable_receiver(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40004C0Cu64, 0x00000004u32, 0x00000004u32)?;
+        Ok(())
+    }
+
+    /// Disable the Uart4 receiver.
+    pub fn disable_receiver(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40004C0Cu64, 0x00000004u32, 0x00000000u32)?;
+        Ok(())
+    }
+
+    pub fn configure_8n1(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40004C0Cu64, 0x00008000u32, 0x00000000u32)?;
+        modify_u32(0x40004C0Cu64, 0x00002000u32, 0x00000000u32)?;
+        modify_u32(0x40004C0Cu64, 0x00000008u32, 0x00000000u32)?;
+        modify_u32(0x40004C0Cu64, 0x00000004u32, 0x00000000u32)?;
+        modify_u32(0x40004C0Cu64, 0x00001000u32, 0x00000000u32)?;
+        modify_u32(0x40004C10u64, 0x00003000u32, 0x00000000u32)?;
+        Ok(())
+    }
+
+    pub fn set_baud_divider(&self, mantissa: u16, fraction: u8) -> Result<(), metadata::Error> {
+        if u32::from(mantissa) > 0xFFFu32 {
+            return Err(metadata::Error::Unsupported("USART baud mantissa exceeds modeled field width"));
+        }
+        if u32::from(fraction) > 0xFu32 {
+            return Err(metadata::Error::Unsupported("USART baud fraction exceeds modeled field width"));
+        }
+        modify_u32(0x40004C08u64, 0x0000FFF0u32, (u32::from(mantissa) & 0xFFFu32) << 4)?;
+        modify_u32(0x40004C08u64, 0x0000000Fu32, (u32::from(fraction) & 0xFu32) << 0)?;
+        Ok(())
+    }
+
+    pub fn write_byte(&self, byte: u8) -> Result<(), metadata::Error> {
+        while (read_u32(0x40004C00u64)? & 0x00000080u32) == 0 {}
+        write_u32(0x40004C04u64, u32::from(byte) & 0x1FFu32)?;
+        Ok(())
+    }
+
+    pub fn write_bytes(&self, bytes: &[u8]) -> Result<(), metadata::Error> {
+        for &byte in bytes {
+            self.write_byte(byte)?;
+        }
+        Ok(())
+    }
+
+    pub fn flush(&self) -> Result<(), metadata::Error> {
+        while (read_u32(0x40004C00u64)? & 0x00000040u32) == 0 {}
+        Ok(())
+    }
+
+    pub fn read_byte(&self) -> Result<u8, metadata::Error> {
+        while (read_u32(0x40004C00u64)? & 0x00000020u32) == 0 {}
+        Ok((read_u32(0x40004C04u64)? & 0x1FFu32) as u8)
+    }
+
+    /// Enable the Uart4 TXE interrupt.
+    pub fn enable_txe_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40004C0Cu64, 0x00000080u32, 0x00000080u32)?;
+        Ok(())
+    }
+
+    /// Disable the Uart4 TXE interrupt.
+    pub fn disable_txe_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40004C0Cu64, 0x00000080u32, 0x00000000u32)?;
+        Ok(())
+    }
+
+    /// Enable the Uart4 RXNE interrupt.
+    pub fn enable_rxne_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40004C0Cu64, 0x00000020u32, 0x00000020u32)?;
+        Ok(())
+    }
+
+    /// Disable the Uart4 RXNE interrupt.
+    pub fn disable_rxne_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40004C0Cu64, 0x00000020u32, 0x00000000u32)?;
+        Ok(())
+    }
+
 
 }
 
@@ -207,6 +327,111 @@ impl Uart5 {
     /// Release reset for UART5.
     pub fn release_reset(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40023820u64, 0x00100000u32, 0x00000000u32)?;
+        Ok(())
+    }
+
+    /// Enable Uart5.
+    pub fn enable(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x4000500Cu64, 0x00002000u32, 0x00002000u32)?;
+        Ok(())
+    }
+
+    /// Disable Uart5.
+    pub fn disable(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x4000500Cu64, 0x00002000u32, 0x00000000u32)?;
+        Ok(())
+    }
+
+    /// Enable the Uart5 transmitter.
+    pub fn enable_transmitter(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x4000500Cu64, 0x00000008u32, 0x00000008u32)?;
+        Ok(())
+    }
+
+    /// Disable the Uart5 transmitter.
+    pub fn disable_transmitter(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x4000500Cu64, 0x00000008u32, 0x00000000u32)?;
+        Ok(())
+    }
+
+    /// Enable the Uart5 receiver.
+    pub fn enable_receiver(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x4000500Cu64, 0x00000004u32, 0x00000004u32)?;
+        Ok(())
+    }
+
+    /// Disable the Uart5 receiver.
+    pub fn disable_receiver(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x4000500Cu64, 0x00000004u32, 0x00000000u32)?;
+        Ok(())
+    }
+
+    pub fn configure_8n1(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x4000500Cu64, 0x00008000u32, 0x00000000u32)?;
+        modify_u32(0x4000500Cu64, 0x00002000u32, 0x00000000u32)?;
+        modify_u32(0x4000500Cu64, 0x00000008u32, 0x00000000u32)?;
+        modify_u32(0x4000500Cu64, 0x00000004u32, 0x00000000u32)?;
+        modify_u32(0x4000500Cu64, 0x00001000u32, 0x00000000u32)?;
+        modify_u32(0x40005010u64, 0x00003000u32, 0x00000000u32)?;
+        Ok(())
+    }
+
+    pub fn set_baud_divider(&self, mantissa: u16, fraction: u8) -> Result<(), metadata::Error> {
+        if u32::from(mantissa) > 0xFFFu32 {
+            return Err(metadata::Error::Unsupported("USART baud mantissa exceeds modeled field width"));
+        }
+        if u32::from(fraction) > 0xFu32 {
+            return Err(metadata::Error::Unsupported("USART baud fraction exceeds modeled field width"));
+        }
+        modify_u32(0x40005008u64, 0x0000FFF0u32, (u32::from(mantissa) & 0xFFFu32) << 4)?;
+        modify_u32(0x40005008u64, 0x0000000Fu32, (u32::from(fraction) & 0xFu32) << 0)?;
+        Ok(())
+    }
+
+    pub fn write_byte(&self, byte: u8) -> Result<(), metadata::Error> {
+        while (read_u32(0x40005000u64)? & 0x00000080u32) == 0 {}
+        write_u32(0x40005004u64, u32::from(byte) & 0x1FFu32)?;
+        Ok(())
+    }
+
+    pub fn write_bytes(&self, bytes: &[u8]) -> Result<(), metadata::Error> {
+        for &byte in bytes {
+            self.write_byte(byte)?;
+        }
+        Ok(())
+    }
+
+    pub fn flush(&self) -> Result<(), metadata::Error> {
+        while (read_u32(0x40005000u64)? & 0x00000040u32) == 0 {}
+        Ok(())
+    }
+
+    pub fn read_byte(&self) -> Result<u8, metadata::Error> {
+        while (read_u32(0x40005000u64)? & 0x00000020u32) == 0 {}
+        Ok((read_u32(0x40005004u64)? & 0x1FFu32) as u8)
+    }
+
+    /// Enable the Uart5 TXE interrupt.
+    pub fn enable_txe_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x4000500Cu64, 0x00000080u32, 0x00000080u32)?;
+        Ok(())
+    }
+
+    /// Disable the Uart5 TXE interrupt.
+    pub fn disable_txe_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x4000500Cu64, 0x00000080u32, 0x00000000u32)?;
+        Ok(())
+    }
+
+    /// Enable the Uart5 RXNE interrupt.
+    pub fn enable_rxne_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x4000500Cu64, 0x00000020u32, 0x00000020u32)?;
+        Ok(())
+    }
+
+    /// Disable the Uart5 RXNE interrupt.
+    pub fn disable_rxne_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x4000500Cu64, 0x00000020u32, 0x00000000u32)?;
         Ok(())
     }
 

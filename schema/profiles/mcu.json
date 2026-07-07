@@ -306,6 +306,7 @@
               "$ref": "#/$defs/routeType"
             },
             "controlRefs": {
+              "description": "Lowering-significant controls for this routing fabric, such as mux or selector fields that an executable profile may need to reproduce deterministically.",
               "type": "array",
               "items": {
                 "$ref": "../common.json#/$defs/entityRef"
@@ -404,6 +405,7 @@
               "$ref": "#/$defs/routeType"
             },
             "controlRefs": {
+              "description": "Lowering-significant routing controls for this interrupt route, such as mux or enable selectors that an executable profile may need to reproduce deterministically.",
               "type": "array",
               "items": {
                 "$ref": "../common.json#/$defs/entityRef"
@@ -478,6 +480,7 @@
               ]
             },
             "controlRefs": {
+              "description": "Lowering-significant controls for this clock binding, such as gate or selector fields needed by generator-facing profiles.",
               "type": "array",
               "items": {
                 "$ref": "../common.json#/$defs/entityRef"
@@ -537,6 +540,7 @@
               ]
             },
             "controlRefs": {
+              "description": "Lowering-significant controls for this reset binding, such as assert or release selectors needed by generator-facing profiles.",
               "type": "array",
               "items": {
                 "$ref": "../common.json#/$defs/entityRef"
@@ -763,6 +767,7 @@
               "$ref": "#/$defs/dmaDirection"
             },
             "controlRefs": {
+              "description": "Lowering-significant controls for this DMA route, such as channel-selection or mux fields needed by generator-facing profiles.",
               "type": "array",
               "items": {
                 "$ref": "../common.json#/$defs/entityRef"
@@ -854,6 +859,7 @@
               "$ref": "#/$defs/routeType"
             },
             "controlRefs": {
+              "description": "Lowering-significant controls for this pin route, such as alternate-function or remap selectors needed by generator-facing profiles.",
               "type": "array",
               "items": {
                 "$ref": "../common.json#/$defs/entityRef"
@@ -875,6 +881,7 @@
               "uniqueItems": true
             },
             "defaultAfterReset": {
+              "description": "Whether this route is the reset-default selection when the hardware comes out of reset. Generators should preserve this when reset-default routing affects executable lowering.",
               "type": "boolean"
             }
           },

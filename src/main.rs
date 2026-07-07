@@ -1424,6 +1424,7 @@ struct McuPinRoute {
 #[derive(Debug, Clone)]
 struct ResolvedRegister {
     id: String,
+    name: String,
     peripheral_ref: String,
     absolute_address: u64,
     width_bits: u32,
@@ -1574,6 +1575,7 @@ struct EmbassyGenerationModel {
     interrupts: Vec<Interrupt>,
     pins: Vec<PhysicalPin>,
     drivers: Vec<ResolvedDriverInstance>,
+    peripherals: HashMap<String, Peripheral>,
     peripheral_names: HashMap<String, String>,
     registers: HashMap<String, ResolvedRegister>,
     fields: HashMap<String, ResolvedFieldTarget>,
@@ -1675,6 +1677,13 @@ impl EmbassyGenerationModel {
             .peripherals
             .iter()
             .map(|peripheral| (peripheral.id.clone(), peripheral.name.clone()))
+            .collect::<HashMap<_, _>>();
+        let peripherals = document
+            .structure
+            .device
+            .peripherals
+            .iter()
+            .map(|peripheral| (peripheral.id.clone(), peripheral.clone()))
             .collect::<HashMap<_, _>>();
         let register_owners = collect_register_owner_map(&document.structure.device.peripherals)?;
         let register_scope = EmbassyRegisterScopeInputs {
@@ -1846,6 +1855,7 @@ impl EmbassyGenerationModel {
             interrupts: document.structure.device.interrupts.clone(),
             pins: document.physical.pins.clone(),
             drivers,
+            peripherals,
             peripheral_names,
             registers,
             fields,
@@ -2898,6 +2908,7 @@ fn render_driver_methods(
     let mut methods = Vec::new();
     methods.extend(render_clock_binding_methods(model, driver)?);
     methods.extend(render_reset_binding_methods(model, driver)?);
+    methods.extend(render_usart_methods(model, driver)?);
     methods.extend(render_operation_methods(model, driver)?);
     methods.extend(render_state_machine_methods(model, driver)?);
 
@@ -2926,7 +2937,7 @@ fn render_driver_methods(
 }
 
 fn render_mmio_helpers() -> &'static str {
-    "#[allow(dead_code)]\nfn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {\n    let address = usize::try_from(address)\n        .map_err(|_| metadata::Error::Unsupported(\"MMIO address does not fit usize on this target\"))?;\n    if address % align != 0 {\n        return Err(metadata::Error::Unsupported(\"MMIO address is not naturally aligned for the target register width\"));\n    }\n    Ok(address)\n}\n\n#[allow(dead_code)]\nfn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u8>())?;\n    unsafe {\n        let current = read_volatile(address as *const u8);\n        write_volatile(address as *mut u8, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u16>())?;\n    unsafe {\n        let current = read_volatile(address as *const u16);\n        write_volatile(address as *mut u16, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        let current = read_volatile(address as *const u32);\n        write_volatile(address as *mut u32, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n"
+    "#[allow(dead_code)]\nfn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {\n    let address = usize::try_from(address)\n        .map_err(|_| metadata::Error::Unsupported(\"MMIO address does not fit usize on this target\"))?;\n    if address % align != 0 {\n        return Err(metadata::Error::Unsupported(\"MMIO address is not naturally aligned for the target register width\"));\n    }\n    Ok(address)\n}\n\n#[allow(dead_code)]\nfn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u8>())?;\n    unsafe {\n        let current = read_volatile(address as *const u8);\n        write_volatile(address as *mut u8, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u16>())?;\n    unsafe {\n        let current = read_volatile(address as *const u16);\n        write_volatile(address as *mut u16, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        let current = read_volatile(address as *const u32);\n        write_volatile(address as *mut u32, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn read_u32(address: u64) -> Result<u32, metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe { Ok(read_volatile(address as *const u32)) }\n}\n\n#[allow(dead_code)]\nfn write_u32(address: u64, value: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        write_volatile(address as *mut u32, value);\n    }\n    Ok(())\n}\n"
 }
 
 fn render_clock_binding_methods(
@@ -3092,6 +3103,238 @@ fn binding_method_name(prefix: &str, subject: &str, suffix: Option<&str>, noun: 
     }
 }
 
+fn render_usart_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    if !matches!(driver.driver_kind.as_str(), "uart" | "usart") {
+        return Ok(Vec::new());
+    }
+
+    let target_ref = driver.target.target_ref.as_str();
+    let has_tx = driver.pin_roles.iter().any(|role| role.signal == "TX");
+    let has_rx = driver.pin_roles.iter().any(|role| role.signal == "RX");
+    let has_irq = !driver.interrupt_routes.is_empty();
+    let has_tx_dma = driver
+        .dma_routes
+        .iter()
+        .any(|route| route.signal.as_deref() == Some("TX"));
+    let has_rx_dma = driver
+        .dma_routes
+        .iter()
+        .any(|route| route.signal.as_deref() == Some("RX"));
+
+    let sr = resolve_target_register_by_name(model, target_ref, "SR")?;
+    let dr = resolve_target_register_by_name(model, target_ref, "DR")?;
+    let brr = resolve_target_register_by_name(model, target_ref, "BRR")?;
+    let cr1 = resolve_target_register_by_name(model, target_ref, "CR1")?;
+    let cr2 = resolve_target_register_by_name(model, target_ref, "CR2")?;
+    let cr3 = resolve_target_register_by_name(model, target_ref, "CR3")?;
+
+    let txe = resolve_register_field(&sr, "TXE")?;
+    let tc = resolve_register_field(&sr, "TC")?;
+    let rxne = resolve_register_field(&sr, "RXNE")?;
+    let dr_field = resolve_register_field(&dr, "DR")?;
+    let div_mantissa = resolve_register_field(&brr, "DIV_Mantissa")?;
+    let div_fraction = resolve_register_field(&brr, "DIV_Fraction")?;
+    let ue = resolve_register_field(&cr1, "UE")?;
+    let te = resolve_register_field(&cr1, "TE")?;
+    let re = resolve_register_field(&cr1, "RE")?;
+    let over8 = resolve_register_field(&cr1, "OVER8")?;
+    let txeie = resolve_register_field(&cr1, "TXEIE")?;
+    let rxneie = resolve_register_field(&cr1, "RXNEIE")?;
+    let stop = resolve_register_field(&cr2, "STOP")?;
+    let dmat = resolve_register_field(&cr3, "DMAT")?;
+    let dmar = resolve_register_field(&cr3, "DMAR")?;
+
+    let txe_mask = field_bit_mask(&txe, &sr)?;
+    let tc_mask = field_bit_mask(&tc, &sr)?;
+    let rxne_mask = field_bit_mask(&rxne, &sr)?;
+    let dr_value_mask = field_value_mask(&dr_field)?;
+    let mantissa_value_mask = field_value_mask(&div_mantissa)?;
+    let fraction_value_mask = field_value_mask(&div_fraction)?;
+    let mantissa_clear_mask = shifted_field_mask(&div_mantissa, &brr)?;
+    let fraction_clear_mask = shifted_field_mask(&div_fraction, &brr)?;
+
+    let mut methods = Vec::new();
+    methods.push(render_register_write_method(
+        "enable".to_string(),
+        &cr1,
+        &ue,
+        1,
+        &format!("Enable {}.", driver.name),
+    )?);
+    methods.push(render_register_write_method(
+        "disable".to_string(),
+        &cr1,
+        &ue,
+        0,
+        &format!("Disable {}.", driver.name),
+    )?);
+    methods.push(render_register_write_method(
+        "enable_transmitter".to_string(),
+        &cr1,
+        &te,
+        1,
+        &format!("Enable the {} transmitter.", driver.name),
+    )?);
+    methods.push(render_register_write_method(
+        "disable_transmitter".to_string(),
+        &cr1,
+        &te,
+        0,
+        &format!("Disable the {} transmitter.", driver.name),
+    )?);
+    methods.push(render_register_write_method(
+        "enable_receiver".to_string(),
+        &cr1,
+        &re,
+        1,
+        &format!("Enable the {} receiver.", driver.name),
+    )?);
+    methods.push(render_register_write_method(
+        "disable_receiver".to_string(),
+        &cr1,
+        &re,
+        0,
+        &format!("Disable the {} receiver.", driver.name),
+    )?);
+
+    let mut configure_code =
+        "    pub fn configure_8n1(&self) -> Result<(), metadata::Error> {\n".to_string();
+    configure_code.push_str(&render_register_write_statement(
+        &cr1, &over8, 0, "        ",
+    )?);
+    configure_code.push_str(&render_register_write_statement(&cr1, &ue, 0, "        ")?);
+    configure_code.push_str(&render_register_write_statement(&cr1, &te, 0, "        ")?);
+    configure_code.push_str(&render_register_write_statement(&cr1, &re, 0, "        ")?);
+    configure_code.push_str(&render_register_write_statement(
+        &cr1,
+        &resolve_register_field(&cr1, "M")?,
+        0,
+        "        ",
+    )?);
+    configure_code.push_str(&render_register_write_statement(
+        &cr2, &stop, 0, "        ",
+    )?);
+    configure_code.push_str("        Ok(())\n    }\n");
+    methods.push(GeneratedMethod {
+        name: "configure_8n1".to_string(),
+        code: configure_code,
+    });
+
+    methods.push(GeneratedMethod {
+        name: "set_baud_divider".to_string(),
+        code: format!(
+            "    pub fn set_baud_divider(&self, mantissa: u16, fraction: u8) -> Result<(), metadata::Error> {{\n        if u32::from(mantissa) > 0x{mantissa_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"USART baud mantissa exceeds modeled field width\"));\n        }}\n        if u32::from(fraction) > 0x{fraction_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"USART baud fraction exceeds modeled field width\"));\n        }}\n        modify_u32(0x{brr_address:X}u64, 0x{mantissa_clear_mask:08X}u32, (u32::from(mantissa) & 0x{mantissa_value_mask:X}u32) << {mantissa_lsb})?;\n        modify_u32(0x{brr_address:X}u64, 0x{fraction_clear_mask:08X}u32, (u32::from(fraction) & 0x{fraction_value_mask:X}u32) << {fraction_lsb})?;\n        Ok(())\n    }}\n",
+            brr_address = brr.absolute_address,
+            mantissa_lsb = div_mantissa.lsb,
+            fraction_lsb = div_fraction.lsb,
+        ),
+    });
+
+    if has_tx {
+        methods.push(GeneratedMethod {
+            name: "write_byte".to_string(),
+            code: format!(
+                "    pub fn write_byte(&self, byte: u8) -> Result<(), metadata::Error> {{\n        while (read_u32(0x{sr_address:X}u64)? & 0x{txe_mask:08X}u32) == 0 {{}}\n        write_u32(0x{dr_address:X}u64, u32::from(byte) & 0x{dr_value_mask:X}u32)?;\n        Ok(())\n    }}\n",
+                sr_address = sr.absolute_address,
+                dr_address = dr.absolute_address,
+            ),
+        });
+        methods.push(GeneratedMethod {
+            name: "write_bytes".to_string(),
+            code: "    pub fn write_bytes(&self, bytes: &[u8]) -> Result<(), metadata::Error> {\n        for &byte in bytes {\n            self.write_byte(byte)?;\n        }\n        Ok(())\n    }\n"
+                .to_string(),
+        });
+        methods.push(GeneratedMethod {
+            name: "flush".to_string(),
+            code: format!(
+                "    pub fn flush(&self) -> Result<(), metadata::Error> {{\n        while (read_u32(0x{sr_address:X}u64)? & 0x{tc_mask:08X}u32) == 0 {{}}\n        Ok(())\n    }}\n",
+                sr_address = sr.absolute_address,
+            ),
+        });
+    }
+
+    if has_rx {
+        methods.push(GeneratedMethod {
+            name: "read_byte".to_string(),
+            code: format!(
+                "    pub fn read_byte(&self) -> Result<u8, metadata::Error> {{\n        while (read_u32(0x{sr_address:X}u64)? & 0x{rxne_mask:08X}u32) == 0 {{}}\n        Ok((read_u32(0x{dr_address:X}u64)? & 0x{dr_value_mask:X}u32) as u8)\n    }}\n",
+                sr_address = sr.absolute_address,
+                dr_address = dr.absolute_address,
+            ),
+        });
+    }
+
+    if has_irq {
+        methods.push(render_register_write_method(
+            "enable_txe_interrupt".to_string(),
+            &cr1,
+            &txeie,
+            1,
+            &format!("Enable the {} TXE interrupt.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_txe_interrupt".to_string(),
+            &cr1,
+            &txeie,
+            0,
+            &format!("Disable the {} TXE interrupt.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "enable_rxne_interrupt".to_string(),
+            &cr1,
+            &rxneie,
+            1,
+            &format!("Enable the {} RXNE interrupt.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_rxne_interrupt".to_string(),
+            &cr1,
+            &rxneie,
+            0,
+            &format!("Disable the {} RXNE interrupt.", driver.name),
+        )?);
+    }
+
+    if has_tx_dma {
+        methods.push(render_register_write_method(
+            "enable_tx_dma".to_string(),
+            &cr3,
+            &dmat,
+            1,
+            &format!("Enable the {} TX DMA path.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_tx_dma".to_string(),
+            &cr3,
+            &dmat,
+            0,
+            &format!("Disable the {} TX DMA path.", driver.name),
+        )?);
+    }
+
+    if has_rx_dma {
+        methods.push(render_register_write_method(
+            "enable_rx_dma".to_string(),
+            &cr3,
+            &dmar,
+            1,
+            &format!("Enable the {} RX DMA path.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_rx_dma".to_string(),
+            &cr3,
+            &dmar,
+            0,
+            &format!("Disable the {} RX DMA path.", driver.name),
+        )?);
+    }
+
+    Ok(methods)
+}
+
 fn render_operation_methods(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
@@ -3218,6 +3461,110 @@ fn render_state_machine_methods(
         }
     }
     Ok(methods)
+}
+
+fn resolve_target_register_by_name(
+    model: &EmbassyGenerationModel,
+    target_ref: &str,
+    register_name: &str,
+) -> Result<ResolvedRegister> {
+    let target = model.peripherals.get(target_ref).ok_or_else(|| {
+        anyhow!(
+            "driver target peripheral {} could not be resolved for register lookup",
+            target_ref
+        )
+    })?;
+    let target_base = target.base_address.ok_or_else(|| {
+        anyhow!(
+            "peripheral {} is missing baseAddress required for derived register lookup",
+            target.id
+        )
+    })?;
+    let template = find_register_template_peripheral(model, target)?;
+    let template_base = template.base_address.ok_or_else(|| {
+        anyhow!(
+            "template peripheral {} is missing baseAddress required for register lookup",
+            template.id
+        )
+    })?;
+
+    let mut registers = HashMap::new();
+    collect_register_members(
+        &mut registers,
+        template.id.as_str(),
+        template_base,
+        0,
+        &template.registers,
+    )?;
+    let mut matches = registers
+        .into_values()
+        .filter(|register| register.name.eq_ignore_ascii_case(register_name))
+        .collect::<Vec<_>>();
+    if matches.is_empty() {
+        bail!(
+            "peripheral {} does not expose register {} through its explicit structural template",
+            target.id,
+            register_name
+        );
+    }
+    if matches.len() > 1 {
+        bail!(
+            "peripheral {} exposes multiple registers named {} through its structural template",
+            target.id,
+            register_name
+        );
+    }
+
+    let mut resolved = matches.pop().expect("one matching register");
+    let offset = resolved
+        .absolute_address
+        .checked_sub(template_base)
+        .ok_or_else(|| {
+            anyhow!(
+                "register {} absolute address underflowed relative to template peripheral {}",
+                resolved.id,
+                template.id
+            )
+        })?;
+    resolved.peripheral_ref = target.id.clone();
+    resolved.absolute_address = checked_offset_add(
+        target_base,
+        offset,
+        &format!("derived register {} on {}", register_name, target.id),
+    )?;
+    Ok(resolved)
+}
+
+fn find_register_template_peripheral<'a>(
+    model: &'a EmbassyGenerationModel,
+    target: &'a Peripheral,
+) -> Result<&'a Peripheral> {
+    let mut current = target;
+    let mut seen = HashSet::new();
+    loop {
+        if !seen.insert(current.id.clone()) {
+            bail!(
+                "peripheral {} has a derivedFromRef cycle while resolving structural template",
+                target.id
+            );
+        }
+        if !current.registers.is_empty() {
+            return Ok(current);
+        }
+        let derived_from = current.derived_from_ref.as_deref().ok_or_else(|| {
+            anyhow!(
+                "peripheral {} has no explicit registers and no derivedFromRef template",
+                target.id
+            )
+        })?;
+        current = model.peripherals.get(derived_from).ok_or_else(|| {
+            anyhow!(
+                "peripheral {} references unknown derivedFromRef {}",
+                current.id,
+                derived_from
+            )
+        })?;
+    }
 }
 
 fn resolve_transition_effect_write<'a>(
@@ -3502,6 +3849,55 @@ fn render_register_write_statement(
         }
         _ => unreachable!("unsupported widths are rejected before mask computation"),
     }
+}
+
+fn field_value_mask(field: &ResolvedField) -> Result<u64> {
+    let field_width = field
+        .msb
+        .checked_sub(field.lsb)
+        .and_then(|delta| delta.checked_add(1))
+        .ok_or_else(|| anyhow!("field {} has an invalid bit range", field.name))?;
+    Ok(if field_width == 64 {
+        u64::MAX
+    } else {
+        ((1u128 << field_width) - 1) as u64
+    })
+}
+
+fn shifted_field_mask(field: &ResolvedField, register: &ResolvedRegister) -> Result<u32> {
+    if field.msb >= register.width_bits || field.lsb >= register.width_bits {
+        bail!(
+            "field {} bit range {}..={} exceeds register {} width {}",
+            field.name,
+            field.lsb,
+            field.msb,
+            register.id,
+            register.width_bits
+        );
+    }
+    let mask = field_value_mask(field)? << field.lsb;
+    u32::try_from(mask).map_err(|_| {
+        anyhow!(
+            "field {} bit range {}..={} exceeds register {} width {}",
+            field.name,
+            field.lsb,
+            field.msb,
+            register.id,
+            register.width_bits
+        )
+    })
+}
+
+fn field_bit_mask(field: &ResolvedField, register: &ResolvedRegister) -> Result<u32> {
+    let raw_mask = field_value_mask(field)?;
+    if raw_mask.count_ones() != 1 {
+        bail!(
+            "field {} on register {} is not a single-bit flag",
+            field.name,
+            register.id
+        );
+    }
+    shifted_field_mask(field, register)
 }
 
 struct EmbassyRegisterScopeInputs<'a> {
@@ -3871,6 +4267,7 @@ fn collect_register_members(
                 )?;
                 let resolved = ResolvedRegister {
                     id: register.id.clone(),
+                    name: register.name.clone(),
                     peripheral_ref: peripheral_ref.to_string(),
                     absolute_address,
                     width_bits: register.width_bits,
@@ -6560,6 +6957,16 @@ mod tests {
         assert!(gpio_rs.contains("pub fn assert_reset"));
         assert!(uart_rs.contains("pub fn enable_clock"));
         assert!(uart_rs.contains("pub fn release_reset"));
+        assert!(uart_rs.contains("pub fn configure_8n1"));
+        assert!(uart_rs.contains("pub fn set_baud_divider"));
+        assert!(uart_rs.contains("pub fn write_byte"));
+        assert!(uart_rs.contains("pub fn write_bytes"));
+        assert!(uart_rs.contains("pub fn read_byte"));
+        assert!(uart_rs.contains("pub fn flush"));
+        assert!(uart_rs.contains("pub fn enable_txe_interrupt"));
+        assert!(uart_rs.contains("pub fn enable_rxne_interrupt"));
+        assert!(uart_rs.contains("pub fn enable_tx_dma"));
+        assert!(uart_rs.contains("pub fn enable_rx_dma"));
         assert!(!uart_rs.contains("pub async fn read"));
         assert!(!uart_rs.contains("pub async fn write"));
         assert!(timer_rs.contains("pub fn apply_enable"));
@@ -8431,7 +8838,37 @@ mod tests {
                             ] }
                         ] },
                         { "id": "periph.gpioa", "name": "GPIOA", "kind": "peripheral", "type": "GPIO" },
-                        { "id": "periph.usart1", "name": "USART1", "kind": "peripheral", "type": "USART", "interruptRefs": ["irq.usart1"] },
+                        { "id": "periph.usart6", "name": "USART6", "kind": "peripheral", "type": "USART", "baseAddress": 1073815552u64, "registers": [
+                            { "id": "reg.usart6.sr", "name": "SR", "kind": "register", "offsetBytes": 0, "widthBits": 32, "fields": [
+                                { "id": "field.usart6.sr.txe", "name": "TXE", "description": "Transmit data register empty", "bitRange": { "lsb": 7, "msb": 7 } },
+                                { "id": "field.usart6.sr.tc", "name": "TC", "description": "Transmission complete", "bitRange": { "lsb": 6, "msb": 6 } },
+                                { "id": "field.usart6.sr.rxne", "name": "RXNE", "description": "Read data register not empty", "bitRange": { "lsb": 5, "msb": 5 } }
+                            ] },
+                            { "id": "reg.usart6.dr", "name": "DR", "kind": "register", "offsetBytes": 4, "widthBits": 32, "fields": [
+                                { "id": "field.usart6.dr.dr", "name": "DR", "description": "Data value", "bitRange": { "lsb": 0, "msb": 8 } }
+                            ] },
+                            { "id": "reg.usart6.brr", "name": "BRR", "kind": "register", "offsetBytes": 8, "widthBits": 32, "fields": [
+                                { "id": "field.usart6.brr.div_mantissa", "name": "DIV_Mantissa", "description": "Mantissa of USARTDIV", "bitRange": { "lsb": 4, "msb": 15 } },
+                                { "id": "field.usart6.brr.div_fraction", "name": "DIV_Fraction", "description": "Fraction of USARTDIV", "bitRange": { "lsb": 0, "msb": 3 } }
+                            ] },
+                            { "id": "reg.usart6.cr1", "name": "CR1", "kind": "register", "offsetBytes": 12, "widthBits": 32, "fields": [
+                                { "id": "field.usart6.cr1.over8", "name": "OVER8", "description": "Oversampling mode", "bitRange": { "lsb": 15, "msb": 15 } },
+                                { "id": "field.usart6.cr1.ue", "name": "UE", "description": "USART enable", "bitRange": { "lsb": 13, "msb": 13 } },
+                                { "id": "field.usart6.cr1.m", "name": "M", "description": "Word length", "bitRange": { "lsb": 12, "msb": 12 } },
+                                { "id": "field.usart6.cr1.txeie", "name": "TXEIE", "description": "TXE interrupt enable", "bitRange": { "lsb": 7, "msb": 7 } },
+                                { "id": "field.usart6.cr1.rxneie", "name": "RXNEIE", "description": "RXNE interrupt enable", "bitRange": { "lsb": 5, "msb": 5 } },
+                                { "id": "field.usart6.cr1.te", "name": "TE", "description": "Transmitter enable", "bitRange": { "lsb": 3, "msb": 3 } },
+                                { "id": "field.usart6.cr1.re", "name": "RE", "description": "Receiver enable", "bitRange": { "lsb": 2, "msb": 2 } }
+                            ] },
+                            { "id": "reg.usart6.cr2", "name": "CR2", "kind": "register", "offsetBytes": 16, "widthBits": 32, "fields": [
+                                { "id": "field.usart6.cr2.stop", "name": "STOP", "description": "STOP bits", "bitRange": { "lsb": 12, "msb": 13 } }
+                            ] },
+                            { "id": "reg.usart6.cr3", "name": "CR3", "kind": "register", "offsetBytes": 20, "widthBits": 32, "fields": [
+                                { "id": "field.usart6.cr3.dmat", "name": "DMAT", "description": "DMA enable transmitter", "bitRange": { "lsb": 7, "msb": 7 } },
+                                { "id": "field.usart6.cr3.dmar", "name": "DMAR", "description": "DMA enable receiver", "bitRange": { "lsb": 6, "msb": 6 } }
+                            ] }
+                        ] },
+                        { "id": "periph.usart1", "name": "USART1", "kind": "peripheral", "type": "USART", "baseAddress": 1073811456u64, "derivedFromRef": "periph.usart6", "interruptRefs": ["irq.usart1"] },
                         { "id": "periph.spi1", "name": "SPI1", "kind": "peripheral", "type": "SPI", "interruptRefs": ["irq.spi1"] },
                         { "id": "periph.i2c1", "name": "I2C1", "kind": "peripheral", "type": "I2C", "interruptRefs": ["irq.i2c1"] },
                         { "id": "periph.tim1", "name": "TIM1", "kind": "peripheral", "type": "TIM", "interruptRefs": ["irq.tim1"], "baseAddress": 1073812480u64, "registers": [

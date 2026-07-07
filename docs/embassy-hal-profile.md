@@ -70,6 +70,33 @@ Normative consequences:
    that module in structured form instead of being re-derived by ad hoc
    name matching
 
+## Executable-readiness extraction contract
+
+When a workflow is asked to extract or audit `profiles.embassyHal` for an
+in-scope executable driver set, it must gather the **lowering-critical
+facts** for the behaviors that set may legitimately claim. This rule is
+generic across supported driver kinds; it is not a per-peripheral special
+case list.
+
+At minimum, the extracted and approved HAIR must preserve, where the
+evidence supports them:
+
+1. topology selectors and controls needed to reproduce the behavior
+   deterministically, such as route or binding `controlRefs`,
+   controller/channel/CPU-target selectors, and reset-default route
+   selection
+2. semantic operations and state machines for any claimed enable,
+   configure, transfer, acknowledge, conversion, or mode-transition path
+3. structural register/field facts reachable from the chosen lowering path,
+   either directly on the target block or through an explicit, resolvable
+   structural relationship such as `derivedFromRef`
+
+Resource discovery alone is not enough. A driver instance is not
+executable-ready when the document names clocks, pins, interrupts, DMA
+channels, or semantic labels but omits the control, operation, or
+structural reachability data needed to lower the claimed behavior without
+guesswork.
+
 ## Reference resolution contract
 
 The Embassy profile uses `entityRef` strings heavily (`targetRef`, `clockBindingRefs`, `interruptRouteRefs`, `dmaRouteRefs`, `pinRoles[].routeRefs`, and semantic-operation refs).
@@ -106,6 +133,13 @@ Any other generation request is out of subset for the first cut and must fail ex
 The table below defines the minimum expected evidence-backed HAIR surfaces
 for first-cut generation of **real register-level code** rather than
 metadata-only stubs.
+
+For every row in the table, the required structural register/field data
+must remain deterministically reachable from the emitted lowering path.
+That reachability may be direct or may flow through explicit structural
+relationships such as `derivedFromRef`, but the generator must not depend
+on silent inheritance assumptions, unresolved shared-base topology, or ad
+hoc name matching.
 
 | `driverKind` | Minimum required supporting data |
 | --- | --- |
@@ -191,6 +225,24 @@ treat these supporting surfaces as required for the requested scope:
 - `profiles.mcuSoc.dmaTopology` channels and routes needed by the selected drivers
 - `profiles.mcuSoc.pinTopology.routes` needed by the selected drivers
 - `semantics.operations` and `semantics.stateMachines` for driver kinds whose contract requires them
+
+For any requested executable driver scope, workflows should also:
+
+1. gather the lowering-critical selectors on those supporting records
+   instead of collapsing them to resource IDs alone
+2. verify that the structural register/field data required by the claimed
+   lowering path remains reachable directly or through explicit resolvable
+   structural relationships
+3. stop and classify the driver as not executable-ready when approved
+   evidence supports resource discovery but not executable closure
+   (for example missing route controls, missing semantic operations, or
+   unresolved inherited register structure)
+
+If a requested driver instance does not meet that executable-readiness
+contract, workflows should either stop and ask the user how to narrow
+scope, or omit that driver instance from `profiles.embassyHal` and record
+the blocker explicitly in the discovery report. They must not emit the
+driver instance as if it were executable-ready.
 
 Workflows should not invent a blanket Embassy-ready claim for every
 peripheral on the device. They should either:
