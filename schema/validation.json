@@ -116,6 +116,7 @@
                   "pac",
                   "hal",
                   "embassy-hal",
+                  "embassy-host",
                   "docs",
                   "simulator",
                   "all"

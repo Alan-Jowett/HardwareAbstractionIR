@@ -281,7 +281,7 @@ These remain hardware-topology facts, not Embassy-specific policy.
 
 The Embassy HAL profile is an optional generation-oriented layer mounted at `profiles.embassyHal`.
 
-It exists to describe how a concrete HAIR document lowers into an Embassy-style HAL crate **without** pushing Embassy-specific structure into the core hardware layers.
+It exists to describe how a concrete HAIR document lowers into an Embassy-style HAL crate or a host-emulated Embassy companion crate **without** pushing Embassy-specific structure into the core hardware layers.
 
 For example, a `gpio-port` driver instance may still lower into a generated
 per-pin API surface when the approved `pinTopology.routes` and reachable
@@ -294,6 +294,11 @@ It currently carries:
 - driver-instance declarations for supported peripheral blocks
 - explicit references to the clock/reset, interrupt, DMA, pin-routing, operation, and state-machine records each generated driver depends on
 - capability tags that are generator-facing rather than raw hardware facts
+
+The same profile can drive more than one artifact mode. In the first cut:
+
+1. `hair generate embassy` emits the embedded-target crate
+2. `hair generate embassy-host` emits a separate host-only `std` crate derived from the same `crate` metadata, with companion emulator/state handles paired 1:1 with the generated HAL-visible devices
 
 The profile intentionally does **not** define one universal fixed Rust
 method list per `driverKind`. Instead, the emitted API surface is expected
@@ -336,7 +341,7 @@ The layers are meant to answer different questions:
 | `normalization` | How do vendor-specific names map into canonical concepts? |
 | `validation` | What must be true before we trust or generate from the IR? |
 | `profiles.mcuSoc` | How should a device be interpreted as a canonical MCU/SoC architecture? |
-| `profiles.embassyHal` | How should this specific HAIR document lower into an Embassy-style HAL crate? |
+| `profiles.embassyHal` | How should this specific HAIR document lower into an Embassy-style HAL crate or host-emulated companion crate? |
 
 Together, these layers make HAIR a semantic IR rather than just a register dump.
 
@@ -372,7 +377,7 @@ Open design areas include:
 
 Those can evolve without abandoning the current layered structure.
 
-For the initial CLI, `hair validate` is limited to schema conformance against `schema/hair.json` and the layered subschemas. The declarative `validation` layer remains the place to model richer invariants and generator preconditions, including profile- and target-specific rules such as `generatorTargets: ["embassy-hal"]`, but executing those rules is future tooling work until implemented by repository tooling.
+For the initial CLI, `hair validate` is limited to schema conformance against `schema/hair.json` and the layered subschemas. The declarative `validation` layer remains the place to model richer invariants and generator preconditions, including profile- and target-specific rules such as `generatorTargets: ["embassy-hal"]` or `["embassy-host"]`, but executing those rules is future tooling work until implemented by repository tooling.
 
 ## Practical authoring guidance
 

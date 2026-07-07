@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://hair.dev/schema/profiles/embassy-hal.json",
   "title": "HAIR Embassy HAL Generation Profile",
-  "description": "An optional generation-oriented profile that binds HAIR structure, semantics, physical facts, and MCU topology into an auditable contract for Embassy-style HAL code generation. Generated driver APIs must be derived from explicit referenced lowering inputs rather than from fixed placeholder method sets.",
+  "description": "An optional generation-oriented profile that binds HAIR structure, semantics, physical facts, and MCU topology into an auditable contract for Embassy-style HAL code generation. The same approved profile may lower either to an embedded-target Embassy HAL crate or to a separate host-emulated companion crate. Generated driver APIs must be derived from explicit referenced lowering inputs rather than from fixed placeholder method sets.",
   "type": "object",
   "properties": {
     "profileKind": {
@@ -72,9 +72,11 @@
       "type": "object",
       "properties": {
         "packageName": {
+          "description": "Base embedded package name for generated Embassy output. Host-emulated generation derives its package name automatically from this base in the first cut.",
           "$ref": "../common.json#/$defs/nonEmptyString"
         },
         "crateName": {
+          "description": "Base embedded crate name for generated Embassy output. Host-emulated generation derives its crate name automatically from this base in the first cut.",
           "$ref": "../common.json#/$defs/nonEmptyString"
         },
         "targetArchitecture": {
@@ -130,7 +132,7 @@
         },
         {
           "type": "object",
-          "description": "A generator-facing driver instance. Executable behavior must be justified by the referenced topology and semantic records plus structural register/field data reachable either directly or through explicit resolvable structural relationships.",
+          "description": "A generator-facing driver instance. Executable behavior must be justified by the referenced topology and semantic records plus structural register/field data reachable either directly or through explicit resolvable structural relationships. When lowered through host-emulated generation, every generated HAL-visible driver surface derived from this instance must also produce a paired emulator/state handle.",
           "properties": {
             "targetRef": {
               "description": "For the first Embassy generator cut, this should resolve to a canonical block in profiles.mcuSoc that the driver instance lowers from.",
@@ -140,7 +142,7 @@
               "$ref": "#/$defs/driverKind"
             },
             "modulePath": {
-              "description": "Generator-facing Rust module placement for the emitted driver/support code. This does not by itself define a fixed method set; methods must be derived from the referenced lowering inputs. Support-oriented placements such as a generated time module are allowed only when the referenced driver instance carries the explicit lowering contract needed for that support surface.",
+              "description": "Generator-facing Rust module placement for the emitted driver/support code. This does not by itself define a fixed method set; methods must be derived from the referenced lowering inputs. Support-oriented placements such as a generated time module are allowed only when the referenced driver instance carries the explicit lowering contract needed for that support surface. The same placement governs host-emulated lowering for the paired HAL and emulator surfaces.",
               "$ref": "../common.json#/$defs/nonEmptyString"
             },
             "clockBindingRefs": {

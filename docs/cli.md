@@ -10,6 +10,7 @@ The current Rust CLI implements these commands today:
 hair validate <input>
 hair generate svd <input> [--output <path>]
 hair generate embassy <input> --output-dir <path>
+hair generate embassy-host <input> --output-dir <path>
 hair diff <left> <right>
 ```
 
@@ -76,6 +77,45 @@ First-cut exclusions:
 - silent widening of first-cut GPIO support into alternate-function or EXTI helpers when the approved profile did not request or justify them
 - pretending that generic schema validity alone is enough for Embassy generation readiness
 
+### `hair generate embassy-host`
+
+`generate embassy-host` lowers one HAIR document to a separate host-only `std`
+crate that pairs the generated Embassy-style HAL surface with explicit emulator
+state and test-control APIs.
+
+First-cut behavior:
+
+- require one HAIR JSON input document plus `--output-dir`
+- consume the same `profiles.mcuSoc` + `profiles.embassyHal` lowering contract
+  used by `generate embassy`
+- derive the generated host package/crate names automatically from
+  `profiles.embassyHal.crate`
+- emit a separate host-target crate rather than a dual-target feature split of
+  the embedded crate
+- preserve a 1:1 relationship between each generated HAL-visible device surface
+  and a generated emulator/state handle for that same device
+- keep the HAL-facing API evidence-bounded in the same way as
+  `generate embassy`; host mode must not widen the executable HAL surface beyond
+  what the approved HAIR lowering inputs justify
+- expose host-only emulator/test-control APIs through companion emulator/state
+  handles rather than by mutating the HAL driver types into a different shape
+- support deterministic progress under explicit test control for simulated time,
+  interrupts, DMA completion, and other emulated side effects needed by the
+  generated HAL interactions
+- fail explicitly if a generated HAL-visible device lacks a paired emulation
+  surface or if an emulator/test-control API would require unsupported
+  inference
+
+First-cut exclusions:
+
+- wall-clock-driven background progression as the default execution model
+- a single crate that is both embedded-target and host-emulated through feature
+  switches
+- host-only placeholder emulations for behaviors that are not justified by the
+  approved HAIR lowering inputs
+- silently omitting emulator observability or control surfaces for generated
+  HAL-visible devices
+
 ### `hair diff`
 
 `diff` compares two HAIR document revisions and reports structural differences.
@@ -111,6 +151,8 @@ The CLI is defined by the repository schema and documentation rather than by ad 
 - `validate` is anchored to `schema/hair.json` and its referenced layered schemas.
 - `generate svd` is a lowering step from HAIR, not a source of truth for the model.
 - `generate embassy` is also a lowering step from HAIR, but one that depends on stronger generation-profile data and explicit unsupported-feature failures.
+- `generate embassy-host` is a separate lowering step from the same
+  `profiles.embassyHal` contract into a host-emulated companion crate.
 - `diff` compares HAIR documents as repository artifacts; it does not redefine HAIR semantics.
 
 The `validation` layer in HAIR remains important, but the first CLI cut only enforces schema conformance. Executing declarative validation rules is future work.

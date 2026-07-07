@@ -2,7 +2,7 @@
 
 This document defines the intended first-cut contract for `profiles.embassyHal`.
 
-It is a **governing specification** for Embassy-style HAL generation. The current Rust CLI is expected to converge on the first-cut contract described here, and later profile revisions may still extend beyond the current generator; generators are expected to follow this contract rather than inventing their own binding rules.
+It is a **governing specification** for Embassy-style HAL generation. The current Rust CLI is expected to converge on the first-cut contract described here, and later profile revisions may still extend beyond the current generator; generators are expected to follow this contract rather than inventing their own binding rules. The same profile may lower either to an embedded-target Embassy HAL crate or to a separate host-emulated companion crate.
 
 ## Design intent
 
@@ -15,6 +15,12 @@ It does **not** duplicate hardware facts. Instead, it references:
 - canonical MCU topology from `profiles.mcuSoc`
 
 This keeps the hardware model auditable and reusable while still giving an Embassy generator an explicit lowering contract.
+
+The generator mode chooses the artifact shape, not the HAIR document shape:
+
+- `hair generate embassy` emits the embedded-target crate
+- `hair generate embassy-host` emits a separate host-only `std` crate derived
+  from the same approved `profiles.embassyHal` contract
 
 ## Executable lowering contract
 
@@ -70,6 +76,44 @@ Normative consequences:
    that module in structured form instead of being re-derived by ad hoc
    name matching
 
+## Host-emulated generation contract
+
+`hair generate embassy-host` is a host-only lowering of the same approved
+Embassy driver contract, not a separate profile with looser evidence rules.
+
+Normative consequences:
+
+1. the host-emulated crate must preserve a 1:1 relationship between each
+   generated HAL-visible device surface and a companion emulator/state handle
+   for that same device
+2. the host-emulated crate must remain a separate generated `std` crate rather
+   than changing the embedded crate into a dual-target feature split
+3. host-only emulator/test-control APIs must be exposed through explicit
+   companion emulator/state handles rather than by changing the generated HAL
+   driver types into a different public shape
+4. the generated host crate names are derived automatically from
+   `profiles.embassyHal.crate` rather than through additional profile fields
+5. simulated time, interrupt delivery, DMA completion, and similar emulated
+   side effects must progress under explicit test control in the first cut so
+   host execution stays deterministic and auditable
+6. host mode must not invent emulator behavior that the embedded lowering could
+   not justify from the approved HAIR topology, semantics, and reachable
+   register/field data
+7. if a generated HAL-visible device would lack a paired emulator/state handle,
+   host generation must fail explicitly rather than silently emitting a
+   partially emulated crate
+
+The companion emulator/state handles are where host-only observation and control
+surfaces live. Depending on the justified lowering inputs, those handles may
+expose:
+
+- register and field state inspection
+- explicit interrupt triggering and acknowledgement
+- deterministic DMA progress and completion injection
+- transmit/receive queues for USART/UART- and SPI-like paths
+- controller/target state for I2C-style transactions
+- explicit time advancement for generated async timing support
+
 ## Async timing contract
 
 First-cut Embassy async timing support is an **optional generated
@@ -104,6 +148,9 @@ Normative consequences:
 
 The first cut currently requires one **common generated async timing
 contract** backed by SysTick across supported MCUs.
+
+In host-emulated mode, that same timing contract must remain deterministic under
+explicit test-controlled progression rather than background wall-clock advance.
 
 ## Executable-readiness extraction contract
 
@@ -163,6 +210,10 @@ The first Embassy generator cut is expected to support this driver subset:
 
 Any other generation request is out of subset for the first cut and must fail explicitly.
 
+For `hair generate embassy-host`, the same supported driver subset applies, and
+every generated driver in that subset must also produce its paired
+emulator/state handle.
+
 ## Required document surfaces by supported driver kind
 
 The table below defines the minimum expected evidence-backed HAIR surfaces
@@ -216,6 +267,9 @@ surface: helper structs and constants in the emitted crate must preserve
 the lowering-relevant structure needed to explain and reuse the approved
 driver contract.
 
+For host-emulated generation, the same traceability rule applies to the
+companion emulator/state handles and their observation/control methods.
+
 ## Authoring rules for `profiles.embassyHal`
 
 1. `driverInstances[].targetRef` should resolve to a `profiles.mcuSoc.canonicalBlocks[]` entry in the first cut.
@@ -227,6 +281,9 @@ driver contract.
 7. A driver instance should not be interpreted as claiming every imaginable operation for its `driverKind`; it only claims the subset that the referenced topology and semantics can justify.
 8. A `gpio-port` driver instance may still lower to a per-pin generated API surface; the HAIR contract stays rooted at the port block while each emitted pin helper must remain traceable to explicit `pinRoles`, routes, and reachable structural controls for that pin.
 9. Capability tag `embassy-time-driver` reserves that driver instance as the crate's generated async timing provider in the first cut. At most one driver instance may claim it, and in the current first cut it must be an `interrupt` driver instance whose single route targets SysTick.
+10. Host-emulated output derives its package/crate naming from `crate.packageName`
+    and `crate.crateName`; the profile does not grow separate host naming
+    fields for the first cut.
 
 ## Failure contract
 
@@ -238,6 +295,12 @@ For Embassy generation, the following cases must fail explicitly:
 4. the input document carries only resource metadata for a claimed behavior, with no executable lowering path
 5. referenced semantic operations or state machines target a different peripheral than the driver instance, or a lowered state transition effect cannot be represented as one supported field write in the first cut
 6. async timing support is requested or claimed, but no unique `embassy-time-driver` instance carries the SysTick interrupt inventory and startup closure needed to drive the generated tick source
+7. host-emulated generation would expose a HAL-visible device without a paired
+   emulator/state handle
+8. a requested host-only observation or control surface would require
+   unsupported inference beyond the approved lowering inputs
+9. host-emulated execution would depend on background wall-clock progression
+   rather than explicit deterministic test control in the first cut
 
 Generators may emit a smaller API surface than another document of the
 same `driverKind`, but they must never silently widen that surface beyond
@@ -297,3 +360,7 @@ For Embassy generation specifically:
 - the command is `hair generate embassy <input> --output-dir <path>`
 - generation is multi-file, so stdout is not the primary artifact surface
 - input documents outside the supported subset must fail explicitly
+- the host-emulated companion command is
+  `hair generate embassy-host <input> --output-dir <path>`
+- the host-emulated command emits a separate host-only crate, not a feature
+  variation of the embedded crate
