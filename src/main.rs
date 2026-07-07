@@ -1,5 +1,6 @@
 #![recursion_limit = "512"]
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::io::{self, Write};
@@ -4826,15 +4827,26 @@ fn svd_item_name(name: &str, array: Option<&ArrayShape>) -> Result<String> {
 
 fn write_text_element(xml: &mut XmlWriter, name: &str, value: &str) {
     xml.start_element(name);
-    xml.write_text(&escape_xml_text(value));
+    let escaped = escape_xml_text(value);
+    xml.write_text(escaped.as_ref());
     xml.end_element();
 }
 
-fn escape_xml_text(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
+fn escape_xml_text(value: &str) -> Cow<'_, str> {
+    if !value.bytes().any(|byte| matches!(byte, b'&' | b'<' | b'>')) {
+        return Cow::Borrowed(value);
+    }
+
+    let mut escaped = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            _ => escaped.push(ch),
+        }
+    }
+    Cow::Owned(escaped)
 }
 
 fn json_u64(value: &Value, context: &str) -> Result<u64> {

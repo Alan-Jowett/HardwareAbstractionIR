@@ -14,12 +14,12 @@
 | `olimex-stm32-h405-product-page` | other | https://www.olimex.com/Products/ARM/ST/STM32-H405/ | - | Board identity and board context. | metadata, physical |
 | `st-stm32f405-datasheet` | datasheet | https://www.st.com/resource/en/datasheet/DM00037051.pdf | - | Official family datasheet. | structure, physical |
 | `st-rm0090` | reference-manual | https://www.st.com/resource/en/reference_manual/DM00031020.pdf | - | Official peripheral reference manual. | structure, physical |
-| `st-cmsis-device-header` | vendor-header | raw GitHub commit-pinned URI | 3c77349ce04c8af401454cc51f85ea9a50e34fc1 | CPU flags, IRQ numbering, memory-base macros. | structure, physical |
-| `st-cmsis-startup` | source-code | raw GitHub commit-pinned URI | 3b64b7b0b546cefe84f13c65508126eea58b97d8 | Interrupt vector ordering cross-check. | structure |
-| `st-stm32f4-svd-bundle` | svd | raw GitHub commit-pinned URI | 9887ffa9fb4f30fc0e928d9a2278d563eeb383c0 | Primary register-bearing structural model. | structure |
-| `stm32-rs-stm32f405-patch` | generated | raw GitHub commit-pinned URI | 9887ffa9fb4f30fc0e928d9a2278d563eeb383c0 | Known SVD deltas and cleanup hints. | structure |
-| `embassy-rs-stm32f405rg-json` | generated | raw GitHub commit-pinned URI | 8b94783cd40d22c6f3dd1e8105568f16ddb62fc7 | Exact-package pins, clocks, DMA, and interrupt topology. | physical, profiles.mcuSoc, profiles.embassyHal |
-| `embassy-rs-embassy-stm32-cargo` | hal | raw GitHub commit-pinned URI | 50ea4f72e54d9cdaa1f1108ba2a08fa2fa4dbdf9 | Embassy supported-chip feature list. | profiles.embassyHal |
+| `st-cmsis-device-header` | vendor-header | https://raw.githubusercontent.com/STMicroelectronics/cmsis-device-f4/3c77349ce04c8af401454cc51f85ea9a50e34fc1/Include/stm32f405xx.h | 3c77349ce04c8af401454cc51f85ea9a50e34fc1 | CPU flags, IRQ numbering, memory-base macros. | structure, physical |
+| `st-cmsis-startup` | source-code | https://raw.githubusercontent.com/STMicroelectronics/cmsis-device-f4/3b64b7b0b546cefe84f13c65508126eea58b97d8/Source/Templates/gcc/startup_stm32f405xx.s | 3b64b7b0b546cefe84f13c65508126eea58b97d8 | Interrupt vector ordering cross-check. | structure |
+| `st-stm32f4-svd-bundle` | svd | https://raw.githubusercontent.com/stm32-rs/stm32-rs/9887ffa9fb4f30fc0e928d9a2278d563eeb383c0/svd/vendor/en.stm32f4-svd.zip | 9887ffa9fb4f30fc0e928d9a2278d563eeb383c0 | Primary register-bearing structural model. | structure |
+| `stm32-rs-stm32f405-patch` | generated | https://raw.githubusercontent.com/stm32-rs/stm32-rs/9887ffa9fb4f30fc0e928d9a2278d563eeb383c0/devices/stm32f405.yaml | 9887ffa9fb4f30fc0e928d9a2278d563eeb383c0 | Known SVD deltas and cleanup hints. | structure |
+| `embassy-rs-stm32f405rg-json` | generated | https://raw.githubusercontent.com/embassy-rs/stm32-data-generated/8b94783cd40d22c6f3dd1e8105568f16ddb62fc7/data/chips/STM32F405RG.json | 8b94783cd40d22c6f3dd1e8105568f16ddb62fc7 | Exact-package pins, clocks, DMA, and interrupt topology. | physical, profiles.mcuSoc, profiles.embassyHal |
+| `embassy-rs-embassy-stm32-cargo` | hal | https://raw.githubusercontent.com/embassy-rs/embassy/50ea4f72e54d9cdaa1f1108ba2a08fa2fa4dbdf9/embassy-stm32/Cargo.toml | 50ea4f72e54d9cdaa1f1108ba2a08fa2fa4dbdf9 | Embassy supported-chip feature list. | profiles.embassyHal |
 
 ## Major Hardware Areas Discovered
 - Cortex-M4F CPU metadata, NVIC interrupt inventory, and memory-region inventory
