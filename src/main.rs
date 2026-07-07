@@ -3310,14 +3310,13 @@ fn render_gpio_methods(
 }
 
 fn render_gpio_support_items(
-    model: &EmbassyGenerationModel,
+    _model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
 ) -> Result<String> {
     if driver.driver_kind != "gpio-port" {
         return Ok(String::new());
     }
 
-    let _lowering = resolve_gpio_port_lowering(model, driver)?;
     let flex_type = format!("{}Flex", driver.type_name);
     let input_type = format!("{}Input", driver.type_name);
     let output_type = format!("{}Output", driver.type_name);
