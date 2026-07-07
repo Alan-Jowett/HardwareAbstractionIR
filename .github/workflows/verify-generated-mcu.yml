@@ -164,7 +164,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo build --manifest-path "${{ inputs.smoke-dir }}/Cargo.toml"
+          cargo build --target "${{ inputs.rust-target }}" --manifest-path "${{ inputs.smoke-dir }}/Cargo.toml"
 
       - name: Run smoke harness
         if: ${{ inputs.smoke-mode == 'required' }}
