@@ -4,8 +4,9 @@
 use core::ptr::{read_volatile, write_volatile};
 
 use cortex_m::asm::nop;
-use cortex_m_rt::entry;
 use cortex_m_semihosting::{debug, hprintln};
+use embassy_executor::Spawner;
+use embassy_time::{Duration, Ticker, Timer};
 use lm3s6965_embassy_hal::gpio::{
     DRV_GPIOA_RESOURCES, DRV_GPIOB_RESOURCES, DRV_GPIOC_RESOURCES, DRV_GPIOD_RESOURCES,
     DRV_GPIOE_RESOURCES, DRV_GPIOF_RESOURCES, GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF, Level,
@@ -15,6 +16,7 @@ use lm3s6965_embassy_hal::i2c::{DRV_I2C0_RESOURCES, I2C0};
 use lm3s6965_embassy_hal::interrupt::{DRV_NVIC_RESOURCES, Irq, NVIC};
 use lm3s6965_embassy_hal::rcc::{DRV_RCC_RESOURCES, SYSCTL};
 use lm3s6965_embassy_hal::spi::{DRV_SSI0_RESOURCES, SSI0};
+use lm3s6965_embassy_hal::time::{DRV_TIME_RESOURCES, Time};
 use lm3s6965_embassy_hal::timer::{
     DRV_TIMER0_RESOURCES, DRV_TIMER1_RESOURCES, DRV_TIMER2_RESOURCES, DRV_TIMER3_RESOURCES, TIMER0,
     TIMER1, TIMER2, TIMER3,
@@ -23,13 +25,6 @@ use lm3s6965_embassy_hal::uart::{DRV_UART0_RESOURCES, DRV_UART1_RESOURCES, UART0
 use panic_halt as _;
 
 const SYSCTL_RCGC2: u32 = 0x400F_E100;
-
-const SYST_CSR: u32 = 0xE000_E010;
-const SYST_RVR: u32 = 0xE000_E014;
-const SYST_CVR: u32 = 0xE000_E018;
-const SYST_CSR_ENABLE: u32 = 1 << 0;
-const SYST_CSR_CLKSOURCE: u32 = 1 << 2;
-const SYST_CSR_COUNTFLAG: u32 = 1 << 16;
 
 const GPIO_DIR_OFFSET: u32 = 0x400;
 const GPIO_AFSEL_OFFSET: u32 = 0x420;
@@ -222,18 +217,22 @@ fn smoke_nvic_and_systick() {
             .any(|route| route.interrupt_ref == "int.uart0"),
     );
     expect("irq enum uart0 value", Irq::UART0 as i32 == 5);
+}
 
-    write_u32(SYST_RVR, 1024);
-    write_u32(SYST_CVR, 0);
-    write_u32(SYST_CSR, SYST_CSR_ENABLE | SYST_CSR_CLKSOURCE);
-    expect("systick reload programmed", read_u32(SYST_RVR) == 1024);
+async fn smoke_embassy_time() {
+    let time = Time::new(DRV_TIME_RESOURCES).unwrap();
+    expect("time route count", time.bind().len() == 1);
     expect(
-        "systick enable bits programmed",
-        (read_u32(SYST_CSR) & (SYST_CSR_ENABLE | SYST_CSR_CLKSOURCE))
-            == (SYST_CSR_ENABLE | SYST_CSR_CLKSOURCE),
+        "time uses systick route",
+        time.bind()[0].interrupt_ref == "int.systick",
     );
-    let _ = read_u32(SYST_CSR) & SYST_CSR_COUNTFLAG;
-    write_u32(SYST_CSR, 0);
+    time.init_time_driver().unwrap();
+
+    Timer::after(Duration::from_ticks(8)).await;
+
+    let mut ticker = Ticker::every(Duration::from_ticks(4));
+    ticker.next().await;
+    ticker.next().await;
 }
 
 fn smoke_rcc() {
@@ -583,8 +582,8 @@ fn smoke_flash_controller() {
     let _ = read_u32(FLASH_FMD);
 }
 
-#[entry]
-fn main() -> ! {
+#[embassy_executor::main]
+async fn main(_spawner: Spawner) {
     smoke_memory();
     hprintln!("memory ok");
     smoke_nvic_and_systick();
@@ -605,5 +604,7 @@ fn main() -> ! {
     hprintln!("watchdog ok");
     smoke_flash_controller();
     hprintln!("flash ok");
+    smoke_embassy_time().await;
+    hprintln!("embassy time ok");
     pass();
 }

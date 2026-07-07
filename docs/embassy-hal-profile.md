@@ -70,6 +70,41 @@ Normative consequences:
    that module in structured form instead of being re-derived by ad hoc
    name matching
 
+## Async timing contract
+
+First-cut Embassy async timing support is an **optional generated
+contract**, not an ambient promise that every Embassy-capable crate can
+already satisfy `embassy_time::Timer` primitives.
+
+When a document intends to support generated async timing behavior such
+as `Timer::after()`, `Ticker`, and executor-driven sleep progression, it
+must identify exactly one time-base provider in
+`profiles.embassyHal.driverInstances[]` using capability tag
+`embassy-time-driver`.
+
+Normative consequences:
+
+1. the tagged driver instance must be a supported lowering target whose
+   approved HAIR inputs can justify a real tick source and wakeup path;
+   in the current first cut that means an `interrupt` driver instance
+   whose single referenced route targets the SysTick exception
+2. the current first cut emits a SysTick-backed generated time driver;
+   alternative timer-backed sources remain future work until they have a
+   dedicated lowering contract and implementation
+3. the tagged driver instance may use generator-facing support-module
+   placement such as `modulePath = "time"`; this is still subject to the
+   same evidence-bounded lowering rules as any other emitted module
+4. the generator must fail explicitly if zero or more than one driver
+   instance claims `embassy-time-driver` in a crate that requests async
+   timing support
+5. workflows and generators must not treat generic timer inventory alone
+   as evidence of async timing readiness; the document must carry the
+   explicit SysTick interrupt inventory and startup facts needed to
+   initialize and drive the generated tick source without guesswork
+
+The first cut currently requires one **common generated async timing
+contract** backed by SysTick across supported MCUs.
+
 ## Executable-readiness extraction contract
 
 When a workflow is asked to extract or audit `profiles.embassyHal` for an
@@ -120,7 +155,7 @@ The first Embassy generator cut is expected to support this driver subset:
 | `uart` / `usart` | supported | Requires explicit pin-routing data. Interrupt and DMA routes are required for async DMA-backed transfers and may be omitted for pure polling-mode instances. |
 | `spi` | supported | Requires explicit pin-routing data and any claimed DMA bindings. |
 | `i2c` | supported | Requires explicit pin-routing data and any claimed interrupt/DMA bindings. |
-| `timer` / `pwm` | supported | Requires state-machine and route data for the supported operating modes being generated. |
+| `timer` / `pwm` | supported | Requires state-machine and route data for the supported operating modes being generated. Timer/PWM blocks do not yet serve as the generated Embassy async time-base provider in the first cut. |
 | `adc` | supported | Requires calibration/init operations and any claimed DMA bindings. |
 | `dma` | supported | Generates DMA infrastructure from `dmaTopology`. |
 | `interrupt` | supported | Generates IRQ enums/bindings from the device interrupt inventory plus `interruptTopology`. |
@@ -169,7 +204,7 @@ exact naming contract:
 | `timer` / `pwm` | Enable/disable/mode/channel helpers derived from state machines, operations, route controls, and structural register data |
 | `adc` | Calibration/enable helpers plus only those conversion/sample methods whose trigger/start/complete/data path is explicitly modeled |
 | `dma` | Channel-oriented enable/configure/launch/status helpers derived from DMA topology and any referenced controls |
-| `interrupt` | IRQ enums plus bind/clear/ack helpers justified by the interrupt inventory, routes, and source-level operations |
+| `interrupt` | IRQ enums plus bind/clear/ack helpers justified by the interrupt inventory, routes, and source-level operations; and, when tagged `embassy-time-driver`, the generated SysTick-backed async time-base support module |
 
 The generator may choose exact Rust names and signatures, but those names
 and signatures must be traceable to the approved HAIR lowering inputs.
@@ -191,6 +226,7 @@ driver contract.
 6. `initOperationRefs` and `stateMachineRefs` should be treated as executable lowering inputs, not as documentation-only labels.
 7. A driver instance should not be interpreted as claiming every imaginable operation for its `driverKind`; it only claims the subset that the referenced topology and semantics can justify.
 8. A `gpio-port` driver instance may still lower to a per-pin generated API surface; the HAIR contract stays rooted at the port block while each emitted pin helper must remain traceable to explicit `pinRoles`, routes, and reachable structural controls for that pin.
+9. Capability tag `embassy-time-driver` reserves that driver instance as the crate's generated async timing provider in the first cut. At most one driver instance may claim it, and in the current first cut it must be an `interrupt` driver instance whose single route targets SysTick.
 
 ## Failure contract
 
@@ -201,6 +237,7 @@ For Embassy generation, the following cases must fail explicitly:
 3. a data-path API such as transfer, transaction, sample, or DMA-backed I/O would require behavior that is not explicitly modeled
 4. the input document carries only resource metadata for a claimed behavior, with no executable lowering path
 5. referenced semantic operations or state machines target a different peripheral than the driver instance, or a lowered state transition effect cannot be represented as one supported field write in the first cut
+6. async timing support is requested or claimed, but no unique `embassy-time-driver` instance carries the SysTick interrupt inventory and startup closure needed to drive the generated tick source
 
 Generators may emit a smaller API surface than another document of the
 same `driverKind`, but they must never silently widen that surface beyond

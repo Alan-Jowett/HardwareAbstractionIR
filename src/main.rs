@@ -1610,6 +1610,21 @@ struct DriverResourceScopeInputs<'a> {
     pin_roles: &'a [ResolvedEmbassyPinRole],
 }
 
+const EMBASSY_TIME_DRIVER_TAG: &str = "embassy-time-driver";
+
+fn has_time_driver_tag(tags: &[String]) -> bool {
+    tags.iter().any(|tag| tag == EMBASSY_TIME_DRIVER_TAG)
+}
+
+fn is_systick_interrupt_ref(interrupt_ref: &str) -> bool {
+    interrupt_ref.eq_ignore_ascii_case("int.systick")
+        || interrupt_ref.eq_ignore_ascii_case("irq.systick")
+        || interrupt_ref
+            .rsplit('.')
+            .next()
+            .is_some_and(|segment| segment.eq_ignore_ascii_case("systick"))
+}
+
 #[allow(dead_code)]
 #[derive(Debug)]
 struct EmbassyGenerationModel {
@@ -1891,6 +1906,7 @@ impl EmbassyGenerationModel {
         }
 
         validate_driver_name_collisions(&drivers)?;
+        validate_capability_tag_contracts(&drivers)?;
         validate_interrupt_name_collisions(&document.structure.device.interrupts)?;
 
         Ok(Self {
@@ -2165,6 +2181,69 @@ fn validate_driver_module_scope(driver: &EmbassyDriverInstance, module_name: &st
             driver.module_path,
             driver.driver_kind
         );
+    }
+    if module_name == "time" && !has_time_driver_tag(&driver.capability_tags) {
+        bail!(
+            "driver {} uses reserved time modulePath {} without capability tag {}",
+            driver.id,
+            driver.module_path,
+            EMBASSY_TIME_DRIVER_TAG
+        );
+    }
+    Ok(())
+}
+
+fn validate_capability_tag_contracts(drivers: &[ResolvedDriverInstance]) -> Result<()> {
+    let time_drivers = drivers
+        .iter()
+        .filter(|driver| has_time_driver_tag(&driver.capability_tags))
+        .collect::<Vec<_>>();
+    if time_drivers.len() > 1 {
+        let ids = time_drivers
+            .iter()
+            .map(|driver| driver.id.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        bail!(
+            "drivers {} all claim capability tag {}; exactly one generated async timing provider is allowed",
+            ids,
+            EMBASSY_TIME_DRIVER_TAG
+        );
+    }
+    if let Some(driver) = time_drivers.first() {
+        if driver.driver_kind != "interrupt" {
+            bail!(
+                "driver {} claims capability tag {} but has unsupported driver kind {}; first-cut generated async timing currently requires interrupt lowering bound to SysTick",
+                driver.id,
+                EMBASSY_TIME_DRIVER_TAG,
+                driver.driver_kind
+            );
+        }
+        if driver.target.block_class != "interrupt-controller" {
+            bail!(
+                "driver {} claims capability tag {} with interrupt lowering, but target block {} is not an interrupt-controller",
+                driver.id,
+                EMBASSY_TIME_DRIVER_TAG,
+                driver.target.id
+            );
+        }
+        if driver.interrupt_routes.len() != 1 {
+            bail!(
+                "driver {} claims capability tag {} but must reference exactly one SysTick interrupt route",
+                driver.id,
+                EMBASSY_TIME_DRIVER_TAG
+            );
+        }
+        let route = &driver.interrupt_routes[0];
+        if !is_systick_interrupt_ref(&route.interrupt_ref) {
+            bail!(
+                "driver {} claims capability tag {} but route {} targets {}; first-cut generated async timing currently requires the SysTick exception",
+                driver.id,
+                EMBASSY_TIME_DRIVER_TAG,
+                route.id,
+                route.interrupt_ref
+            );
+        }
     }
     Ok(())
 }
@@ -2687,7 +2766,8 @@ fn validate_driver_requirements(
             }
         }
         "timer" | "pwm" => {
-            if requirements.pin_roles.is_empty() {
+            let is_time_driver = has_time_driver_tag(&driver.capability_tags);
+            if requirements.pin_roles.is_empty() && !is_time_driver {
                 bail!(
                     "{} driver {} requires pin roles",
                     driver.driver_kind,
@@ -2790,11 +2870,21 @@ fn to_rust_method_name(text: &str) -> String {
 }
 
 fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
-    format!(
+    let mut out = format!(
         "[package]\nname = {}\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[lib]\nname = {}\npath = \"src/lib.rs\"\n",
         render_rust_string(&model.crate_info.package_name),
         render_rust_string(&model.crate_info.crate_name)
-    )
+    );
+    if model
+        .drivers
+        .iter()
+        .any(|driver| has_time_driver_tag(&driver.capability_tags))
+    {
+        out.push_str(
+            "\n[dependencies]\ncritical-section = \"1.2\"\nembassy-time-driver = \"0.2.2\"\nembassy-time-queue-utils = { version = \"0.3.2\", features = [\"generic-queue-8\"] }\n",
+        );
+    }
+    out
 }
 
 fn render_embassy_lib_rs(model: &EmbassyGenerationModel) -> String {
@@ -2956,24 +3046,28 @@ fn render_driver_support_items(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
 ) -> Result<String> {
-    match driver.driver_kind.as_str() {
-        "gpio-port" => render_gpio_support_items(model, driver),
-        _ => Ok(String::new()),
+    let mut out = String::new();
+    if driver.driver_kind == "gpio-port" {
+        out.push_str(&render_gpio_support_items(model, driver)?);
     }
+    if has_time_driver_tag(&driver.capability_tags) {
+        out.push_str(&render_time_driver_support_items(model, driver));
+    }
+    Ok(out)
 }
 
 fn render_driver_methods(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
 ) -> Result<String> {
-    if driver.driver_kind == "interrupt" {
-        return Ok(
-            "    pub fn bind(&self) -> &'static [metadata::InterruptRoute] {\n        self.resources.interrupts\n    }\n"
-                .to_string(),
-        );
-    }
-
     let mut methods = Vec::new();
+    if driver.driver_kind == "interrupt" {
+        methods.push(GeneratedMethod {
+            name: "bind".to_string(),
+            code: "    pub fn bind(&self) -> &'static [metadata::InterruptRoute] {\n        self.resources.interrupts\n    }\n"
+                .to_string(),
+        });
+    }
     methods.extend(render_clock_binding_methods(model, driver)?);
     methods.extend(render_reset_binding_methods(model, driver)?);
     methods.extend(render_gpio_methods(model, driver)?);
@@ -2981,6 +3075,7 @@ fn render_driver_methods(
     methods.extend(render_usart_methods(model, driver)?);
     methods.extend(render_operation_methods(model, driver)?);
     methods.extend(render_state_machine_methods(model, driver)?);
+    methods.extend(render_time_driver_methods(driver));
 
     if methods.is_empty() {
         bail!(
@@ -2988,6 +3083,19 @@ fn render_driver_methods(
             driver.id,
             driver.driver_kind
         );
+    }
+
+    fn render_time_driver_methods(driver: &ResolvedDriverInstance) -> Vec<GeneratedMethod> {
+        if !has_time_driver_tag(&driver.capability_tags) {
+            return Vec::new();
+        }
+        vec![GeneratedMethod {
+            name: "init_time_driver".to_string(),
+            code: format!(
+                "    pub fn init_time_driver(&self) -> Result<(), metadata::Error> {{\n        initialize_{}_time_driver()\n    }}\n",
+                to_rust_const_name(&driver.id).to_lowercase()
+            ),
+        }]
     }
 
     let mut seen = BTreeSet::new();
@@ -3008,6 +3116,19 @@ fn render_driver_methods(
 
 fn render_mmio_helpers() -> &'static str {
     "#[allow(dead_code)]\nfn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {\n    let address = usize::try_from(address)\n        .map_err(|_| metadata::Error::Unsupported(\"MMIO address does not fit usize on this target\"))?;\n    if address % align != 0 {\n        return Err(metadata::Error::Unsupported(\"MMIO address is not naturally aligned for the target register width\"));\n    }\n    Ok(address)\n}\n\n#[allow(dead_code)]\nfn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u8>())?;\n    unsafe {\n        let current = read_volatile(address as *const u8);\n        write_volatile(address as *mut u8, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u16>())?;\n    unsafe {\n        let current = read_volatile(address as *const u16);\n        write_volatile(address as *mut u16, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        let current = read_volatile(address as *const u32);\n        write_volatile(address as *mut u32, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn read_u32(address: u64) -> Result<u32, metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe { Ok(read_volatile(address as *const u32)) }\n}\n\n#[allow(dead_code)]\nfn write_u32(address: u64, value: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        write_volatile(address as *mut u32, value);\n    }\n    Ok(())\n}\n"
+}
+
+fn render_time_driver_support_items(
+    _model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> String {
+    let init_fn = format!(
+        "initialize_{}_time_driver",
+        to_rust_const_name(&driver.id).to_lowercase()
+    );
+    format!(
+        "\nuse core::cell::{{Cell, RefCell}};\nuse critical_section::Mutex as CriticalSectionMutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nconst SYST_CSR_ADDRESS: u64 = 0xE000_E010;\nconst SYST_RVR_ADDRESS: u64 = 0xE000_E014;\nconst SYST_CVR_ADDRESS: u64 = 0xE000_E018;\nconst SYST_CSR_ENABLE: u32 = 1 << 0;\nconst SYST_CSR_TICKINT: u32 = 1 << 1;\nconst SYST_CSR_CLKSOURCE: u32 = 1 << 2;\nconst SYST_RELOAD_VALUE: u32 = 15;\n\nstruct GeneratedSystickTimeDriver {{\n    initialized: CriticalSectionMutex<Cell<bool>>,\n    ticks: CriticalSectionMutex<Cell<u64>>,\n    queue: CriticalSectionMutex<RefCell<EmbassyTimeQueue>>,\n}}\n\nimpl GeneratedSystickTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            initialized: CriticalSectionMutex::new(Cell::new(false)),\n            ticks: CriticalSectionMutex::new(Cell::new(0)),\n            queue: CriticalSectionMutex::new(RefCell::new(EmbassyTimeQueue::new())),\n        }}\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        critical_section::with(|cs| {{\n            if self.initialized.borrow(cs).get() {{\n                return Ok(());\n            }}\n            self.ticks.borrow(cs).set(0);\n            write_u32(SYST_CSR_ADDRESS, 0)?;\n            write_u32(SYST_RVR_ADDRESS, SYST_RELOAD_VALUE)?;\n            write_u32(SYST_CVR_ADDRESS, 0)?;\n            write_u32(\n                SYST_CSR_ADDRESS,\n                SYST_CSR_ENABLE | SYST_CSR_TICKINT | SYST_CSR_CLKSOURCE,\n            )?;\n            self.initialized.borrow(cs).set(true);\n            Ok(())\n        }})\n    }}\n\n    fn on_systick(&self) {{\n        critical_section::with(|cs| {{\n            if !self.initialized.borrow(cs).get() {{\n                return;\n            }}\n            let now = self.ticks.borrow(cs).get().wrapping_add(1);\n            self.ticks.borrow(cs).set(now);\n            let _ = self.queue.borrow(cs).borrow_mut().next_expiration(now);\n        }});\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedSystickTimeDriver {{\n    fn now(&self) -> u64 {{\n        critical_section::with(|cs| self.ticks.borrow(cs).get())\n    }}\n\n    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {{\n        critical_section::with(|cs| {{\n            let now = self.ticks.borrow(cs).get();\n            let mut queue = self.queue.borrow(cs).borrow_mut();\n            let _ = queue.schedule_wake(at, waker);\n            let _ = queue.next_expiration(now);\n        }});\n    }}\n}}\n\n        embassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedSystickTimeDriver = GeneratedSystickTimeDriver::new());\n\n#[allow(dead_code)]\n#[allow(non_snake_case)]\n#[unsafe(no_mangle)]\nextern \"C\" fn SysTick() {{\n    GENERATED_TIME_DRIVER.on_systick();\n}}\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.init()\n}}\n"
+    )
 }
 
 fn render_gpio_module_prelude() -> &'static str {
@@ -9856,6 +9977,266 @@ mod tests {
         let error =
             generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
         assert!(error.to_string().contains("reserved interrupt modulePath"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_reserved_time_module_without_capability_tag() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        drivers[5]
+            .as_object_mut()
+            .expect("timer driver")
+            .insert("modulePath".to_string(), Value::String("time".to_string()));
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("reserved time module fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("reserved time modulePath"));
+    }
+
+    #[test]
+    fn generate_embassy_supports_interrupt_scoped_time_driver() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let interrupts = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("interrupts")
+            .and_then(Value::as_array_mut)
+            .expect("interrupts");
+        interrupts.push(serde_json::json!({
+            "id": "irq.systick",
+            "name": "SysTick",
+            "number": -1,
+            "controllerRef": "ic.nvic"
+        }));
+        let mcu = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object");
+        let interrupt_topology = mcu
+            .get_mut("interruptTopology")
+            .and_then(Value::as_object_mut)
+            .expect("interrupt topology");
+        interrupt_topology
+            .get_mut("sources")
+            .and_then(Value::as_array_mut)
+            .expect("interrupt sources")
+            .push(serde_json::json!({
+                "id": "isrc.systick",
+                "name": "SysTick source",
+                "sourceRef": "block.cpu0",
+                "producerRef": "block.cpu0",
+                "kind": "timer"
+            }));
+        interrupt_topology
+            .get_mut("routes")
+            .and_then(Value::as_array_mut)
+            .expect("interrupt routes")
+            .push(serde_json::json!({
+                "id": "iroute.systick",
+                "name": "SysTick route",
+                "sourceRef": "isrc.systick",
+                "interruptRef": "irq.systick",
+                "controllerRef": "block.pfic",
+                "cpuTargetRef": "block.cpu0",
+                "routeType": "hardwired"
+            }));
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let nvic = drivers
+            .iter()
+            .find(|driver| {
+                driver
+                    .as_object()
+                    .and_then(|driver| driver.get("driverKind"))
+                    .and_then(Value::as_str)
+                    == Some("interrupt")
+            })
+            .expect("interrupt driver")
+            .clone();
+        let mut time_driver = nvic.as_object().expect("nvic object").clone();
+        time_driver.insert("id".to_string(), Value::String("drv.time".to_string()));
+        time_driver.insert("name".to_string(), Value::String("Time".to_string()));
+        time_driver.insert("modulePath".to_string(), Value::String("time".to_string()));
+        time_driver.insert(
+            "interruptRouteRefs".to_string(),
+            serde_json::json!(["iroute.systick"]),
+        );
+        time_driver.insert(
+            "capabilityTags".to_string(),
+            serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
+        );
+        drivers.push(Value::Object(time_driver));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("interrupt time-driver fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+        generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
+
+        let cargo_toml = std::fs::read_to_string(output_dir.path().join("Cargo.toml"))
+            .expect("generated Cargo.toml");
+        let lib_rs = std::fs::read_to_string(output_dir.path().join("src").join("lib.rs"))
+            .expect("generated lib.rs");
+        let time_rs = std::fs::read_to_string(output_dir.path().join("src").join("time.rs"))
+            .expect("generated time module");
+        assert!(cargo_toml.contains("embassy-time-driver"));
+        assert!(cargo_toml.contains("embassy-time-queue-utils"));
+        assert!(lib_rs.contains("pub mod time;"));
+        assert!(time_rs.contains("init_time_driver"));
+        assert!(time_rs.contains("extern \"C\" fn SysTick()"));
+        assert!(time_rs.contains("#[allow(dead_code)]"));
+        assert!(time_rs.contains("time_driver_impl!"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_timer_scoped_time_driver() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let tim1 = drivers[5].as_object_mut().expect("timer driver");
+        tim1.insert("modulePath".to_string(), Value::String("time".to_string()));
+        tim1.insert(
+            "capabilityTags".to_string(),
+            serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
+        );
+        tim1.insert("pinRoles".to_string(), serde_json::json!([]));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("time-driver timer fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("currently requires interrupt lowering bound to SysTick")
+        );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_duplicate_time_driver_capability_tags() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        for index in [5usize, 6usize] {
+            let driver = drivers[index].as_object_mut().expect("time-capable driver");
+            driver.insert(
+                "capabilityTags".to_string(),
+                serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
+            );
+        }
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("duplicate time-driver fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("exactly one generated async timing provider")
+        );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_time_driver_without_interrupt_route() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let interrupt = drivers[9].as_object_mut().expect("interrupt driver");
+        interrupt.insert("modulePath".to_string(), Value::String("time".to_string()));
+        interrupt.insert(
+            "capabilityTags".to_string(),
+            serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
+        );
+        interrupt.insert("interruptRouteRefs".to_string(), serde_json::json!([]));
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("time-driver without interrupt fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("interrupt driver drv.pfic requires interrupt routes")
+        );
     }
 
     #[test]
