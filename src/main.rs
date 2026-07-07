@@ -6451,6 +6451,10 @@ fn write_peripheral(
     Ok(())
 }
 
+fn is_svd_system_exception(interrupt: &Interrupt) -> bool {
+    interrupt.number < 0
+}
+
 fn assign_svd_interrupts<'a>(
     device: &'a Device,
     peripherals: &HashMap<&'a str, &'a Peripheral>,
@@ -6471,6 +6475,9 @@ fn assign_svd_interrupts<'a>(
                         interrupt_ref
                     )
                 })?;
+            if is_svd_system_exception(interrupt) {
+                continue;
+            }
             assigned
                 .entry(peripheral.id.as_str())
                 .or_default()
@@ -6480,6 +6487,9 @@ fn assign_svd_interrupts<'a>(
     }
 
     for interrupt in &device.interrupts {
+        if is_svd_system_exception(interrupt) {
+            continue;
+        }
         if emitted_interrupt_ids.contains(interrupt.id.as_str()) {
             continue;
         }
@@ -8319,6 +8329,141 @@ mod tests {
                 .to_string()
                 .contains("is not linked by interruptRefs and could not be attributed")
         );
+    }
+
+    #[test]
+    fn generate_svd_ignores_unlinked_systick_exception() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "architectures": [
+                    {
+                        "id": "arch.test",
+                        "addressUnitBits": 8,
+                        "dataBusWidthBits": 32
+                    }
+                ],
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "architectureRef": "arch.test",
+                    "cpu": {
+                        "name": "Cortex-M4",
+                        "revision": "r0p1",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": true,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": false
+                        }
+                    },
+                    "interrupts": [
+                        {
+                            "id": "irq.systick",
+                            "name": "SysTick",
+                            "number": -1
+                        },
+                        {
+                            "id": "int.wwdg",
+                            "name": "WWDG",
+                            "number": 16
+                        }
+                    ],
+                    "peripherals": [
+                        {
+                            "id": "periph.wwdg",
+                            "name": "WWDG",
+                            "type": "WWDG",
+                            "baseAddress": 1073753088u64,
+                            "registers": []
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let svd = generate_svd(&document).expect("svd generation");
+        assert!(svd.contains("<interrupt><name>WWDG</name><value>16</value></interrupt>"));
+        assert!(!svd.contains("<interrupt><name>SysTick</name><value>-1</value></interrupt>"));
+    }
+
+    #[test]
+    fn generate_svd_ignores_linked_systick_exception() {
+        let document: HairDocument = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "0.1.0",
+            "metadata": {
+                "id": "test.device",
+                "title": "Test Device",
+                "version": "0.1.0"
+            },
+            "structure": {
+                "architectures": [
+                    {
+                        "id": "arch.test",
+                        "addressUnitBits": 8,
+                        "dataBusWidthBits": 32
+                    }
+                ],
+                "device": {
+                    "name": "TEST123",
+                    "vendor": "TestVendor",
+                    "architectureRef": "arch.test",
+                    "cpu": {
+                        "name": "Cortex-M4",
+                        "revision": "r0p1",
+                        "endianness": "little",
+                        "interruptPriorityBits": 4,
+                        "featureFlags": {
+                            "mpuPresent": true,
+                            "fpuPresent": false,
+                            "vendorSystemTimerConfig": false
+                        }
+                    },
+                    "interrupts": [
+                        {
+                            "id": "irq.systick",
+                            "name": "SysTick",
+                            "number": -1
+                        },
+                        {
+                            "id": "int.wwdg",
+                            "name": "WWDG",
+                            "number": 16
+                        }
+                    ],
+                    "peripherals": [
+                        {
+                            "id": "periph.core",
+                            "name": "SysTick",
+                            "type": "Core",
+                            "baseAddress": 3758153744u64,
+                            "interruptRefs": ["irq.systick"],
+                            "registers": []
+                        },
+                        {
+                            "id": "periph.wwdg",
+                            "name": "WWDG",
+                            "type": "WWDG",
+                            "baseAddress": 1073753088u64,
+                            "interruptRefs": ["int.wwdg"],
+                            "registers": []
+                        }
+                    ]
+                }
+            }
+        }))
+        .expect("fixture should parse");
+
+        let svd = generate_svd(&document).expect("svd generation");
+        assert!(svd.contains("<interrupt><name>WWDG</name><value>16</value></interrupt>"));
+        assert!(!svd.contains("<interrupt><name>SysTick</name><value>-1</value></interrupt>"));
     }
 
     #[test]

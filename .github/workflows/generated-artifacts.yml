@@ -1,0 +1,142 @@
+name: Generated artifact verification
+
+permissions:
+  actions: write
+  contents: read
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  qemu:
+    name: custom-qemu
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_name: ${{ steps.resolve.outputs.artifact_name }}
+    env:
+      QEMU_REPOSITORY: https://gitlab.com/Alan_Jowett/qemu.git
+    steps:
+      - name: Resolve custom QEMU revision
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_info="$(git ls-remote --symref "$QEMU_REPOSITORY" HEAD)"
+          qemu_branch="$(printf '%s\n' "$remote_info" | awk '/^ref:/ { sub("refs/heads/", "", $2); print $2 }')"
+          qemu_sha="$(printf '%s\n' "$remote_info" | awk 'NR == 2 { print $1 }')"
+          test -n "$qemu_branch"
+          test -n "$qemu_sha"
+          echo "branch=$qemu_branch" >> "$GITHUB_OUTPUT"
+          echo "sha=$qemu_sha" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=custom-qemu-$qemu_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Restore cached custom QEMU
+        id: cache-qemu
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/custom-qemu-install
+          key: custom-qemu-${{ runner.os }}-${{ steps.resolve.outputs.sha }}
+
+      - name: Install custom QEMU build dependencies
+        if: ${{ steps.cache-qemu.outputs.cache-hit != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes \
+            build-essential \
+            git \
+            meson \
+            ninja-build \
+            pkg-config \
+            python3 \
+            python3-venv \
+            libfdt-dev \
+            libglib2.0-dev \
+            libpixman-1-dev \
+            zlib1g-dev
+
+      - name: Check out custom QEMU source
+        if: ${{ steps.cache-qemu.outputs.cache-hit != 'true' }}
+        shell: bash
+        env:
+          QEMU_SHA: ${{ steps.resolve.outputs.sha }}
+        run: |
+          set -euo pipefail
+          git init "$RUNNER_TEMP/custom-qemu-src"
+          git -C "$RUNNER_TEMP/custom-qemu-src" remote add origin "$QEMU_REPOSITORY"
+          git -C "$RUNNER_TEMP/custom-qemu-src" fetch --depth 1 origin "$QEMU_SHA"
+          git -C "$RUNNER_TEMP/custom-qemu-src" checkout --detach FETCH_HEAD
+
+      - name: Build custom QEMU
+        if: ${{ steps.cache-qemu.outputs.cache-hit != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/custom-qemu-build" "$RUNNER_TEMP/custom-qemu-install"
+          cd "$RUNNER_TEMP/custom-qemu-build"
+          "$RUNNER_TEMP/custom-qemu-src/configure" \
+            --prefix="$RUNNER_TEMP/custom-qemu-install" \
+            --target-list=arm-softmmu \
+            --disable-docs \
+            --disable-gtk \
+            --disable-opengl \
+            --disable-sdl \
+            --disable-tools \
+            --disable-vte \
+            --disable-werror \
+            --audio-drv-list=
+          make -j"$(nproc)"
+          make install
+
+      - name: Save custom QEMU cache
+        if: ${{ steps.cache-qemu.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/custom-qemu-install
+          key: custom-qemu-${{ runner.os }}-${{ steps.resolve.outputs.sha }}
+
+      - name: Upload custom QEMU artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.resolve.outputs.artifact_name }}
+          path: ${{ runner.temp }}/custom-qemu-install
+          if-no-files-found: error
+
+  stm32f405rgt6:
+    name: stm32f405rgt6
+    needs:
+      - qemu
+    uses: ./.github/workflows/verify-generated-mcu.yml
+    with:
+      mcu_name: stm32f405rgt6
+      hair_path: evidence/st/stm32f405rgt6/hair.json
+      svd_path: evidence/st/stm32f405rgt6/generated/stm32f405rgt6.svd
+      pac_dir: evidence/st/stm32f405rgt6/generated/pac
+      embassy_dir: evidence/st/stm32f405rgt6/generated/embassy
+      rust_target: thumbv7em-none-eabihf
+      smoke_mode: required
+      smoke_dir: evidence/st/stm32f405rgt6/generated/embassy-smoke
+      smoke_command: qemu-system-arm -M netduinoplus2 -nographic -semihosting -kernel "$SMOKE_BINARY"
+      qemu_artifact_name: ${{ needs.qemu.outputs.artifact_name }}
+
+  lm3s6965:
+    name: lm3s6965
+    needs:
+      - qemu
+    uses: ./.github/workflows/verify-generated-mcu.yml
+    with:
+      mcu_name: lm3s6965
+      hair_path: evidence/texas-instruments/lm3s6965/hair.json
+      svd_path: evidence/texas-instruments/lm3s6965/generated/lm3s6965.svd
+      pac_dir: evidence/texas-instruments/lm3s6965/generated/pac
+      embassy_dir: evidence/texas-instruments/lm3s6965/generated/embassy
+      rust_target: thumbv7m-none-eabi
+      smoke_mode: required
+      smoke_dir: evidence/texas-instruments/lm3s6965/generated/embassy-smoke
+      smoke_command: qemu-system-arm -M lm3s6965evb -display none -monitor none -serial stdio -semihosting-config enable=on,target=native -kernel "$SMOKE_BINARY"
+      qemu_artifact_name: ${{ needs.qemu.outputs.artifact_name }}

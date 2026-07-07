@@ -1461,7 +1461,7 @@
               "offsetBytes": 12,
               "widthBits": 32,
               "description": "Watchdog Interrupt Clear",
-              "access": "write-only",
+              "access": "read-write",
               "fields": [
                 {
                   "id": "field.watchdog0.icr.intclr",
@@ -1470,7 +1470,7 @@
                     "lsb": 0,
                     "msb": 0
                   },
-                  "access": "write-only",
+                  "access": "read-write",
                   "description": "Clears the watchdog interrupt.",
                   "provenance": {
                     "sourceRefs": [
@@ -2030,7 +2030,7 @@
               "offsetBytes": 1052,
               "widthBits": 32,
               "description": "GPIO Interrupt Clear",
-              "access": "write-only",
+              "access": "read-write",
               "fields": [
                 {
                   "id": "field.gpioa.icr.gpio",
@@ -2039,7 +2039,7 @@
                     "lsb": 0,
                     "msb": 7
                   },
-                  "access": "write-only",
+                  "access": "read-write",
                   "description": "GPIO Interrupt Clear bits for GPIO[7:0].",
                   "provenance": {
                     "sourceRefs": [
@@ -7946,7 +7946,7 @@
               "offsetBytes": 4,
               "widthBits": 32,
               "description": "UART error clear register view.",
-              "access": "write-only",
+              "access": "read-write",
               "fields": [
                 {
                   "id": "field.uart0.ecr.error",
@@ -8957,7 +8957,7 @@
               "offsetBytes": 4,
               "widthBits": 32,
               "description": "UART error clear register view.",
-              "access": "write-only",
+              "access": "read-write",
               "fields": [
                 {
                   "id": "field.uart1.ecr.error",
@@ -9792,7 +9792,7 @@
               "kind": "register",
               "offsetBytes": 4,
               "widthBits": 32,
-              "description": "I2C Master Control/Status",
+              "description": "I2C Master Control register view.",
               "access": "read-write",
               "fields": [
                 {
@@ -9882,9 +9882,32 @@
                     "status": "verified",
                     "confidence": 0.92
                   }
-                },
+                }
+              ],
+              "provenance": {
+                "sourceRefs": [
+                  "cmsis-lm3s6965-header-mirror",
+                  "ti-driverlib-mirror-hw-i2c"
+                ],
+                "evidenceRefs": [
+                  "e_register_models",
+                  "e_i2c_offsets"
+                ],
+                "status": "verified",
+                "confidence": 0.92
+              }
+            },
+            {
+              "id": "reg.i2c0.mcs_status",
+              "name": "MCS_STATUS",
+              "kind": "register",
+              "offsetBytes": 4,
+              "widthBits": 32,
+              "description": "I2C Master Status register readback view.",
+              "access": "read-write",
+              "fields": [
                 {
-                  "id": "field.i2c0.mcs.busy",
+                  "id": "field.i2c0.mcs_status.busy",
                   "name": "BUSY",
                   "bitRange": {
                     "lsb": 0,
@@ -9906,7 +9929,7 @@
                   }
                 },
                 {
-                  "id": "field.i2c0.mcs.error",
+                  "id": "field.i2c0.mcs_status.error",
                   "name": "ERROR",
                   "bitRange": {
                     "lsb": 1,
@@ -9939,7 +9962,8 @@
                 ],
                 "status": "verified",
                 "confidence": 0.92
-              }
+              },
+              "alternateOfRef": "reg.i2c0.mcs"
             },
             {
               "id": "reg.i2c0.mdr",

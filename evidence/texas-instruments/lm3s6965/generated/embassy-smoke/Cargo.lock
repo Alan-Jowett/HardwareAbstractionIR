@@ -152,6 +152,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fc328bf943af66b80b98755db9106bf7e7471b0cf47dc8559cd9a6be504cc9c"
 
 [[package]]
+name = "embassy-smoke"
+version = "0.1.0"
+dependencies = [
+ "cortex-m",
+ "cortex-m-rt",
+ "cortex-m-semihosting",
+ "embassy-executor",
+ "embassy-time",
+ "lm3s6965-embassy-hal",
+ "panic-halt",
+]
+
+[[package]]
 name = "embassy-time"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -253,19 +266,6 @@ name = "litrs"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
-
-[[package]]
-name = "lm3s-embassy-smoke"
-version = "0.1.0"
-dependencies = [
- "cortex-m",
- "cortex-m-rt",
- "cortex-m-semihosting",
- "embassy-executor",
- "embassy-time",
- "lm3s6965-embassy-hal",
- "panic-halt",
-]
 
 [[package]]
 name = "lm3s6965-embassy-hal"

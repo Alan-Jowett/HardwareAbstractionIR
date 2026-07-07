@@ -5,13 +5,10 @@ use core::ptr::{read_volatile, write_volatile};
 
 #[allow(dead_code)]
 fn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {
-    let address = usize::try_from(address).map_err(|_| {
-        metadata::Error::Unsupported("MMIO address does not fit usize on this target")
-    })?;
+    let address = usize::try_from(address)
+        .map_err(|_| metadata::Error::Unsupported("MMIO address does not fit usize on this target"))?;
     if address % align != 0 {
-        return Err(metadata::Error::Unsupported(
-            "MMIO address is not naturally aligned for the target register width",
-        ));
+        return Err(metadata::Error::Unsupported("MMIO address is not naturally aligned for the target register width"));
     }
     Ok(address)
 }
@@ -70,91 +67,15 @@ pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProven
 };
 
 // Driver instance: UART0 (uart) from canonical block block.uart0 -> uart
-pub const DRV_UART0_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding {
-    id: "clk.uart0",
-    name: "UART0",
-    consumer_ref: "periph.uart0",
-    clock_ref: "clock.sysclk",
-    controller_ref: Some("block.rcc"),
-    binding_kind: "gated",
-    control_refs: &["reg.sysctl.rcgc1"],
-    enable_operation_refs: &[],
-    disable_operation_refs: &[],
-}];
-pub const DRV_UART0_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding {
-    id: "rst.uart0",
-    name: "UART0",
-    target_ref: "periph.uart0",
-    controller_ref: Some("block.rcc"),
-    reset_domain_ref: Some("rd.software"),
-    binding_kind: "software",
-    control_refs: &["reg.sysctl.srcr1"],
-    assert_operation_refs: &[],
-    release_operation_refs: &[],
-}];
-pub const DRV_UART0_INTERRUPT_SOURCES: &[metadata::InterruptSource] =
-    &[metadata::InterruptSource {
-        id: "isrc.uart0",
-        name: "UART0 interrupt source",
-        source_ref: "periph.uart0",
-        producer_ref: Some("periph.uart0"),
-        kind: "peripheral",
-        flag_refs: &[],
-        clear_operation_refs: &[],
-    }];
-pub const DRV_UART0_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute {
-    id: "iroute.uart0",
-    name: "UART0 interrupt source route",
-    source_ref: "isrc.uart0",
-    interrupt_ref: "int.uart0",
-    controller_ref: "block.nvic",
-    cpu_target_ref: Some("block.cpu0"),
-    line_index: None,
-    route_type: "hardwired",
-    control_refs: &[],
-    acknowledge_operation_refs: &[],
-    shared_group: None,
-}];
+pub const DRV_UART0_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.uart0", name: "UART0", consumer_ref: "periph.uart0", clock_ref: "clock.sysclk", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.sysctl.rcgc1"], enable_operation_refs: &[], disable_operation_refs: &[] }];
+pub const DRV_UART0_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.uart0", name: "UART0", target_ref: "periph.uart0", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rd.software"), binding_kind: "software", control_refs: &["reg.sysctl.srcr1"], assert_operation_refs: &[], release_operation_refs: &[] }];
+pub const DRV_UART0_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource { id: "isrc.uart0", name: "UART0 interrupt source", source_ref: "periph.uart0", producer_ref: Some("periph.uart0"), kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }];
+pub const DRV_UART0_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute { id: "iroute.uart0", name: "UART0 interrupt source route", source_ref: "isrc.uart0", interrupt_ref: "int.uart0", controller_ref: "block.nvic", cpu_target_ref: Some("block.cpu0"), line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }];
 pub const DRV_UART0_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_UART0_DMA_ROUTES: &[metadata::DmaRoute] = &[];
-pub const DRV_UART0_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
-    id: "pinroute.uart0.rx.pa0",
-    name: "UART0 RX on PA0",
-    pin_ref: "pin.pa0",
-    peripheral_ref: "periph.uart0",
-    signal: "RX",
-    route_type: "hardwired",
-    control_refs: &["reg.gpioa.afsel", "reg.gpioa.den"],
-    electrical_constraint_refs: &[],
-    conflict_refs: &[],
-    default_after_reset: Some(true),
-}];
-pub const DRV_UART0_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
-    id: "pinroute.uart0.tx.pa1",
-    name: "UART0 TX on PA1",
-    pin_ref: "pin.pa1",
-    peripheral_ref: "periph.uart0",
-    signal: "TX",
-    route_type: "hardwired",
-    control_refs: &["reg.gpioa.afsel", "reg.gpioa.den"],
-    electrical_constraint_refs: &[],
-    conflict_refs: &[],
-    default_after_reset: Some(true),
-}];
-pub const DRV_UART0_PIN_ROLES: &[metadata::PinRole] = &[
-    metadata::PinRole {
-        role: "rx",
-        signal: "RX",
-        routes: DRV_UART0_PIN_ROLE_0_ROUTES,
-        requirement: metadata::ResourceRequirement::Required,
-    },
-    metadata::PinRole {
-        role: "tx",
-        signal: "TX",
-        routes: DRV_UART0_PIN_ROLE_1_ROUTES,
-        requirement: metadata::ResourceRequirement::Required,
-    },
-];
+pub const DRV_UART0_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.uart0.rx.pa0", name: "UART0 RX on PA0", pin_ref: "pin.pa0", peripheral_ref: "periph.uart0", signal: "RX", route_type: "hardwired", control_refs: &["reg.gpioa.afsel", "reg.gpioa.den"], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
+pub const DRV_UART0_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.uart0.tx.pa1", name: "UART0 TX on PA1", pin_ref: "pin.pa1", peripheral_ref: "periph.uart0", signal: "TX", route_type: "hardwired", control_refs: &["reg.gpioa.afsel", "reg.gpioa.den"], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
+pub const DRV_UART0_PIN_ROLES: &[metadata::PinRole] = &[metadata::PinRole { role: "rx", signal: "RX", routes: DRV_UART0_PIN_ROLE_0_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "tx", signal: "TX", routes: DRV_UART0_PIN_ROLE_1_ROUTES, requirement: metadata::ResourceRequirement::Required }];
 pub const DRV_UART0_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_UART0_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_UART0_CAPABILITY_TAGS: &[&str] = &[];
@@ -222,94 +143,20 @@ impl UART0 {
         modify_u32(0x400FE040u64, 0x00000001u32, 0x00000000u32)?;
         Ok(())
     }
+
+
 }
 
 // Driver instance: UART1 (uart) from canonical block block.uart1 -> uart
-pub const DRV_UART1_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding {
-    id: "clk.uart1",
-    name: "UART1",
-    consumer_ref: "periph.uart1",
-    clock_ref: "clock.sysclk",
-    controller_ref: Some("block.rcc"),
-    binding_kind: "gated",
-    control_refs: &["reg.sysctl.rcgc1"],
-    enable_operation_refs: &[],
-    disable_operation_refs: &[],
-}];
-pub const DRV_UART1_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding {
-    id: "rst.uart1",
-    name: "UART1",
-    target_ref: "periph.uart1",
-    controller_ref: Some("block.rcc"),
-    reset_domain_ref: Some("rd.software"),
-    binding_kind: "software",
-    control_refs: &["reg.sysctl.srcr1"],
-    assert_operation_refs: &[],
-    release_operation_refs: &[],
-}];
-pub const DRV_UART1_INTERRUPT_SOURCES: &[metadata::InterruptSource] =
-    &[metadata::InterruptSource {
-        id: "isrc.uart1",
-        name: "UART1 interrupt source",
-        source_ref: "periph.uart1",
-        producer_ref: Some("periph.uart1"),
-        kind: "peripheral",
-        flag_refs: &[],
-        clear_operation_refs: &[],
-    }];
-pub const DRV_UART1_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute {
-    id: "iroute.uart1",
-    name: "UART1 interrupt source route",
-    source_ref: "isrc.uart1",
-    interrupt_ref: "int.uart1",
-    controller_ref: "block.nvic",
-    cpu_target_ref: Some("block.cpu0"),
-    line_index: None,
-    route_type: "hardwired",
-    control_refs: &[],
-    acknowledge_operation_refs: &[],
-    shared_group: None,
-}];
+pub const DRV_UART1_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.uart1", name: "UART1", consumer_ref: "periph.uart1", clock_ref: "clock.sysclk", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.sysctl.rcgc1"], enable_operation_refs: &[], disable_operation_refs: &[] }];
+pub const DRV_UART1_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.uart1", name: "UART1", target_ref: "periph.uart1", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rd.software"), binding_kind: "software", control_refs: &["reg.sysctl.srcr1"], assert_operation_refs: &[], release_operation_refs: &[] }];
+pub const DRV_UART1_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource { id: "isrc.uart1", name: "UART1 interrupt source", source_ref: "periph.uart1", producer_ref: Some("periph.uart1"), kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }];
+pub const DRV_UART1_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute { id: "iroute.uart1", name: "UART1 interrupt source route", source_ref: "isrc.uart1", interrupt_ref: "int.uart1", controller_ref: "block.nvic", cpu_target_ref: Some("block.cpu0"), line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }];
 pub const DRV_UART1_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_UART1_DMA_ROUTES: &[metadata::DmaRoute] = &[];
-pub const DRV_UART1_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
-    id: "pinroute.uart1.rx.pd2",
-    name: "UART1 RX on PD2",
-    pin_ref: "pin.pd2",
-    peripheral_ref: "periph.uart1",
-    signal: "RX",
-    route_type: "hardwired",
-    control_refs: &["reg.gpiod.afsel", "reg.gpiod.den"],
-    electrical_constraint_refs: &[],
-    conflict_refs: &[],
-    default_after_reset: Some(false),
-}];
-pub const DRV_UART1_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
-    id: "pinroute.uart1.tx.pd3",
-    name: "UART1 TX on PD3",
-    pin_ref: "pin.pd3",
-    peripheral_ref: "periph.uart1",
-    signal: "TX",
-    route_type: "hardwired",
-    control_refs: &["reg.gpiod.afsel", "reg.gpiod.den"],
-    electrical_constraint_refs: &[],
-    conflict_refs: &[],
-    default_after_reset: Some(false),
-}];
-pub const DRV_UART1_PIN_ROLES: &[metadata::PinRole] = &[
-    metadata::PinRole {
-        role: "rx",
-        signal: "RX",
-        routes: DRV_UART1_PIN_ROLE_0_ROUTES,
-        requirement: metadata::ResourceRequirement::Required,
-    },
-    metadata::PinRole {
-        role: "tx",
-        signal: "TX",
-        routes: DRV_UART1_PIN_ROLE_1_ROUTES,
-        requirement: metadata::ResourceRequirement::Required,
-    },
-];
+pub const DRV_UART1_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.uart1.rx.pd2", name: "UART1 RX on PD2", pin_ref: "pin.pd2", peripheral_ref: "periph.uart1", signal: "RX", route_type: "hardwired", control_refs: &["reg.gpiod.afsel", "reg.gpiod.den"], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(false) }];
+pub const DRV_UART1_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.uart1.tx.pd3", name: "UART1 TX on PD3", pin_ref: "pin.pd3", peripheral_ref: "periph.uart1", signal: "TX", route_type: "hardwired", control_refs: &["reg.gpiod.afsel", "reg.gpiod.den"], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(false) }];
+pub const DRV_UART1_PIN_ROLES: &[metadata::PinRole] = &[metadata::PinRole { role: "rx", signal: "RX", routes: DRV_UART1_PIN_ROLE_0_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "tx", signal: "TX", routes: DRV_UART1_PIN_ROLE_1_ROUTES, requirement: metadata::ResourceRequirement::Required }];
 pub const DRV_UART1_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_UART1_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_UART1_CAPABILITY_TAGS: &[&str] = &[];
@@ -377,4 +224,7 @@ impl UART1 {
         modify_u32(0x400FE040u64, 0x00000002u32, 0x00000000u32)?;
         Ok(())
     }
+
+
 }
+
