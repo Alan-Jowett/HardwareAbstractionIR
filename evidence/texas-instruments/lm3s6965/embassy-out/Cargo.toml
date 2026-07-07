@@ -1,0 +1,8 @@
+[package]
+name = "lm3s6965-embassy-hal"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "lm3s6965_embassy_hal"
+path = "src/lib.rs"

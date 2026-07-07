@@ -384,6 +384,44 @@ If the requested driver set is unclear or the evidence cannot support the
 required bindings, stop and ask the user to narrow scope or provide more
 guidance.
 
+For current first-cut Embassy lowering, enforce these generator-contract
+checks while drafting rather than waiting for the final lowering pass:
+
+- `semantics.operations[].steps[].targetRef` for a write step must resolve
+  to a **register** (`reg.*`), not a field. The field written is inferred
+  from the step expression or value text.
+- `semantics.stateMachines[].transitions[].effects` must be executable-ready
+  for the current generator:
+  - exactly one effect per transition
+  - effect `targetRef` must resolve to a **field** (`field.*`)
+  - supported effect kinds are only those that lower to a field write in
+    the current generator (for example start/set vs stop/clear)
+  - the resolved field must belong to the **same peripheral** as the driver
+    target; do not point TIMER1 executable semantics at TIMER0 field ids
+- For executable `clockBindings`, `resetBindings`, and any route
+  `controlRefs` used by lowering, `controlRefs` must name the containing
+  **register** (`reg.*`), not the individual field. The lowering code
+  resolves the field from register contents plus the binding/route subject.
+- Do not assume a driver kind is portable across MCU families just because
+  the high-level resource inventory matches. For example, `gpio-port`
+  executable readiness depends on the target exposing a supported GPIO
+  register layout. The current generator supports at least:
+  - indexed-field GPIO layouts such as `MODER` / `PUPDR` / `IDR` / `ODR` /
+    `BSRR`
+  - bitmask-register GPIO layouts such as `DIR` / `DEN` / `AFSEL` / `PUR` /
+    `PDR` / `DATA`
+  If the in-scope device exposes some other GPIO topology, classify that
+  driver as non-executable-ready unless the generator gains an explicit
+  lowering path for the observed register contract.
+- If a peripheral family shares one CMSIS/header type across multiple
+  instances, do not assume template inheritance alone is sufficient for
+  executable refs. When same-peripheral validation or explicit local refs
+  are required, materialize per-instance register/field ids or classify the
+  affected driver as non-executable-ready.
+- Run `hair generate embassy ...` as part of the translation-boundary check
+  for any claimed executable Embassy scope, and treat generator failures as
+  evidence that the draft is not yet Embassy-ready.
+
 #### 2.6 Discovery report drafting
 
 In parallel with the JSON draft, build a Markdown discovery report with:
