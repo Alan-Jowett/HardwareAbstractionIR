@@ -3957,6 +3957,14 @@ fn resolve_bitmask_gpio_data_alias_address(
             data_register.id
         )
     })?;
+    if base_address % 0x1000 != 0 {
+        bail!(
+            "gpio-port driver {} data register {} implies an unaligned GPIO base address 0x{:X}; expected DATA at base+0x3FC within a 4KiB GPIO block",
+            driver.id,
+            data_register.id,
+            base_address
+        );
+    }
     checked_offset_add(
         base_address,
         (bit_mask as u64) << 2,
@@ -8203,19 +8211,19 @@ mod tests {
             .and_then(Value::as_array_mut)
             .expect("gpioa registers");
         *gpioa_registers = serde_json::from_value(serde_json::json!([
-            { "id": "reg.gpioa.data", "name": "DATA", "kind": "register", "offsetBytes": 0, "widthBits": 32, "fields": [
+            { "id": "reg.gpioa.data", "name": "DATA", "kind": "register", "offsetBytes": 1020, "widthBits": 32, "fields": [
                 { "id": "field.gpioa.data.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
             ] },
             { "id": "reg.gpioa.dir", "name": "DIR", "kind": "register", "offsetBytes": 1024, "widthBits": 32, "fields": [
                 { "id": "field.gpioa.dir.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
             ] },
-            { "id": "reg.gpioa.afsel", "name": "AFSEL", "kind": "register", "offsetBytes": 1064, "widthBits": 32, "fields": [
+            { "id": "reg.gpioa.afsel", "name": "AFSEL", "kind": "register", "offsetBytes": 1056, "widthBits": 32, "fields": [
                 { "id": "field.gpioa.afsel.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
             ] },
-            { "id": "reg.gpioa.pur", "name": "PUR", "kind": "register", "offsetBytes": 1280, "widthBits": 32, "fields": [
+            { "id": "reg.gpioa.pur", "name": "PUR", "kind": "register", "offsetBytes": 1296, "widthBits": 32, "fields": [
                 { "id": "field.gpioa.pur.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
             ] },
-            { "id": "reg.gpioa.pdr", "name": "PDR", "kind": "register", "offsetBytes": 1284, "widthBits": 32, "fields": [
+            { "id": "reg.gpioa.pdr", "name": "PDR", "kind": "register", "offsetBytes": 1300, "widthBits": 32, "fields": [
                 { "id": "field.gpioa.pdr.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
             ] },
             { "id": "reg.gpioa.den", "name": "DEN", "kind": "register", "offsetBytes": 1308, "widthBits": 32, "fields": [
@@ -8249,6 +8257,65 @@ mod tests {
             String::from_utf8_lossy(&cargo_output.stdout),
             String::from_utf8_lossy(&cargo_output.stderr)
         );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_bitmask_gpio_data_without_canonical_alias_layout() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let gpioa_registers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals")
+            .iter_mut()
+            .find_map(|peripheral| {
+                let peripheral = peripheral.as_object_mut()?;
+                (peripheral.get("id").and_then(Value::as_str) == Some("periph.gpioa"))
+                    .then_some(peripheral)
+            })
+            .expect("gpioa peripheral")
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("gpioa registers");
+        *gpioa_registers = serde_json::from_value(serde_json::json!([
+            { "id": "reg.gpioa.data", "name": "DATA", "kind": "register", "offsetBytes": 0, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.data.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
+            ] },
+            { "id": "reg.gpioa.dir", "name": "DIR", "kind": "register", "offsetBytes": 1024, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.dir.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
+            ] },
+            { "id": "reg.gpioa.afsel", "name": "AFSEL", "kind": "register", "offsetBytes": 1056, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.afsel.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
+            ] },
+            { "id": "reg.gpioa.pur", "name": "PUR", "kind": "register", "offsetBytes": 1296, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.pur.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
+            ] },
+            { "id": "reg.gpioa.pdr", "name": "PDR", "kind": "register", "offsetBytes": 1300, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.pdr.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
+            ] },
+            { "id": "reg.gpioa.den", "name": "DEN", "kind": "register", "offsetBytes": 1308, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.den.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
+            ] }
+        ]))
+        .expect("bitmask gpio registers");
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("fixture with noncanonical data offset should still validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("unaligned GPIO base address"));
     }
 
     #[test]
