@@ -161,10 +161,11 @@ jobs:
 
       - name: Build smoke harness
         if: ${{ inputs.smoke-mode == 'required' }}
+        working-directory: ${{ inputs.smoke-dir }}
         shell: bash
         run: |
           set -euo pipefail
-          cargo build --target "${{ inputs.rust-target }}" --manifest-path "${{ inputs.smoke-dir }}/Cargo.toml"
+          cargo build --target "${{ inputs.rust-target }}"
 
       - name: Run smoke harness
         if: ${{ inputs.smoke-mode == 'required' }}
