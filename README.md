@@ -135,10 +135,24 @@ The repository includes agent skills under `.github\skills\` that formalize the 
 
 | Skill | Purpose |
 | --- | --- |
+| `bootstrap` | Extract the initial repository requirements, design, and validation baseline from the current repo state so later maintenance workflows have governing specs to update |
 | `find-mcu-sources` | Discover and review authoritative source materials, then author an evidence manifest |
 | `extract` | Build a HAIR document from an evidence manifest using phased extraction and adversarial review |
 | `audit` | Adversarially audit an existing HAIR document against its approved evidence and completeness requirements before downstream generation |
-| `maintain` / `evolve` | Support ongoing schema and repository maintenance workflows |
+| `maintain` / `evolve` | Support ongoing schema and repository maintenance workflows once a governing spec baseline exists |
+
+### Governing specification baseline
+
+Repository-level evolution and maintenance are intended to converge on a
+canonical requirements/design/validation trifecta:
+
+- `specs/requirements.md`
+- `specs/design.md`
+- `specs/validation.md`
+
+When those artifacts do not exist yet, start with `bootstrap` to extract
+them from the current repository state before using `evolve` or
+`maintain`.
 
 The extraction flow is intentionally conservative:
 
