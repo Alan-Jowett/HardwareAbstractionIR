@@ -6,39 +6,39 @@ permissions:
 on:
   workflow_call:
     inputs:
-      mcu-name:
+      mcu_name:
         required: true
         type: string
-      hair-path:
+      hair_path:
         required: true
         type: string
-      svd-path:
+      svd_path:
         required: true
         type: string
-      pac-dir:
+      pac_dir:
         required: true
         type: string
-      embassy-dir:
+      embassy_dir:
         required: true
         type: string
-      rust-target:
+      rust_target:
         required: true
         type: string
-      smoke-mode:
+      smoke_mode:
         required: true
         type: string
-      smoke-dir:
+      smoke_dir:
         required: false
         type: string
         default: ""
-      smoke-command:
+      smoke_command:
         required: false
         type: string
         default: ""
 
 jobs:
   verify:
-    name: Verify ${{ inputs.mcu-name }}
+    name: Verify ${{ inputs.mcu_name }}
     runs-on: ubuntu-latest
     env:
       CARGO_TERM_COLOR: always
@@ -49,13 +49,13 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ inputs.rust-target }}
+          targets: ${{ inputs.rust_target }}
 
       - name: Validate reusable workflow inputs
         env:
-          SMOKE_MODE_INPUT: ${{ inputs.smoke-mode }}
-          SMOKE_DIR_INPUT: ${{ inputs.smoke-dir }}
-          SMOKE_COMMAND_INPUT: ${{ inputs.smoke-command }}
+          SMOKE_MODE_INPUT: ${{ inputs.smoke_mode }}
+          SMOKE_DIR_INPUT: ${{ inputs.smoke_dir }}
+          SMOKE_COMMAND_INPUT: ${{ inputs.smoke_command }}
         shell: bash
         run: |
           set -euo pipefail
@@ -84,7 +84,7 @@ jobs:
         run: cargo install --locked svd2rust --version 0.37.1
 
       - name: Install QEMU
-        if: ${{ inputs.smoke-mode == 'required' }}
+        if: ${{ inputs.smoke_mode == 'required' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -95,19 +95,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo run --locked --quiet -- generate svd "${{ inputs.hair-path }}" --output "$RUNNER_TEMP/generated.svd"
+          cargo run --locked --quiet -- generate svd "${{ inputs.hair_path }}" --output "$RUNNER_TEMP/generated.svd"
 
       - name: Verify checked-in SVD
         shell: bash
         run: |
           set -euo pipefail
-          diff -u "${{ inputs.svd-path }}" "$RUNNER_TEMP/generated.svd"
+          diff -u "${{ inputs.svd_path }}" "$RUNNER_TEMP/generated.svd"
 
       - name: Regenerate Embassy HAL crate
         shell: bash
         run: |
           set -euo pipefail
-          cargo run --locked --quiet -- generate embassy "${{ inputs.hair-path }}" --output-dir "$RUNNER_TEMP/generated-embassy"
+          cargo run --locked --quiet -- generate embassy "${{ inputs.hair_path }}" --output-dir "$RUNNER_TEMP/generated-embassy"
 
       - name: Verify checked-in Embassy HAL crate
         shell: bash
@@ -116,7 +116,7 @@ jobs:
           diff -ruN \
             --exclude Cargo.lock \
             --exclude target \
-            "${{ inputs.embassy-dir }}" \
+            "${{ inputs.embassy_dir }}" \
             "$RUNNER_TEMP/generated-embassy"
 
       - name: Regenerate PAC crate sources
@@ -135,47 +135,47 @@ jobs:
         run: |
           set -euo pipefail
           for file in build.rs device.x lib.rs; do
-            diff -u "${{ inputs.pac-dir }}/$file" "$RUNNER_TEMP/generated-pac/$file"
+            diff -u "${{ inputs.pac_dir }}/$file" "$RUNNER_TEMP/generated-pac/$file"
           done
 
       - name: Build regenerated PAC crate
         shell: bash
         run: |
           set -euo pipefail
-          cp "${{ inputs.pac-dir }}/Cargo.toml" "$RUNNER_TEMP/generated-pac/Cargo.toml"
-          if [[ -f "${{ inputs.pac-dir }}/Cargo.lock" ]]; then
-            cp "${{ inputs.pac-dir }}/Cargo.lock" "$RUNNER_TEMP/generated-pac/Cargo.lock"
+          cp "${{ inputs.pac_dir }}/Cargo.toml" "$RUNNER_TEMP/generated-pac/Cargo.toml"
+          if [[ -f "${{ inputs.pac_dir }}/Cargo.lock" ]]; then
+            cp "${{ inputs.pac_dir }}/Cargo.lock" "$RUNNER_TEMP/generated-pac/Cargo.lock"
           fi
-          cargo check --locked --target "${{ inputs.rust-target }}" --manifest-path "$RUNNER_TEMP/generated-pac/Cargo.toml"
+          cargo check --locked --target "${{ inputs.rust_target }}" --manifest-path "$RUNNER_TEMP/generated-pac/Cargo.toml"
 
       - name: Build regenerated Embassy HAL crate
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -f "${{ inputs.embassy-dir }}/Cargo.lock" ]]; then
-            cp "${{ inputs.embassy-dir }}/Cargo.lock" "$RUNNER_TEMP/generated-embassy/Cargo.lock"
+          if [[ -f "${{ inputs.embassy_dir }}/Cargo.lock" ]]; then
+            cp "${{ inputs.embassy_dir }}/Cargo.lock" "$RUNNER_TEMP/generated-embassy/Cargo.lock"
           fi
-          cargo check --locked --target "${{ inputs.rust-target }}" --manifest-path "$RUNNER_TEMP/generated-embassy/Cargo.toml"
+          cargo check --locked --target "${{ inputs.rust_target }}" --manifest-path "$RUNNER_TEMP/generated-embassy/Cargo.toml"
 
       - name: Report intentionally unsupported smoke target
-        if: ${{ inputs.smoke-mode == 'unsupported' }}
+        if: ${{ inputs.smoke_mode == 'unsupported' }}
         shell: bash
-        run: echo "Smoke test intentionally unsupported for ${{ inputs.mcu-name }}."
+        run: echo "Smoke test intentionally unsupported for ${{ inputs.mcu_name }}."
 
       - name: Build smoke harness
-        if: ${{ inputs.smoke-mode == 'required' }}
-        working-directory: ${{ inputs.smoke-dir }}
+        if: ${{ inputs.smoke_mode == 'required' }}
+        working-directory: ${{ inputs.smoke_dir }}
         shell: bash
         run: |
           set -euo pipefail
-          cargo build --locked --target "${{ inputs.rust-target }}"
+          cargo build --locked --target "${{ inputs.rust_target }}"
 
       - name: Run smoke harness
-        if: ${{ inputs.smoke-mode == 'required' }}
+        if: ${{ inputs.smoke_mode == 'required' }}
         shell: bash
         env:
-          SMOKE_BINARY: ${{ github.workspace }}/${{ inputs.smoke-dir }}/target/${{ inputs.rust-target }}/debug/embassy-smoke
-          SMOKE_COMMAND: ${{ inputs.smoke-command }}
+          SMOKE_BINARY: ${{ github.workspace }}/${{ inputs.smoke_dir }}/target/${{ inputs.rust_target }}/debug/embassy-smoke
+          SMOKE_COMMAND: ${{ inputs.smoke_command }}
         run: |
           set -euo pipefail
           bash -lc "$SMOKE_COMMAND"

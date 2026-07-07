@@ -6,6 +6,8 @@ permissions:
 on:
   pull_request:
   push:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -13,12 +15,12 @@ jobs:
     name: stm32f405rgt6
     uses: ./.github/workflows/verify-generated-mcu.yml
     with:
-      mcu-name: stm32f405rgt6
-      hair-path: evidence/st/stm32f405rgt6/hair.json
-      svd-path: evidence/st/stm32f405rgt6/generated/stm32f405rgt6.svd
-      pac-dir: evidence/st/stm32f405rgt6/generated/pac
-      embassy-dir: evidence/st/stm32f405rgt6/generated/embassy
-      rust-target: thumbv7em-none-eabihf
-      smoke-mode: required
-      smoke-dir: evidence/st/stm32f405rgt6/generated/embassy-smoke
-      smoke-command: qemu-system-arm -M netduinoplus2 -nographic -semihosting -kernel "$SMOKE_BINARY"
+      mcu_name: stm32f405rgt6
+      hair_path: evidence/st/stm32f405rgt6/hair.json
+      svd_path: evidence/st/stm32f405rgt6/generated/stm32f405rgt6.svd
+      pac_dir: evidence/st/stm32f405rgt6/generated/pac
+      embassy_dir: evidence/st/stm32f405rgt6/generated/embassy
+      rust_target: thumbv7em-none-eabihf
+      smoke_mode: required
+      smoke_dir: evidence/st/stm32f405rgt6/generated/embassy-smoke
+      smoke_command: qemu-system-arm -M netduinoplus2 -nographic -semihosting -kernel "$SMOKE_BINARY"
