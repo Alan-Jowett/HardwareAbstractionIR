@@ -1,5 +1,8 @@
 name: Verify generated MCU artifacts
 
+permissions:
+  contents: read
+
 on:
   workflow_call:
     inputs:
@@ -92,7 +95,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo run --quiet -- generate svd "${{ inputs.hair-path }}" --output "$RUNNER_TEMP/generated.svd"
+          cargo run --locked --quiet -- generate svd "${{ inputs.hair-path }}" --output "$RUNNER_TEMP/generated.svd"
 
       - name: Verify checked-in SVD
         shell: bash
@@ -104,7 +107,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo run --quiet -- generate embassy "${{ inputs.hair-path }}" --output-dir "$RUNNER_TEMP/generated-embassy"
+          cargo run --locked --quiet -- generate embassy "${{ inputs.hair-path }}" --output-dir "$RUNNER_TEMP/generated-embassy"
 
       - name: Verify checked-in Embassy HAL crate
         shell: bash
@@ -143,13 +146,13 @@ jobs:
           if [[ -f "${{ inputs.pac-dir }}/Cargo.lock" ]]; then
             cp "${{ inputs.pac-dir }}/Cargo.lock" "$RUNNER_TEMP/generated-pac/Cargo.lock"
           fi
-          cargo check --manifest-path "$RUNNER_TEMP/generated-pac/Cargo.toml"
+          cargo check --target "${{ inputs.rust-target }}" --manifest-path "$RUNNER_TEMP/generated-pac/Cargo.toml"
 
       - name: Build regenerated Embassy HAL crate
         shell: bash
         run: |
           set -euo pipefail
-          cargo check --manifest-path "$RUNNER_TEMP/generated-embassy/Cargo.toml"
+          cargo check --target "${{ inputs.rust-target }}" --manifest-path "$RUNNER_TEMP/generated-embassy/Cargo.toml"
 
       - name: Report intentionally unsupported smoke target
         if: ${{ inputs.smoke-mode == 'unsupported' }}
