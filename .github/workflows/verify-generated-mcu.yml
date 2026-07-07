@@ -1,0 +1,244 @@
+name: Verify generated MCU artifacts
+
+permissions:
+  actions: read
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      mcu_name:
+        required: true
+        type: string
+      hair_path:
+        required: true
+        type: string
+      svd_path:
+        required: true
+        type: string
+      pac_dir:
+        required: true
+        type: string
+      embassy_dir:
+        required: true
+        type: string
+      rust_target:
+        required: true
+        type: string
+      smoke_mode:
+        required: true
+        type: string
+      smoke_dir:
+        required: false
+        type: string
+        default: ""
+      smoke_command:
+        required: false
+        type: string
+        default: ""
+      qemu_artifact_name:
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  verify:
+    name: Verify ${{ inputs.mcu_name }}
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ inputs.rust_target }}
+
+      - name: Validate reusable workflow inputs
+        env:
+          SMOKE_MODE_INPUT: ${{ inputs.smoke_mode }}
+          SMOKE_DIR_INPUT: ${{ inputs.smoke_dir }}
+          SMOKE_COMMAND_INPUT: ${{ inputs.smoke_command }}
+          QEMU_ARTIFACT_INPUT: ${{ inputs.qemu_artifact_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          case "$SMOKE_MODE_INPUT" in
+            required)
+              test -n "$SMOKE_DIR_INPUT" || {
+                echo "smoke_dir is required when smoke_mode=required" >&2
+                exit 1
+              }
+              test -d "$SMOKE_DIR_INPUT" || {
+                echo "smoke_dir does not exist: $SMOKE_DIR_INPUT" >&2
+                exit 1
+              }
+              test -n "$SMOKE_COMMAND_INPUT" || {
+                echo "smoke_command is required when smoke_mode=required" >&2
+                exit 1
+              }
+              test -n "$QEMU_ARTIFACT_INPUT" || {
+                echo "qemu_artifact_name is required when smoke_mode=required" >&2
+                exit 1
+              }
+              ;;
+            unsupported)
+              test -z "$SMOKE_DIR_INPUT" || {
+                echo "smoke_dir must be empty when smoke_mode=unsupported" >&2
+                exit 1
+              }
+              test -z "$SMOKE_COMMAND_INPUT" || {
+                echo "smoke_command must be empty when smoke_mode=unsupported" >&2
+                exit 1
+              }
+              test -z "$QEMU_ARTIFACT_INPUT" || {
+                echo "qemu_artifact_name must be empty when smoke_mode=unsupported" >&2
+                exit 1
+              }
+              ;;
+            *)
+              echo "unsupported smoke_mode: $SMOKE_MODE_INPUT" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Install PAC generation tool
+        shell: bash
+        run: cargo install --locked --force svd2rust --version 0.37.1
+
+      - name: Download custom QEMU
+        if: ${{ inputs.smoke_mode == 'required' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.qemu_artifact_name }}
+          path: ${{ runner.temp }}/custom-qemu
+
+      - name: Install custom QEMU runtime dependencies
+        if: ${{ inputs.smoke_mode == 'required' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes \
+            libfdt1 \
+            libglib2.0-0 \
+            libpixman-1-0 \
+            libslirp0 \
+            zlib1g
+
+      - name: Add custom QEMU to PATH
+        if: ${{ inputs.smoke_mode == 'required' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          qemu_system_arm="$(find "$RUNNER_TEMP/custom-qemu" -type f -name qemu-system-arm | head -n 1)"
+          test -n "$qemu_system_arm" || {
+            echo "qemu-system-arm not found in downloaded artifact ${{ inputs.qemu_artifact_name }}" >&2
+            exit 1
+          }
+          qemu_prefix="$(dirname "$(dirname "$qemu_system_arm")")"
+          qemu_lib_dir="$qemu_prefix/lib"
+          chmod +x "$qemu_system_arm"
+          dirname "$qemu_system_arm" >> "$GITHUB_PATH"
+          if [[ -d "$qemu_lib_dir" ]]; then
+            echo "LD_LIBRARY_PATH=$qemu_lib_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Regenerate SVD
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --quiet -- generate svd "${{ inputs.hair_path }}" --output "$RUNNER_TEMP/generated.svd"
+
+      - name: Verify checked-in SVD
+        shell: bash
+        run: |
+          set -euo pipefail
+          diff -u "${{ inputs.svd_path }}" "$RUNNER_TEMP/generated.svd"
+
+      - name: Regenerate Embassy HAL crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --quiet -- generate embassy "${{ inputs.hair_path }}" --output-dir "$RUNNER_TEMP/generated-embassy"
+
+      - name: Verify checked-in Embassy HAL crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          diff -ruN \
+            --exclude Cargo.lock \
+            --exclude target \
+            "${{ inputs.embassy_dir }}" \
+            "$RUNNER_TEMP/generated-embassy"
+
+      - name: Regenerate PAC crate sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/generated-pac"
+          svd2rust \
+            -i "$RUNNER_TEMP/generated.svd" \
+            -o "$RUNNER_TEMP/generated-pac" \
+            --edition 2024 \
+            --target cortex-m
+
+      - name: Verify checked-in PAC sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in build.rs device.x lib.rs; do
+            diff -u "${{ inputs.pac_dir }}/$file" "$RUNNER_TEMP/generated-pac/$file"
+          done
+
+      - name: Build regenerated PAC crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "${{ inputs.pac_dir }}/Cargo.toml" "$RUNNER_TEMP/generated-pac/Cargo.toml"
+          if [[ -f "${{ inputs.pac_dir }}/Cargo.lock" ]]; then
+            cp "${{ inputs.pac_dir }}/Cargo.lock" "$RUNNER_TEMP/generated-pac/Cargo.lock"
+          fi
+          cargo check --locked --target "${{ inputs.rust_target }}" --manifest-path "$RUNNER_TEMP/generated-pac/Cargo.toml"
+
+      - name: Build regenerated Embassy HAL crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f "${{ inputs.embassy_dir }}/Cargo.lock" ]]; then
+            cp "${{ inputs.embassy_dir }}/Cargo.lock" "$RUNNER_TEMP/generated-embassy/Cargo.lock"
+          fi
+          cargo check --locked --target "${{ inputs.rust_target }}" --manifest-path "$RUNNER_TEMP/generated-embassy/Cargo.toml"
+
+      - name: Report intentionally unsupported smoke target
+        if: ${{ inputs.smoke_mode == 'unsupported' }}
+        shell: bash
+        run: echo "Smoke test intentionally unsupported for ${{ inputs.mcu_name }}."
+
+      - name: Build smoke harness
+        if: ${{ inputs.smoke_mode == 'required' }}
+        working-directory: ${{ inputs.smoke_dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked --target "${{ inputs.rust_target }}"
+
+      - name: Run smoke harness
+        if: ${{ inputs.smoke_mode == 'required' }}
+        shell: bash
+        env:
+          SMOKE_BINARY: ${{ github.workspace }}/${{ inputs.smoke_dir }}/target/${{ inputs.rust_target }}/debug/embassy-smoke
+          SMOKE_COMMAND: ${{ inputs.smoke_command }}
+        run: |
+          set -euo pipefail
+          set +e
+          timeout 20s bash -lc "$SMOKE_COMMAND"
+          status=$?
+          set -e
+          if [[ $status -eq 124 ]]; then
+            echo "Smoke command timed out after 20s: $SMOKE_COMMAND" >&2
+          fi
+          exit $status
