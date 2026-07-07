@@ -115,6 +115,19 @@ jobs:
           name: ${{ inputs.qemu_artifact_name }}
           path: ${{ runner.temp }}/custom-qemu
 
+      - name: Install custom QEMU runtime dependencies
+        if: ${{ inputs.smoke_mode == 'required' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes \
+            libfdt1 \
+            libglib2.0-0 \
+            libpixman-1-0 \
+            libslirp0 \
+            zlib1g
+
       - name: Add custom QEMU to PATH
         if: ${{ inputs.smoke_mode == 'required' }}
         shell: bash
