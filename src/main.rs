@@ -3850,6 +3850,7 @@ fn resolve_bitmask_gpio_port_lowering(
         }
 
         let bit_mask = resolve_bitmask_gpio_bit_mask(&dir, pin_index, driver, "DIR")?;
+        let gpio_block_base = gpio_register_block_base(&dir);
         for (register, name) in [
             (&afsel, "AFSEL"),
             (&den, "DEN"),
@@ -3857,7 +3858,27 @@ fn resolve_bitmask_gpio_port_lowering(
             (&pdr, "PDR"),
             (&data, "DATA"),
         ] {
-            let _ = resolve_bitmask_gpio_bit_mask(register, pin_index, driver, name)?;
+            let register_mask = resolve_bitmask_gpio_bit_mask(register, pin_index, driver, name)?;
+            if register_mask != bit_mask {
+                bail!(
+                    "gpio-port driver {} pin index {} uses inconsistent bit masks across bitmask GPIO registers: DIR=0x{:X}, {}=0x{:X}",
+                    driver.id,
+                    pin_index,
+                    bit_mask,
+                    name,
+                    register_mask
+                );
+            }
+            let register_block_base = gpio_register_block_base(register);
+            if register_block_base != gpio_block_base {
+                bail!(
+                    "gpio-port driver {} register {} is in GPIO block 0x{:X}, expected 0x{:X} to match DIR",
+                    driver.id,
+                    register.id,
+                    register_block_base,
+                    gpio_block_base
+                );
+            }
         }
         let data_alias_address = resolve_bitmask_gpio_data_alias_address(&data, bit_mask, driver)?;
 
@@ -3914,6 +3935,15 @@ fn resolve_bitmask_gpio_bit_mask(
     register_name: &str,
 ) -> Result<u32> {
     let field = resolve_register_field(register, "GPIO")?;
+    if field.lsb != 0 {
+        bail!(
+            "gpio-port driver {} requires {} GPIO field {} to start at bit 0 for bitmask lowering, found lsb {}",
+            driver.id,
+            register_name,
+            field.name,
+            field.lsb
+        );
+    }
     let bit = field.lsb.checked_add(pin_index).ok_or_else(|| {
         anyhow!(
             "gpio-port driver {} pin index {} overflowed {} field {}",
@@ -3943,6 +3973,10 @@ fn resolve_bitmask_gpio_bit_mask(
             register_name
         )
     })
+}
+
+fn gpio_register_block_base(register: &ResolvedRegister) -> u64 {
+    register.absolute_address & !0xFFFu64
 }
 
 fn resolve_bitmask_gpio_data_alias_address(
@@ -8327,7 +8361,7 @@ mod tests {
     }
 
     #[test]
-    fn generate_embassy_rejects_bitmask_gpio_data_mask_outside_alias_window() {
+    fn generate_embassy_rejects_bitmask_gpio_with_nonzero_gpio_field_lsb() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let fixture = write_embassy_fixture(false);
         let mut document = load_json_file(fixture.path()).expect("fixture json");
@@ -8382,7 +8416,141 @@ mod tests {
         let temp = tempdir().expect("tempdir");
         let error =
             generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("to start at bit 0"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_bitmask_gpio_data_mask_outside_alias_window() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let pins = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("physical")
+            .and_then(Value::as_object_mut)
+            .expect("physical object")
+            .get_mut("pins")
+            .and_then(Value::as_array_mut)
+            .expect("pins");
+        let pa0 = pins
+            .iter_mut()
+            .find(|pin| pin["id"] == "pin.pa0")
+            .and_then(Value::as_object_mut)
+            .expect("pa0 pin");
+        pa0.insert("index".to_string(), serde_json::json!(8));
+
+        let gpioa_registers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals")
+            .iter_mut()
+            .find_map(|peripheral| {
+                let peripheral = peripheral.as_object_mut()?;
+                (peripheral.get("id").and_then(Value::as_str) == Some("periph.gpioa"))
+                    .then_some(peripheral)
+            })
+            .expect("gpioa peripheral")
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("gpioa registers");
+        *gpioa_registers = serde_json::from_value(serde_json::json!([
+            { "id": "reg.gpioa.data", "name": "DATA", "kind": "register", "offsetBytes": 1020, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.data.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 8 } }
+            ] },
+            { "id": "reg.gpioa.dir", "name": "DIR", "kind": "register", "offsetBytes": 1024, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.dir.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 8 } }
+            ] },
+            { "id": "reg.gpioa.afsel", "name": "AFSEL", "kind": "register", "offsetBytes": 1056, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.afsel.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 8 } }
+            ] },
+            { "id": "reg.gpioa.pur", "name": "PUR", "kind": "register", "offsetBytes": 1296, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.pur.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 8 } }
+            ] },
+            { "id": "reg.gpioa.pdr", "name": "PDR", "kind": "register", "offsetBytes": 1300, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.pdr.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 8 } }
+            ] },
+            { "id": "reg.gpioa.den", "name": "DEN", "kind": "register", "offsetBytes": 1308, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.den.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 8 } }
+            ] }
+        ]))
+        .expect("bitmask gpio registers");
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("fixture with out-of-window bitmask should still validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
         assert!(error.to_string().contains("masked DATA alias window"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_bitmask_gpio_registers_across_blocks() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+
+        let gpioa_registers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals")
+            .iter_mut()
+            .find_map(|peripheral| {
+                let peripheral = peripheral.as_object_mut()?;
+                (peripheral.get("id").and_then(Value::as_str) == Some("periph.gpioa"))
+                    .then_some(peripheral)
+            })
+            .expect("gpioa peripheral")
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("gpioa registers");
+        *gpioa_registers = serde_json::from_value(serde_json::json!([
+            { "id": "reg.gpioa.data", "name": "DATA", "kind": "register", "offsetBytes": 1020, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.data.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
+            ] },
+            { "id": "reg.gpioa.dir", "name": "DIR", "kind": "register", "offsetBytes": 1024, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.dir.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
+            ] },
+            { "id": "reg.gpioa.afsel", "name": "AFSEL", "kind": "register", "offsetBytes": 5152, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.afsel.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
+            ] },
+            { "id": "reg.gpioa.pur", "name": "PUR", "kind": "register", "offsetBytes": 1296, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.pur.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
+            ] },
+            { "id": "reg.gpioa.pdr", "name": "PDR", "kind": "register", "offsetBytes": 1300, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.pdr.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
+            ] },
+            { "id": "reg.gpioa.den", "name": "DEN", "kind": "register", "offsetBytes": 1308, "widthBits": 32, "fields": [
+                { "id": "field.gpioa.den.gpio", "name": "GPIO", "bitRange": { "lsb": 0, "msb": 7 } }
+            ] }
+        ]))
+        .expect("bitmask gpio registers");
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("fixture with cross-block afsel should still validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("is in GPIO block"));
     }
 
     #[test]
