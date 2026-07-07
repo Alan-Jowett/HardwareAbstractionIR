@@ -63,22 +63,30 @@ jobs:
           case "$SMOKE_MODE_INPUT" in
             required)
               test -n "$SMOKE_DIR_INPUT" || {
-                echo "smoke-dir is required when smoke-mode=required" >&2
+                echo "smoke_dir is required when smoke_mode=required" >&2
                 exit 1
               }
               test -d "$SMOKE_DIR_INPUT" || {
-                echo "smoke-dir does not exist: $SMOKE_DIR_INPUT" >&2
+                echo "smoke_dir does not exist: $SMOKE_DIR_INPUT" >&2
                 exit 1
               }
               test -n "$SMOKE_COMMAND_INPUT" || {
-                echo "smoke-command is required when smoke-mode=required" >&2
+                echo "smoke_command is required when smoke_mode=required" >&2
                 exit 1
               }
               ;;
             unsupported)
+              test -z "$SMOKE_DIR_INPUT" || {
+                echo "smoke_dir must be empty when smoke_mode=unsupported" >&2
+                exit 1
+              }
+              test -z "$SMOKE_COMMAND_INPUT" || {
+                echo "smoke_command must be empty when smoke_mode=unsupported" >&2
+                exit 1
+              }
               ;;
             *)
-              echo "unsupported smoke-mode: $SMOKE_MODE_INPUT" >&2
+              echo "unsupported smoke_mode: $SMOKE_MODE_INPUT" >&2
               exit 1
               ;;
           esac
