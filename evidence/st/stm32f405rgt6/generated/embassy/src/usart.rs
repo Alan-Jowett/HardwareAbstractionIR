@@ -184,10 +184,10 @@ impl Usart1 {
     }
 
     pub fn configure_8n1(&self) -> Result<(), metadata::Error> {
-        modify_u32(0x4001100Cu64, 0x00008000u32, 0x00000000u32)?;
         modify_u32(0x4001100Cu64, 0x00002000u32, 0x00000000u32)?;
         modify_u32(0x4001100Cu64, 0x00000008u32, 0x00000000u32)?;
         modify_u32(0x4001100Cu64, 0x00000004u32, 0x00000000u32)?;
+        modify_u32(0x4001100Cu64, 0x00008000u32, 0x00000000u32)?;
         modify_u32(0x4001100Cu64, 0x00001000u32, 0x00000000u32)?;
         modify_u32(0x40011010u64, 0x00003000u32, 0x00000000u32)?;
         Ok(())
@@ -207,7 +207,7 @@ impl Usart1 {
 
     pub fn write_byte(&self, byte: u8) -> Result<(), metadata::Error> {
         while (read_u32(0x40011000u64)? & 0x00000080u32) == 0 {}
-        write_u32(0x40011004u64, u32::from(byte) & 0x1FFu32)?;
+        write_u32(0x40011004u64, u32::from(byte))?;
         Ok(())
     }
 
@@ -225,7 +225,7 @@ impl Usart1 {
 
     pub fn read_byte(&self) -> Result<u8, metadata::Error> {
         while (read_u32(0x40011000u64)? & 0x00000020u32) == 0 {}
-        Ok((read_u32(0x40011004u64)? & 0x1FFu32) as u8)
+        Ok((read_u32(0x40011004u64)? & 0xFFu32) as u8)
     }
 
     /// Enable the Usart1 TXE interrupt.
@@ -397,10 +397,10 @@ impl Usart2 {
     }
 
     pub fn configure_8n1(&self) -> Result<(), metadata::Error> {
-        modify_u32(0x4000440Cu64, 0x00008000u32, 0x00000000u32)?;
         modify_u32(0x4000440Cu64, 0x00002000u32, 0x00000000u32)?;
         modify_u32(0x4000440Cu64, 0x00000008u32, 0x00000000u32)?;
         modify_u32(0x4000440Cu64, 0x00000004u32, 0x00000000u32)?;
+        modify_u32(0x4000440Cu64, 0x00008000u32, 0x00000000u32)?;
         modify_u32(0x4000440Cu64, 0x00001000u32, 0x00000000u32)?;
         modify_u32(0x40004410u64, 0x00003000u32, 0x00000000u32)?;
         Ok(())
@@ -420,7 +420,7 @@ impl Usart2 {
 
     pub fn write_byte(&self, byte: u8) -> Result<(), metadata::Error> {
         while (read_u32(0x40004400u64)? & 0x00000080u32) == 0 {}
-        write_u32(0x40004404u64, u32::from(byte) & 0x1FFu32)?;
+        write_u32(0x40004404u64, u32::from(byte))?;
         Ok(())
     }
 
@@ -438,7 +438,7 @@ impl Usart2 {
 
     pub fn read_byte(&self) -> Result<u8, metadata::Error> {
         while (read_u32(0x40004400u64)? & 0x00000020u32) == 0 {}
-        Ok((read_u32(0x40004404u64)? & 0x1FFu32) as u8)
+        Ok((read_u32(0x40004404u64)? & 0xFFu32) as u8)
     }
 
     /// Enable the Usart2 TXE interrupt.
@@ -586,10 +586,10 @@ impl Usart3 {
     }
 
     pub fn configure_8n1(&self) -> Result<(), metadata::Error> {
-        modify_u32(0x4000480Cu64, 0x00008000u32, 0x00000000u32)?;
         modify_u32(0x4000480Cu64, 0x00002000u32, 0x00000000u32)?;
         modify_u32(0x4000480Cu64, 0x00000008u32, 0x00000000u32)?;
         modify_u32(0x4000480Cu64, 0x00000004u32, 0x00000000u32)?;
+        modify_u32(0x4000480Cu64, 0x00008000u32, 0x00000000u32)?;
         modify_u32(0x4000480Cu64, 0x00001000u32, 0x00000000u32)?;
         modify_u32(0x40004810u64, 0x00003000u32, 0x00000000u32)?;
         Ok(())
@@ -609,7 +609,7 @@ impl Usart3 {
 
     pub fn write_byte(&self, byte: u8) -> Result<(), metadata::Error> {
         while (read_u32(0x40004800u64)? & 0x00000080u32) == 0 {}
-        write_u32(0x40004804u64, u32::from(byte) & 0x1FFu32)?;
+        write_u32(0x40004804u64, u32::from(byte))?;
         Ok(())
     }
 
@@ -627,7 +627,7 @@ impl Usart3 {
 
     pub fn read_byte(&self) -> Result<u8, metadata::Error> {
         while (read_u32(0x40004800u64)? & 0x00000020u32) == 0 {}
-        Ok((read_u32(0x40004804u64)? & 0x1FFu32) as u8)
+        Ok((read_u32(0x40004804u64)? & 0xFFu32) as u8)
     }
 
     /// Enable the Usart3 TXE interrupt.
@@ -773,10 +773,10 @@ impl Usart6 {
     }
 
     pub fn configure_8n1(&self) -> Result<(), metadata::Error> {
-        modify_u32(0x4001140Cu64, 0x00008000u32, 0x00000000u32)?;
         modify_u32(0x4001140Cu64, 0x00002000u32, 0x00000000u32)?;
         modify_u32(0x4001140Cu64, 0x00000008u32, 0x00000000u32)?;
         modify_u32(0x4001140Cu64, 0x00000004u32, 0x00000000u32)?;
+        modify_u32(0x4001140Cu64, 0x00008000u32, 0x00000000u32)?;
         modify_u32(0x4001140Cu64, 0x00001000u32, 0x00000000u32)?;
         modify_u32(0x40011410u64, 0x00003000u32, 0x00000000u32)?;
         Ok(())
@@ -796,7 +796,7 @@ impl Usart6 {
 
     pub fn write_byte(&self, byte: u8) -> Result<(), metadata::Error> {
         while (read_u32(0x40011400u64)? & 0x00000080u32) == 0 {}
-        write_u32(0x40011404u64, u32::from(byte) & 0x1FFu32)?;
+        write_u32(0x40011404u64, u32::from(byte))?;
         Ok(())
     }
 
@@ -814,7 +814,7 @@ impl Usart6 {
 
     pub fn read_byte(&self) -> Result<u8, metadata::Error> {
         while (read_u32(0x40011400u64)? & 0x00000020u32) == 0 {}
-        Ok((read_u32(0x40011404u64)? & 0x1FFu32) as u8)
+        Ok((read_u32(0x40011404u64)? & 0xFFu32) as u8)
     }
 
     /// Enable the Usart6 TXE interrupt.

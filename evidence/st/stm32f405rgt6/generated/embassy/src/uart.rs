@@ -181,10 +181,10 @@ impl Uart4 {
     }
 
     pub fn configure_8n1(&self) -> Result<(), metadata::Error> {
-        modify_u32(0x40004C0Cu64, 0x00008000u32, 0x00000000u32)?;
         modify_u32(0x40004C0Cu64, 0x00002000u32, 0x00000000u32)?;
         modify_u32(0x40004C0Cu64, 0x00000008u32, 0x00000000u32)?;
         modify_u32(0x40004C0Cu64, 0x00000004u32, 0x00000000u32)?;
+        modify_u32(0x40004C0Cu64, 0x00008000u32, 0x00000000u32)?;
         modify_u32(0x40004C0Cu64, 0x00001000u32, 0x00000000u32)?;
         modify_u32(0x40004C10u64, 0x00003000u32, 0x00000000u32)?;
         Ok(())
@@ -204,7 +204,7 @@ impl Uart4 {
 
     pub fn write_byte(&self, byte: u8) -> Result<(), metadata::Error> {
         while (read_u32(0x40004C00u64)? & 0x00000080u32) == 0 {}
-        write_u32(0x40004C04u64, u32::from(byte) & 0x1FFu32)?;
+        write_u32(0x40004C04u64, u32::from(byte))?;
         Ok(())
     }
 
@@ -222,7 +222,7 @@ impl Uart4 {
 
     pub fn read_byte(&self) -> Result<u8, metadata::Error> {
         while (read_u32(0x40004C00u64)? & 0x00000020u32) == 0 {}
-        Ok((read_u32(0x40004C04u64)? & 0x1FFu32) as u8)
+        Ok((read_u32(0x40004C04u64)? & 0xFFu32) as u8)
     }
 
     /// Enable the Uart4 TXE interrupt.
@@ -367,10 +367,10 @@ impl Uart5 {
     }
 
     pub fn configure_8n1(&self) -> Result<(), metadata::Error> {
-        modify_u32(0x4000500Cu64, 0x00008000u32, 0x00000000u32)?;
         modify_u32(0x4000500Cu64, 0x00002000u32, 0x00000000u32)?;
         modify_u32(0x4000500Cu64, 0x00000008u32, 0x00000000u32)?;
         modify_u32(0x4000500Cu64, 0x00000004u32, 0x00000000u32)?;
+        modify_u32(0x4000500Cu64, 0x00008000u32, 0x00000000u32)?;
         modify_u32(0x4000500Cu64, 0x00001000u32, 0x00000000u32)?;
         modify_u32(0x40005010u64, 0x00003000u32, 0x00000000u32)?;
         Ok(())
@@ -390,7 +390,7 @@ impl Uart5 {
 
     pub fn write_byte(&self, byte: u8) -> Result<(), metadata::Error> {
         while (read_u32(0x40005000u64)? & 0x00000080u32) == 0 {}
-        write_u32(0x40005004u64, u32::from(byte) & 0x1FFu32)?;
+        write_u32(0x40005004u64, u32::from(byte))?;
         Ok(())
     }
 
@@ -408,7 +408,7 @@ impl Uart5 {
 
     pub fn read_byte(&self) -> Result<u8, metadata::Error> {
         while (read_u32(0x40005000u64)? & 0x00000020u32) == 0 {}
-        Ok((read_u32(0x40005004u64)? & 0x1FFu32) as u8)
+        Ok((read_u32(0x40005004u64)? & 0xFFu32) as u8)
     }
 
     /// Enable the Uart5 TXE interrupt.

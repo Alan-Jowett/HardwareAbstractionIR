@@ -3124,33 +3124,20 @@ fn render_usart_methods(
         .iter()
         .any(|route| route.signal.as_deref() == Some("RX"));
 
-    let sr = resolve_target_register_by_name(model, target_ref, "SR")?;
-    let dr = resolve_target_register_by_name(model, target_ref, "DR")?;
+    let Some(cr1) = try_resolve_target_register_by_name(model, target_ref, "CR1")? else {
+        return Ok(Vec::new());
+    };
     let brr = resolve_target_register_by_name(model, target_ref, "BRR")?;
-    let cr1 = resolve_target_register_by_name(model, target_ref, "CR1")?;
     let cr2 = resolve_target_register_by_name(model, target_ref, "CR2")?;
-    let cr3 = resolve_target_register_by_name(model, target_ref, "CR3")?;
 
-    let txe = resolve_register_field(&sr, "TXE")?;
-    let tc = resolve_register_field(&sr, "TC")?;
-    let rxne = resolve_register_field(&sr, "RXNE")?;
-    let dr_field = resolve_register_field(&dr, "DR")?;
     let div_mantissa = resolve_register_field(&brr, "DIV_Mantissa")?;
     let div_fraction = resolve_register_field(&brr, "DIV_Fraction")?;
     let ue = resolve_register_field(&cr1, "UE")?;
     let te = resolve_register_field(&cr1, "TE")?;
     let re = resolve_register_field(&cr1, "RE")?;
     let over8 = resolve_register_field(&cr1, "OVER8")?;
-    let txeie = resolve_register_field(&cr1, "TXEIE")?;
-    let rxneie = resolve_register_field(&cr1, "RXNEIE")?;
+    let word_length = resolve_register_field(&cr1, "M")?;
     let stop = resolve_register_field(&cr2, "STOP")?;
-    let dmat = resolve_register_field(&cr3, "DMAT")?;
-    let dmar = resolve_register_field(&cr3, "DMAR")?;
-
-    let txe_mask = field_bit_mask(&txe, &sr)?;
-    let tc_mask = field_bit_mask(&tc, &sr)?;
-    let rxne_mask = field_bit_mask(&rxne, &sr)?;
-    let dr_value_mask = field_value_mask(&dr_field)?;
     let mantissa_value_mask = field_value_mask(&div_mantissa)?;
     let fraction_value_mask = field_value_mask(&div_fraction)?;
     let mantissa_clear_mask = shifted_field_mask(&div_mantissa, &brr)?;
@@ -3202,15 +3189,15 @@ fn render_usart_methods(
 
     let mut configure_code =
         "    pub fn configure_8n1(&self) -> Result<(), metadata::Error> {\n".to_string();
-    configure_code.push_str(&render_register_write_statement(
-        &cr1, &over8, 0, "        ",
-    )?);
     configure_code.push_str(&render_register_write_statement(&cr1, &ue, 0, "        ")?);
     configure_code.push_str(&render_register_write_statement(&cr1, &te, 0, "        ")?);
     configure_code.push_str(&render_register_write_statement(&cr1, &re, 0, "        ")?);
     configure_code.push_str(&render_register_write_statement(
+        &cr1, &over8, 0, "        ",
+    )?);
+    configure_code.push_str(&render_register_write_statement(
         &cr1,
-        &resolve_register_field(&cr1, "M")?,
+        &word_length,
         0,
         "        ",
     )?);
@@ -3234,10 +3221,17 @@ fn render_usart_methods(
     });
 
     if has_tx {
+        let sr = resolve_target_register_by_name(model, target_ref, "SR")?;
+        let dr = resolve_target_register_by_name(model, target_ref, "DR")?;
+        let txe = resolve_register_field(&sr, "TXE")?;
+        let tc = resolve_register_field(&sr, "TC")?;
+        let txe_mask = field_bit_mask(&txe, &sr)?;
+        let tc_mask = field_bit_mask(&tc, &sr)?;
+
         methods.push(GeneratedMethod {
             name: "write_byte".to_string(),
             code: format!(
-                "    pub fn write_byte(&self, byte: u8) -> Result<(), metadata::Error> {{\n        while (read_u32(0x{sr_address:X}u64)? & 0x{txe_mask:08X}u32) == 0 {{}}\n        write_u32(0x{dr_address:X}u64, u32::from(byte) & 0x{dr_value_mask:X}u32)?;\n        Ok(())\n    }}\n",
+                "    pub fn write_byte(&self, byte: u8) -> Result<(), metadata::Error> {{\n        while (read_u32(0x{sr_address:X}u64)? & 0x{txe_mask:08X}u32) == 0 {{}}\n        write_u32(0x{dr_address:X}u64, u32::from(byte))?;\n        Ok(())\n    }}\n",
                 sr_address = sr.absolute_address,
                 dr_address = dr.absolute_address,
             ),
@@ -3257,10 +3251,15 @@ fn render_usart_methods(
     }
 
     if has_rx {
+        let sr = resolve_target_register_by_name(model, target_ref, "SR")?;
+        let dr = resolve_target_register_by_name(model, target_ref, "DR")?;
+        let rxne = resolve_register_field(&sr, "RXNE")?;
+        let rxne_mask = field_bit_mask(&rxne, &sr)?;
+
         methods.push(GeneratedMethod {
             name: "read_byte".to_string(),
             code: format!(
-                "    pub fn read_byte(&self) -> Result<u8, metadata::Error> {{\n        while (read_u32(0x{sr_address:X}u64)? & 0x{rxne_mask:08X}u32) == 0 {{}}\n        Ok((read_u32(0x{dr_address:X}u64)? & 0x{dr_value_mask:X}u32) as u8)\n    }}\n",
+                "    pub fn read_byte(&self) -> Result<u8, metadata::Error> {{\n        while (read_u32(0x{sr_address:X}u64)? & 0x{rxne_mask:08X}u32) == 0 {{}}\n        Ok((read_u32(0x{dr_address:X}u64)? & 0xFFu32) as u8)\n    }}\n",
                 sr_address = sr.absolute_address,
                 dr_address = dr.absolute_address,
             ),
@@ -3268,6 +3267,8 @@ fn render_usart_methods(
     }
 
     if has_irq {
+        let txeie = resolve_register_field(&cr1, "TXEIE")?;
+        let rxneie = resolve_register_field(&cr1, "RXNEIE")?;
         methods.push(render_register_write_method(
             "enable_txe_interrupt".to_string(),
             &cr1,
@@ -3299,6 +3300,8 @@ fn render_usart_methods(
     }
 
     if has_tx_dma {
+        let cr3 = resolve_target_register_by_name(model, target_ref, "CR3")?;
+        let dmat = resolve_register_field(&cr3, "DMAT")?;
         methods.push(render_register_write_method(
             "enable_tx_dma".to_string(),
             &cr3,
@@ -3316,6 +3319,8 @@ fn render_usart_methods(
     }
 
     if has_rx_dma {
+        let cr3 = resolve_target_register_by_name(model, target_ref, "CR3")?;
+        let dmar = resolve_register_field(&cr3, "DMAR")?;
         methods.push(render_register_write_method(
             "enable_rx_dma".to_string(),
             &cr3,
@@ -3481,6 +3486,38 @@ fn resolve_target_register_by_name(
         )
     })?;
     let template = find_register_template_peripheral(model, target)?;
+    resolve_target_register_from_template(target, target_base, template, register_name)
+}
+
+fn try_resolve_target_register_by_name(
+    model: &EmbassyGenerationModel,
+    target_ref: &str,
+    register_name: &str,
+) -> Result<Option<ResolvedRegister>> {
+    let target = model.peripherals.get(target_ref).ok_or_else(|| {
+        anyhow!(
+            "driver target peripheral {} could not be resolved for register lookup",
+            target_ref
+        )
+    })?;
+    let target_base = target.base_address.ok_or_else(|| {
+        anyhow!(
+            "peripheral {} is missing baseAddress required for derived register lookup",
+            target.id
+        )
+    })?;
+    let Some(template) = try_find_register_template_peripheral(model, target)? else {
+        return Ok(None);
+    };
+    resolve_target_register_from_template(target, target_base, template, register_name).map(Some)
+}
+
+fn resolve_target_register_from_template(
+    target: &Peripheral,
+    target_base: u64,
+    template: &Peripheral,
+    register_name: &str,
+) -> Result<ResolvedRegister> {
     let template_base = template.base_address.ok_or_else(|| {
         anyhow!(
             "template peripheral {} is missing baseAddress required for register lookup",
@@ -3535,10 +3572,10 @@ fn resolve_target_register_by_name(
     Ok(resolved)
 }
 
-fn find_register_template_peripheral<'a>(
+fn try_find_register_template_peripheral<'a>(
     model: &'a EmbassyGenerationModel,
     target: &'a Peripheral,
-) -> Result<&'a Peripheral> {
+) -> Result<Option<&'a Peripheral>> {
     let mut current = target;
     let mut seen = HashSet::new();
     loop {
@@ -3549,14 +3586,11 @@ fn find_register_template_peripheral<'a>(
             );
         }
         if !current.registers.is_empty() {
-            return Ok(current);
+            return Ok(Some(current));
         }
-        let derived_from = current.derived_from_ref.as_deref().ok_or_else(|| {
-            anyhow!(
-                "peripheral {} has no explicit registers and no derivedFromRef template",
-                target.id
-            )
-        })?;
+        let Some(derived_from) = current.derived_from_ref.as_deref() else {
+            return Ok(None);
+        };
         current = model.peripherals.get(derived_from).ok_or_else(|| {
             anyhow!(
                 "peripheral {} references unknown derivedFromRef {}",
@@ -3565,6 +3599,18 @@ fn find_register_template_peripheral<'a>(
             )
         })?;
     }
+}
+
+fn find_register_template_peripheral<'a>(
+    model: &'a EmbassyGenerationModel,
+    target: &'a Peripheral,
+) -> Result<&'a Peripheral> {
+    try_find_register_template_peripheral(model, target)?.ok_or_else(|| {
+        anyhow!(
+            "peripheral {} has no explicit registers and no derivedFromRef template",
+            target.id
+        )
+    })
 }
 
 fn resolve_transition_effect_write<'a>(
@@ -8756,6 +8802,106 @@ mod tests {
         let temp = tempdir().expect("tempdir");
         generate_embassy_crate(&validated, temp.path())
             .expect("polling uart generation should succeed");
+    }
+
+    #[test]
+    fn generate_embassy_allows_polling_uart_without_irq_or_dma_registers() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let device = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object");
+        let peripherals = device
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let usart_template = peripherals
+            .iter_mut()
+            .find(|peripheral| peripheral["id"] == "periph.usart6")
+            .and_then(Value::as_object_mut)
+            .expect("usart6 peripheral");
+        let registers = usart_template
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("usart6 registers");
+        registers.retain(|register| register["name"] != "CR3");
+        let cr1_fields = registers
+            .iter_mut()
+            .find(|register| register["name"] == "CR1")
+            .and_then(Value::as_object_mut)
+            .expect("cr1 register")
+            .get_mut("fields")
+            .and_then(Value::as_array_mut)
+            .expect("cr1 fields");
+        cr1_fields.retain(|field| field["name"] != "TXEIE" && field["name"] != "RXNEIE");
+
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let uart = drivers[2].as_object_mut().expect("uart driver");
+        uart.remove("interruptRouteRefs");
+        uart.remove("dmaRouteRefs");
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("polling uart fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        generate_embassy_crate(&validated, temp.path())
+            .expect("polling uart generation should succeed without irq/dma registers");
+    }
+
+    #[test]
+    fn generate_embassy_keeps_clock_reset_helpers_when_uart_template_is_missing() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let device = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object");
+        let peripherals = device
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let usart = peripherals
+            .iter_mut()
+            .find(|peripheral| peripheral["id"] == "periph.usart1")
+            .and_then(Value::as_object_mut)
+            .expect("usart1 peripheral");
+        usart.remove("derivedFromRef");
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("uart-without-template fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        generate_embassy_crate(&validated, temp.path())
+            .expect("uart generation should keep clock/reset helpers without template");
+        let uart_rs =
+            std::fs::read_to_string(temp.path().join("src").join("uart.rs")).expect("uart.rs");
+        assert!(uart_rs.contains("pub fn enable_clock"));
+        assert!(uart_rs.contains("pub fn release_reset"));
+        assert!(!uart_rs.contains("pub fn configure_8n1"));
     }
 
     fn write_embassy_fixture(use_custom_driver: bool) -> NamedTempFile {
