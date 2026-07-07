@@ -4826,8 +4826,15 @@ fn svd_item_name(name: &str, array: Option<&ArrayShape>) -> Result<String> {
 
 fn write_text_element(xml: &mut XmlWriter, name: &str, value: &str) {
     xml.start_element(name);
-    xml.write_text(value);
+    xml.write_text(&escape_xml_text(value));
     xml.end_element();
+}
+
+fn escape_xml_text(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 fn json_u64(value: &Value, context: &str) -> Result<u64> {

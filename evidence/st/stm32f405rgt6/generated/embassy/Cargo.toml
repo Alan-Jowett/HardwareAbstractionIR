@@ -1,0 +1,8 @@
+[package]
+name = "stm32-h405-generated"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "stm32_h405_generated"
+path = "src/lib.rs"
