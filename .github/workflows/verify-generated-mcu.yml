@@ -66,6 +66,10 @@ jobs:
                 echo "smoke-dir is required when smoke-mode=required" >&2
                 exit 1
               }
+              test -d "$SMOKE_DIR_INPUT" || {
+                echo "smoke-dir does not exist: $SMOKE_DIR_INPUT" >&2
+                exit 1
+              }
               test -n "$SMOKE_COMMAND_INPUT" || {
                 echo "smoke-command is required when smoke-mode=required" >&2
                 exit 1
@@ -81,7 +85,7 @@ jobs:
 
       - name: Install PAC generation tool
         shell: bash
-        run: cargo install --locked svd2rust --version 0.37.1
+        run: cargo install --locked --force svd2rust --version 0.37.1
 
       - name: Install QEMU
         if: ${{ inputs.smoke_mode == 'required' }}
