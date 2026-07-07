@@ -1,6 +1,7 @@
 name: Verify generated MCU artifacts
 
 permissions:
+  actions: read
   contents: read
 
 on:
@@ -233,4 +234,11 @@ jobs:
           SMOKE_COMMAND: ${{ inputs.smoke_command }}
         run: |
           set -euo pipefail
-          bash -lc "$SMOKE_COMMAND"
+          set +e
+          timeout 20s bash -lc "$SMOKE_COMMAND"
+          status=$?
+          set -e
+          if [[ $status -eq 124 ]]; then
+            echo "Smoke command timed out after 20s: $SMOKE_COMMAND" >&2
+          fi
+          exit $status

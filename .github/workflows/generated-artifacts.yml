@@ -1,6 +1,7 @@
 name: Generated artifact verification
 
 permissions:
+  actions: write
   contents: read
 
 on:
