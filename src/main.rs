@@ -74,6 +74,9 @@ fn run(cli: Cli) -> Result<CommandOutcome> {
         Commands::Generate {
             command: GenerateCommands::Embassy { input, output_dir },
         } => run_generate_embassy(&input, &output_dir),
+        Commands::Generate {
+            command: GenerateCommands::EmbassyHost { input, output_dir },
+        } => run_generate_embassy_host(&input, &output_dir),
         Commands::Diff { left, right } => run_diff(&left, &right),
     }
 }
@@ -109,6 +112,11 @@ enum GenerateCommands {
         output: Option<PathBuf>,
     },
     Embassy {
+        input: PathBuf,
+        #[arg(long = "output-dir")]
+        output_dir: PathBuf,
+    },
+    EmbassyHost {
         input: PathBuf,
         #[arg(long = "output-dir")]
         output_dir: PathBuf,
@@ -183,6 +191,17 @@ fn run_generate_embassy(input: &Path, output_dir: &Path) -> Result<CommandOutcom
     })
 }
 
+fn run_generate_embassy_host(input: &Path, output_dir: &Path) -> Result<CommandOutcome> {
+    let schema_root = find_schema_root(&std::env::current_dir()?)?;
+    let document = load_validated_hair_document(input, &schema_root)?;
+    generate_embassy_host_crate(&document, output_dir)?;
+    Ok(CommandOutcome {
+        exit_code: 0,
+        stdout: String::new(),
+        stderr: String::new(),
+    })
+}
+
 fn generate_embassy_crate(document: &HairDocument, output_dir: &Path) -> Result<()> {
     let model = EmbassyGenerationModel::from_document(document)?;
     let src_dir = output_dir.join("src");
@@ -205,6 +224,39 @@ fn generate_embassy_crate(document: &HairDocument, output_dir: &Path) -> Result<
         } else {
             render_driver_module(&model, &module_name, &driver_group)?
         };
+        write_generated_text(&src_dir.join(format!("{module_name}.rs")), &rendered)?;
+    }
+
+    Ok(())
+}
+
+fn generate_embassy_host_crate(document: &HairDocument, output_dir: &Path) -> Result<()> {
+    let model = EmbassyGenerationModel::from_document(document)?;
+    validate_reserved_generated_module_names(
+        &model,
+        &[("host", "reserved generated host module name host")],
+    )?;
+    validate_host_accessor_name_collisions(&model.drivers)?;
+    let src_dir = output_dir.join("src");
+    fs::create_dir_all(&src_dir)
+        .with_context(|| format!("creating output directory {}", src_dir.display()))?;
+
+    write_generated_text(
+        &output_dir.join("Cargo.toml"),
+        &render_embassy_host_cargo_toml(&model),
+    )?;
+    write_generated_text(&src_dir.join("lib.rs"), &render_embassy_host_lib_rs(&model))?;
+    write_generated_text(
+        &src_dir.join("metadata.rs"),
+        &render_embassy_host_metadata_rs(&model)?,
+    )?;
+    write_generated_text(
+        &src_dir.join("host.rs"),
+        &render_embassy_host_root_rs(&model),
+    )?;
+
+    for (module_name, driver_group) in model.driver_groups() {
+        let rendered = render_embassy_host_driver_module(&model, &module_name, &driver_group)?;
         write_generated_text(&src_dir.join(format!("{module_name}.rs")), &rendered)?;
     }
 
@@ -1936,7 +1988,13 @@ impl EmbassyGenerationModel {
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect::<Vec<_>>();
-        if !self.interrupts.is_empty() && !names.iter().any(|name| name == "interrupt") {
+        let has_interrupt_driver = self
+            .drivers
+            .iter()
+            .any(|driver| driver.driver_kind == "interrupt");
+        if (has_interrupt_driver || !self.interrupts.is_empty())
+            && !names.iter().any(|name| name == "interrupt")
+        {
             names.push("interrupt".to_string());
         }
         names.insert(0, "metadata".to_string());
@@ -1948,7 +2006,12 @@ impl EmbassyGenerationModel {
         for driver in &self.drivers {
             groups.insert(driver.module_name.clone());
         }
-        if !self.interrupts.is_empty() {
+        if self
+            .drivers
+            .iter()
+            .any(|driver| driver.driver_kind == "interrupt")
+            || !self.interrupts.is_empty()
+        {
             groups.insert("interrupt".to_string());
         }
 
@@ -2010,6 +2073,21 @@ fn validate_module_name(module_path: &str) -> Result<String> {
         bail!("modulePath {module_path} normalizes to reserved generated module name metadata");
     }
     Ok(normalized)
+}
+
+fn validate_reserved_generated_module_names(
+    model: &EmbassyGenerationModel,
+    reserved: &[(&str, &str)],
+) -> Result<()> {
+    for module_name in model.module_names() {
+        if let Some((_, message)) = reserved
+            .iter()
+            .find(|(reserved_name, _)| module_name == *reserved_name)
+        {
+            bail!("modulePath {module_name} normalizes to {message}");
+        }
+    }
+    Ok(())
 }
 
 fn render_module_provenance_const(module_name: &str) -> String {
@@ -2148,6 +2226,64 @@ fn validate_driver_name_collisions(drivers: &[ResolvedDriverInstance]) -> Result
             );
         }
     }
+    Ok(())
+}
+
+fn validate_host_accessor_name_collisions(drivers: &[ResolvedDriverInstance]) -> Result<()> {
+    let mut method_names = HashMap::<String, String>::from([
+        (
+            "new".to_string(),
+            "built-in HostEmulator method new".to_string(),
+        ),
+        (
+            "activate".to_string(),
+            "built-in HostEmulator method activate".to_string(),
+        ),
+        (
+            "activate_scoped".to_string(),
+            "built-in HostEmulator method activate_scoped".to_string(),
+        ),
+        (
+            "clear_active".to_string(),
+            "built-in HostEmulator method clear_active".to_string(),
+        ),
+        (
+            "state".to_string(),
+            "built-in HostEmulator method state".to_string(),
+        ),
+    ]);
+
+    for driver in drivers {
+        let accessor = to_rust_method_name(&driver.name);
+        if is_rust_keyword(&accessor) {
+            bail!(
+                "driver {} normalizes to reserved Rust keyword {} as HostEmulator method",
+                driver.id,
+                accessor
+            );
+        }
+        let accessor_owner = format!("driver {} accessor", driver.id);
+        if let Some(previous) = method_names.insert(accessor.clone(), accessor_owner) {
+            bail!(
+                "{} collides with {} as HostEmulator method {}",
+                driver.id,
+                previous,
+                accessor
+            );
+        }
+
+        let emulator_accessor = format!("{accessor}_emulator");
+        let emulator_owner = format!("driver {} emulator accessor", driver.id);
+        if let Some(previous) = method_names.insert(emulator_accessor.clone(), emulator_owner) {
+            bail!(
+                "{} collides with {} as HostEmulator method {}",
+                driver.id,
+                previous,
+                emulator_accessor
+            );
+        }
+    }
+
     Ok(())
 }
 
@@ -6887,6 +7023,449 @@ fn svd_endian(endianness: &str) -> Result<String> {
     Ok(mapped.to_string())
 }
 
+#[derive(Debug, Clone)]
+struct HostSerialRegisterModel {
+    driver_id: String,
+    sr_address: u64,
+    dr_address: u64,
+    has_tx: bool,
+    has_rx: bool,
+    txe_mask: u32,
+    tc_mask: u32,
+    rxne_mask: u32,
+}
+
+#[derive(Debug, Clone)]
+struct HostIndexedGpioModel {
+    bsrr_address: u64,
+    odr_address: u64,
+}
+
+fn host_package_name(base: &str) -> String {
+    format!("{base}-host")
+}
+
+fn host_crate_name(base: &str) -> String {
+    format!("{base}_host")
+}
+
+fn collect_host_serial_register_models(
+    model: &EmbassyGenerationModel,
+) -> Result<Vec<HostSerialRegisterModel>> {
+    let mut serial_models = Vec::new();
+    for driver in &model.drivers {
+        if !matches!(driver.driver_kind.as_str(), "uart" | "usart") {
+            continue;
+        }
+        let target_ref = driver.target.target_ref.as_str();
+        let has_tx = driver.pin_roles.iter().any(|role| role.signal == "TX");
+        let has_rx = driver.pin_roles.iter().any(|role| role.signal == "RX");
+        if !has_tx && !has_rx {
+            continue;
+        }
+        let sr = resolve_target_register_by_name(model, target_ref, "SR")?;
+        let dr = resolve_target_register_by_name(model, target_ref, "DR")?;
+        let txe_mask = if has_tx {
+            let txe = resolve_register_field(&sr, "TXE")?;
+            field_bit_mask(&txe, &sr)?
+        } else {
+            0
+        };
+        let tc_mask = if has_tx {
+            let tc = resolve_register_field(&sr, "TC")?;
+            field_bit_mask(&tc, &sr)?
+        } else {
+            0
+        };
+        let rxne_mask = if has_rx {
+            let rxne = resolve_register_field(&sr, "RXNE")?;
+            field_bit_mask(&rxne, &sr)?
+        } else {
+            0
+        };
+        serial_models.push(HostSerialRegisterModel {
+            driver_id: driver.id.clone(),
+            sr_address: sr.absolute_address,
+            dr_address: dr.absolute_address,
+            has_tx,
+            has_rx,
+            txe_mask,
+            tc_mask,
+            rxne_mask,
+        });
+    }
+    Ok(serial_models)
+}
+
+fn collect_host_indexed_gpio_models(
+    model: &EmbassyGenerationModel,
+) -> Result<Vec<HostIndexedGpioModel>> {
+    let mut gpio_models = Vec::new();
+    for driver in &model.drivers {
+        if driver.driver_kind != "gpio-port" {
+            continue;
+        }
+        if let ResolvedGpioPortLowering::IndexedFields { odr, bsrr, .. } =
+            resolve_gpio_port_lowering(model, driver)?
+        {
+            gpio_models.push(HostIndexedGpioModel {
+                bsrr_address: bsrr.absolute_address,
+                odr_address: odr.absolute_address,
+            });
+        }
+    }
+    Ok(gpio_models)
+}
+
+fn render_embassy_host_cargo_toml(model: &EmbassyGenerationModel) -> String {
+    let mut out = format!(
+        "[package]\nname = {}\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[lib]\nname = {}\npath = \"src/lib.rs\"\n",
+        render_rust_string(&host_package_name(&model.crate_info.package_name)),
+        render_rust_string(&host_crate_name(&model.crate_info.crate_name))
+    );
+    if model
+        .drivers
+        .iter()
+        .any(|driver| has_time_driver_tag(&driver.capability_tags))
+    {
+        out.push_str(
+            "\n[dependencies]\nembassy-time-driver = \"0.2.2\"\nembassy-time-queue-utils = { version = \"0.3.2\", features = [\"generic-queue-8\"] }\n",
+        );
+    }
+    out
+}
+
+fn render_embassy_host_lib_rs(model: &EmbassyGenerationModel) -> String {
+    let mut out = String::from("pub mod metadata;\n");
+    for module_name in model.module_names() {
+        if module_name == "metadata" {
+            continue;
+        }
+        out.push_str(&format!("pub mod {module_name};\n"));
+    }
+    out.push_str("pub mod host;\n");
+    out
+}
+
+fn render_embassy_host_metadata_rs(model: &EmbassyGenerationModel) -> Result<String> {
+    let mut out = render_embassy_metadata_rs(model);
+    let serial_models = collect_host_serial_register_models(model)?;
+    let gpio_models = collect_host_indexed_gpio_models(model)?;
+    out.push_str(
+        "\nuse std::cell::RefCell;\nuse std::collections::{BTreeMap, BTreeSet, VecDeque};\nuse std::sync::{Arc, Mutex};\n\npub type SharedEmulatorState = Arc<GeneratedHostState>;\n\n#[derive(Debug, Default)]\nstruct SerialQueues {\n    tx: VecDeque<u8>,\n    rx: VecDeque<u8>,\n}\n\n#[derive(Debug, Default)]\npub struct GeneratedHostState {\n    registers: Mutex<BTreeMap<u64, u32>>,\n    serial: Mutex<BTreeMap<String, SerialQueues>>,\n    pending_irqs: Mutex<BTreeSet<i32>>,\n    dma_completions: Mutex<BTreeMap<String, usize>>,\n}\n\n#[derive(Debug, Clone, Copy)]\nstruct SerialRegisterModel {\n    driver_id: &'static str,\n    sr_address: u64,\n    dr_address: u64,\n    has_tx: bool,\n    has_rx: bool,\n    txe_mask: u32,\n    tc_mask: u32,\n    rxne_mask: u32,\n}\n\n#[derive(Debug, Clone, Copy)]\nstruct IndexedGpioModel {\n    bsrr_address: u64,\n    odr_address: u64,\n}\n\nconst SERIAL_REGISTER_MODELS: &[SerialRegisterModel] = &",
+    );
+    out.push_str(&render_host_serial_register_model_slice(&serial_models));
+    out.push_str(";\n");
+    out.push_str("const INDEXED_GPIO_MODELS: &[IndexedGpioModel] = &");
+    out.push_str(&render_host_indexed_gpio_model_slice(&gpio_models));
+    out.push_str(";\n\n");
+    out.push_str(
+        "thread_local! {\n    static CURRENT_EMULATOR: RefCell<Option<SharedEmulatorState>> = const { RefCell::new(None) };\n}\n\npub struct CurrentEmulatorGuard {\n    previous: Option<SharedEmulatorState>,\n}\n\nimpl Drop for CurrentEmulatorGuard {\n    fn drop(&mut self) {\n        CURRENT_EMULATOR.with(|slot| {\n            *slot.borrow_mut() = self.previous.take();\n        });\n    }\n}\n\nfn lock_guard<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {\n    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())\n}\n\npub fn new_emulator_state() -> SharedEmulatorState {\n    Arc::new(GeneratedHostState::default())\n}\n\npub fn install_current_emulator(state: SharedEmulatorState) {\n    CURRENT_EMULATOR.with(|slot| {\n        *slot.borrow_mut() = Some(state);\n    });\n}\n\npub fn push_current_emulator(state: SharedEmulatorState) -> CurrentEmulatorGuard {\n    let previous = CURRENT_EMULATOR.with(|slot| slot.replace(Some(state)));\n    CurrentEmulatorGuard { previous }\n}\n\npub fn clear_current_emulator() {\n    CURRENT_EMULATOR.with(|slot| {\n        slot.borrow_mut().take();\n    });\n}\n\npub fn clear_current_emulator_if_active(state: &SharedEmulatorState) {\n    CURRENT_EMULATOR.with(|slot| {\n        let mut slot = slot.borrow_mut();\n        if slot\n            .as_ref()\n            .is_some_and(|current| Arc::ptr_eq(current, state))\n        {\n            slot.take();\n        }\n    });\n}\n\npub fn initialize_emulator_state(state: &SharedEmulatorState) {\n    let mut registers = lock_guard(&state.registers);\n    for model in SERIAL_REGISTER_MODELS {\n        registers.insert(model.sr_address, model.txe_mask | model.tc_mask);\n        registers.insert(model.dr_address, 0);\n    }\n}\n\nfn current_emulator() -> Result<SharedEmulatorState, Error> {\n    CURRENT_EMULATOR.with(|slot| {\n        slot.borrow()\n            .clone()\n            .ok_or(Error::Unsupported(\"host emulator is not active on this thread\"))\n    })\n}\n\nfn serial_model_for_driver(driver_id: &str) -> Option<&'static SerialRegisterModel> {\n    SERIAL_REGISTER_MODELS.iter().find(|model| model.driver_id == driver_id)\n}\n\nfn serial_model_for_dr_address(address: u64) -> Option<&'static SerialRegisterModel> {\n    SERIAL_REGISTER_MODELS.iter().find(|model| model.dr_address == address)\n}\n\nfn indexed_gpio_model_for_bsrr(address: u64) -> Option<&'static IndexedGpioModel> {\n    INDEXED_GPIO_MODELS.iter().find(|model| model.bsrr_address == address)\n}\n\npub fn read_u32_for(state: &SharedEmulatorState, address: u64) -> Result<u32, Error> {\n    if let Some(model) = serial_model_for_dr_address(address) {\n        let mut serial = lock_guard(&state.serial);\n        let queues = serial.entry(model.driver_id.to_string()).or_default();\n        if let Some(byte) = queues.rx.pop_front() {\n            let mut registers = lock_guard(&state.registers);\n            let entry = registers.entry(model.sr_address).or_insert(model.txe_mask | model.tc_mask);\n            if queues.rx.is_empty() {\n                *entry &= !model.rxne_mask;\n            } else {\n                *entry |= model.rxne_mask;\n            }\n            registers.insert(model.dr_address, u32::from(byte));\n            return Ok(u32::from(byte));\n        }\n    }\n    Ok(*lock_guard(&state.registers).get(&address).unwrap_or(&0))\n}\n\npub fn write_u32_for(state: &SharedEmulatorState, address: u64, value: u32) -> Result<(), Error> {\n    if let Some(model) = serial_model_for_dr_address(address) {\n        let mut serial = lock_guard(&state.serial);\n        let queues = serial.entry(model.driver_id.to_string()).or_default();\n        queues.tx.push_back((value & 0xFF) as u8);\n        let mut registers = lock_guard(&state.registers);\n        registers.insert(model.dr_address, value & 0xFF);\n        let entry = registers.entry(model.sr_address).or_insert(0);\n        *entry |= model.txe_mask | model.tc_mask;\n        return Ok(());\n    }\n    if let Some(model) = indexed_gpio_model_for_bsrr(address) {\n        let mut registers = lock_guard(&state.registers);\n        let odr = registers.entry(model.odr_address).or_insert(0);\n        let set_bits = value & 0xFFFF;\n        let reset_bits = (value >> 16) & 0xFFFF;\n        *odr |= set_bits;\n        *odr &= !reset_bits;\n        registers.insert(address, value);\n        return Ok(());\n    }\n    lock_guard(&state.registers).insert(address, value);\n    Ok(())\n}\n\npub fn modify_u8_for(state: &SharedEmulatorState, address: u64, clear_mask: u8, set_mask: u8) -> Result<(), Error> {\n    let current = read_u32_for(state, address)? as u8;\n    write_u32_for(state, address, u32::from((current & !clear_mask) | set_mask))\n}\n\npub fn modify_u16_for(state: &SharedEmulatorState, address: u64, clear_mask: u16, set_mask: u16) -> Result<(), Error> {\n    let current = read_u32_for(state, address)? as u16;\n    write_u32_for(state, address, u32::from((current & !clear_mask) | set_mask))\n}\n\npub fn modify_u32_for(state: &SharedEmulatorState, address: u64, clear_mask: u32, set_mask: u32) -> Result<(), Error> {\n    let current = read_u32_for(state, address)?;\n    write_u32_for(state, address, (current & !clear_mask) | set_mask)\n}\n\npub fn read_u32(address: u64) -> Result<u32, Error> {\n    let state = current_emulator()?;\n    read_u32_for(&state, address)\n}\n\npub fn write_u32(address: u64, value: u32) -> Result<(), Error> {\n    let state = current_emulator()?;\n    write_u32_for(&state, address, value)\n}\n\npub fn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u8_for(&state, address, clear_mask, set_mask)\n}\n\npub fn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u16_for(&state, address, clear_mask, set_mask)\n}\n\npub fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u32_for(&state, address, clear_mask, set_mask)\n}\n\npub fn push_serial_rx_for(state: &SharedEmulatorState, driver_id: &str, bytes: &[u8]) -> Result<(), Error> {\n    let model = serial_model_for_driver(driver_id)\n        .ok_or(Error::InvalidReference(\"unknown serial driver\"))?;\n    if !model.has_rx {\n        return Err(Error::InvalidReference(\"serial driver has no RX capability\"));\n    }\n    let mut serial = lock_guard(&state.serial);\n    let queues = serial.entry(driver_id.to_string()).or_default();\n    for &byte in bytes {\n        queues.rx.push_back(byte);\n    }\n    drop(serial);\n    let mut registers = lock_guard(&state.registers);\n    let entry = registers.entry(model.sr_address).or_insert(model.txe_mask | model.tc_mask);\n    if !bytes.is_empty() {\n        *entry |= model.rxne_mask;\n    }\n    Ok(())\n}\n\npub fn take_serial_tx_for(state: &SharedEmulatorState, driver_id: &str) -> Vec<u8> {\n    let mut serial = lock_guard(&state.serial);\n    let queues = serial.entry(driver_id.to_string()).or_default();\n    queues.tx.drain(..).collect()\n}\n\npub fn mark_dma_route_complete_for(state: &SharedEmulatorState, route_id: &str) {\n    let mut dma = lock_guard(&state.dma_completions);\n    *dma.entry(route_id.to_string()).or_default() += 1;\n}\n\npub fn dma_route_completion_count_for(state: &SharedEmulatorState, route_id: &str) -> usize {\n    *lock_guard(&state.dma_completions).get(route_id).unwrap_or(&0)\n}\n\npub fn set_irq_pending_for(state: &SharedEmulatorState, irq_number: i32, pending: bool) {\n    let mut irqs = lock_guard(&state.pending_irqs);\n    if pending {\n        irqs.insert(irq_number);\n    } else {\n        irqs.remove(&irq_number);\n    }\n}\n\npub fn is_irq_pending_for(state: &SharedEmulatorState, irq_number: i32) -> bool {\n    lock_guard(&state.pending_irqs).contains(&irq_number)\n}\n",
+    );
+    Ok(out)
+}
+
+fn render_host_serial_register_model_slice(items: &[HostSerialRegisterModel]) -> String {
+    let rendered = items
+        .iter()
+        .map(|item| {
+            format!(
+                "SerialRegisterModel {{ driver_id: {}, sr_address: 0x{:X}u64, dr_address: 0x{:X}u64, has_tx: {}, has_rx: {}, txe_mask: 0x{:08X}u32, tc_mask: 0x{:08X}u32, rxne_mask: 0x{:08X}u32 }}",
+                render_rust_string(&item.driver_id),
+                item.sr_address,
+                item.dr_address,
+                item.has_tx,
+                item.has_rx,
+                item.txe_mask,
+                item.tc_mask,
+                item.rxne_mask
+            )
+        })
+        .collect::<Vec<_>>();
+    format!("[{}]", rendered.join(", "))
+}
+
+fn render_host_indexed_gpio_model_slice(items: &[HostIndexedGpioModel]) -> String {
+    let rendered = items
+        .iter()
+        .map(|item| {
+            format!(
+                "IndexedGpioModel {{ bsrr_address: 0x{:X}u64, odr_address: 0x{:X}u64 }}",
+                item.bsrr_address, item.odr_address
+            )
+        })
+        .collect::<Vec<_>>();
+    format!("[{}]", rendered.join(", "))
+}
+
+fn render_embassy_host_root_rs(model: &EmbassyGenerationModel) -> String {
+    let mut out = String::from(
+        "use crate::metadata;\n\n#[derive(Debug, Clone)]\npub struct HostEmulator {\n    state: metadata::SharedEmulatorState,\n}\n\nimpl Default for HostEmulator {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\nimpl Drop for HostEmulator {\n    fn drop(&mut self) {\n        metadata::clear_current_emulator_if_active(&self.state);\n    }\n}\n\nimpl HostEmulator {\n    pub fn new() -> Self {\n        let state = metadata::new_emulator_state();\n        metadata::initialize_emulator_state(&state);\n        Self { state }\n    }\n\n    pub fn activate(&self) {\n        metadata::install_current_emulator(self.state.clone());\n    }\n\n    pub fn activate_scoped(&self) -> metadata::CurrentEmulatorGuard {\n        metadata::push_current_emulator(self.state.clone())\n    }\n\n    pub fn clear_active(&self) {\n        metadata::clear_current_emulator_if_active(&self.state);\n    }\n\n    pub fn state(&self) -> metadata::SharedEmulatorState {\n        self.state.clone()\n    }\n",
+    );
+    for driver in &model.drivers {
+        let accessor = to_rust_method_name(&driver.name);
+        let emulator_accessor = format!("{accessor}_emulator");
+        out.push_str(&format!(
+            "\n    pub fn {accessor}(&self) -> Result<crate::{module}::{type_name}, metadata::Error> {{\n        self.activate();\n        crate::{module}::{type_name}::new(crate::{module}::{const_prefix}_RESOURCES)\n    }}\n\n    pub fn {emulator_accessor}(&self) -> crate::{module}::{type_name}Emulator {{\n        self.activate();\n        crate::{module}::{type_name}Emulator::new(self.state.clone())\n    }}\n",
+            module = driver.module_name,
+            type_name = driver.type_name,
+            const_prefix = to_rust_const_name(&driver.id),
+        ));
+    }
+    out.push_str("}\n");
+    out
+}
+
+fn render_embassy_host_driver_module(
+    model: &EmbassyGenerationModel,
+    module_name: &str,
+    drivers: &[&ResolvedDriverInstance],
+) -> Result<String> {
+    let mut out = format!(
+        "//! Generated host-emulated Embassy-style {module_name} module for {}.\n\nuse crate::metadata;\n\n{}\n",
+        render_comment_text(&model.device_name),
+        render_host_mmio_helpers()
+    );
+    if drivers
+        .iter()
+        .any(|driver| driver.driver_kind == "gpio-port")
+    {
+        out.push_str(render_gpio_module_prelude());
+    }
+    if module_name == "interrupt" {
+        out.push_str("#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Irq {\n");
+        for interrupt in &model.interrupts {
+            out.push_str(&format!(
+                "    {} = {},\n",
+                to_rust_type_name(&interrupt.name),
+                interrupt.number
+            ));
+        }
+        out.push_str("}\n\n");
+    }
+    out.push_str(&render_module_provenance_const(module_name));
+    for driver in drivers {
+        out.push_str(&render_embassy_host_driver_instance(model, driver)?);
+    }
+    Ok(out)
+}
+
+fn render_host_mmio_helpers() -> &'static str {
+    "#[allow(dead_code)]\nfn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), metadata::Error> {\n    metadata::modify_u8(address, clear_mask, set_mask)\n}\n\n#[allow(dead_code)]\nfn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), metadata::Error> {\n    metadata::modify_u16(address, clear_mask, set_mask)\n}\n\n#[allow(dead_code)]\nfn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metadata::Error> {\n    metadata::modify_u32(address, clear_mask, set_mask)\n}\n\n#[allow(dead_code)]\nfn read_u32(address: u64) -> Result<u32, metadata::Error> {\n    metadata::read_u32(address)\n}\n\n#[allow(dead_code)]\nfn write_u32(address: u64, value: u32) -> Result<(), metadata::Error> {\n    metadata::write_u32(address, value)\n}\n"
+}
+
+fn render_embassy_host_driver_instance(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    let const_prefix = to_rust_const_name(&driver.id);
+    let support_items = render_embassy_host_driver_support_items(model, driver)?;
+    let emulator_items = render_embassy_host_driver_emulator(model, driver)?;
+    let mut out = String::new();
+    out.push_str(&format!(
+        "// Driver instance: {} ({}) from canonical block {} -> {}\n",
+        render_comment_text(&driver.name),
+        render_comment_text(&driver.driver_kind),
+        render_comment_text(&driver.target.id),
+        render_comment_text(&driver.target.block_class)
+    ));
+    out.push_str(&format!(
+        "pub const {const_prefix}_CLOCK_BINDINGS: &[metadata::ClockBinding] = &{};\n",
+        render_clock_binding_slice(&driver.clock_bindings)
+    ));
+    out.push_str(&format!(
+        "pub const {const_prefix}_RESET_BINDINGS: &[metadata::ResetBinding] = &{};\n",
+        render_reset_binding_slice(&driver.reset_bindings)
+    ));
+    out.push_str(&format!(
+        "pub const {const_prefix}_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &{};\n",
+        render_interrupt_source_slice(&driver.interrupt_sources)
+    ));
+    out.push_str(&format!(
+        "pub const {const_prefix}_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &{};\n",
+        render_interrupt_route_slice(&driver.interrupt_routes)
+    ));
+    out.push_str(&format!(
+        "pub const {const_prefix}_DMA_CHANNELS: &[metadata::DmaChannel] = &{};\n",
+        render_dma_channel_slice(&driver.dma_channels)
+    ));
+    out.push_str(&format!(
+        "pub const {const_prefix}_DMA_ROUTES: &[metadata::DmaRoute] = &{};\n",
+        render_dma_route_slice(&driver.dma_routes)
+    ));
+    for (index, pin_role) in driver.pin_roles.iter().enumerate() {
+        out.push_str(&format!(
+            "pub const {const_prefix}_PIN_ROLE_{index}_ROUTES: &[metadata::PinRoute] = &{};\n",
+            render_pin_route_slice(&pin_role.routes)
+        ));
+    }
+    out.push_str(&format!(
+        "pub const {const_prefix}_PIN_ROLES: &[metadata::PinRole] = &{};\n",
+        render_pin_role_slice(const_prefix.as_str(), &driver.pin_roles)
+    ));
+    out.push_str(&format!(
+        "pub const {const_prefix}_INIT_OPERATIONS: &[metadata::SemanticOperation] = &{};\n",
+        render_semantic_operation_slice(&driver.init_operations)
+    ));
+    out.push_str(&format!(
+        "pub const {const_prefix}_STATE_MACHINES: &[metadata::SemanticStateMachine] = &{};\n",
+        render_semantic_state_machine_slice(&driver.state_machines)
+    ));
+    out.push_str(&format!(
+        "pub const {const_prefix}_CAPABILITY_TAGS: &[&str] = &{};\n\n",
+        render_named_entity_slice(&driver.capability_tags)
+    ));
+    out.push_str(&format!(
+        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n{support_items}\n{emulator_items}",
+        type_name = driver.type_name,
+        const_prefix = const_prefix,
+        methods = render_driver_methods(model, driver)?,
+        support_items = support_items,
+        emulator_items = emulator_items
+    ));
+    Ok(out)
+}
+
+fn render_embassy_host_driver_support_items(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    let mut out = String::new();
+    if driver.driver_kind == "gpio-port" {
+        out.push_str(&render_gpio_support_items(model, driver)?);
+    }
+    if has_time_driver_tag(&driver.capability_tags) {
+        out.push_str(&render_host_time_driver_support_items(driver));
+    }
+    Ok(out)
+}
+
+fn render_host_time_driver_support_items(driver: &ResolvedDriverInstance) -> String {
+    let init_fn = format!(
+        "initialize_{}_time_driver",
+        to_rust_const_name(&driver.id).to_lowercase()
+    );
+    let advance_fn = format!(
+        "advance_{}_time_driver",
+        to_rust_const_name(&driver.id).to_lowercase()
+    );
+    format!(
+        "\nuse std::sync::Mutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nconst SYST_CSR_ADDRESS: u64 = 0xE000_E010;\nconst SYST_RVR_ADDRESS: u64 = 0xE000_E014;\nconst SYST_CVR_ADDRESS: u64 = 0xE000_E018;\nconst SYST_CSR_ENABLE: u32 = 1 << 0;\nconst SYST_CSR_TICKINT: u32 = 1 << 1;\nconst SYST_CSR_CLKSOURCE: u32 = 1 << 2;\nconst SYST_RELOAD_VALUE: u32 = 15;\n\nstruct GeneratedSystickTimeDriverState {{\n    initialized: bool,\n    ticks: u64,\n    queue: EmbassyTimeQueue,\n}}\n\nstruct GeneratedSystickTimeDriver {{\n    state: Mutex<GeneratedSystickTimeDriverState>,\n}}\n\nimpl GeneratedSystickTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            state: Mutex::new(GeneratedSystickTimeDriverState {{\n                initialized: false,\n                ticks: 0,\n                queue: EmbassyTimeQueue::new(),\n            }}),\n        }}\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if state.initialized {{\n            return Ok(());\n        }}\n        state.ticks = 0;\n        metadata::write_u32(SYST_CSR_ADDRESS, 0)?;\n        metadata::write_u32(SYST_RVR_ADDRESS, SYST_RELOAD_VALUE)?;\n        metadata::write_u32(SYST_CVR_ADDRESS, 0)?;\n        metadata::write_u32(\n            SYST_CSR_ADDRESS,\n            SYST_CSR_ENABLE | SYST_CSR_TICKINT | SYST_CSR_CLKSOURCE,\n        )?;\n        state.initialized = true;\n        Ok(())\n    }}\n\n    fn advance(&self, ticks: u64) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if !state.initialized {{\n            return;\n        }}\n        state.ticks = state.ticks.wrapping_add(ticks);\n        let now = state.ticks;\n        let _ = state.queue.next_expiration(now);\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedSystickTimeDriver {{\n    fn now(&self) -> u64 {{\n        self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).ticks\n    }}\n\n    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        let now = state.ticks;\n        let _ = state.queue.schedule_wake(at, waker);\n        let _ = state.queue.next_expiration(now);\n    }}\n}}\n\nembassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedSystickTimeDriver = GeneratedSystickTimeDriver::new());\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.init()\n}}\n\nfn {advance_fn}(ticks: u64) {{\n    GENERATED_TIME_DRIVER.advance(ticks)\n}}\n"
+    )
+}
+
+fn render_embassy_host_driver_emulator(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    let mut out = format!(
+        "#[derive(Debug, Clone)]\npub struct {type_name}Emulator {{\n    state: metadata::SharedEmulatorState,\n}}\n\nimpl {type_name}Emulator {{\n    pub(crate) fn new(state: metadata::SharedEmulatorState) -> Self {{\n        Self {{ state }}\n    }}\n\n    pub fn read_register(&self, address: u64) -> Result<u32, metadata::Error> {{\n        metadata::read_u32_for(&self.state, address)\n    }}\n\n    pub fn write_register(&self, address: u64, value: u32) -> Result<(), metadata::Error> {{\n        metadata::write_u32_for(&self.state, address, value)\n    }}\n\n    pub fn modify_register(&self, address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metadata::Error> {{\n        metadata::modify_u32_for(&self.state, address, clear_mask, set_mask)\n    }}\n",
+        type_name = driver.type_name
+    );
+    if driver.driver_kind == "gpio-port" {
+        out.push_str(&render_host_gpio_emulator_methods(model, driver)?);
+    }
+    if matches!(driver.driver_kind.as_str(), "uart" | "usart") {
+        let has_tx = driver.pin_roles.iter().any(|role| role.signal == "TX");
+        let has_rx = driver.pin_roles.iter().any(|role| role.signal == "RX");
+        if has_rx {
+            out.push_str(&format!(
+                "    pub fn push_received_bytes(&self, bytes: &[u8]) -> Result<(), metadata::Error> {{\n        metadata::push_serial_rx_for(&self.state, {}, bytes)\n    }}\n\n",
+                render_rust_string(&driver.id),
+            ));
+        }
+        if has_tx {
+            out.push_str(&format!(
+                "    pub fn take_transmitted_bytes(&self) -> Vec<u8> {{\n        metadata::take_serial_tx_for(&self.state, {})\n    }}\n\n",
+                render_rust_string(&driver.id),
+            ));
+        }
+    }
+    if driver.driver_kind == "interrupt" {
+        out.push_str(
+            "    pub fn trigger(&self, irq: crate::interrupt::Irq) {\n        metadata::set_irq_pending_for(&self.state, irq as i32, true)\n    }\n\n    pub fn clear(&self, irq: crate::interrupt::Irq) {\n        metadata::set_irq_pending_for(&self.state, irq as i32, false)\n    }\n\n    pub fn is_pending(&self, irq: crate::interrupt::Irq) -> bool {\n        metadata::is_irq_pending_for(&self.state, irq as i32)\n    }\n\n",
+        );
+    }
+    if driver.driver_kind == "dma" {
+        out.push_str(
+            "    pub fn mark_route_complete(&self, route_id: &str) {\n        metadata::mark_dma_route_complete_for(&self.state, route_id)\n    }\n\n    pub fn completion_count(&self, route_id: &str) -> usize {\n        metadata::dma_route_completion_count_for(&self.state, route_id)\n    }\n\n",
+        );
+    }
+    if has_time_driver_tag(&driver.capability_tags) {
+        out.push_str(&format!(
+            "    pub fn advance_ticks(&self, ticks: u64) {{\n        advance_{}_time_driver(ticks)\n    }}\n\n",
+            to_rust_const_name(&driver.id).to_lowercase()
+        ));
+    }
+    out.push_str("}\n");
+    Ok(out)
+}
+
+fn render_host_gpio_emulator_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    let lowering = resolve_gpio_port_lowering(model, driver)?;
+    let mut out = String::new();
+    match lowering {
+        ResolvedGpioPortLowering::IndexedFields { idr, odr, pins, .. } => {
+            out.push_str(
+                "    pub fn set_input_level(&self, pin_name: &str, high: bool) -> Result<(), metadata::Error> {\n        match pin_name {\n",
+            );
+            for pin in &pins {
+                out.push_str(&format!(
+                    "            {} => metadata::modify_u32_for(&self.state, 0x{:X}u64, 0x{:08X}u32, if high {{ 0x{:08X}u32 }} else {{ 0x00000000u32 }})?,\n",
+                    render_rust_string(&pin.pin_name),
+                    idr.absolute_address,
+                    pin.idr_mask,
+                    pin.idr_mask,
+                ));
+            }
+            out.push_str(
+                "            _ => return Err(metadata::Error::InvalidReference(\"unknown GPIO pin\")),\n        }\n        Ok(())\n    }\n\n    pub fn output_level(&self, pin_name: &str) -> Result<bool, metadata::Error> {\n        match pin_name {\n",
+            );
+            for pin in &pins {
+                out.push_str(&format!(
+                    "            {} => Ok((metadata::read_u32_for(&self.state, 0x{:X}u64)? & 0x{:08X}u32) != 0),\n",
+                    render_rust_string(&pin.pin_name),
+                    odr.absolute_address,
+                    pin.odr_mask,
+                ));
+            }
+            out.push_str(
+                "            _ => Err(metadata::Error::InvalidReference(\"unknown GPIO pin\")),\n        }\n    }\n\n",
+            );
+        }
+        ResolvedGpioPortLowering::BitmaskRegisters { pins, .. } => {
+            out.push_str(
+                "    pub fn set_input_level(&self, pin_name: &str, high: bool) -> Result<(), metadata::Error> {\n        match pin_name {\n",
+            );
+            for pin in &pins {
+                out.push_str(&format!(
+                    "            {} => metadata::write_u32_for(&self.state, 0x{:X}u64, if high {{ 0x{:08X}u32 }} else {{ 0x00000000u32 }})?,\n",
+                    render_rust_string(&pin.pin_name),
+                    pin.data_alias_address,
+                    pin.bit_mask,
+                ));
+            }
+            out.push_str(
+                "            _ => return Err(metadata::Error::InvalidReference(\"unknown GPIO pin\")),\n        }\n        Ok(())\n    }\n\n    pub fn output_level(&self, pin_name: &str) -> Result<bool, metadata::Error> {\n        match pin_name {\n",
+            );
+            for pin in &pins {
+                out.push_str(&format!(
+                    "            {} => Ok(metadata::read_u32_for(&self.state, 0x{:X}u64)? != 0),\n",
+                    render_rust_string(&pin.pin_name),
+                    pin.data_alias_address,
+                ));
+            }
+            out.push_str(
+                "            _ => Err(metadata::Error::InvalidReference(\"unknown GPIO pin\")),\n        }\n    }\n\n",
+            );
+        }
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -8234,6 +8813,436 @@ mod tests {
             String::from_utf8_lossy(&cargo_output.stdout),
             String::from_utf8_lossy(&cargo_output.stderr)
         );
+    }
+
+    #[test]
+    fn generate_embassy_host_emits_compilable_crate_with_emulator_handles() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let document = load_validated_hair_document(fixture.path(), &repo_root)
+            .expect("embassy fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_host_crate(&document, output_dir.path()).expect("embassy-host generation");
+
+        assert!(output_dir.path().join("Cargo.toml").exists());
+        assert!(output_dir.path().join("src").join("host.rs").exists());
+        let host_rs = std::fs::read_to_string(output_dir.path().join("src").join("host.rs"))
+            .expect("host.rs");
+        let uart_rs = std::fs::read_to_string(output_dir.path().join("src").join("uart.rs"))
+            .expect("uart.rs");
+        let gpio_rs = std::fs::read_to_string(output_dir.path().join("src").join("gpio.rs"))
+            .expect("gpio.rs");
+        let spi_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("spi.rs")).expect("spi.rs");
+        let i2c_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("i2c.rs")).expect("i2c.rs");
+        let metadata_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("metadata.rs"))
+                .expect("metadata.rs");
+        assert!(host_rs.contains("pub struct HostEmulator"));
+        assert!(uart_rs.contains("pub struct Usart1Emulator"));
+        assert!(gpio_rs.contains("pub struct GpioAEmulator"));
+        assert!(!spi_rs.contains("push_received_bytes"));
+        assert!(!spi_rs.contains("take_transmitted_bytes"));
+        assert!(!i2c_rs.contains("push_received_bytes"));
+        assert!(!i2c_rs.contains("take_transmitted_bytes"));
+        assert!(metadata_rs.contains("thread_local!"));
+        assert!(metadata_rs.contains("pub struct CurrentEmulatorGuard"));
+        assert!(metadata_rs.contains("pub fn clear_current_emulator()"));
+        assert!(metadata_rs.contains("host emulator is not active on this thread"));
+        assert!(metadata_rs.contains("unknown serial driver"));
+        assert!(metadata_rs.contains("serial driver has no RX capability"));
+        assert!(host_rs.contains("pub fn activate_scoped(&self)"));
+        assert!(host_rs.contains("pub fn clear_active(&self)"));
+        assert!(host_rs.contains("impl Drop for HostEmulator"));
+
+        let tests_dir = output_dir.path().join("tests");
+        fs::create_dir_all(&tests_dir).expect("create tests dir");
+        fs::write(
+            tests_dir.join("host_smoke.rs"),
+            r#"use fixture_embassy_hal_host::host::HostEmulator;
+use fixture_embassy_hal_host::gpio::Level;
+use fixture_embassy_hal_host::interrupt::Irq;
+
+#[test]
+fn host_emulator_wires_hal_and_companion_state() {
+    assert!(fixture_embassy_hal_host::metadata::read_u32(0).is_err());
+
+    {
+        let host = HostEmulator::new();
+        assert!(fixture_embassy_hal_host::metadata::push_serial_rx_for(
+            &host.state(),
+            "serial.unknown",
+            b"X",
+        )
+        .is_err());
+
+        let gpio = host.gpio_a().expect("gpio");
+        let gpio_emulator = host.gpio_a_emulator();
+        let pin = gpio.pa0();
+        gpio_emulator.set_input_level("PA0", true).expect("set input high");
+        assert!(pin.is_high().expect("pin high"));
+        let output = pin.into_output(Level::Low).expect("output");
+        output.set_high().expect("set high");
+        assert!(gpio_emulator.output_level("PA0").expect("read output"));
+
+        let usart = host.usart1().expect("usart");
+        let usart_emulator = host.usart1_emulator();
+        usart_emulator.push_received_bytes(b"A").expect("inject rx");
+        assert_eq!(usart.read_byte().expect("read byte"), b'A');
+        usart.write_byte(b'B').expect("write byte");
+        assert_eq!(usart_emulator.take_transmitted_bytes(), b"B");
+
+        let dma = host.dma1_emulator();
+        dma.mark_route_complete("dmaroute.usart1_tx");
+        assert_eq!(dma.completion_count("dmaroute.usart1_tx"), 1);
+
+        let interrupt = host.pfic_emulator();
+        interrupt.trigger(Irq::USART1);
+        assert!(interrupt.is_pending(Irq::USART1));
+        interrupt.clear(Irq::USART1);
+        assert!(!interrupt.is_pending(Irq::USART1));
+
+        let host2 = HostEmulator::new();
+        let gpio2 = host2.gpio_a_emulator();
+        gpio_emulator.write_register(0x1234, 1).expect("write state 1");
+        gpio2.write_register(0x1234, 2).expect("write state 2");
+
+        fixture_embassy_hal_host::metadata::clear_current_emulator();
+        let _guard1 = host.activate_scoped();
+        assert_eq!(fixture_embassy_hal_host::metadata::read_u32(0x1234).expect("read host1"), 1);
+        {
+            let _guard2 = host2.activate_scoped();
+            assert_eq!(fixture_embassy_hal_host::metadata::read_u32(0x1234).expect("read host2"), 2);
+        }
+        assert_eq!(fixture_embassy_hal_host::metadata::read_u32(0x1234).expect("restore host1"), 1);
+        host.clear_active();
+        assert!(fixture_embassy_hal_host::metadata::read_u32(0x1234).is_err());
+    }
+
+    assert!(fixture_embassy_hal_host::metadata::read_u32(0).is_err());
+}
+"#,
+        )
+        .expect("write smoke test");
+
+        let cargo_output = Command::new("cargo")
+            .arg("test")
+            .arg("--quiet")
+            .current_dir(output_dir.path())
+            .output()
+            .expect("cargo test");
+        assert!(
+            cargo_output.status.success(),
+            "generated host crate should compile and pass smoke tests:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&cargo_output.stdout),
+            String::from_utf8_lossy(&cargo_output.stderr)
+        );
+    }
+
+    #[test]
+    fn generate_embassy_host_gates_serial_emulator_methods_by_pin_role() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let uart = drivers[2].as_object_mut().expect("uart driver");
+        let pin_roles = uart
+            .get_mut("pinRoles")
+            .and_then(Value::as_array_mut)
+            .expect("pinRoles");
+        pin_roles.retain(|role| {
+            role.as_object()
+                .and_then(|role| role.get("signal"))
+                .and_then(Value::as_str)
+                != Some("RX")
+        });
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("tx-only uart fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_host_crate(&validated, output_dir.path())
+            .expect("embassy-host generation");
+
+        let uart_rs = std::fs::read_to_string(output_dir.path().join("src").join("uart.rs"))
+            .expect("uart.rs");
+        assert!(!uart_rs.contains("push_received_bytes"));
+        assert!(uart_rs.contains("take_transmitted_bytes"));
+    }
+
+    #[test]
+    fn generate_embassy_host_rejects_reserved_host_module_name() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        drivers[0]
+            .as_object_mut()
+            .expect("rcc driver")
+            .insert("modulePath".to_string(), Value::String("host".to_string()));
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("reserved host module fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error = generate_embassy_host_crate(&validated, temp.path())
+            .expect_err("host generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("reserved generated host module name host")
+        );
+    }
+
+    #[test]
+    fn generate_embassy_host_rejects_colliding_accessor_names() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        drivers[0]
+            .as_object_mut()
+            .expect("rcc driver")
+            .insert("name".to_string(), Value::String("FooBar".to_string()));
+        drivers[1]
+            .as_object_mut()
+            .expect("gpio driver")
+            .insert("name".to_string(), Value::String("FooBAR".to_string()));
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("colliding accessor fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error = generate_embassy_host_crate(&validated, temp.path())
+            .expect_err("host generation should fail");
+        assert!(error.to_string().contains("HostEmulator method foo_bar"));
+    }
+
+    #[test]
+    fn generate_embassy_host_rejects_keyword_accessor_names() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        drivers[0]
+            .as_object_mut()
+            .expect("rcc driver")
+            .insert("name".to_string(), Value::String("Type".to_string()));
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("keyword accessor fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error = generate_embassy_host_crate(&validated, temp.path())
+            .expect_err("host generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("reserved Rust keyword type as HostEmulator method")
+        );
+    }
+
+    #[test]
+    fn generate_embassy_host_supports_interrupt_scoped_time_driver() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let interrupts = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("interrupts")
+            .and_then(Value::as_array_mut)
+            .expect("interrupts");
+        interrupts.push(serde_json::json!({
+            "id": "irq.systick",
+            "name": "SysTick",
+            "number": -1,
+            "controllerRef": "ic.nvic"
+        }));
+        let mcu = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object");
+        let interrupt_topology = mcu
+            .get_mut("interruptTopology")
+            .and_then(Value::as_object_mut)
+            .expect("interrupt topology");
+        interrupt_topology
+            .get_mut("sources")
+            .and_then(Value::as_array_mut)
+            .expect("interrupt sources")
+            .push(serde_json::json!({
+                "id": "isrc.systick",
+                "name": "SysTick source",
+                "sourceRef": "block.cpu0",
+                "producerRef": "block.cpu0",
+                "kind": "timer"
+            }));
+        interrupt_topology
+            .get_mut("routes")
+            .and_then(Value::as_array_mut)
+            .expect("interrupt routes")
+            .push(serde_json::json!({
+                "id": "iroute.systick",
+                "name": "SysTick route",
+                "sourceRef": "isrc.systick",
+                "interruptRef": "irq.systick",
+                "controllerRef": "block.pfic",
+                "cpuTargetRef": "block.cpu0",
+                "routeType": "hardwired"
+            }));
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let nvic = drivers
+            .iter()
+            .find(|driver| {
+                driver
+                    .as_object()
+                    .and_then(|driver| driver.get("driverKind"))
+                    .and_then(Value::as_str)
+                    == Some("interrupt")
+            })
+            .expect("interrupt driver")
+            .clone();
+        let mut time_driver = nvic.as_object().expect("nvic object").clone();
+        time_driver.insert("id".to_string(), Value::String("drv.time".to_string()));
+        time_driver.insert("name".to_string(), Value::String("Time".to_string()));
+        time_driver.insert("modulePath".to_string(), Value::String("time".to_string()));
+        time_driver.insert(
+            "interruptRouteRefs".to_string(),
+            serde_json::json!(["iroute.systick"]),
+        );
+        time_driver.insert(
+            "capabilityTags".to_string(),
+            serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
+        );
+        drivers.push(Value::Object(time_driver));
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("interrupt time-driver fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+        generate_embassy_host_crate(&validated, output_dir.path())
+            .expect("embassy-host generation");
+
+        let cargo_toml = std::fs::read_to_string(output_dir.path().join("Cargo.toml"))
+            .expect("generated Cargo.toml");
+        let lib_rs = std::fs::read_to_string(output_dir.path().join("src").join("lib.rs"))
+            .expect("generated lib.rs");
+        let host_rs = std::fs::read_to_string(output_dir.path().join("src").join("host.rs"))
+            .expect("generated host.rs");
+        let time_rs = std::fs::read_to_string(output_dir.path().join("src").join("time.rs"))
+            .expect("generated time module");
+        assert!(cargo_toml.contains("embassy-time-driver"));
+        assert!(cargo_toml.contains("embassy-time-queue-utils"));
+        assert!(lib_rs.contains("pub mod time;"));
+        assert!(host_rs.contains("pub fn time(&self)"));
+        assert!(host_rs.contains("pub fn time_emulator(&self)"));
+        assert!(time_rs.contains("init_time_driver"));
+        assert!(time_rs.contains("advance_drv_time_time_driver"));
+        assert!(time_rs.contains("state.ticks = state.ticks.wrapping_add(ticks);"));
+        assert!(!time_rs.contains("for _ in 0..ticks"));
+        assert!(time_rs.contains("time_driver_impl!"));
+
+        let cargo_output = Command::new("cargo")
+            .arg("check")
+            .current_dir(output_dir.path())
+            .output()
+            .expect("cargo check");
+        assert!(
+            cargo_output.status.success(),
+            "generated time-driver host crate should compile:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&cargo_output.stdout),
+            String::from_utf8_lossy(&cargo_output.stderr)
+        );
+    }
+
+    #[test]
+    fn embassy_generation_model_keeps_interrupt_module_when_interrupt_driver_moves() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let document = load_validated_hair_document(fixture.path(), &repo_root)
+            .expect("embassy fixture should validate");
+        let mut model = EmbassyGenerationModel::from_document(&document).expect("generation model");
+        model.interrupts.clear();
+        let interrupt_driver = model
+            .drivers
+            .iter_mut()
+            .find(|driver| driver.driver_kind == "interrupt")
+            .expect("interrupt driver");
+        interrupt_driver.module_name = "irqctl".to_string();
+
+        let module_names = model.module_names();
+        let driver_groups = model.driver_groups();
+
+        assert!(module_names.iter().any(|name| name == "interrupt"));
+        assert!(driver_groups.iter().any(|(name, _)| name == "interrupt"));
+        assert!(driver_groups.iter().any(|(name, _)| name == "irqctl"));
     }
 
     #[test]
