@@ -26,6 +26,10 @@ You require:
 - a natural-language description of the desired change
 - any existing requirements, design notes, validation notes, issue links,
   or user constraints relevant to the change
+- if the canonical governing-spec baseline
+  (`specs/requirements.md`, `specs/design.md`, `specs/validation.md`) is
+  missing and the user does not provide equivalent governing artifacts,
+  stop and run `.github/skills/bootstrap/SKILL.md` first
 - optional focus areas or file paths, if the user wants to narrow scope
 
 Discover the target project root at execution time by locating the
@@ -79,6 +83,8 @@ context. Start with:
 - `README.md`
 - `docs/schema.md`
 - `docs/mcu-profile.md`
+- `docs/embassy-hal-profile.md`
+- `docs/cli.md`
 - `schema/common.json`
 - `schema/hair.json`
 - `schema/provenance.json`
@@ -88,9 +94,14 @@ context. Start with:
 - `schema/normalization.json`
 - `schema/validation.json`
 - `schema/profiles/mcu.json`
+- `schema/profiles/embassy-hal.json`
 - `schema/evidence-manifest.json`
+- `.github/skills/bootstrap/SKILL.md`
 - `.github/skills/extract/SKILL.md`
 - `.github/skills/find-mcu-sources/SKILL.md`
+- `specs/requirements.md` *(when present)*
+- `specs/design.md` *(when present)*
+- `specs/validation.md` *(when present)*
 
 If Rust tooling exists, also inspect the relevant:
 
@@ -103,6 +114,8 @@ Grounding rules:
 
 - HAIR is a schema-first repository; documentation and schema changes are
   first-class artifacts
+- the default governing repository baseline, once bootstrapped, lives in
+  `specs/requirements.md`, `specs/design.md`, and `specs/validation.md`
 - one HAIR document still represents one concrete device variant
 - extraction and evidence workflows must remain aligned with the schema
 - when a change touches Rust tooling, apply Rust memory-safety discipline
@@ -118,6 +131,7 @@ Grounding rules:
 2. Ask clarifying questions about scope, edge cases, acceptance
    criteria, and non-goals.
 3. Identify the affected HAIR artifacts:
+   - governing requirements/design/validation artifacts
    - schema files
    - docs
    - evidence/workflow assets
@@ -129,6 +143,10 @@ Grounding rules:
 
 Do **not** proceed to Phase 2 until the user explicitly confirms the
 discovery phase is complete.
+
+If no governing repository baseline exists yet and the user did not supply
+equivalent artifacts, stop here and bootstrap that baseline with
+`.github/skills/bootstrap/SKILL.md` before evolving the repository.
 
 ### Phase 2: Specification Changes
 

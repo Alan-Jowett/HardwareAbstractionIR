@@ -24,6 +24,10 @@ You require:
 
 - the current repository state
 - the relevant requirements/design/validation artifacts if they exist
+- if the canonical governing-spec baseline
+  (`specs/requirements.md`, `specs/design.md`, `specs/validation.md`) is
+  missing and the user does not provide equivalent governing artifacts,
+  stop and run `.github/skills/bootstrap/SKILL.md` first
 - the implementation and verification roots if the repo contains
   supporting tools
 - optional focus areas and recent-change context from the user
@@ -77,6 +81,8 @@ Start with:
 - `README.md`
 - `docs/schema.md`
 - `docs/mcu-profile.md`
+- `docs/embassy-hal-profile.md`
+- `docs/cli.md`
 - `schema/common.json`
 - `schema/hair.json`
 - `schema/provenance.json`
@@ -86,10 +92,15 @@ Start with:
 - `schema/normalization.json`
 - `schema/validation.json`
 - `schema/profiles/mcu.json`
+- `schema/profiles/embassy-hal.json`
 - `schema/evidence-manifest.json`
+- `.github/skills/bootstrap/SKILL.md`
 - `.github/skills/extract/SKILL.md`
 - `.github/skills/find-mcu-sources/SKILL.md`
 - `.github/skills/evolve/SKILL.md`
+- `specs/requirements.md` *(when present)*
+- `specs/design.md` *(when present)*
+- `specs/validation.md` *(when present)*
 
 If Rust tooling exists, also inspect the relevant:
 
@@ -102,6 +113,8 @@ Grounding rules:
 
 - the maintenance baseline spans schema, documentation, evidence
   workflows, and implementation artifacts
+- the default governing repository baseline, once bootstrapped, lives in
+  `specs/requirements.md`, `specs/design.md`, and `specs/validation.md`
 - HAIR extraction and evidence-manifest flows must remain aligned with
   the schema
 - when Rust tooling exists, drift can exist in both semantic behavior and
@@ -136,6 +149,10 @@ Audit the repository for drift across all relevant layers.
 
 Do **not** proceed to Phase 2 until the audit is complete and the
 findings have been presented to the user.
+
+If the governing repository baseline is missing and the user did not
+provide equivalent artifacts, stop here and bootstrap that baseline with
+`.github/skills/bootstrap/SKILL.md` before classifying maintenance drift.
 
 ### Phase 2: Human Classification Loop
 
