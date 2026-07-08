@@ -232,6 +232,10 @@ fn generate_embassy_crate(document: &HairDocument, output_dir: &Path) -> Result<
 
 fn generate_embassy_host_crate(document: &HairDocument, output_dir: &Path) -> Result<()> {
     let model = EmbassyGenerationModel::from_document(document)?;
+    validate_reserved_generated_module_names(
+        &model,
+        &[("host", "reserved generated host module name host")],
+    )?;
     let src_dir = output_dir.join("src");
     fs::create_dir_all(&src_dir)
         .with_context(|| format!("creating output directory {}", src_dir.display()))?;
@@ -2068,6 +2072,21 @@ fn validate_module_name(module_path: &str) -> Result<String> {
         bail!("modulePath {module_path} normalizes to reserved generated module name metadata");
     }
     Ok(normalized)
+}
+
+fn validate_reserved_generated_module_names(
+    model: &EmbassyGenerationModel,
+    reserved: &[(&str, &str)],
+) -> Result<()> {
+    for module_name in model.module_names() {
+        if let Some((_, message)) = reserved
+            .iter()
+            .find(|(reserved_name, _)| module_name == *reserved_name)
+        {
+            bail!("modulePath {module_name} normalizes to {message}");
+        }
+    }
+    Ok(())
 }
 
 fn render_module_provenance_const(module_name: &str) -> String {
@@ -8904,6 +8923,40 @@ fn host_emulator_wires_hal_and_companion_state() {
             .expect("uart.rs");
         assert!(!uart_rs.contains("push_received_bytes"));
         assert!(uart_rs.contains("take_transmitted_bytes"));
+    }
+
+    #[test]
+    fn generate_embassy_host_rejects_reserved_host_module_name() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        drivers[0]
+            .as_object_mut()
+            .expect("rcc driver")
+            .insert("modulePath".to_string(), Value::String("host".to_string()));
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("reserved host module fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error = generate_embassy_host_crate(&validated, temp.path())
+            .expect_err("host generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("reserved generated host module name host")
+        );
     }
 
     #[test]
