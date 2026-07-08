@@ -70,7 +70,9 @@ First-cut behavior:
 - allow a `usb-device` driver instance to lower only the explicitly justified
   subset of endpoint-oriented and/or serial-style USB behaviors, including
   vendor-specific paths such as ESP32-C3 USB Serial/JTAG when the approved HAIR
-  document models that path explicitly
+  document models that path explicitly, and require an explicit profile-level
+  lowering selector when the chosen USB family has materially distinct
+  bring-up behavior
 - preserve the generator-relevant structured subset of referenced topology and semantic inputs in the emitted Rust metadata so downstream code does not lose control refs, remap data, or executable semantic structure that the approved HAIR document already provides
 - emit register-level code only for methods that can be justified by explicit HAIR lowering inputs, and fail explicitly when the requested or implied behavior is underspecified
 - fail explicitly when the input document falls outside the documented supported subset or omits generator-required topology, semantics, or bindings documented in `docs/embassy-hal-profile.md`

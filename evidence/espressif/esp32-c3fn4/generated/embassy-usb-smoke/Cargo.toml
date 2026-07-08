@@ -1,0 +1,16 @@
+[package]
+name = "embassy-usb-smoke"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+esp-bootloader-esp-idf = { version = "0.5.0", features = ["esp32c3"] }
+esp-hal = { version = "1.1.1", features = ["esp32c3"] }
+esp32c3fn4_generated = { package = "esp32c3fn4-generated", path = "../embassy" }
+panic-halt = "1.0"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"

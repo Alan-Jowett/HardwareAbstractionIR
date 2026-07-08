@@ -211,7 +211,11 @@ Embassy profile contract.
   relevant endpoint or FIFO control/data path explicitly. If the generated
   surface claims serial-style byte-stream helpers, those helpers shall remain
   traceable to an approved device-specific USB data path rather than to a
-  repository-invented generic USB stack.
+  repository-invented generic USB stack. If a USB lowering family has
+  materially distinct bring-up behavior, the profile shall also carry an
+  explicit lowering selector for that family and the referenced semantic
+  operations shall justify the exact attach/reset-preservation pattern the
+  generator emits.
 - Unsupported driver kinds, unresolved references, missing lowering inputs,
   and out-of-subset requests fail explicitly.
 

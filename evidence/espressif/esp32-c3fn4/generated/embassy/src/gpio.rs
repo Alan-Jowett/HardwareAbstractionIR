@@ -124,6 +124,7 @@ pub struct GPIOPortResources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -137,6 +138,7 @@ pub const DRV_GPIO_RESOURCES: GPIOPortResources = GPIOPortResources {
     pins: DRV_GPIO_PIN_ROLES,
     init_operations: DRV_GPIO_INIT_OPERATIONS,
     state_machines: DRV_GPIO_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_GPIO_CAPABILITY_TAGS,
 };
 

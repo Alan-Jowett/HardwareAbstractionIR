@@ -119,6 +119,11 @@ cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-
   endpoint/FIFO-oriented device records or to an approved device-specific
   serial-style USB path such as ESP32-C3 USB Serial/JTAG; generation must fail
   explicitly rather than synthesizing a generic USB stack from partial evidence.
+- If a `usb-device` driver instance selects a lowering family whose bring-up
+  behavior is materially specific (for example a boot-link-preserving USB
+  Serial/JTAG path), generation succeeds only when the profile carries that
+  explicit selector and the referenced semantic operations justify the emitted
+  attach/reset-preservation sequence; otherwise generation fails explicitly.
 
 ## 3. Artifact-level validation
 

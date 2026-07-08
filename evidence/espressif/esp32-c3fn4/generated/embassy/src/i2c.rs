@@ -91,6 +91,7 @@ pub struct I2c0Resources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -104,6 +105,7 @@ pub const DRV_I2C0_RESOURCES: I2c0Resources = I2c0Resources {
     pins: DRV_I2C0_PIN_ROLES,
     init_operations: DRV_I2C0_INIT_OPERATIONS,
     state_machines: DRV_I2C0_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_I2C0_CAPABILITY_TAGS,
 };
 

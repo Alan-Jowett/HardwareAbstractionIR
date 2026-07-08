@@ -99,6 +99,7 @@ pub struct InterruptMatrixResources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -112,6 +113,7 @@ pub const DRV_IRQ_RESOURCES: InterruptMatrixResources = InterruptMatrixResources
     pins: DRV_IRQ_PIN_ROLES,
     init_operations: DRV_IRQ_INIT_OPERATIONS,
     state_machines: DRV_IRQ_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_IRQ_CAPABILITY_TAGS,
 };
 

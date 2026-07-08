@@ -193,6 +193,13 @@ register/field data. Device-specific USB transport shapes such as the
 ESP32-C3 USB Serial/JTAG FIFO path are valid first-cut lowering families when
 the approved HAIR records make that path explicit; the generator must not
 pretend that one vendor-specific path implies a universal generic USB stack.
+When a supported USB lowering family also depends on family-specific bring-up
+policy, that policy must be selected explicitly in `profiles.embassyHal`
+rather than hidden inside generator heuristics. For example, a
+`serial-jtag-preserve-link` lowering family may require the generator to
+preserve a boot-established USB Serial/JTAG link instead of emitting a generic
+reset-and-reattach sequence; that distinction belongs in the approved profile
+contract plus referenced semantic operations, not in ad hoc code generation.
 
 When a document also carries explicit normalization canonical mappings, Embassy
 lowering may use those mappings as secondary resolution hints for supported

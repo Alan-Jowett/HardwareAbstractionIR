@@ -1644,6 +1644,8 @@ struct EmbassyDriverInstance {
     driver_kind: String,
     module_path: String,
     #[serde(default)]
+    lowering_pattern: Option<String>,
+    #[serde(default)]
     clock_binding_refs: Vec<String>,
     #[serde(default)]
     reset_binding_refs: Vec<String>,
@@ -1693,6 +1695,7 @@ struct ResolvedDriverInstance {
     type_name: String,
     driver_kind: String,
     module_name: String,
+    lowering_pattern: Option<String>,
     target: McuCanonicalBlock,
     clock_bindings: Vec<McuClockBinding>,
     reset_bindings: Vec<McuResetBinding>,
@@ -1727,9 +1730,19 @@ struct DriverResourceScopeInputs<'a> {
 }
 
 const EMBASSY_TIME_DRIVER_TAG: &str = "embassy-time-driver";
+const USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK: &str = "serial-jtag-preserve-link";
+const USB_PRESERVE_LINK_OPERATION_ID: &str = "op.usb_device.preserve_serial_jtag_link";
 
 fn has_time_driver_tag(tags: &[String]) -> bool {
     tags.iter().any(|tag| tag == EMBASSY_TIME_DRIVER_TAG)
+}
+
+fn has_usb_preserve_link_lowering(pattern: Option<&str>) -> bool {
+    matches!(pattern, Some(USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK))
+}
+
+fn driver_uses_usb_preserve_link_lowering(driver: &ResolvedDriverInstance) -> bool {
+    has_usb_preserve_link_lowering(driver.lowering_pattern.as_deref())
 }
 
 fn is_systick_interrupt_ref(interrupt_ref: &str) -> bool {
@@ -2011,6 +2024,7 @@ impl EmbassyGenerationModel {
                 state_machines: &state_machines,
             };
             validate_driver_requirements(driver, &requirements)?;
+            validate_driver_lowering_pattern(driver, &init_operations)?;
 
             drivers.push(ResolvedDriverInstance {
                 id: driver.id.clone(),
@@ -2018,6 +2032,7 @@ impl EmbassyGenerationModel {
                 type_name: to_rust_type_name(&driver.name),
                 driver_kind: driver.driver_kind.clone(),
                 module_name,
+                lowering_pattern: driver.lowering_pattern.clone(),
                 target,
                 clock_bindings,
                 reset_bindings,
@@ -3062,6 +3077,108 @@ fn validate_driver_requirements(
     Ok(())
 }
 
+fn validate_driver_lowering_pattern(
+    driver: &EmbassyDriverInstance,
+    init_operations: &[SemanticOperation],
+) -> Result<()> {
+    let Some(pattern) = driver.lowering_pattern.as_deref() else {
+        return Ok(());
+    };
+
+    if driver.driver_kind != "usb-device" {
+        bail!(
+            "driver {} uses loweringPattern {} but first-cut lowering patterns are only supported on usb-device drivers",
+            driver.id,
+            pattern
+        );
+    }
+
+    match pattern {
+        USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK => {
+            validate_usb_preserve_link_lowering(driver, init_operations)
+        }
+        other => bail!(
+            "driver {} uses unsupported loweringPattern {}",
+            driver.id,
+            other
+        ),
+    }
+}
+
+fn validate_usb_preserve_link_lowering(
+    driver: &EmbassyDriverInstance,
+    init_operations: &[SemanticOperation],
+) -> Result<()> {
+    let operation = init_operations
+        .iter()
+        .find(|operation| operation.id == USB_PRESERVE_LINK_OPERATION_ID)
+        .ok_or_else(|| {
+            anyhow!(
+                "usb-device driver {} loweringPattern {} requires init operation {}",
+                driver.id,
+                USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK,
+                USB_PRESERVE_LINK_OPERATION_ID
+            )
+        })?;
+
+    if operation.steps.is_empty() {
+        bail!(
+            "operation {} on driver {} must contain explicit preserve-link steps",
+            operation.id,
+            driver.id
+        );
+    }
+
+    for step in &operation.steps {
+        if step.action != "write" {
+            bail!(
+                "operation {} on driver {} uses unsupported action {} for loweringPattern {}",
+                operation.id,
+                driver.id,
+                step.action,
+                USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK
+            );
+        }
+        let target_ref = step.target_ref.as_deref().ok_or_else(|| {
+            anyhow!(
+                "operation {} step {} on driver {} is missing targetRef",
+                operation.id,
+                step.index,
+                driver.id
+            )
+        })?;
+        let parsed = parse_field_write_expression(
+            step.expression.as_ref(),
+            step.value.as_ref(),
+            &operation.id,
+            step.index,
+        )?;
+        let register_name = normalize_search_text(last_ref_segment(target_ref));
+        let field_name = normalize_search_text(&parsed.field_name);
+        let supported = matches!(
+            (register_name.as_str(), field_name.as_str(), parsed.value),
+            ("INTENA", "SERIALINEMPTYINTENA", 0)
+                | ("INTENA", "SERIALOUTRECVPKTINTENA", 0)
+                | ("INTCLR", "SERIALINEMPTYINTCLR", 1)
+                | ("INTCLR", "SERIALOUTRECVPKTINTCLR", 1)
+        );
+        if !supported {
+            bail!(
+                "operation {} step {} on driver {} is not compatible with loweringPattern {}: {} -> {} = {}",
+                operation.id,
+                step.index,
+                driver.id,
+                USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK,
+                register_name,
+                field_name,
+                parsed.value
+            );
+        }
+    }
+
+    Ok(())
+}
+
 fn to_rust_type_name(text: &str) -> String {
     let mut output = String::new();
     let mut capitalize = true;
@@ -3284,9 +3401,10 @@ fn render_driver_instance(
         render_named_entity_slice(&driver.capability_tags)
     ));
     out.push_str(&format!(
-        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n{support_items}",
+        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub lowering_pattern: Option<&'static str>,\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    lowering_pattern: {lowering_pattern},\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n{support_items}",
         type_name = driver.type_name,
         const_prefix = const_prefix,
+        lowering_pattern = render_optional_rust_string(driver.lowering_pattern.as_deref()),
         methods = render_driver_methods(model, driver)?,
         support_items = support_items
     ));
@@ -3393,6 +3511,9 @@ fn render_clock_binding_methods(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
 ) -> Result<Vec<GeneratedMethod>> {
+    if driver_uses_usb_preserve_link_lowering(driver) {
+        return Ok(Vec::new());
+    }
     let multi_binding_names = driver.clock_bindings.len() > 1 || driver.driver_kind == "rcc";
     let mut subject_counts = BTreeMap::<String, usize>::new();
     for binding in &driver.clock_bindings {
@@ -3468,6 +3589,9 @@ fn render_reset_binding_methods(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
 ) -> Result<Vec<GeneratedMethod>> {
+    if driver_uses_usb_preserve_link_lowering(driver) {
+        return Ok(Vec::new());
+    }
     let multi_binding_names = driver.reset_bindings.len() > 1 || driver.driver_kind == "rcc";
     let mut subject_counts = BTreeMap::<String, usize>::new();
     for binding in &driver.reset_bindings {
@@ -5020,7 +5144,9 @@ fn render_usb_device_methods(
 
     let mut methods = Vec::new();
 
-    if let Some(conf0) = try_resolve_target_register_by_name(model, target_ref, "CONF0")? {
+    if !driver_uses_usb_preserve_link_lowering(driver)
+        && let Some(conf0) = try_resolve_target_register_by_name(model, target_ref, "CONF0")?
+    {
         if let Some(usb_pad_enable) = try_resolve_register_field(&conf0, "USB_PAD_ENABLE") {
             methods.push(render_register_write_method(
                 "enable_usb_pad".to_string(),
@@ -8831,9 +8957,10 @@ fn render_embassy_host_driver_instance(
         render_named_entity_slice(&driver.capability_tags)
     ));
     out.push_str(&format!(
-        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n{support_items}\n{emulator_items}",
+        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub lowering_pattern: Option<&'static str>,\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    lowering_pattern: {lowering_pattern},\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n{support_items}\n{emulator_items}",
         type_name = driver.type_name,
         const_prefix = const_prefix,
+        lowering_pattern = render_optional_rust_string(driver.lowering_pattern.as_deref()),
         methods = render_driver_methods(model, driver)?,
         support_items = support_items,
         emulator_items = emulator_items
@@ -10679,9 +10806,56 @@ fn host_emulator_tracks_esp_gpio_output_level() {
         let usb_rs = std::fs::read_to_string(output_dir.path().join("src").join("usb.rs"))
             .expect("generated usb.rs");
         assert!(lib_rs.contains("pub mod usb;"));
-        assert!(usb_rs.contains("pub fn enable_usb_pad(&self)"));
+        assert!(usb_rs.contains("pub fn apply_preserve_serial_jtag_link(&self)"));
+        assert!(usb_rs.contains("lowering_pattern: Some(\"serial-jtag-preserve-link\")"));
+        assert!(!usb_rs.contains("pub fn enable_usb_pad(&self)"));
+        assert!(!usb_rs.contains("pub fn assert_reset(&self)"));
         assert!(usb_rs.contains("pub fn write_serial_packet(&self, bytes: &[u8])"));
         assert!(usb_rs.contains("pub fn is_usb_bus_reset_pending(&self)"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_usb_preserve_link_pattern_without_required_operation() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let mut document = load_json_file(
+            &repo_root
+                .join("evidence")
+                .join("espressif")
+                .join("esp32-c3fn4")
+                .join("hair.json"),
+        )
+        .expect("esp32-c3 hair json");
+
+        let profiles = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object");
+        let drivers = profiles
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let usb_driver = drivers
+            .iter_mut()
+            .find(|driver| driver["id"] == "drv.usb_device")
+            .and_then(Value::as_object_mut)
+            .expect("usb driver");
+        usb_driver.insert(
+            "initOperationRefs".to_string(),
+            serde_json::json!(["op.usb_device.complete_serial_in_packet"]),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("mutated esp32-c3 hair should still validate structurally");
+        let output_dir = tempdir().expect("tempdir");
+        let error = generate_embassy_crate(&validated, output_dir.path())
+            .expect_err("generation should fail without preserve-link operation");
+        assert!(error.to_string().contains(USB_PRESERVE_LINK_OPERATION_ID));
     }
 
     #[test]

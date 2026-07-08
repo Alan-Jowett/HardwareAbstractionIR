@@ -76,7 +76,7 @@ pub const DRV_USB_DEVICE_DMA_ROUTES: &[metadata::DmaRoute] = &[];
 pub const DRV_USB_DEVICE_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.usb.dm.gpio18", name: "USB D- on GPIO18", pin_ref: "pin.gpio18", peripheral_ref: "per.usb_device", signal: "USB_D-", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
 pub const DRV_USB_DEVICE_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.usb.dp.gpio19", name: "USB D+ on GPIO19", pin_ref: "pin.gpio19", peripheral_ref: "per.usb_device", signal: "USB_D+", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
 pub const DRV_USB_DEVICE_PIN_ROLES: &[metadata::PinRole] = &[metadata::PinRole { role: "dm", signal: "USB_D-", routes: DRV_USB_DEVICE_PIN_ROLE_0_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "dp", signal: "USB_D+", routes: DRV_USB_DEVICE_PIN_ROLE_1_ROUTES, requirement: metadata::ResourceRequirement::Required }];
-pub const DRV_USB_DEVICE_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[metadata::SemanticOperation { id: "op.usb_device.attach_serial_jtag", name: "Attach USB Serial/JTAG pads", description: None, kind: Some("initialization"), target_refs: &["per.usb_device"], steps: &[metadata::SemanticOperationStep { index: 0, action: "write", target_ref: Some("reg.usb_device.conf0"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Set PHY_SEL" }), value: None, description: Some("Select the on-chip USB device PHY.") }, metadata::SemanticOperationStep { index: 1, action: "write", target_ref: Some("reg.usb_device.conf0"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Set PAD_PULL_OVERRIDE" }), value: None, description: Some("Let software drive the D+ and D- pull resistors for attach signaling.") }, metadata::SemanticOperationStep { index: 2, action: "write", target_ref: Some("reg.usb_device.conf0"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Clear DP_PULLDOWN" }), value: None, description: Some("Release the D+ pull-down before advertising the device.") }, metadata::SemanticOperationStep { index: 3, action: "write", target_ref: Some("reg.usb_device.conf0"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Clear DM_PULLDOWN" }), value: None, description: Some("Release the D- pull-down before advertising the device.") }, metadata::SemanticOperationStep { index: 4, action: "write", target_ref: Some("reg.usb_device.conf0"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Set USB_PAD_ENABLE" }), value: None, description: Some("Enable the USB pad drivers on GPIO18 and GPIO19.") }, metadata::SemanticOperationStep { index: 5, action: "write", target_ref: Some("reg.usb_device.conf0"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Set DP_PULLUP" }), value: None, description: Some("Advertise a full-speed USB device attach on D+.") }], preconditions: &[], postconditions: &[] }, metadata::SemanticOperation { id: "op.usb_device.complete_serial_in_packet", name: "Commit USB Serial/JTAG IN packet", description: None, kind: Some("transaction"), target_refs: &["per.usb_device"], steps: &[metadata::SemanticOperationStep { index: 0, action: "write", target_ref: Some("reg.usb_device.ep1_conf"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Set WR_DONE" }), value: None, description: Some("Hand the queued Serial IN bytes to the host-visible endpoint.") }], preconditions: &[], postconditions: &[] }];
+pub const DRV_USB_DEVICE_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[metadata::SemanticOperation { id: "op.usb_device.preserve_serial_jtag_link", name: "Preserve boot-established USB Serial/JTAG link", description: None, kind: Some("initialization"), target_refs: &["per.usb_device"], steps: &[metadata::SemanticOperationStep { index: 0, action: "write", target_ref: Some("reg.usb_device.int_ena"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Clear SERIAL_IN_EMPTY_INT_ENA" }), value: None, description: Some("Disable the Serial IN empty interrupt so firmware can start from a quiescent USB Serial/JTAG state without forcing a reattach.") }, metadata::SemanticOperationStep { index: 1, action: "write", target_ref: Some("reg.usb_device.int_ena"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Clear SERIAL_OUT_RECV_PKT_INT_ENA" }), value: None, description: Some("Disable the Serial OUT packet interrupt so bring-up preserves the boot-established link instead of depending on a fresh attach sequence.") }, metadata::SemanticOperationStep { index: 2, action: "write", target_ref: Some("reg.usb_device.int_clr"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Set SERIAL_IN_EMPTY_INT_CLR" }), value: None, description: Some("Clear any stale Serial IN empty interrupt state left by the boot ROM or previous firmware.") }, metadata::SemanticOperationStep { index: 3, action: "write", target_ref: Some("reg.usb_device.int_clr"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Set SERIAL_OUT_RECV_PKT_INT_CLR" }), value: None, description: Some("Clear any stale Serial OUT packet interrupt state while leaving the active USB Serial/JTAG connection intact.") }], preconditions: &[], postconditions: &[] }, metadata::SemanticOperation { id: "op.usb_device.complete_serial_in_packet", name: "Commit USB Serial/JTAG IN packet", description: None, kind: Some("transaction"), target_refs: &["per.usb_device"], steps: &[metadata::SemanticOperationStep { index: 0, action: "write", target_ref: Some("reg.usb_device.ep1_conf"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Set WR_DONE" }), value: None, description: Some("Hand the queued Serial IN bytes to the host-visible endpoint.") }], preconditions: &[], postconditions: &[] }];
 pub const DRV_USB_DEVICE_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_USB_DEVICE_CAPABILITY_TAGS: &[&str] = &[];
 
@@ -91,6 +91,7 @@ pub struct UsbSerialJtagResources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -104,6 +105,7 @@ pub const DRV_USB_DEVICE_RESOURCES: UsbSerialJtagResources = UsbSerialJtagResour
     pins: DRV_USB_DEVICE_PIN_ROLES,
     init_operations: DRV_USB_DEVICE_INIT_OPERATIONS,
     state_machines: DRV_USB_DEVICE_STATE_MACHINES,
+    lowering_pattern: Some("serial-jtag-preserve-link"),
     capability_tags: DRV_USB_DEVICE_CAPABILITY_TAGS,
 };
 
@@ -120,66 +122,6 @@ impl UsbSerialJtag {
     pub fn resources(&self) -> UsbSerialJtagResources {
         self.resources
     }
-    /// Enable the USB_DEVICE clock gate.
-    pub fn enable_clock(&self) -> Result<(), metadata::Error> {
-        modify_u32(0x600C0010u64, 0x00800000u32, 0x00800000u32)?;
-        Ok(())
-    }
-
-    /// Disable the USB_DEVICE clock gate.
-    pub fn disable_clock(&self) -> Result<(), metadata::Error> {
-        modify_u32(0x600C0010u64, 0x00800000u32, 0x00000000u32)?;
-        Ok(())
-    }
-
-    /// Assert reset for USB_DEVICE.
-    pub fn assert_reset(&self) -> Result<(), metadata::Error> {
-        modify_u32(0x600C0018u64, 0x00800000u32, 0x00800000u32)?;
-        Ok(())
-    }
-
-    /// Release reset for USB_DEVICE.
-    pub fn release_reset(&self) -> Result<(), metadata::Error> {
-        modify_u32(0x600C0018u64, 0x00800000u32, 0x00000000u32)?;
-        Ok(())
-    }
-
-    /// Enable the UsbSerialJtag USB pad drivers.
-    pub fn enable_usb_pad(&self) -> Result<(), metadata::Error> {
-        modify_u32(0x60043018u64, 0x00004000u32, 0x00004000u32)?;
-        Ok(())
-    }
-
-    /// Disable the UsbSerialJtag USB pad drivers.
-    pub fn disable_usb_pad(&self) -> Result<(), metadata::Error> {
-        modify_u32(0x60043018u64, 0x00004000u32, 0x00000000u32)?;
-        Ok(())
-    }
-
-    /// Enable the UsbSerialJtag D+ pull-up.
-    pub fn enable_dp_pullup(&self) -> Result<(), metadata::Error> {
-        modify_u32(0x60043018u64, 0x00000200u32, 0x00000200u32)?;
-        Ok(())
-    }
-
-    /// Disable the UsbSerialJtag D+ pull-up.
-    pub fn disable_dp_pullup(&self) -> Result<(), metadata::Error> {
-        modify_u32(0x60043018u64, 0x00000200u32, 0x00000000u32)?;
-        Ok(())
-    }
-
-    /// Let UsbSerialJtag pad pull control follow software override bits.
-    pub fn enable_pad_pull_override(&self) -> Result<(), metadata::Error> {
-        modify_u32(0x60043018u64, 0x00000100u32, 0x00000100u32)?;
-        Ok(())
-    }
-
-    /// Release UsbSerialJtag pad pull control back to hardware defaults.
-    pub fn disable_pad_pull_override(&self) -> Result<(), metadata::Error> {
-        modify_u32(0x60043018u64, 0x00000100u32, 0x00000000u32)?;
-        Ok(())
-    }
-
     /// Return whether the UsbSerialJtag Serial IN endpoint can accept another byte.
     pub fn serial_in_ready(&self) -> Result<bool, metadata::Error> {
         Ok((read_u32(0x60043004u64)? & 0x00000002u32) != 0)
@@ -290,13 +232,11 @@ impl UsbSerialJtag {
         Ok((read_u32(0x6004300Cu64)? & 0x00000200u32) != 0)
     }
 
-    pub fn apply_attach_serial_jtag(&self) -> Result<(), metadata::Error> {
-        modify_u32(0x60043018u64, 0x00000001u32, 0x00000001u32)?;
-        modify_u32(0x60043018u64, 0x00000100u32, 0x00000100u32)?;
-        modify_u32(0x60043018u64, 0x00000400u32, 0x00000000u32)?;
-        modify_u32(0x60043018u64, 0x00001000u32, 0x00000000u32)?;
-        modify_u32(0x60043018u64, 0x00004000u32, 0x00004000u32)?;
-        modify_u32(0x60043018u64, 0x00000200u32, 0x00000200u32)?;
+    pub fn apply_preserve_serial_jtag_link(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x60043010u64, 0x00000008u32, 0x00000000u32)?;
+        modify_u32(0x60043010u64, 0x00000004u32, 0x00000000u32)?;
+        modify_u32(0x60043014u64, 0x00000008u32, 0x00000008u32)?;
+        modify_u32(0x60043014u64, 0x00000004u32, 0x00000004u32)?;
         Ok(())
     }
 
