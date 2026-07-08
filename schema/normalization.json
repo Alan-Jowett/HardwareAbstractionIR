@@ -11,6 +11,13 @@
       },
       "uniqueItems": true
     },
+    "canonicalTerms": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/canonicalTerm"
+      },
+      "uniqueItems": true
+    },
     "mappings": {
       "type": "array",
       "items": {
@@ -94,6 +101,47 @@
         }
       ]
     },
+    "canonicalTerm": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/entityBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "scope": {
+              "type": "string",
+              "enum": [
+                "peripheral",
+                "register",
+                "field"
+              ]
+            },
+            "peripheralFamilyRef": {
+              "$ref": "common.json#/$defs/entityRef"
+            },
+            "semanticRoles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "broaderTermRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "scope"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "normalizedMapping": {
       "allOf": [
         {
@@ -105,8 +153,13 @@
             "targetRef": {
               "$ref": "common.json#/$defs/entityRef"
             },
-            "canonicalName": {
-              "$ref": "common.json#/$defs/nonEmptyString"
+            "canonicalTermRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/entityRef"
+              },
+              "minItems": 1,
+              "uniqueItems": true
             },
             "peripheralFamilyRef": {
               "$ref": "common.json#/$defs/entityRef"
@@ -131,7 +184,7 @@
           },
           "required": [
             "targetRef",
-            "canonicalName"
+            "canonicalTermRefs"
           ],
           "additionalProperties": false
         }

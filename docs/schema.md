@@ -221,6 +221,7 @@ The normalization layer captures how vendor-specific descriptions map into a can
 It includes:
 
 - peripheral families
+- canonical terms
 - canonical mappings
 - naming rules
 - vendor quirks
@@ -229,6 +230,11 @@ This is how HAIR can represent both:
 
 1. the original vendor-facing shape of the hardware, and
 2. a normalized semantic model that downstream tools can rely on
+
+For first-cut cross-vendor standardization, `normalization` is also where a
+document may define or import a seeded set of canonical peripheral, register,
+and field terms, then map one vendor-facing entity to one or more of those
+canonical terms without rewriting the source-derived structural names.
 
 ## `schema/validation.json`
 

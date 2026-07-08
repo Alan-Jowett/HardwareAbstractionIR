@@ -9641,6 +9641,75 @@ mod tests {
     }
 
     #[test]
+    fn generate_svd_accepts_canonical_term_normalization_metadata() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let mut document = load_json_file(
+            &repo_root
+                .join("evidence")
+                .join("wch")
+                .join("ch32v203c8t6")
+                .join("hair.json"),
+        )
+        .expect("document");
+
+        document
+            .as_object_mut()
+            .expect("reference document should be an object")
+            .insert(
+                "normalization".to_string(),
+                serde_json::json!({
+                    "canonicalTerms": [
+                        {
+                            "id": "term.peripheral.uart",
+                            "name": "UART",
+                            "scope": "peripheral"
+                        },
+                        {
+                            "id": "term.register.baud-rate",
+                            "name": "Baud-rate register",
+                            "scope": "register"
+                        },
+                        {
+                            "id": "term.field.enable",
+                            "name": "Enable",
+                            "scope": "field"
+                        }
+                    ],
+                    "mappings": [
+                        {
+                            "id": "norm.uart4",
+                            "name": "UART4 normalization",
+                            "targetRef": "periph.uart4",
+                            "canonicalTermRefs": ["term.peripheral.uart"]
+                        },
+                        {
+                            "id": "norm.uart4-brr",
+                            "name": "UART4 BRR normalization",
+                            "targetRef": "reg.uart4.brr",
+                            "canonicalTermRefs": ["term.register.baud-rate"]
+                        },
+                        {
+                            "id": "norm.uart4-ue",
+                            "name": "UART4 UE normalization",
+                            "targetRef": "field.uart4.ctlr1.ue",
+                            "canonicalTermRefs": ["term.field.enable"],
+                            "vendorNames": ["UE"]
+                        }
+                    ]
+                }),
+            );
+
+        let mut file = NamedTempFile::new().expect("temp file");
+        serde_json::to_writer(&mut file, &document).expect("write temp file");
+
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("document with canonical terminology should validate");
+        let svd = generate_svd(&validated)
+            .expect("normalization metadata should not break svd generation");
+        assert!(svd.contains("<device"));
+    }
+
+    #[test]
     fn generate_embassy_emits_compilable_crate_for_supported_subset() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let fixture = write_embassy_fixture(false);
