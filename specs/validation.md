@@ -113,6 +113,12 @@ cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-
 - The ESP32-C3 reference bundle succeeds without weakening the executable
   lowering contract, demonstrating support for a non-STM32/TM4C GPIO/routing
   family plus any claimed async/DMA-backed UART/I2C/SPI/ADC paths.
+- If the ESP32-C3 reference bundle claims `usb-device` lowering, generation
+  succeeds only when the approved HAIR inputs explicitly support the claimed USB
+  control/data path. Generated USB artifacts must remain traceable either to
+  endpoint/FIFO-oriented device records or to an approved device-specific
+  serial-style USB path such as ESP32-C3 USB Serial/JTAG; generation must fail
+  explicitly rather than synthesizing a generic USB stack from partial evidence.
 
 ## 3. Artifact-level validation
 
@@ -209,6 +215,10 @@ approved evidence.
 - When canonical terminology is in scope, extraction reports identify which
   peripheral/register/field entities received canonical term mappings, which
   candidates were deferred, and why.
+- When `usb-device` executable lowering is claimed, extraction reports identify
+  the supporting clock/reset bindings, interrupt routes, D+/D- pin routes, and
+  the explicit endpoint/FIFO or serial-style semantic path that justifies each
+  claimed generated behavior.
 - HAIR documents align with the extraction scope claimed in the report.
 
 ### V-011 Audit review

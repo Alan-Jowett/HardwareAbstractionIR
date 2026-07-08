@@ -231,6 +231,7 @@ The first Embassy generator cut is expected to support this driver subset:
 | `adc` | supported | Requires calibration/init operations and any claimed DMA bindings. |
 | `dma` | supported | Generates DMA infrastructure from `dmaTopology`. |
 | `interrupt` | supported | Generates IRQ enums/bindings from the device interrupt inventory plus `interruptTopology`. |
+| `usb-device` | supported | Requires explicit D+/D- pin-routing data, clock/reset support, interrupt routes, and semantic/state-machine plus structural register/field closure for any claimed endpoint-oriented or serial-style USB behavior. The first concrete lowering family may be device-specific, such as ESP32-C3 USB Serial/JTAG, but the generator must still stay evidence-bounded and expose only the justified subset. |
 | `custom` | unsupported in the first cut | Must fail explicitly rather than generating placeholders. |
 
 Any other generation request is out of subset for the first cut and must fail explicitly.
@@ -263,6 +264,7 @@ hoc name matching.
 | `adc` | `semantics.operations` for calibration/init/enable; structural register/field data for any emitted conversion or sample path; pin/electrical data for exposed analog inputs; `dmaTopology.routes` only when the emitted API claims DMA-backed sampling |
 | `dma` | `profiles.mcuSoc.dmaTopology.routes` and the referenced `dmaTopology.channels`; any referenced route `controlRefs`; and structural register/field data for emitted channel enable/launch/status helpers |
 | `interrupt` | `structure.device.interrupts`, `profiles.mcuSoc.interruptTopology.routes`, and the referenced `interruptTopology.sources`; plus any clear/ack operations or control refs required by emitted helper methods |
+| `usb-device` | `pinTopology.routes` for D+ and D-; clock/reset support for emitted bring-up helpers; `interruptTopology.routes` for any emitted interrupt-driven behavior; explicit `semantics.operations` and/or `semantics.stateMachines` for claimed bus-reset, attach, endpoint/FIFO, or byte-stream data movement helpers; and structural register/field data for the reachable USB control/data path being lowered |
 
 ## Generated API contract by driver kind
 
@@ -281,6 +283,7 @@ exact naming contract:
 | `adc` | Calibration/enable helpers plus only those conversion/sample methods whose trigger/start/complete/data path is explicitly modeled |
 | `dma` | Channel-oriented enable/configure/launch/status helpers derived from DMA topology and any referenced controls |
 | `interrupt` | IRQ enums plus bind/clear/ack helpers justified by the interrupt inventory, routes, and source-level operations; and, when tagged `embassy-time-driver`, the generated SysTick-backed async time-base support module |
+| `usb-device` | Bring-up helpers plus only those endpoint-oriented and/or serial-style USB methods whose attach, reset, interrupt, and data paths are explicitly modeled; device-specific helpers are allowed when they remain traceable to the approved USB lowering path rather than to inferred generic USB behavior |
 
 The generator may choose exact Rust names and signatures, but those names
 and signatures must be traceable to the approved HAIR lowering inputs.
@@ -314,6 +317,11 @@ companion emulator/state handles and their observation/control methods.
     lowering inputs needed for that behavior; otherwise the generator must emit
     only the supported polling subset or fail explicitly if the requested
     surface depends on the missing inputs.
+12. A `usb-device` driver instance may claim endpoint-oriented behavior,
+    serial-style behavior, or both, but each claimed helper must map to an
+    explicit approved USB control/data path. Generic USB endpoint inventory
+    alone does not justify CDC- or UART-like byte-stream helpers, and a
+    device-specific byte-stream path does not justify unrelated generic USB APIs.
 
 ## Failure contract
 
@@ -325,11 +333,14 @@ For Embassy generation, the following cases must fail explicitly:
 4. the input document carries only resource metadata for a claimed behavior, with no executable lowering path
 5. referenced semantic operations or state machines target a different peripheral than the driver instance, or a lowered state transition effect cannot be represented as one supported field write in the first cut
 6. async timing support is requested or claimed, but no unique `embassy-time-driver` instance carries the SysTick interrupt inventory and startup closure needed to drive the generated tick source
-7. host-emulated generation would expose a HAL-visible device without a paired
+7. a `usb-device` API would require inferred USB protocol state, endpoint
+   semantics, or serial-style behavior that is not explicitly modeled by the
+   approved clock/reset, interrupt, pin, semantic, and structural inputs
+8. host-emulated generation would expose a HAL-visible device without a paired
    emulator/state handle
-8. a requested host-only observation or control surface would require
+9. a requested host-only observation or control surface would require
    unsupported inference beyond the approved lowering inputs
-9. host-emulated execution would depend on background wall-clock progression
+10. host-emulated execution would depend on background wall-clock progression
    rather than explicit deterministic test control in the first cut
 
 Generators may emit a smaller API surface than another document of the

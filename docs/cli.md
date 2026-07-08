@@ -67,6 +67,10 @@ First-cut behavior:
 - derive the emitted Rust API surface from the approved topology and semantic lowering inputs in the HAIR document rather than from fixed placeholder signatures per driver kind
 - allow explicit `normalization.canonicalTerms[]` / `normalization.mappings[]` to act as secondary lowering hints for equivalent supported concepts across vendor naming schemes, without replacing the required profile/topology/semantic inputs
 - allow a `gpio-port` driver instance to lower into a per-pin GPIO API surface when the approved HAIR routes and structural controls justify that shape
+- allow a `usb-device` driver instance to lower only the explicitly justified
+  subset of endpoint-oriented and/or serial-style USB behaviors, including
+  vendor-specific paths such as ESP32-C3 USB Serial/JTAG when the approved HAIR
+  document models that path explicitly
 - preserve the generator-relevant structured subset of referenced topology and semantic inputs in the emitted Rust metadata so downstream code does not lose control refs, remap data, or executable semantic structure that the approved HAIR document already provides
 - emit register-level code only for methods that can be justified by explicit HAIR lowering inputs, and fail explicitly when the requested or implied behavior is underspecified
 - fail explicitly when the input document falls outside the documented supported subset or omits generator-required topology, semantics, or bindings documented in `docs/embassy-hal-profile.md`
