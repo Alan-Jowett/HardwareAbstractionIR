@@ -74,7 +74,7 @@ cargo run -- diff evidence\st\stm32f405rgt6\hair.json evidence\st\stm32f405rgt6\
 ### V-004 SVD generation path
 
 **Purpose:** verify that repository-managed SVD lowering still operates on a
-reference HAIR document.
+passing reference HAIR document under the current CLI contract.
 
 **Command**
 
@@ -151,7 +151,9 @@ repository contracts.
 - `evidence\texas-instruments\lm3s6965\embassy-smoke\`
 
 **Check**
-- SVD output is present for a reference device that exercises the SVD path.
+- Checked-in SVD output is present for the STM32F405RGT6 reference bundle, and
+  V-004 separately exercises the current passing SVD command path on
+  `evidence\wch\ch32v203c8t6\hair.json`.
 - Embassy output directories contain a complete generated crate layout.
 - Smoke-project directories consume generated crates using normal Rust package
   boundaries rather than ad hoc post-processing.
