@@ -4759,18 +4759,20 @@ fn render_usart_methods(
     });
 
     let cr1 = try_resolve_target_register_by_name(model, target_ref, "CR1")?;
-    let brr = try_resolve_target_register_by_name_or_canonical_term(
-        model,
-        target_ref,
-        "BRR",
-        "term.register.baud-rate",
-    )?;
     let cr2 = try_resolve_target_register_by_name(model, target_ref, "CR2")?;
-    if let (Some(cr1), Some(brr), Some(cr2)) = (cr1, brr, cr2) {
-        return render_stm32_usart_methods(
-            model, driver, target_ref, has_tx, has_rx, has_irq, has_tx_dma, has_rx_dma, cr1, brr,
-            cr2,
-        );
+    if let (Some(cr1), Some(cr2)) = (cr1, cr2) {
+        let brr = try_resolve_target_register_by_name_or_canonical_term(
+            model,
+            target_ref,
+            "BRR",
+            "term.register.baud-rate",
+        )?;
+        if let Some(brr) = brr {
+            return render_stm32_usart_methods(
+                model, driver, target_ref, has_tx, has_rx, has_irq, has_tx_dma, has_rx_dma, cr1,
+                brr, cr2,
+            );
+        }
     }
     let conf0 = try_resolve_target_register_by_name(model, target_ref, "CONF0")?;
     let clkdiv = try_resolve_target_register_by_name(model, target_ref, "CLKDIV")?;
