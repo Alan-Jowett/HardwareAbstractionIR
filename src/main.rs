@@ -8808,6 +8808,7 @@ fn host_emulator_wires_hal_and_companion_state() {
         gpio_emulator.write_register(0x1234, 1).expect("write state 1");
         gpio2.write_register(0x1234, 2).expect("write state 2");
 
+        fixture_embassy_hal_host::metadata::clear_current_emulator();
         let _guard1 = host.activate_scoped();
         assert_eq!(fixture_embassy_hal_host::metadata::read_u32(0x1234).expect("read host1"), 1);
         {
