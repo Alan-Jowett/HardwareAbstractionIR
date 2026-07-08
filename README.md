@@ -21,27 +21,27 @@ The current repository baseline is intentionally conservative.
 
 Today this repository contains:
 
-- a layered JSON Schema set under `schema\`
+- a layered JSON Schema set under `schema/`
 - optional `profiles.mcuSoc` and `profiles.embassyHal` specialization layers
 - a Rust crate (`edition = "2024"`) that implements the current CLI
-- governed repository requirements, design, and validation baselines under `specs\`
-- workflow skills under `.github\skills\` for source discovery, extraction, audit, and repository maintenance
-- reference evidence bundles under `evidence\` for real device examples and generated artifacts
+- governed repository requirements, design, and validation baselines under `specs/`
+- workflow skills under `.github/skills/` for source discovery, extraction, audit, and repository maintenance
+- reference evidence bundles under `evidence/` for real device examples and generated artifacts
 
 ## Repository layout
 
 | Path | Purpose |
 | --- | --- |
-| `schema\` | Core HAIR schema layers, profile schemas, and the evidence-manifest schema |
-| `docs\` | Human-oriented schema, CLI, MCU-profile, and Embassy-profile guides |
-| `specs\` | Governing repository requirements, design, and validation baselines |
-| `src\main.rs` | Current Rust CLI implementation |
-| `evidence\` | Reference device bundles, manifests, reports, and generated artifacts |
-| `.github\skills\` | Repository workflows for discovery, extraction, audit, bootstrap, evolve, and maintain |
+| `schema/` | Core HAIR schema layers, profile schemas, and the evidence-manifest schema |
+| `docs/` | Human-oriented schema, CLI, MCU-profile, and Embassy-profile guides |
+| `specs/` | Governing repository requirements, design, and validation baselines |
+| `src/main.rs` | Current Rust CLI implementation |
+| `evidence/` | Reference device bundles, manifests, reports, and generated artifacts |
+| `.github/skills/` | Repository workflows for discovery, extraction, audit, bootstrap, evolve, and maintain |
 
 ## HAIR document model
 
-The top-level schema is `schema\hair.json`. A HAIR document can include:
+The top-level schema is `schema/hair.json`. A HAIR document can include:
 
 - `metadata`
 - `imports`
@@ -53,23 +53,23 @@ The top-level schema is `schema\hair.json`. A HAIR document can include:
 - `validation`
 - `profiles`
 
-The repository also defines `schema\evidence-manifest.json`, which is the input format for evidence-first extraction workflows.
+The repository also defines `schema/evidence-manifest.json`, which is the input format for evidence-first extraction workflows.
 
 ## Schema layers
 
 | File | Role |
 | --- | --- |
-| `schema\hair.json` | Top-level HAIR document schema |
-| `schema\common.json` | Shared primitive types and reusable helpers |
-| `schema\provenance.json` | Sources, evidence, reviews, and provenance records |
-| `schema\structure.json` | Devices, peripherals, interrupts, registers, fields, and memory regions |
-| `schema\semantics.json` | Behaviors, operations, state machines, and semantic relationships |
-| `schema\physical.json` | Clocks, timing, pins, packages, power/reset domains, and electrical constraints |
-| `schema\normalization.json` | Canonical mappings, naming rules, and vendor quirks |
-| `schema\validation.json` | Declarative validation rules and validation profiles |
-| `schema\profiles\mcu.json` | Canonical MCU/SoC topology and block classification layer |
-| `schema\profiles\embassy-hal.json` | Embassy-generation lowering contract |
-| `schema\evidence-manifest.json` | Approved-source manifest for extraction workflows |
+| `schema/hair.json` | Top-level HAIR document schema |
+| `schema/common.json` | Shared primitive types and reusable helpers |
+| `schema/provenance.json` | Sources, evidence, reviews, and provenance records |
+| `schema/structure.json` | Devices, peripherals, interrupts, registers, fields, and memory regions |
+| `schema/semantics.json` | Behaviors, operations, state machines, and semantic relationships |
+| `schema/physical.json` | Clocks, timing, pins, packages, power/reset domains, and electrical constraints |
+| `schema/normalization.json` | Canonical mappings, naming rules, and vendor quirks |
+| `schema/validation.json` | Declarative validation rules and validation profiles |
+| `schema/profiles/mcu.json` | Canonical MCU/SoC topology and block classification layer |
+| `schema/profiles/embassy-hal.json` | Embassy-generation lowering contract |
+| `schema/evidence-manifest.json` | Approved-source manifest for extraction workflows |
 
 ## Current CLI surface
 
@@ -87,7 +87,7 @@ hair diff <left> <right>
 
 | Command | Current behavior |
 | --- | --- |
-| `validate` | Checks one HAIR JSON document against the repository schema set rooted at `schema\hair.json` |
+| `validate` | Checks one HAIR JSON document against the repository schema set rooted at `schema/hair.json` |
 | `generate svd` | Lowers a validated HAIR document to CMSIS-SVD-style output |
 | `generate embassy` | Lowers a validated HAIR document to an embedded-target Embassy-style HAL crate |
 | `generate embassy-host` | Lowers the same Embassy contract to a separate host-only `std` companion crate |
@@ -119,10 +119,10 @@ Generate a host-emulated Embassy companion crate:
 cargo run -- generate embassy-host evidence\texas-instruments\lm3s6965\hair.json --output-dir out\embassy-host
 ```
 
-Compare two HAIR documents structurally:
+Compare a working-tree HAIR document against its committed version:
 
 ```powershell
-cargo run -- diff evidence\st\stm32f405rgt6\hair.json evidence\st\stm32f405rgt6\hair.json
+cargo run -- diff git:HEAD:evidence/st/stm32f405rgt6/hair.json evidence\st\stm32f405rgt6\hair.json
 ```
 
 Run the Rust regression suite:
@@ -144,7 +144,7 @@ The main workflow skills are:
 - `evolve`
 - `maintain`
 
-Use the workflow docs and generated reports under `evidence\` when you need an evidence-backed extraction or audit trail rather than just schema validation or generation.
+Use the workflow docs and generated reports under `evidence/` when you need an evidence-backed extraction or audit trail rather than just schema validation or generation.
 
 ## Reference evidence bundles
 
@@ -171,13 +171,13 @@ These are important limits of the current baseline:
 
 Start with these documents:
 
-- `docs\schema.md` — layered schema overview
-- `docs\mcu-profile.md` — MCU/SoC profile contract
-- `docs\embassy-hal-profile.md` — Embassy HAL generation contract
-- `docs\cli.md` — current CLI contract
-- `specs\requirements.md` — repository requirements baseline
-- `specs\design.md` — repository design baseline
-- `specs\validation.md` — validation baseline
+- `docs/schema.md` — layered schema overview
+- `docs/mcu-profile.md` — MCU/SoC profile contract
+- `docs/embassy-hal-profile.md` — Embassy HAL generation contract
+- `docs/cli.md` — current CLI contract
+- `specs/requirements.md` — repository requirements baseline
+- `specs/design.md` — repository design baseline
+- `specs/validation.md` — validation baseline
 
 ## Contributing
 
