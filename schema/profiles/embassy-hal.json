@@ -47,6 +47,7 @@
       "type": "string",
       "enum": [
         "gpio-port",
+        "usb-device",
         "uart",
         "usart",
         "spi",
@@ -58,6 +59,13 @@
         "interrupt",
         "rcc",
         "custom"
+      ]
+    },
+    "loweringPattern": {
+      "type": "string",
+      "description": "Optional generator-facing lowering selector for cases where one supported driver kind has more than one approved evidence-backed lowering family with materially different bring-up behavior. The first reserved value, `serial-jtag-preserve-link`, selects a USB Serial/JTAG-style lowering that preserves an already boot-established link instead of synthesizing a reset-and-reattach sequence. Generators must fail explicitly if a selected lowering pattern lacks the referenced semantic inputs it requires.",
+      "enum": [
+        "serial-jtag-preserve-link"
       ]
     },
     "resourceRequirement": {
@@ -144,6 +152,9 @@
             "modulePath": {
               "description": "Generator-facing Rust module placement for the emitted driver/support code. This does not by itself define a fixed method set; methods must be derived from the referenced lowering inputs. Support-oriented placements such as a generated time module are allowed only when the referenced driver instance carries the explicit lowering contract needed for that support surface. The same placement governs host-emulated lowering for the paired HAL and emulator surfaces.",
               "$ref": "../common.json#/$defs/nonEmptyString"
+            },
+            "loweringPattern": {
+              "$ref": "#/$defs/loweringPattern"
             },
             "clockBindingRefs": {
               "description": "Referenced clock bindings that may justify emitted clock-gating or bring-up helpers when those bindings and their linked structural/semantic data are sufficient for real lowering.",

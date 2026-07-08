@@ -92,6 +92,7 @@ pub struct I2C1Resources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -105,6 +106,7 @@ pub const DRV_I2C1_RESOURCES: I2C1Resources = I2C1Resources {
     pins: DRV_I2C1_PIN_ROLES,
     init_operations: DRV_I2C1_INIT_OPERATIONS,
     state_machines: DRV_I2C1_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_I2C1_CAPABILITY_TAGS,
 };
 
@@ -174,6 +176,7 @@ pub struct I2C2Resources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -187,6 +190,7 @@ pub const DRV_I2C2_RESOURCES: I2C2Resources = I2C2Resources {
     pins: DRV_I2C2_PIN_ROLES,
     init_operations: DRV_I2C2_INIT_OPERATIONS,
     state_machines: DRV_I2C2_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_I2C2_CAPABILITY_TAGS,
 };
 
@@ -256,6 +260,7 @@ pub struct I2C3Resources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -269,6 +274,7 @@ pub const DRV_I2C3_RESOURCES: I2C3Resources = I2C3Resources {
     pins: DRV_I2C3_PIN_ROLES,
     init_operations: DRV_I2C3_INIT_OPERATIONS,
     state_machines: DRV_I2C3_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_I2C3_CAPABILITY_TAGS,
 };
 

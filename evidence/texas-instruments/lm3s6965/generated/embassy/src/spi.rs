@@ -93,6 +93,7 @@ pub struct SSI0Resources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -106,6 +107,7 @@ pub const DRV_SSI0_RESOURCES: SSI0Resources = SSI0Resources {
     pins: DRV_SSI0_PIN_ROLES,
     init_operations: DRV_SSI0_INIT_OPERATIONS,
     state_machines: DRV_SSI0_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_SSI0_CAPABILITY_TAGS,
 };
 

@@ -93,6 +93,7 @@ pub struct Spi1Resources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -106,6 +107,7 @@ pub const DRV_SPI1_RESOURCES: Spi1Resources = Spi1Resources {
     pins: DRV_SPI1_PIN_ROLES,
     init_operations: DRV_SPI1_INIT_OPERATIONS,
     state_machines: DRV_SPI1_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_SPI1_CAPABILITY_TAGS,
 };
 
@@ -176,6 +178,7 @@ pub struct Spi2Resources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -189,6 +192,7 @@ pub const DRV_SPI2_RESOURCES: Spi2Resources = Spi2Resources {
     pins: DRV_SPI2_PIN_ROLES,
     init_operations: DRV_SPI2_INIT_OPERATIONS,
     state_machines: DRV_SPI2_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_SPI2_CAPABILITY_TAGS,
 };
 
@@ -259,6 +263,7 @@ pub struct Spi3Resources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -272,6 +277,7 @@ pub const DRV_SPI3_RESOURCES: Spi3Resources = Spi3Resources {
     pins: DRV_SPI3_PIN_ROLES,
     init_operations: DRV_SPI3_INIT_OPERATIONS,
     state_machines: DRV_SPI3_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_SPI3_CAPABILITY_TAGS,
 };
 

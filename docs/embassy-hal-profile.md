@@ -231,6 +231,7 @@ The first Embassy generator cut is expected to support this driver subset:
 | `adc` | supported | Requires calibration/init operations and any claimed DMA bindings. |
 | `dma` | supported | Generates DMA infrastructure from `dmaTopology`. |
 | `interrupt` | supported | Generates IRQ enums/bindings from the device interrupt inventory plus `interruptTopology`. |
+| `usb-device` | supported | Requires explicit D+/D- pin-routing data, clock/reset support, interrupt routes, and semantic/state-machine plus structural register/field closure for any claimed endpoint-oriented or serial-style USB behavior. Some USB lowering families may additionally require an explicit `loweringPattern` selector when bring-up behavior is materially family-specific. The first such lowering family may be device-specific, such as ESP32-C3 USB Serial/JTAG, but the generator must still stay evidence-bounded and expose only the justified subset. |
 | `custom` | unsupported in the first cut | Must fail explicitly rather than generating placeholders. |
 
 Any other generation request is out of subset for the first cut and must fail explicitly.
@@ -263,6 +264,7 @@ hoc name matching.
 | `adc` | `semantics.operations` for calibration/init/enable; structural register/field data for any emitted conversion or sample path; pin/electrical data for exposed analog inputs; `dmaTopology.routes` only when the emitted API claims DMA-backed sampling |
 | `dma` | `profiles.mcuSoc.dmaTopology.routes` and the referenced `dmaTopology.channels`; any referenced route `controlRefs`; and structural register/field data for emitted channel enable/launch/status helpers |
 | `interrupt` | `structure.device.interrupts`, `profiles.mcuSoc.interruptTopology.routes`, and the referenced `interruptTopology.sources`; plus any clear/ack operations or control refs required by emitted helper methods |
+| `usb-device` | `pinTopology.routes` for D+ and D-; clock/reset support for emitted bring-up helpers; `interruptTopology.routes` for any emitted interrupt-driven behavior; explicit `semantics.operations` and/or `semantics.stateMachines` for claimed bus-reset, attach, endpoint/FIFO, or byte-stream data movement helpers; structural register/field data for the reachable USB control/data path being lowered; and `driverInstances[].loweringPattern` whenever the chosen USB lowering family has materially distinct bring-up behavior that the generator must not infer |
 
 ## Generated API contract by driver kind
 
@@ -281,6 +283,7 @@ exact naming contract:
 | `adc` | Calibration/enable helpers plus only those conversion/sample methods whose trigger/start/complete/data path is explicitly modeled |
 | `dma` | Channel-oriented enable/configure/launch/status helpers derived from DMA topology and any referenced controls |
 | `interrupt` | IRQ enums plus bind/clear/ack helpers justified by the interrupt inventory, routes, and source-level operations; and, when tagged `embassy-time-driver`, the generated SysTick-backed async time-base support module |
+| `usb-device` | Bring-up helpers plus only those endpoint-oriented and/or serial-style USB methods whose attach, reset, interrupt, and data paths are explicitly modeled; device-specific helpers are allowed when they remain traceable to the approved USB lowering path rather than to inferred generic USB behavior. When `loweringPattern = "serial-jtag-preserve-link"`, the emitted bring-up sequence must preserve the boot-established USB Serial/JTAG link instead of synthesizing an unconditional reset-and-reattach sequence |
 
 The generator may choose exact Rust names and signatures, but those names
 and signatures must be traceable to the approved HAIR lowering inputs.
@@ -314,6 +317,98 @@ companion emulator/state handles and their observation/control methods.
     lowering inputs needed for that behavior; otherwise the generator must emit
     only the supported polling subset or fail explicitly if the requested
     surface depends on the missing inputs.
+12. A `usb-device` driver instance may claim endpoint-oriented behavior,
+    serial-style behavior, or both, but each claimed helper must map to an
+    explicit approved USB control/data path. Generic USB endpoint inventory
+    alone does not justify CDC- or UART-like byte-stream helpers, and a
+    device-specific byte-stream path does not justify unrelated generic USB APIs.
+13. If a `usb-device` driver instance names a `loweringPattern`, that selector
+    becomes part of the executable lowering contract. In particular,
+    `serial-jtag-preserve-link` requires the referenced semantic operations to
+    justify a bring-up path that preserves an already boot-established USB
+    Serial/JTAG link; the generator must not silently substitute a reset or
+    attach pattern that is not explicitly modeled.
+
+## Building a bootable ESP32-C3 image around a generated Embassy crate
+
+`hair generate embassy` emits a generated HAL crate, not a complete flash-ready
+application image. For Espressif parts such as the ESP32-C3, a standalone image
+that boots through the normal ROM + second-stage flash boot flow must still
+conform to Espressif's app-image contract.
+
+The checked-in reference for that packaging is:
+
+- `evidence\espressif\esp32-c3fn4\generated\embassy-usb-smoke\Cargo.toml`
+- `evidence\espressif\esp32-c3fn4\generated\embassy-usb-smoke\.cargo\config.toml`
+- `evidence\espressif\esp32-c3fn4\generated\embassy-usb-smoke\src\main.rs`
+
+For the current ESP32-C3 first cut, that means the application crate should:
+
+1. depend on the generated Embassy crate plus `esp-hal`
+2. use `esp-bootloader-esp-idf` so the resulting ELF carries the boot metadata
+   and layout expected by Espressif's flash boot chain
+3. emit an app descriptor with `esp_bootloader_esp_idf::esp_app_desc!();`
+4. link with `-Tlinkall.x`
+5. package the release ELF into an ESP32-C3 flash image before writing it to
+   the factory app slot
+
+Minimal project shape:
+
+```toml
+[dependencies]
+esp-bootloader-esp-idf = { version = "0.5.0", features = ["esp32c3"] }
+esp-hal = { version = "1.1.1", features = ["esp32c3"] }
+esp32c3fn4_generated = { package = "esp32c3fn4-generated", path = "../embassy" }
+panic-halt = "1.0"
+```
+
+```toml
+[build]
+target = "riscv32imc-unknown-none-elf"
+
+[target.riscv32imc-unknown-none-elf]
+rustflags = ["-C", "link-arg=-Tlinkall.x"]
+```
+
+```rust
+#![no_std]
+#![no_main]
+
+use esp_hal as _;
+use panic_halt as _;
+
+esp_bootloader_esp_idf::esp_app_desc!();
+
+#[esp_hal::main]
+fn main() -> ! {
+    let _peripherals = esp_hal::init(esp_hal::Config::default());
+    loop {}
+}
+```
+
+Build, package, and flash flow:
+
+```powershell
+Set-Location evidence\espressif\esp32-c3fn4\generated\embassy-usb-smoke
+cargo build --release
+python -m esptool --chip esp32c3 elf2image --flash-mode dio --flash-freq 40m --flash-size 4MB `
+  -o target\riscv32imc-unknown-none-elf\release\embassy-usb-smoke.bin `
+  target\riscv32imc-unknown-none-elf\release\embassy-usb-smoke
+python -m esptool --chip esp32c3 --port COM6 write-flash 0x10000 `
+  target\riscv32imc-unknown-none-elf\release\embassy-usb-smoke.bin
+espflash monitor -p COM6
+```
+
+Notes:
+
+- The generated Embassy HAL crate itself is reusable; the boot-image packaging
+  lives in the board/application crate wrapped around it.
+- For the current tool versions in this repository, `esptool elf2image` is the
+  reliable path for packaging the final flash image. Direct `espflash flash
+  <elf>` packaging may not work for this crate shape.
+- This boot-packaging guidance is ESP32-C3-specific. Other families may require
+  different vendor boot metadata, different linker arguments, or no extra
+  packaging step at all.
 
 ## Failure contract
 
@@ -325,11 +420,17 @@ For Embassy generation, the following cases must fail explicitly:
 4. the input document carries only resource metadata for a claimed behavior, with no executable lowering path
 5. referenced semantic operations or state machines target a different peripheral than the driver instance, or a lowered state transition effect cannot be represented as one supported field write in the first cut
 6. async timing support is requested or claimed, but no unique `embassy-time-driver` instance carries the SysTick interrupt inventory and startup closure needed to drive the generated tick source
-7. host-emulated generation would expose a HAL-visible device without a paired
+7. a `usb-device` API would require inferred USB protocol state, endpoint
+   semantics, or serial-style behavior that is not explicitly modeled by the
+   approved clock/reset, interrupt, pin, semantic, and structural inputs
+8. a selected `loweringPattern` requires semantic or structural bring-up
+   inputs that are absent, contradictory, or would force the generator to
+   invent a different attach/reset sequence
+9. host-emulated generation would expose a HAL-visible device without a paired
    emulator/state handle
-8. a requested host-only observation or control surface would require
+10. a requested host-only observation or control surface would require
    unsupported inference beyond the approved lowering inputs
-9. host-emulated execution would depend on background wall-clock progression
+11. host-emulated execution would depend on background wall-clock progression
    rather than explicit deterministic test control in the first cut
 
 Generators may emit a smaller API surface than another document of the

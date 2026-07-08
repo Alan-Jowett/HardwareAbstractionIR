@@ -90,6 +90,7 @@ pub struct TIMER0Resources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -103,6 +104,7 @@ pub const DRV_TIMER0_RESOURCES: TIMER0Resources = TIMER0Resources {
     pins: DRV_TIMER0_PIN_ROLES,
     init_operations: DRV_TIMER0_INIT_OPERATIONS,
     state_machines: DRV_TIMER0_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_TIMER0_CAPABILITY_TAGS,
 };
 
@@ -185,6 +187,7 @@ pub struct TIMER1Resources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -198,6 +201,7 @@ pub const DRV_TIMER1_RESOURCES: TIMER1Resources = TIMER1Resources {
     pins: DRV_TIMER1_PIN_ROLES,
     init_operations: DRV_TIMER1_INIT_OPERATIONS,
     state_machines: DRV_TIMER1_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_TIMER1_CAPABILITY_TAGS,
 };
 
@@ -280,6 +284,7 @@ pub struct TIMER2Resources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -293,6 +298,7 @@ pub const DRV_TIMER2_RESOURCES: TIMER2Resources = TIMER2Resources {
     pins: DRV_TIMER2_PIN_ROLES,
     init_operations: DRV_TIMER2_INIT_OPERATIONS,
     state_machines: DRV_TIMER2_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_TIMER2_CAPABILITY_TAGS,
 };
 
@@ -375,6 +381,7 @@ pub struct TIMER3Resources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -388,6 +395,7 @@ pub const DRV_TIMER3_RESOURCES: TIMER3Resources = TIMER3Resources {
     pins: DRV_TIMER3_PIN_ROLES,
     init_operations: DRV_TIMER3_INIT_OPERATIONS,
     state_machines: DRV_TIMER3_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_TIMER3_CAPABILITY_TAGS,
 };
 

@@ -115,6 +115,7 @@ pub struct InterruptsResources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -128,6 +129,7 @@ pub const DRV_NVIC_RESOURCES: InterruptsResources = InterruptsResources {
     pins: DRV_NVIC_PIN_ROLES,
     init_operations: DRV_NVIC_INIT_OPERATIONS,
     state_machines: DRV_NVIC_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_NVIC_CAPABILITY_TAGS,
 };
 

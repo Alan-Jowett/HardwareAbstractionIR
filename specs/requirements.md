@@ -204,6 +204,18 @@ Embassy profile contract.
 - Async and DMA-backed generated APIs are allowed only when the document
   carries the interrupt, DMA, pin-routing, and semantic-operation/state-machine
   facts needed to lower those behaviors deterministically.
+- `usb-device` lowering is allowed only when the document carries the
+  clock/reset, interrupt, pin-routing, and semantic/state-machine facts needed
+  to lower the claimed USB behavior deterministically. If the generated surface
+  claims endpoint-oriented behavior, the approved HAIR inputs shall model the
+  relevant endpoint or FIFO control/data path explicitly. If the generated
+  surface claims serial-style byte-stream helpers, those helpers shall remain
+  traceable to an approved device-specific USB data path rather than to a
+  repository-invented generic USB stack. If a USB lowering family has
+  materially distinct bring-up behavior, the profile shall also carry an
+  explicit lowering selector for that family and the referenced semantic
+  operations shall justify the exact attach/reset-preservation pattern the
+  generator emits.
 - Unsupported driver kinds, unresolved references, missing lowering inputs,
   and out-of-subset requests fail explicitly.
 

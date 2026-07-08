@@ -305,6 +305,7 @@ It currently carries:
 - crate/package metadata for generated output
 - driver-instance declarations for supported peripheral blocks
 - explicit references to the clock/reset, interrupt, DMA, pin-routing, operation, and state-machine records each generated driver depends on
+- optional lowering selectors for supported families whose bring-up behavior is materially family-specific
 - capability tags that are generator-facing rather than raw hardware facts
 
 The same profile can drive more than one artifact mode. In the first cut:

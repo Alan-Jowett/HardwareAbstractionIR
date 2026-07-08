@@ -8,3 +8,4 @@ pub mod interrupt;
 pub mod rcc;
 pub mod spi;
 pub mod uart;
+pub mod usb;

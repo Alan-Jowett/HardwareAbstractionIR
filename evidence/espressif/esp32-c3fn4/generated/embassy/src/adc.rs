@@ -95,6 +95,7 @@ pub struct ApbSarAdcResources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -108,6 +109,7 @@ pub const DRV_ADC_RESOURCES: ApbSarAdcResources = ApbSarAdcResources {
     pins: DRV_ADC_PIN_ROLES,
     init_operations: DRV_ADC_INIT_OPERATIONS,
     state_machines: DRV_ADC_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_ADC_CAPABILITY_TAGS,
 };
 

@@ -89,6 +89,7 @@ pub struct SYSCTLResources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -102,6 +103,7 @@ pub const DRV_RCC_RESOURCES: SYSCTLResources = SYSCTLResources {
     pins: DRV_RCC_PIN_ROLES,
     init_operations: DRV_RCC_INIT_OPERATIONS,
     state_machines: DRV_RCC_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_RCC_CAPABILITY_TAGS,
 };
 

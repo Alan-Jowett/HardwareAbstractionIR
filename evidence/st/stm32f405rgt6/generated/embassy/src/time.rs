@@ -89,6 +89,7 @@ pub struct TimeResources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -102,6 +103,7 @@ pub const DRV_TIME_RESOURCES: TimeResources = TimeResources {
     pins: DRV_TIME_PIN_ROLES,
     init_operations: DRV_TIME_INIT_OPERATIONS,
     state_machines: DRV_TIME_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_TIME_CAPABILITY_TAGS,
 };
 

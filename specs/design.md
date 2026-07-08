@@ -184,6 +184,23 @@ interrupt-driven and DMA-backed UART/I2C/SPI/ADC behavior is part of the
 supported subset only when the driver instance names the full interrupt, DMA,
 pin, and semantic closure required for real lowering.
 
+USB device lowering follows the same evidence-bounded rule. A `usb-device`
+driver instance may expose endpoint-oriented helpers, serial-style byte-stream
+helpers, or both, but only for the subset whose control and data paths are
+explicitly modeled by approved clock/reset bindings, interrupt routes, D+/D-
+pin routes, semantic operations/state machines, and structurally reachable
+register/field data. Device-specific USB transport shapes such as the
+ESP32-C3 USB Serial/JTAG FIFO path are valid first-cut lowering families when
+the approved HAIR records make that path explicit; the generator must not
+pretend that one vendor-specific path implies a universal generic USB stack.
+When a supported USB lowering family also depends on family-specific bring-up
+policy, that policy must be selected explicitly in `profiles.embassyHal`
+rather than hidden inside generator heuristics. For example, a
+`serial-jtag-preserve-link` lowering family may require the generator to
+preserve a boot-established USB Serial/JTAG link instead of emitting a generic
+reset-and-reattach sequence; that distinction belongs in the approved profile
+contract plus referenced semantic operations, not in ad hoc code generation.
+
 When a document also carries explicit normalization canonical mappings, Embassy
 lowering may use those mappings as secondary resolution hints for supported
 register, field, or peripheral concepts that recur across vendors. This is a

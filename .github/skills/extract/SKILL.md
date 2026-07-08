@@ -375,6 +375,18 @@ applicable:
   path, either directly or through explicit resolvable structural
   relationships such as `derivedFromRef`
 
+For `usb-device` driver scope, treat the following as lowering-critical rather
+than optional nice-to-have metadata:
+
+- D+ and D- pin routes and any pad-enable / pull-up / PHY-selection controls
+- clock/reset bindings for the USB block and any USB memory/auxiliary clocks
+- interrupt sources/routes for bus-reset, packet, FIFO, or endpoint events used
+  by the claimed API surface
+- semantic operations/state machines for attach, reset handling, endpoint/FIFO
+  servicing, and any claimed serial-style byte-stream path
+- explicit structural reachability for the endpoint or FIFO registers/fields
+  that implement the claimed data path
+
 If the approved evidence supports clocks, pins, interrupts, DMA channels,
 or semantic labels for a requested driver but does **not** support the
 controls, operations, or structural reachability needed for executable
