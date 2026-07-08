@@ -86,7 +86,7 @@ Two structural design decisions are central:
 The structural layer is the main SVD-overlapping slice of HAIR, but it is not
 the full model.
 
-**Supports:** RQ-001, RQ-002, RQ-003, RQ-012
+**Supports:** RQ-001, RQ-002, RQ-003, RQ-013
 
 ### 3.4 Semantic layer
 
@@ -97,7 +97,7 @@ This layer gives the repository a place to represent executable intent such as
 initialization sequences, mode transitions, control semantics, and side
 effects.
 
-**Supports:** RQ-003, RQ-009, RQ-013
+**Supports:** RQ-003, RQ-010, RQ-014
 
 ### 3.5 Physical layer
 
@@ -108,16 +108,22 @@ interrupt-controller facts.
 The physical layer exists because downstream tooling frequently depends on
 non-register constraints that are absent from SVD-like formats.
 
-**Supports:** RQ-003, RQ-009, RQ-013
+**Supports:** RQ-003, RQ-010, RQ-014
 
 ### 3.6 Normalization layer
 
-`schema\normalization.json` defines peripheral families, normalized mappings,
-naming rules, and vendor quirks. This layer separates vendor-native structure
-from the canonical model that downstream tooling can depend on across device
-families.
+`schema\normalization.json` defines peripheral families, canonical terms,
+normalized mappings, naming rules, and vendor quirks. This layer separates
+vendor-native structure from the canonical model that downstream tooling can
+depend on across device families.
 
-**Supports:** RQ-003, RQ-009
+For first-cut terminology standardization, the normalization layer may carry a
+seeded catalog of canonical peripheral, register, and field terms plus
+per-entity mappings from structural entities to one or more of those terms.
+This keeps the source-derived vendor names in `structure` while making
+cross-vendor comparability explicit and reviewable.
+
+**Supports:** RQ-003, RQ-009, RQ-010
 
 ### 3.7 Validation layer
 
@@ -128,7 +134,7 @@ though the current CLI only enforces schema conformance.
 This preserves an explicit place for richer validation logic without requiring
 the current tooling to invent partial execution semantics.
 
-**Supports:** RQ-011
+**Supports:** RQ-012
 
 ## 4. Optional profile design
 
@@ -150,7 +156,7 @@ This profile gives generators and validators stable architectural names and
 topology records without relocating the underlying hardware facts out of the
 core layers.
 
-**Supports:** RQ-008, RQ-013
+**Supports:** RQ-008, RQ-014
 
 ### 4.2 Embassy HAL profile
 
@@ -171,7 +177,7 @@ interrupt-driven and DMA-backed UART/I2C/SPI/ADC behavior is part of the
 supported subset only when the driver instance names the full interrupt, DMA,
 pin, and semantic closure required for real lowering.
 
-**Supports:** RQ-008, RQ-009, RQ-013
+**Supports:** RQ-008, RQ-010, RQ-014
 
 ## 5. Workflow architecture
 
@@ -220,7 +226,7 @@ The Rust crate exposes the current repository-managed CLI:
 The CLI is implemented in a single root crate and uses `clap` subcommands to
 dispatch to each operation.
 
-**Supports:** RQ-010, RQ-015
+**Supports:** RQ-011
 
 ### 6.2 Schema loading and validation
 
@@ -233,7 +239,7 @@ This design allows `hair validate` and generator entry points to operate on
 the repository schema set as a coherent whole rather than relying on ad hoc
 single-file validation.
 
-**Supports:** RQ-003, RQ-011
+**Supports:** RQ-003, RQ-012
 
 ### 6.3 `validate`
 
@@ -241,7 +247,7 @@ single-file validation.
 checks conformance to the HAIR document schema. It reports path-oriented
 validation errors and does not execute declarative validation-rule logic.
 
-**Supports:** RQ-011, RQ-015
+**Supports:** RQ-012, RQ-016
 
 ### 6.4 `generate svd`
 
@@ -255,7 +261,7 @@ through explicit `interruptRefs` or through one unambiguous same-name
 peripheral match. Otherwise the generator fails explicitly rather than
 inventing or silently dropping SVD interrupt attribution.
 
-**Supports:** RQ-009, RQ-012, RQ-015
+**Supports:** RQ-010, RQ-013, RQ-016
 
 ### 6.5 `generate embassy`
 
@@ -270,7 +276,7 @@ lowering path is intentionally family-aware rather than vendor-name-driven:
 multiple register-layout or routing-fabric strategies may satisfy the same
 driver kind when they all preserve the same evidence-bounded API contract.
 
-**Supports:** RQ-009, RQ-013, RQ-015
+**Supports:** RQ-010, RQ-014, RQ-016
 
 ### 6.6 `diff`
 
@@ -278,7 +284,7 @@ driver kind when they all preserve the same evidence-bounded API contract.
 both operands as JSON, compares parsed structures, and reports stable path
 differences as additions, removals, or changed values.
 
-**Supports:** RQ-014, RQ-015
+**Supports:** RQ-015, RQ-016
 
 ## 7. Artifact layout and responsibilities
 
@@ -372,46 +378,54 @@ hardware facts.
 
 ### 9.9 RQ-009 design coverage
 
-RQ-009 is realized by the generator-facing schema and CLI design in Sections
-3.4-3.7, 4.2, 6.4, and 6.5. Lowering depends on explicit topology, semantics,
-and structural reachability, and unsupported cases fail explicitly.
+RQ-009 is realized by the normalization-layer design in Section 3.6. Canonical
+terminology is modeled as additive normalization metadata rather than as a
+rewrite of source-derived structural names, and mappings may bind one entity to
+more than one canonical term when the vendor-facing entity bundles multiple
+concepts.
 
 ### 9.10 RQ-010 design coverage
 
-RQ-010 is realized by the Rust CLI command-surface design in Section 6.1 and
+RQ-010 is realized by the generator-facing schema and CLI design in Sections
+3.4-3.7, 4.2, 6.4, and 6.5. Lowering depends on explicit topology, semantics,
+and structural reachability, and unsupported cases fail explicitly.
+
+### 9.11 RQ-011 design coverage
+
+RQ-011 is realized by the Rust CLI command-surface design in Section 6.1 and
 by the command-specific designs in Sections 6.3-6.6. The implemented command
 surface is intentionally limited to validate, generate svd, generate embassy,
 and diff.
 
-### 9.11 RQ-011 design coverage
+### 9.12 RQ-012 design coverage
 
-RQ-011 is realized by the validation-layer design in Section 3.7 and the CLI
+RQ-012 is realized by the validation-layer design in Section 3.7 and the CLI
 schema-loader design in Sections 6.2-6.3. Declarative validation rules exist
 in the model, while the implemented CLI currently enforces schema conformance.
 
-### 9.12 RQ-012 design coverage
+### 9.13 RQ-013 design coverage
 
-RQ-012 is realized by the structural-layer interrupt and CPU metadata design in
+RQ-013 is realized by the structural-layer interrupt and CPU metadata design in
 Section 3.3 and the SVD lowering design in Section 6.4. The SVD path depends
 on explicit device-level interrupt inventory and explicit CPU metadata, while
 requiring safe peripheral attribution for emitted SVD interrupt blocks.
 
-### 9.13 RQ-013 design coverage
+### 9.14 RQ-014 design coverage
 
-RQ-013 is realized by the MCU/SoC and Embassy profile designs in Section 4 and
+RQ-014 is realized by the MCU/SoC and Embassy profile designs in Section 4 and
 the Embassy CLI path in Section 6.5. Embassy generation resolves driver
 instances from explicit canonical topology and profile-declared lowering
 contracts.
 
-### 9.14 RQ-014 design coverage
+### 9.15 RQ-015 design coverage
 
-RQ-014 is realized by the diff command design in Section 6.6. The repository
+RQ-015 is realized by the diff command design in Section 6.6. The repository
 loads JSON operands from either filesystem paths or git selectors and reports
 stable structural differences.
 
-### 9.15 RQ-015 design coverage
+### 9.16 RQ-016 design coverage
 
-RQ-015 is realized by the CLI command architecture in Section 6, where commands
+RQ-016 is realized by the CLI command architecture in Section 6, where commands
 return normalized success, check-failure, and operational-failure exit
 semantics.
 
@@ -421,10 +435,10 @@ semantics.
 | --- | --- |
 | Top-level document composition | RQ-001, RQ-002, RQ-003 |
 | Common and provenance layers | RQ-004, RQ-005, RQ-006 |
-| Structural, semantic, physical, normalization layers | RQ-003, RQ-009, RQ-012, RQ-013 |
-| Optional profiles | RQ-008, RQ-013 |
-| Workflow architecture | RQ-006, RQ-007 |
-| CLI architecture | RQ-010, RQ-011, RQ-012, RQ-013, RQ-014, RQ-015 |
+| Structural, semantic, physical, normalization layers | RQ-003, RQ-009, RQ-010, RQ-013, RQ-014 |
+| Optional profiles | RQ-008, RQ-014 |
+| Workflow architecture | RQ-006, RQ-007, RQ-009 |
+| CLI architecture | RQ-011, RQ-012, RQ-013, RQ-014, RQ-015, RQ-016 |
 | Evidence and generated artifacts | RQ-006, RQ-007, RQ-009 |
 
 ## 11. Current design limits

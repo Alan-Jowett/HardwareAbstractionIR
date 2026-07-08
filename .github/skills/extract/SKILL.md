@@ -269,6 +269,13 @@ If a conservative normalization can align the records without inventing
 facts or silently reshaping the official-source-derived topology, you
 must do that work before classifying the metadata as omitted.
 
+When the document carries a canonical terminology scope, the normalization
+pass must also decide whether the vendor-facing peripheral, register, or
+field should map to one or more repository-defined canonical terms. Keep
+the vendor-native structural names intact. Add canonical mappings only when
+the concept match is evidence-backed and specific enough to improve
+cross-vendor comparability without erasing meaningful vendor differences.
+
 When approved structured sources decompose a shared-base peripheral
 differently from the current official-source-derived HAIR topology, you
 must run an **overlay-preserving reconciliation pass** before calling
@@ -456,6 +463,7 @@ source and relevant metadata class:
 - whether the metadata is present in approved evidence
 - whether it was extracted
 - whether comparison required normalization
+- whether a canonical peripheral/register/field term mapping was assigned
 - the count or explicit inventory of unresolved items
 - the root cause of each unresolved item:
   - missing source evidence

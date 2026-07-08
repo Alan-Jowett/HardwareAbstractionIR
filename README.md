@@ -33,7 +33,7 @@ Today this repository contains:
 | Path | Purpose |
 | --- | --- |
 | `schema/` | Core HAIR schema layers, profile schemas, and the evidence-manifest schema |
-| `docs/` | Human-oriented schema, CLI, MCU-profile, and Embassy-profile guides |
+| `docs/` | Human-oriented schema, CLI, profile, and canonical-terminology guides |
 | `specs/` | Governing repository requirements, design, and validation baselines |
 | `src/main.rs` | Current Rust CLI implementation |
 | `evidence/` | Reference device bundles, manifests, reports, and generated artifacts |

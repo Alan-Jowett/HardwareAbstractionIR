@@ -107,7 +107,25 @@ optional layers that specialize the core HAIR model without replacing it.
 - Profile data may only narrow and bind hardware facts already represented in
   the core layers.
 
-### RQ-009 Generator behavior is deterministic and explicit
+### RQ-009 Canonical cross-vendor terminology is normalization-owned
+
+The repository shall represent cross-vendor peripheral, register, and field
+concepts through explicit normalization data without overwriting vendor-native
+names in the structural model.
+
+**Acceptance criteria**
+- `normalization` may define a seeded catalog of canonical terms for
+  `peripheral`, `register`, and `field` concepts.
+- Per-entity normalization mappings bind a target structural entity to one or
+  more canonical term references.
+- Vendor-facing names remain on the structural entities themselves; canonical
+  mappings are additive normalization metadata rather than replacements for the
+  source-derived names.
+- First-cut coverage may be partial and seeded from the repository's current
+  reference bundles and workflows rather than requiring an immediate universal
+  vocabulary.
+
+### RQ-010 Generator behavior is deterministic and explicit
 
 The repository shall require deterministic lowering from HAIR and explicit
 failure when required data is missing or unsupported.
@@ -119,7 +137,7 @@ failure when required data is missing or unsupported.
 - Generator outputs are treated as lowerings from HAIR, not as alternate
   sources of truth.
 
-### RQ-010 The repository-managed CLI surface is limited
+### RQ-011 The repository-managed CLI surface is limited
 
 The repository shall define the current CLI contract as the implemented `hair`
 commands only.
@@ -133,7 +151,7 @@ commands only.
 - `extract` and `normalize` are workflow contracts, not CLI commands in the
   current baseline.
 
-### RQ-011 Validation is currently schema-conformance-first
+### RQ-012 Validation is currently schema-conformance-first
 
 The repository shall treat CLI validation as schema conformance against the
 repository schema set, not as full semantic or profile execution.
@@ -145,7 +163,7 @@ repository schema set, not as full semantic or profile execution.
   document model.
 - Executing declarative validation rules is outside the current CLI guarantee.
 
-### RQ-012 SVD generation preserves required device structure
+### RQ-013 SVD generation preserves required device structure
 
 The repository shall lower HAIR device documents to CMSIS-SVD-style output
 when the required SVD-representable data is present.
@@ -163,7 +181,7 @@ when the required SVD-representable data is present.
 - The input document must provide explicit CPU revision, endianness, interrupt
   priority width, and core feature flags needed by CMSIS-SVD output.
 
-### RQ-013 Embassy generation is profile-derived
+### RQ-014 Embassy generation is profile-derived
 
 The repository shall allow Embassy-style HAL generation only from HAIR
 documents that include the required canonical MCU topology and an explicit
@@ -182,7 +200,7 @@ Embassy profile contract.
 - Unsupported driver kinds, unresolved references, missing lowering inputs,
   and out-of-subset requests fail explicitly.
 
-### RQ-014 Diff is structural and repository-aware
+### RQ-015 Diff is structural and repository-aware
 
 The repository shall compare HAIR documents structurally rather than as raw
 text and shall support both filesystem and git-backed inputs.
@@ -194,7 +212,7 @@ text and shall support both filesystem and git-backed inputs.
   HAIR paths.
 - The command exits non-zero when differences are found.
 
-### RQ-015 Exit behavior is stable
+### RQ-016 Exit behavior is stable
 
 The repository shall preserve stable high-level CLI exit semantics.
 
@@ -227,5 +245,6 @@ The current baseline intentionally leaves these areas open for later evolution:
 - stronger semantic-expression constraints
 - richer declarative validation execution
 - additional generator contracts beyond the currently implemented CLI surface
-- expansion of canonical MCU/SoC vocabularies and profile-specific readiness
+- expansion of canonical peripheral/register/field vocabularies and
+  profile-specific readiness
   rules

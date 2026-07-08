@@ -17226,6 +17226,2090 @@
       }
     ]
   },
+  "normalization": {
+    "canonicalTerms": [
+      {
+        "id": "term.peripheral.clock-controller",
+        "name": "Clock controller",
+        "scope": "peripheral"
+      },
+      {
+        "id": "term.peripheral.gpio-port",
+        "name": "GPIO port",
+        "scope": "peripheral"
+      },
+      {
+        "id": "term.peripheral.uart",
+        "name": "UART",
+        "scope": "peripheral"
+      },
+      {
+        "id": "term.peripheral.spi",
+        "name": "SPI controller",
+        "scope": "peripheral"
+      },
+      {
+        "id": "term.peripheral.i2c",
+        "name": "I2C controller",
+        "scope": "peripheral"
+      },
+      {
+        "id": "term.peripheral.timer-general",
+        "name": "General-purpose timer",
+        "scope": "peripheral"
+      },
+      {
+        "id": "term.register.control",
+        "name": "Control register",
+        "scope": "register"
+      },
+      {
+        "id": "term.register.auto-reload",
+        "name": "Auto-reload register",
+        "scope": "register"
+      },
+      {
+        "id": "term.register.counter",
+        "name": "Counter register",
+        "scope": "register"
+      },
+      {
+        "id": "term.field.counter-value",
+        "name": "Counter value",
+        "scope": "field"
+      },
+      {
+        "id": "term.register.interrupt-clear",
+        "name": "Interrupt-clear register",
+        "scope": "register"
+      },
+      {
+        "id": "term.register.interrupt-status",
+        "name": "Interrupt-status register",
+        "scope": "register"
+      },
+      {
+        "id": "term.register.data",
+        "name": "Data register",
+        "scope": "register"
+      },
+      {
+        "id": "term.field.busy",
+        "name": "Busy",
+        "scope": "field"
+      },
+      {
+        "id": "term.register.baud-rate",
+        "name": "Baud-rate register",
+        "scope": "register"
+      },
+      {
+        "id": "term.field.baud-divider",
+        "name": "Baud divider",
+        "scope": "field"
+      },
+      {
+        "id": "term.register.config",
+        "name": "Configuration register",
+        "scope": "register"
+      },
+      {
+        "id": "term.field.enable",
+        "name": "Enable",
+        "scope": "field"
+      },
+      {
+        "id": "term.register.mode",
+        "name": "Mode register",
+        "scope": "register"
+      },
+      {
+        "id": "term.register.interrupt-enable",
+        "name": "Interrupt-enable register",
+        "scope": "register"
+      },
+      {
+        "id": "term.register.reset-control",
+        "name": "Reset-control register",
+        "scope": "register"
+      },
+      {
+        "id": "term.field.reset-assert",
+        "name": "Reset assert",
+        "scope": "field"
+      },
+      {
+        "id": "term.register.clock-enable",
+        "name": "Clock-enable register",
+        "scope": "register"
+      },
+      {
+        "id": "term.field.clock-enable",
+        "name": "Clock enable",
+        "scope": "field"
+      }
+    ],
+    "mappings": [
+      {
+        "id": "norm.periph.sysctl",
+        "name": "SYSCTL canonical mapping",
+        "targetRef": "periph.sysctl",
+        "canonicalTermRefs": [
+          "term.peripheral.clock-controller"
+        ],
+        "vendorNames": [
+          "SYSCTL"
+        ]
+      },
+      {
+        "id": "norm.periph.gpioa",
+        "name": "GPIOA canonical mapping",
+        "targetRef": "periph.gpioa",
+        "canonicalTermRefs": [
+          "term.peripheral.gpio-port"
+        ],
+        "vendorNames": [
+          "GPIOA"
+        ]
+      },
+      {
+        "id": "norm.periph.gpiob",
+        "name": "GPIOB canonical mapping",
+        "targetRef": "periph.gpiob",
+        "canonicalTermRefs": [
+          "term.peripheral.gpio-port"
+        ],
+        "vendorNames": [
+          "GPIOB"
+        ]
+      },
+      {
+        "id": "norm.periph.gpioc",
+        "name": "GPIOC canonical mapping",
+        "targetRef": "periph.gpioc",
+        "canonicalTermRefs": [
+          "term.peripheral.gpio-port"
+        ],
+        "vendorNames": [
+          "GPIOC"
+        ]
+      },
+      {
+        "id": "norm.periph.gpiod",
+        "name": "GPIOD canonical mapping",
+        "targetRef": "periph.gpiod",
+        "canonicalTermRefs": [
+          "term.peripheral.gpio-port"
+        ],
+        "vendorNames": [
+          "GPIOD"
+        ]
+      },
+      {
+        "id": "norm.periph.gpioe",
+        "name": "GPIOE canonical mapping",
+        "targetRef": "periph.gpioe",
+        "canonicalTermRefs": [
+          "term.peripheral.gpio-port"
+        ],
+        "vendorNames": [
+          "GPIOE"
+        ]
+      },
+      {
+        "id": "norm.periph.gpiof",
+        "name": "GPIOF canonical mapping",
+        "targetRef": "periph.gpiof",
+        "canonicalTermRefs": [
+          "term.peripheral.gpio-port"
+        ],
+        "vendorNames": [
+          "GPIOF"
+        ]
+      },
+      {
+        "id": "norm.periph.uart0",
+        "name": "UART0 canonical mapping",
+        "targetRef": "periph.uart0",
+        "canonicalTermRefs": [
+          "term.peripheral.uart"
+        ],
+        "vendorNames": [
+          "UART0"
+        ]
+      },
+      {
+        "id": "norm.periph.uart1",
+        "name": "UART1 canonical mapping",
+        "targetRef": "periph.uart1",
+        "canonicalTermRefs": [
+          "term.peripheral.uart"
+        ],
+        "vendorNames": [
+          "UART1"
+        ]
+      },
+      {
+        "id": "norm.periph.ssi0",
+        "name": "SSI0 canonical mapping",
+        "targetRef": "periph.ssi0",
+        "canonicalTermRefs": [
+          "term.peripheral.spi"
+        ],
+        "vendorNames": [
+          "SSI0"
+        ]
+      },
+      {
+        "id": "norm.periph.i2c0",
+        "name": "I2C0 canonical mapping",
+        "targetRef": "periph.i2c0",
+        "canonicalTermRefs": [
+          "term.peripheral.i2c"
+        ],
+        "vendorNames": [
+          "I2C0"
+        ]
+      },
+      {
+        "id": "norm.periph.timer0",
+        "name": "TIMER0 canonical mapping",
+        "targetRef": "periph.timer0",
+        "canonicalTermRefs": [
+          "term.peripheral.timer-general"
+        ],
+        "vendorNames": [
+          "TIMER0"
+        ]
+      },
+      {
+        "id": "norm.periph.timer1",
+        "name": "TIMER1 canonical mapping",
+        "targetRef": "periph.timer1",
+        "canonicalTermRefs": [
+          "term.peripheral.timer-general"
+        ],
+        "vendorNames": [
+          "TIMER1"
+        ]
+      },
+      {
+        "id": "norm.periph.timer2",
+        "name": "TIMER2 canonical mapping",
+        "targetRef": "periph.timer2",
+        "canonicalTermRefs": [
+          "term.peripheral.timer-general"
+        ],
+        "vendorNames": [
+          "TIMER2"
+        ]
+      },
+      {
+        "id": "norm.periph.timer3",
+        "name": "TIMER3 canonical mapping",
+        "targetRef": "periph.timer3",
+        "canonicalTermRefs": [
+          "term.peripheral.timer-general"
+        ],
+        "vendorNames": [
+          "TIMER3"
+        ]
+      },
+      {
+        "id": "norm.reg.systick.ctrl",
+        "name": "CTRL canonical mapping",
+        "targetRef": "reg.systick.ctrl",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTRL"
+        ]
+      },
+      {
+        "id": "norm.reg.systick.load",
+        "name": "LOAD canonical mapping",
+        "targetRef": "reg.systick.load",
+        "canonicalTermRefs": [
+          "term.register.auto-reload"
+        ],
+        "vendorNames": [
+          "LOAD"
+        ]
+      },
+      {
+        "id": "norm.reg.watchdog0.load",
+        "name": "LOAD canonical mapping",
+        "targetRef": "reg.watchdog0.load",
+        "canonicalTermRefs": [
+          "term.register.auto-reload"
+        ],
+        "vendorNames": [
+          "LOAD"
+        ]
+      },
+      {
+        "id": "norm.reg.watchdog0.value",
+        "name": "VALUE canonical mapping",
+        "targetRef": "reg.watchdog0.value",
+        "canonicalTermRefs": [
+          "term.register.counter"
+        ],
+        "vendorNames": [
+          "VALUE"
+        ]
+      },
+      {
+        "id": "norm.field.watchdog0.value.value",
+        "name": "VALUE canonical mapping",
+        "targetRef": "field.watchdog0.value.value",
+        "canonicalTermRefs": [
+          "term.field.counter-value"
+        ],
+        "vendorNames": [
+          "VALUE"
+        ]
+      },
+      {
+        "id": "norm.reg.watchdog0.ctl",
+        "name": "CTL canonical mapping",
+        "targetRef": "reg.watchdog0.ctl",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTL"
+        ]
+      },
+      {
+        "id": "norm.reg.watchdog0.icr",
+        "name": "ICR canonical mapping",
+        "targetRef": "reg.watchdog0.icr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-clear"
+        ],
+        "vendorNames": [
+          "ICR"
+        ]
+      },
+      {
+        "id": "norm.reg.watchdog0.ris",
+        "name": "RIS canonical mapping",
+        "targetRef": "reg.watchdog0.ris",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "RIS"
+        ]
+      },
+      {
+        "id": "norm.reg.watchdog0.mis",
+        "name": "MIS canonical mapping",
+        "targetRef": "reg.watchdog0.mis",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "MIS"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioa.data",
+        "name": "DATA canonical mapping",
+        "targetRef": "reg.gpioa.data",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DATA"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioa.ris",
+        "name": "RIS canonical mapping",
+        "targetRef": "reg.gpioa.ris",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "RIS"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioa.mis",
+        "name": "MIS canonical mapping",
+        "targetRef": "reg.gpioa.mis",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "MIS"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioa.icr",
+        "name": "ICR canonical mapping",
+        "targetRef": "reg.gpioa.icr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-clear"
+        ],
+        "vendorNames": [
+          "ICR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioa.cr",
+        "name": "CR canonical mapping",
+        "targetRef": "reg.gpioa.cr",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiob.data",
+        "name": "DATA canonical mapping",
+        "targetRef": "reg.gpiob.data",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DATA"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiob.ris",
+        "name": "RIS canonical mapping",
+        "targetRef": "reg.gpiob.ris",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "RIS"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiob.mis",
+        "name": "MIS canonical mapping",
+        "targetRef": "reg.gpiob.mis",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "MIS"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiob.icr",
+        "name": "ICR canonical mapping",
+        "targetRef": "reg.gpiob.icr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-clear"
+        ],
+        "vendorNames": [
+          "ICR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiob.cr",
+        "name": "CR canonical mapping",
+        "targetRef": "reg.gpiob.cr",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioc.data",
+        "name": "DATA canonical mapping",
+        "targetRef": "reg.gpioc.data",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DATA"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioc.ris",
+        "name": "RIS canonical mapping",
+        "targetRef": "reg.gpioc.ris",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "RIS"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioc.mis",
+        "name": "MIS canonical mapping",
+        "targetRef": "reg.gpioc.mis",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "MIS"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioc.icr",
+        "name": "ICR canonical mapping",
+        "targetRef": "reg.gpioc.icr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-clear"
+        ],
+        "vendorNames": [
+          "ICR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioc.cr",
+        "name": "CR canonical mapping",
+        "targetRef": "reg.gpioc.cr",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiod.data",
+        "name": "DATA canonical mapping",
+        "targetRef": "reg.gpiod.data",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DATA"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiod.ris",
+        "name": "RIS canonical mapping",
+        "targetRef": "reg.gpiod.ris",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "RIS"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiod.mis",
+        "name": "MIS canonical mapping",
+        "targetRef": "reg.gpiod.mis",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "MIS"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiod.icr",
+        "name": "ICR canonical mapping",
+        "targetRef": "reg.gpiod.icr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-clear"
+        ],
+        "vendorNames": [
+          "ICR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiod.cr",
+        "name": "CR canonical mapping",
+        "targetRef": "reg.gpiod.cr",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioe.data",
+        "name": "DATA canonical mapping",
+        "targetRef": "reg.gpioe.data",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DATA"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioe.ris",
+        "name": "RIS canonical mapping",
+        "targetRef": "reg.gpioe.ris",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "RIS"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioe.mis",
+        "name": "MIS canonical mapping",
+        "targetRef": "reg.gpioe.mis",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "MIS"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioe.icr",
+        "name": "ICR canonical mapping",
+        "targetRef": "reg.gpioe.icr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-clear"
+        ],
+        "vendorNames": [
+          "ICR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioe.cr",
+        "name": "CR canonical mapping",
+        "targetRef": "reg.gpioe.cr",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiof.data",
+        "name": "DATA canonical mapping",
+        "targetRef": "reg.gpiof.data",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DATA"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiof.ris",
+        "name": "RIS canonical mapping",
+        "targetRef": "reg.gpiof.ris",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "RIS"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiof.mis",
+        "name": "MIS canonical mapping",
+        "targetRef": "reg.gpiof.mis",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "MIS"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiof.icr",
+        "name": "ICR canonical mapping",
+        "targetRef": "reg.gpiof.icr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-clear"
+        ],
+        "vendorNames": [
+          "ICR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiof.cr",
+        "name": "CR canonical mapping",
+        "targetRef": "reg.gpiof.cr",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CR"
+        ]
+      },
+      {
+        "id": "norm.reg.ssi0.cr1",
+        "name": "CR1 canonical mapping",
+        "targetRef": "reg.ssi0.cr1",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CR1"
+        ]
+      },
+      {
+        "id": "norm.reg.ssi0.dr",
+        "name": "DR canonical mapping",
+        "targetRef": "reg.ssi0.dr",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DR"
+        ]
+      },
+      {
+        "id": "norm.reg.ssi0.ris",
+        "name": "RIS canonical mapping",
+        "targetRef": "reg.ssi0.ris",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "RIS"
+        ]
+      },
+      {
+        "id": "norm.reg.ssi0.mis",
+        "name": "MIS canonical mapping",
+        "targetRef": "reg.ssi0.mis",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "MIS"
+        ]
+      },
+      {
+        "id": "norm.reg.ssi0.icr",
+        "name": "ICR canonical mapping",
+        "targetRef": "reg.ssi0.icr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-clear"
+        ],
+        "vendorNames": [
+          "ICR"
+        ]
+      },
+      {
+        "id": "norm.reg.uart0.dr",
+        "name": "DR canonical mapping",
+        "targetRef": "reg.uart0.dr",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DR"
+        ]
+      },
+      {
+        "id": "norm.field.uart0.fr.busy",
+        "name": "BUSY canonical mapping",
+        "targetRef": "field.uart0.fr.busy",
+        "canonicalTermRefs": [
+          "term.field.busy"
+        ],
+        "vendorNames": [
+          "BUSY"
+        ]
+      },
+      {
+        "id": "norm.reg.uart0.ibrd",
+        "name": "IBRD canonical mapping",
+        "targetRef": "reg.uart0.ibrd",
+        "canonicalTermRefs": [
+          "term.register.baud-rate"
+        ],
+        "vendorNames": [
+          "IBRD"
+        ]
+      },
+      {
+        "id": "norm.field.uart0.ibrd.divint",
+        "name": "DIVINT canonical mapping",
+        "targetRef": "field.uart0.ibrd.divint",
+        "canonicalTermRefs": [
+          "term.field.baud-divider"
+        ],
+        "vendorNames": [
+          "DIVINT"
+        ]
+      },
+      {
+        "id": "norm.reg.uart0.fbrd",
+        "name": "FBRD canonical mapping",
+        "targetRef": "reg.uart0.fbrd",
+        "canonicalTermRefs": [
+          "term.register.baud-rate"
+        ],
+        "vendorNames": [
+          "FBRD"
+        ]
+      },
+      {
+        "id": "norm.field.uart0.fbrd.divfrac",
+        "name": "DIVFRAC canonical mapping",
+        "targetRef": "field.uart0.fbrd.divfrac",
+        "canonicalTermRefs": [
+          "term.field.baud-divider"
+        ],
+        "vendorNames": [
+          "DIVFRAC"
+        ]
+      },
+      {
+        "id": "norm.reg.uart0.lcrh",
+        "name": "LCRH canonical mapping",
+        "targetRef": "reg.uart0.lcrh",
+        "canonicalTermRefs": [
+          "term.register.config"
+        ],
+        "vendorNames": [
+          "LCRH"
+        ]
+      },
+      {
+        "id": "norm.reg.uart0.ctl",
+        "name": "CTL canonical mapping",
+        "targetRef": "reg.uart0.ctl",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTL"
+        ]
+      },
+      {
+        "id": "norm.field.uart0.ctl.uarten",
+        "name": "UARTEN canonical mapping",
+        "targetRef": "field.uart0.ctl.uarten",
+        "canonicalTermRefs": [
+          "term.field.enable"
+        ],
+        "vendorNames": [
+          "UARTEN"
+        ]
+      },
+      {
+        "id": "norm.field.uart0.ctl.rxe",
+        "name": "RXE canonical mapping",
+        "targetRef": "field.uart0.ctl.rxe",
+        "canonicalTermRefs": [
+          "term.field.enable"
+        ],
+        "vendorNames": [
+          "RXE"
+        ]
+      },
+      {
+        "id": "norm.field.uart0.ctl.txe",
+        "name": "TXE canonical mapping",
+        "targetRef": "field.uart0.ctl.txe",
+        "canonicalTermRefs": [
+          "term.field.enable"
+        ],
+        "vendorNames": [
+          "TXE"
+        ]
+      },
+      {
+        "id": "norm.reg.uart0.ris",
+        "name": "RIS canonical mapping",
+        "targetRef": "reg.uart0.ris",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "RIS"
+        ]
+      },
+      {
+        "id": "norm.reg.uart0.mis",
+        "name": "MIS canonical mapping",
+        "targetRef": "reg.uart0.mis",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "MIS"
+        ]
+      },
+      {
+        "id": "norm.reg.uart0.icr",
+        "name": "ICR canonical mapping",
+        "targetRef": "reg.uart0.icr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-clear"
+        ],
+        "vendorNames": [
+          "ICR"
+        ]
+      },
+      {
+        "id": "norm.reg.uart1.dr",
+        "name": "DR canonical mapping",
+        "targetRef": "reg.uart1.dr",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DR"
+        ]
+      },
+      {
+        "id": "norm.field.uart1.fr.busy",
+        "name": "BUSY canonical mapping",
+        "targetRef": "field.uart1.fr.busy",
+        "canonicalTermRefs": [
+          "term.field.busy"
+        ],
+        "vendorNames": [
+          "BUSY"
+        ]
+      },
+      {
+        "id": "norm.reg.uart1.ibrd",
+        "name": "IBRD canonical mapping",
+        "targetRef": "reg.uart1.ibrd",
+        "canonicalTermRefs": [
+          "term.register.baud-rate"
+        ],
+        "vendorNames": [
+          "IBRD"
+        ]
+      },
+      {
+        "id": "norm.field.uart1.ibrd.divint",
+        "name": "DIVINT canonical mapping",
+        "targetRef": "field.uart1.ibrd.divint",
+        "canonicalTermRefs": [
+          "term.field.baud-divider"
+        ],
+        "vendorNames": [
+          "DIVINT"
+        ]
+      },
+      {
+        "id": "norm.reg.uart1.fbrd",
+        "name": "FBRD canonical mapping",
+        "targetRef": "reg.uart1.fbrd",
+        "canonicalTermRefs": [
+          "term.register.baud-rate"
+        ],
+        "vendorNames": [
+          "FBRD"
+        ]
+      },
+      {
+        "id": "norm.field.uart1.fbrd.divfrac",
+        "name": "DIVFRAC canonical mapping",
+        "targetRef": "field.uart1.fbrd.divfrac",
+        "canonicalTermRefs": [
+          "term.field.baud-divider"
+        ],
+        "vendorNames": [
+          "DIVFRAC"
+        ]
+      },
+      {
+        "id": "norm.reg.uart1.lcrh",
+        "name": "LCRH canonical mapping",
+        "targetRef": "reg.uart1.lcrh",
+        "canonicalTermRefs": [
+          "term.register.config"
+        ],
+        "vendorNames": [
+          "LCRH"
+        ]
+      },
+      {
+        "id": "norm.reg.uart1.ctl",
+        "name": "CTL canonical mapping",
+        "targetRef": "reg.uart1.ctl",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTL"
+        ]
+      },
+      {
+        "id": "norm.field.uart1.ctl.uarten",
+        "name": "UARTEN canonical mapping",
+        "targetRef": "field.uart1.ctl.uarten",
+        "canonicalTermRefs": [
+          "term.field.enable"
+        ],
+        "vendorNames": [
+          "UARTEN"
+        ]
+      },
+      {
+        "id": "norm.field.uart1.ctl.rxe",
+        "name": "RXE canonical mapping",
+        "targetRef": "field.uart1.ctl.rxe",
+        "canonicalTermRefs": [
+          "term.field.enable"
+        ],
+        "vendorNames": [
+          "RXE"
+        ]
+      },
+      {
+        "id": "norm.field.uart1.ctl.txe",
+        "name": "TXE canonical mapping",
+        "targetRef": "field.uart1.ctl.txe",
+        "canonicalTermRefs": [
+          "term.field.enable"
+        ],
+        "vendorNames": [
+          "TXE"
+        ]
+      },
+      {
+        "id": "norm.reg.uart1.ris",
+        "name": "RIS canonical mapping",
+        "targetRef": "reg.uart1.ris",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "RIS"
+        ]
+      },
+      {
+        "id": "norm.reg.uart1.mis",
+        "name": "MIS canonical mapping",
+        "targetRef": "reg.uart1.mis",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "MIS"
+        ]
+      },
+      {
+        "id": "norm.reg.uart1.icr",
+        "name": "ICR canonical mapping",
+        "targetRef": "reg.uart1.icr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-clear"
+        ],
+        "vendorNames": [
+          "ICR"
+        ]
+      },
+      {
+        "id": "norm.field.i2c0.mcs_status.busy",
+        "name": "BUSY canonical mapping",
+        "targetRef": "field.i2c0.mcs_status.busy",
+        "canonicalTermRefs": [
+          "term.field.busy"
+        ],
+        "vendorNames": [
+          "BUSY"
+        ]
+      },
+      {
+        "id": "norm.reg.timer0.cfg",
+        "name": "CFG canonical mapping",
+        "targetRef": "reg.timer0.cfg",
+        "canonicalTermRefs": [
+          "term.register.config"
+        ],
+        "vendorNames": [
+          "CFG"
+        ]
+      },
+      {
+        "id": "norm.reg.timer0.tamr",
+        "name": "TAMR canonical mapping",
+        "targetRef": "reg.timer0.tamr",
+        "canonicalTermRefs": [
+          "term.register.mode"
+        ],
+        "vendorNames": [
+          "TAMR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer0.tbmr",
+        "name": "TBMR canonical mapping",
+        "targetRef": "reg.timer0.tbmr",
+        "canonicalTermRefs": [
+          "term.register.mode"
+        ],
+        "vendorNames": [
+          "TBMR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer0.ctl",
+        "name": "CTL canonical mapping",
+        "targetRef": "reg.timer0.ctl",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTL"
+        ]
+      },
+      {
+        "id": "norm.reg.timer0.imr",
+        "name": "IMR canonical mapping",
+        "targetRef": "reg.timer0.imr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-enable"
+        ],
+        "vendorNames": [
+          "IMR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer0.ris",
+        "name": "RIS canonical mapping",
+        "targetRef": "reg.timer0.ris",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "RIS"
+        ]
+      },
+      {
+        "id": "norm.reg.timer0.mis",
+        "name": "MIS canonical mapping",
+        "targetRef": "reg.timer0.mis",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "MIS"
+        ]
+      },
+      {
+        "id": "norm.reg.timer0.icr",
+        "name": "ICR canonical mapping",
+        "targetRef": "reg.timer0.icr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-clear"
+        ],
+        "vendorNames": [
+          "ICR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer0.tailr",
+        "name": "TAILR canonical mapping",
+        "targetRef": "reg.timer0.tailr",
+        "canonicalTermRefs": [
+          "term.register.auto-reload"
+        ],
+        "vendorNames": [
+          "TAILR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer0.tbilr",
+        "name": "TBILR canonical mapping",
+        "targetRef": "reg.timer0.tbilr",
+        "canonicalTermRefs": [
+          "term.register.auto-reload"
+        ],
+        "vendorNames": [
+          "TBILR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer0.tar",
+        "name": "TAR canonical mapping",
+        "targetRef": "reg.timer0.tar",
+        "canonicalTermRefs": [
+          "term.register.counter"
+        ],
+        "vendorNames": [
+          "TAR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer0.tbr",
+        "name": "TBR canonical mapping",
+        "targetRef": "reg.timer0.tbr",
+        "canonicalTermRefs": [
+          "term.register.counter"
+        ],
+        "vendorNames": [
+          "TBR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer1.cfg",
+        "name": "CFG canonical mapping",
+        "targetRef": "reg.timer1.cfg",
+        "canonicalTermRefs": [
+          "term.register.config"
+        ],
+        "vendorNames": [
+          "CFG"
+        ]
+      },
+      {
+        "id": "norm.reg.timer1.tamr",
+        "name": "TAMR canonical mapping",
+        "targetRef": "reg.timer1.tamr",
+        "canonicalTermRefs": [
+          "term.register.mode"
+        ],
+        "vendorNames": [
+          "TAMR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer1.tbmr",
+        "name": "TBMR canonical mapping",
+        "targetRef": "reg.timer1.tbmr",
+        "canonicalTermRefs": [
+          "term.register.mode"
+        ],
+        "vendorNames": [
+          "TBMR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer1.ctl",
+        "name": "CTL canonical mapping",
+        "targetRef": "reg.timer1.ctl",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTL"
+        ]
+      },
+      {
+        "id": "norm.reg.timer1.imr",
+        "name": "IMR canonical mapping",
+        "targetRef": "reg.timer1.imr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-enable"
+        ],
+        "vendorNames": [
+          "IMR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer1.ris",
+        "name": "RIS canonical mapping",
+        "targetRef": "reg.timer1.ris",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "RIS"
+        ]
+      },
+      {
+        "id": "norm.reg.timer1.mis",
+        "name": "MIS canonical mapping",
+        "targetRef": "reg.timer1.mis",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "MIS"
+        ]
+      },
+      {
+        "id": "norm.reg.timer1.icr",
+        "name": "ICR canonical mapping",
+        "targetRef": "reg.timer1.icr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-clear"
+        ],
+        "vendorNames": [
+          "ICR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer1.tailr",
+        "name": "TAILR canonical mapping",
+        "targetRef": "reg.timer1.tailr",
+        "canonicalTermRefs": [
+          "term.register.auto-reload"
+        ],
+        "vendorNames": [
+          "TAILR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer1.tbilr",
+        "name": "TBILR canonical mapping",
+        "targetRef": "reg.timer1.tbilr",
+        "canonicalTermRefs": [
+          "term.register.auto-reload"
+        ],
+        "vendorNames": [
+          "TBILR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer1.tar",
+        "name": "TAR canonical mapping",
+        "targetRef": "reg.timer1.tar",
+        "canonicalTermRefs": [
+          "term.register.counter"
+        ],
+        "vendorNames": [
+          "TAR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer1.tbr",
+        "name": "TBR canonical mapping",
+        "targetRef": "reg.timer1.tbr",
+        "canonicalTermRefs": [
+          "term.register.counter"
+        ],
+        "vendorNames": [
+          "TBR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer2.cfg",
+        "name": "CFG canonical mapping",
+        "targetRef": "reg.timer2.cfg",
+        "canonicalTermRefs": [
+          "term.register.config"
+        ],
+        "vendorNames": [
+          "CFG"
+        ]
+      },
+      {
+        "id": "norm.reg.timer2.tamr",
+        "name": "TAMR canonical mapping",
+        "targetRef": "reg.timer2.tamr",
+        "canonicalTermRefs": [
+          "term.register.mode"
+        ],
+        "vendorNames": [
+          "TAMR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer2.tbmr",
+        "name": "TBMR canonical mapping",
+        "targetRef": "reg.timer2.tbmr",
+        "canonicalTermRefs": [
+          "term.register.mode"
+        ],
+        "vendorNames": [
+          "TBMR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer2.ctl",
+        "name": "CTL canonical mapping",
+        "targetRef": "reg.timer2.ctl",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTL"
+        ]
+      },
+      {
+        "id": "norm.reg.timer2.imr",
+        "name": "IMR canonical mapping",
+        "targetRef": "reg.timer2.imr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-enable"
+        ],
+        "vendorNames": [
+          "IMR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer2.ris",
+        "name": "RIS canonical mapping",
+        "targetRef": "reg.timer2.ris",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "RIS"
+        ]
+      },
+      {
+        "id": "norm.reg.timer2.mis",
+        "name": "MIS canonical mapping",
+        "targetRef": "reg.timer2.mis",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "MIS"
+        ]
+      },
+      {
+        "id": "norm.reg.timer2.icr",
+        "name": "ICR canonical mapping",
+        "targetRef": "reg.timer2.icr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-clear"
+        ],
+        "vendorNames": [
+          "ICR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer2.tailr",
+        "name": "TAILR canonical mapping",
+        "targetRef": "reg.timer2.tailr",
+        "canonicalTermRefs": [
+          "term.register.auto-reload"
+        ],
+        "vendorNames": [
+          "TAILR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer2.tbilr",
+        "name": "TBILR canonical mapping",
+        "targetRef": "reg.timer2.tbilr",
+        "canonicalTermRefs": [
+          "term.register.auto-reload"
+        ],
+        "vendorNames": [
+          "TBILR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer2.tar",
+        "name": "TAR canonical mapping",
+        "targetRef": "reg.timer2.tar",
+        "canonicalTermRefs": [
+          "term.register.counter"
+        ],
+        "vendorNames": [
+          "TAR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer2.tbr",
+        "name": "TBR canonical mapping",
+        "targetRef": "reg.timer2.tbr",
+        "canonicalTermRefs": [
+          "term.register.counter"
+        ],
+        "vendorNames": [
+          "TBR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer3.cfg",
+        "name": "CFG canonical mapping",
+        "targetRef": "reg.timer3.cfg",
+        "canonicalTermRefs": [
+          "term.register.config"
+        ],
+        "vendorNames": [
+          "CFG"
+        ]
+      },
+      {
+        "id": "norm.reg.timer3.tamr",
+        "name": "TAMR canonical mapping",
+        "targetRef": "reg.timer3.tamr",
+        "canonicalTermRefs": [
+          "term.register.mode"
+        ],
+        "vendorNames": [
+          "TAMR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer3.tbmr",
+        "name": "TBMR canonical mapping",
+        "targetRef": "reg.timer3.tbmr",
+        "canonicalTermRefs": [
+          "term.register.mode"
+        ],
+        "vendorNames": [
+          "TBMR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer3.ctl",
+        "name": "CTL canonical mapping",
+        "targetRef": "reg.timer3.ctl",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTL"
+        ]
+      },
+      {
+        "id": "norm.reg.timer3.imr",
+        "name": "IMR canonical mapping",
+        "targetRef": "reg.timer3.imr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-enable"
+        ],
+        "vendorNames": [
+          "IMR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer3.ris",
+        "name": "RIS canonical mapping",
+        "targetRef": "reg.timer3.ris",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "RIS"
+        ]
+      },
+      {
+        "id": "norm.reg.timer3.mis",
+        "name": "MIS canonical mapping",
+        "targetRef": "reg.timer3.mis",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "MIS"
+        ]
+      },
+      {
+        "id": "norm.reg.timer3.icr",
+        "name": "ICR canonical mapping",
+        "targetRef": "reg.timer3.icr",
+        "canonicalTermRefs": [
+          "term.register.interrupt-clear"
+        ],
+        "vendorNames": [
+          "ICR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer3.tailr",
+        "name": "TAILR canonical mapping",
+        "targetRef": "reg.timer3.tailr",
+        "canonicalTermRefs": [
+          "term.register.auto-reload"
+        ],
+        "vendorNames": [
+          "TAILR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer3.tbilr",
+        "name": "TBILR canonical mapping",
+        "targetRef": "reg.timer3.tbilr",
+        "canonicalTermRefs": [
+          "term.register.auto-reload"
+        ],
+        "vendorNames": [
+          "TBILR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer3.tar",
+        "name": "TAR canonical mapping",
+        "targetRef": "reg.timer3.tar",
+        "canonicalTermRefs": [
+          "term.register.counter"
+        ],
+        "vendorNames": [
+          "TAR"
+        ]
+      },
+      {
+        "id": "norm.reg.timer3.tbr",
+        "name": "TBR canonical mapping",
+        "targetRef": "reg.timer3.tbr",
+        "canonicalTermRefs": [
+          "term.register.counter"
+        ],
+        "vendorNames": [
+          "TBR"
+        ]
+      },
+      {
+        "id": "norm.reg.sysctl.ris",
+        "name": "RIS canonical mapping",
+        "targetRef": "reg.sysctl.ris",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "RIS"
+        ]
+      },
+      {
+        "id": "norm.reg.sysctl.srcr0",
+        "name": "SRCR0 canonical mapping",
+        "targetRef": "reg.sysctl.srcr0",
+        "canonicalTermRefs": [
+          "term.register.reset-control"
+        ],
+        "vendorNames": [
+          "SRCR0"
+        ]
+      },
+      {
+        "id": "norm.reg.sysctl.srcr1",
+        "name": "SRCR1 canonical mapping",
+        "targetRef": "reg.sysctl.srcr1",
+        "canonicalTermRefs": [
+          "term.register.reset-control"
+        ],
+        "vendorNames": [
+          "SRCR1"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.srcr1.timer0",
+        "name": "TIMER0 canonical mapping",
+        "targetRef": "field.sysctl.srcr1.timer0",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "TIMER0"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.srcr1.timer1",
+        "name": "TIMER1 canonical mapping",
+        "targetRef": "field.sysctl.srcr1.timer1",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "TIMER1"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.srcr1.timer2",
+        "name": "TIMER2 canonical mapping",
+        "targetRef": "field.sysctl.srcr1.timer2",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "TIMER2"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.srcr1.timer3",
+        "name": "TIMER3 canonical mapping",
+        "targetRef": "field.sysctl.srcr1.timer3",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "TIMER3"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.srcr1.i2c0",
+        "name": "I2C0 canonical mapping",
+        "targetRef": "field.sysctl.srcr1.i2c0",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "I2C0"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.srcr1.ssi0",
+        "name": "SSI0 canonical mapping",
+        "targetRef": "field.sysctl.srcr1.ssi0",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "SSI0"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.srcr1.uart0",
+        "name": "UART0 canonical mapping",
+        "targetRef": "field.sysctl.srcr1.uart0",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "UART0"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.srcr1.uart1",
+        "name": "UART1 canonical mapping",
+        "targetRef": "field.sysctl.srcr1.uart1",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "UART1"
+        ]
+      },
+      {
+        "id": "norm.reg.sysctl.srcr2",
+        "name": "SRCR2 canonical mapping",
+        "targetRef": "reg.sysctl.srcr2",
+        "canonicalTermRefs": [
+          "term.register.reset-control"
+        ],
+        "vendorNames": [
+          "SRCR2"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.srcr2.gpioa",
+        "name": "GPIOA canonical mapping",
+        "targetRef": "field.sysctl.srcr2.gpioa",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "GPIOA"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.srcr2.gpiob",
+        "name": "GPIOB canonical mapping",
+        "targetRef": "field.sysctl.srcr2.gpiob",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "GPIOB"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.srcr2.gpioc",
+        "name": "GPIOC canonical mapping",
+        "targetRef": "field.sysctl.srcr2.gpioc",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "GPIOC"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.srcr2.gpiod",
+        "name": "GPIOD canonical mapping",
+        "targetRef": "field.sysctl.srcr2.gpiod",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "GPIOD"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.srcr2.gpioe",
+        "name": "GPIOE canonical mapping",
+        "targetRef": "field.sysctl.srcr2.gpioe",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "GPIOE"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.srcr2.gpiof",
+        "name": "GPIOF canonical mapping",
+        "targetRef": "field.sysctl.srcr2.gpiof",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "GPIOF"
+        ]
+      },
+      {
+        "id": "norm.reg.sysctl.rcgc0",
+        "name": "RCGC0 canonical mapping",
+        "targetRef": "reg.sysctl.rcgc0",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "RCGC0"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.rcgc0.wdt0",
+        "name": "WDT0 canonical mapping",
+        "targetRef": "field.sysctl.rcgc0.wdt0",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "WDT0"
+        ]
+      },
+      {
+        "id": "norm.reg.sysctl.scgc0",
+        "name": "SCGC0 canonical mapping",
+        "targetRef": "reg.sysctl.scgc0",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "SCGC0"
+        ]
+      },
+      {
+        "id": "norm.reg.sysctl.dcgc0",
+        "name": "DCGC0 canonical mapping",
+        "targetRef": "reg.sysctl.dcgc0",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "DCGC0"
+        ]
+      },
+      {
+        "id": "norm.reg.sysctl.rcgc1",
+        "name": "RCGC1 canonical mapping",
+        "targetRef": "reg.sysctl.rcgc1",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "RCGC1"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.rcgc1.timer0",
+        "name": "TIMER0 canonical mapping",
+        "targetRef": "field.sysctl.rcgc1.timer0",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TIMER0"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.rcgc1.timer1",
+        "name": "TIMER1 canonical mapping",
+        "targetRef": "field.sysctl.rcgc1.timer1",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TIMER1"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.rcgc1.timer2",
+        "name": "TIMER2 canonical mapping",
+        "targetRef": "field.sysctl.rcgc1.timer2",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TIMER2"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.rcgc1.timer3",
+        "name": "TIMER3 canonical mapping",
+        "targetRef": "field.sysctl.rcgc1.timer3",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TIMER3"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.rcgc1.i2c0",
+        "name": "I2C0 canonical mapping",
+        "targetRef": "field.sysctl.rcgc1.i2c0",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "I2C0"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.rcgc1.ssi0",
+        "name": "SSI0 canonical mapping",
+        "targetRef": "field.sysctl.rcgc1.ssi0",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "SSI0"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.rcgc1.uart0",
+        "name": "UART0 canonical mapping",
+        "targetRef": "field.sysctl.rcgc1.uart0",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "UART0"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.rcgc1.uart1",
+        "name": "UART1 canonical mapping",
+        "targetRef": "field.sysctl.rcgc1.uart1",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "UART1"
+        ]
+      },
+      {
+        "id": "norm.reg.sysctl.scgc1",
+        "name": "SCGC1 canonical mapping",
+        "targetRef": "reg.sysctl.scgc1",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "SCGC1"
+        ]
+      },
+      {
+        "id": "norm.reg.sysctl.dcgc1",
+        "name": "DCGC1 canonical mapping",
+        "targetRef": "reg.sysctl.dcgc1",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "DCGC1"
+        ]
+      },
+      {
+        "id": "norm.reg.sysctl.rcgc2",
+        "name": "RCGC2 canonical mapping",
+        "targetRef": "reg.sysctl.rcgc2",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "RCGC2"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.rcgc2.gpioa",
+        "name": "GPIOA canonical mapping",
+        "targetRef": "field.sysctl.rcgc2.gpioa",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "GPIOA"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.rcgc2.gpiob",
+        "name": "GPIOB canonical mapping",
+        "targetRef": "field.sysctl.rcgc2.gpiob",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "GPIOB"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.rcgc2.gpioc",
+        "name": "GPIOC canonical mapping",
+        "targetRef": "field.sysctl.rcgc2.gpioc",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "GPIOC"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.rcgc2.gpiod",
+        "name": "GPIOD canonical mapping",
+        "targetRef": "field.sysctl.rcgc2.gpiod",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "GPIOD"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.rcgc2.gpioe",
+        "name": "GPIOE canonical mapping",
+        "targetRef": "field.sysctl.rcgc2.gpioe",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "GPIOE"
+        ]
+      },
+      {
+        "id": "norm.field.sysctl.rcgc2.gpiof",
+        "name": "GPIOF canonical mapping",
+        "targetRef": "field.sysctl.rcgc2.gpiof",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "GPIOF"
+        ]
+      },
+      {
+        "id": "norm.reg.sysctl.scgc2",
+        "name": "SCGC2 canonical mapping",
+        "targetRef": "reg.sysctl.scgc2",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "SCGC2"
+        ]
+      },
+      {
+        "id": "norm.reg.sysctl.dcgc2",
+        "name": "DCGC2 canonical mapping",
+        "targetRef": "reg.sysctl.dcgc2",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "DCGC2"
+        ]
+      }
+    ]
+  },
   "profiles": {
     "mcuSoc": {
       "profileKind": "mcu-soc",

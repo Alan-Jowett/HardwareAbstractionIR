@@ -9641,6 +9641,103 @@ mod tests {
     }
 
     #[test]
+    fn generate_svd_accepts_canonical_term_normalization_metadata() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let mut document = load_json_file(
+            &repo_root
+                .join("evidence")
+                .join("wch")
+                .join("ch32v203c8t6")
+                .join("hair.json"),
+        )
+        .expect("document");
+
+        let normalization = document
+            .as_object_mut()
+            .expect("reference document should be an object")
+            .entry("normalization".to_string())
+            .or_insert_with(|| serde_json::json!({}));
+        let normalization = normalization
+            .as_object_mut()
+            .expect("normalization should be an object");
+        let extend_unique = |items: &mut Vec<Value>, additions: [Value; 3]| {
+            for addition in additions {
+                let addition_id = addition
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .expect("normalization entry should have an id");
+                if items
+                    .iter()
+                    .all(|existing| existing.get("id").and_then(Value::as_str) != Some(addition_id))
+                {
+                    items.push(addition);
+                }
+            }
+        };
+        extend_unique(
+            normalization
+                .entry("canonicalTerms".to_string())
+                .or_insert_with(|| serde_json::json!([]))
+                .as_array_mut()
+                .expect("canonicalTerms should be an array"),
+            [
+                serde_json::json!({
+                    "id": "term.peripheral.uart",
+                    "name": "UART",
+                    "scope": "peripheral"
+                }),
+                serde_json::json!({
+                    "id": "term.register.baud-rate",
+                    "name": "Baud-rate register",
+                    "scope": "register"
+                }),
+                serde_json::json!({
+                    "id": "term.field.enable",
+                    "name": "Enable",
+                    "scope": "field"
+                }),
+            ],
+        );
+        extend_unique(
+            normalization
+                .entry("mappings".to_string())
+                .or_insert_with(|| serde_json::json!([]))
+                .as_array_mut()
+                .expect("mappings should be an array"),
+            [
+                serde_json::json!({
+                    "id": "norm.uart4",
+                    "name": "UART4 normalization",
+                    "targetRef": "periph.uart4",
+                    "canonicalTermRefs": ["term.peripheral.uart"]
+                }),
+                serde_json::json!({
+                    "id": "norm.uart4-brr",
+                    "name": "UART4 BRR normalization",
+                    "targetRef": "reg.uart4.brr",
+                    "canonicalTermRefs": ["term.register.baud-rate"]
+                }),
+                serde_json::json!({
+                    "id": "norm.uart4-ue",
+                    "name": "UART4 UE normalization",
+                    "targetRef": "field.usart_ctlr1.ue",
+                    "canonicalTermRefs": ["term.field.enable"],
+                    "vendorNames": ["UE"]
+                }),
+            ],
+        );
+
+        let mut file = NamedTempFile::new().expect("temp file");
+        serde_json::to_writer(&mut file, &document).expect("write temp file");
+
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("document with canonical terminology should validate");
+        let svd = generate_svd(&validated)
+            .expect("normalization metadata should not break svd generation");
+        assert!(svd.contains("<device"));
+    }
+
+    #[test]
     fn generate_embassy_emits_compilable_crate_for_supported_subset() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let fixture = write_embassy_fixture(false);

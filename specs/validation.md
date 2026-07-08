@@ -140,6 +140,10 @@ in realistic device bundles.
 - Each document represents one concrete device variant.
 - Provenance, structure, and any included profiles remain internally
   consistent.
+- When `normalization.canonicalTerms[]` or `normalization.mappings[]` are
+  present, mappings remain additive metadata: vendor-facing entity names are
+  still preserved in `structure`, and each mapping resolves to one or more
+  document-defined canonical terms.
 - Example documents exercise different portions of the schema and generator
   surface.
 
@@ -195,6 +199,9 @@ approved evidence.
 **Check**
 - Extraction reports identify target scope, source inventory, discovered
   hardware areas, metadata coverage, rejected claims, and limitations.
+- When canonical terminology is in scope, extraction reports identify which
+  peripheral/register/field entities received canonical term mappings, which
+  candidates were deferred, and why.
 - HAIR documents align with the extraction scope claimed in the report.
 
 ### V-011 Audit review
@@ -228,6 +235,8 @@ adversarial challenge.
 - Requirements, design, and validation remain mutually traceable.
 - Specification changes occur before implementation changes that would alter
   repository guarantees.
+- Repository-owned canonical term guidance and normalization schema changes stay
+  aligned with the extraction workflow contract.
 - Maintenance work treats missing or drifting governing specs as a first-class
   problem.
 
@@ -328,44 +337,51 @@ the core model rather than replacements for it.
 
 ### 6.9 RQ-009 validation coverage
 
-RQ-009 is validated by V-001, V-004, V-005, V-008, and V-011. The regression
-suite, generator runs, generated-output inspection, and audit review together
-check deterministic lowering and explicit failure behavior.
+RQ-009 is validated by V-007, V-010, V-011, and V-012. Reference artifact
+review, extraction review, audit review, and governing-spec review together
+check that canonical terminology remains additive normalization metadata rather
+than a silent rewrite of vendor-facing structure.
 
 ### 6.10 RQ-010 validation coverage
 
-RQ-010 is validated by V-001, V-002, V-003, V-004, and V-005. These automated
-checks exercise the implemented CLI surface and its command-specific contracts.
+RQ-010 is validated by V-001, V-004, V-005, V-008, and V-011. The regression
+suite, generator runs, generated-output inspection, and audit review together
+check deterministic lowering and explicit failure behavior.
 
 ### 6.11 RQ-011 validation coverage
 
-RQ-011 is validated by V-001, V-002, and V-011. Schema validation confirms the
-implemented CLI boundary, while audit review reinforces that schema validity
-alone is not treated as full semantic readiness.
+RQ-011 is validated by V-001, V-002, V-003, V-004, and V-005. These automated
+checks exercise the implemented CLI surface and its command-specific contracts.
 
 ### 6.12 RQ-012 validation coverage
 
-RQ-012 is validated by V-001, V-004, and V-008. The regression suite, SVD
+RQ-012 is validated by V-001, V-002, and V-011. Schema validation confirms the
+implemented CLI boundary, while audit review reinforces that schema validity
+alone is not treated as full semantic readiness.
+
+### 6.13 RQ-013 validation coverage
+
+RQ-013 is validated by V-001, V-004, V-008. The regression suite, SVD
 generation path, and generated-output inspection verify the current SVD
 lowering contract on reference artifacts, including explicit failure when
 interrupt attribution is incomplete or ambiguous.
 
-### 6.13 RQ-013 validation coverage
+### 6.14 RQ-014 validation coverage
 
-RQ-013 is validated by V-001, V-005, V-008, V-010, and V-011. The regression
+RQ-014 is validated by V-001, V-005, V-008, V-010, and V-011. The regression
 suite, Embassy generation path, generated crate inspection, extraction review,
 and audit review jointly test the profile-derived Embassy contract across both
 classic register-layout MCUs and composite-routing MCUs such as ESP32-C3.
 
-### 6.14 RQ-014 validation coverage
+### 6.15 RQ-015 validation coverage
 
-RQ-014 is validated by V-001 and V-003. The regression suite and identical-doc
+RQ-015 is validated by V-001 and V-003. The regression suite and identical-doc
 diff command check the structural diff behavior and stable path reporting
 contract.
 
-### 6.15 RQ-015 validation coverage
+### 6.16 RQ-016 validation coverage
 
-RQ-015 is validated by V-001, V-002, V-003, V-004, and V-005. These command
+RQ-016 is validated by V-001, V-002, V-003, V-004, and V-005. These command
 checks cover successful execution plus the current split between direct
 check-failure outcomes and generator/operational failures across the
 implemented CLI surface.
@@ -382,13 +398,14 @@ implemented CLI surface.
 | RQ-006 | V-006, V-009, V-010 |
 | RQ-007 | V-009, V-010, V-011, V-012 |
 | RQ-008 | V-001, V-007, V-010 |
-| RQ-009 | V-001, V-004, V-005, V-008, V-011 |
-| RQ-010 | V-001, V-002, V-003, V-004, V-005 |
-| RQ-011 | V-001, V-002, V-011 |
-| RQ-012 | V-001, V-004, V-008 |
-| RQ-013 | V-001, V-005, V-008, V-010, V-011 |
-| RQ-014 | V-001, V-003 |
-| RQ-015 | V-001, V-002, V-003, V-004, V-005 |
+| RQ-009 | V-007, V-010, V-011, V-012 |
+| RQ-010 | V-001, V-004, V-005, V-008, V-011 |
+| RQ-011 | V-001, V-002, V-003, V-004, V-005 |
+| RQ-012 | V-001, V-002, V-011 |
+| RQ-013 | V-001, V-004, V-008 |
+| RQ-014 | V-001, V-005, V-008, V-010, V-011 |
+| RQ-015 | V-001, V-003 |
+| RQ-016 | V-001, V-002, V-003, V-004, V-005 |
 
 ## 8. Current validation limits
 
