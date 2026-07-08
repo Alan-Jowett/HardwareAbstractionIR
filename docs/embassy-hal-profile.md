@@ -45,6 +45,31 @@ This means Embassy generation is **profile-derived and evidence-bounded**:
 the emitted Rust API may vary across documents of the same `driverKind`
 depending on what was actually extracted, reviewed, and approved.
 
+## Canonical-term-assisted resolution
+
+When a document carries explicit `normalization.canonicalTerms[]` and
+`normalization.mappings[]`, Embassy lowering may use those mappings as
+**secondary** lookup hints for supported cross-vendor concepts such as
+equivalent peripheral, register, or field roles.
+
+Normative consequences:
+
+1. canonical mappings may help the generator reduce internal lowering variance
+   across vendors that express the same supported concept under different native
+   names
+2. canonical mappings do not replace `profiles.mcuSoc`,
+   `profiles.embassyHal`, explicit semantic operations/state machines, pin
+   routes, clock/reset bindings, interrupt routes, DMA routes, or reachable
+   structural register/field data
+3. canonical mappings do not silently rename the source-derived structural model
+   or force a document into a more uniform public API shape than the approved
+   lowering inputs justify
+4. if a canonical-mapping-assisted lowering path encounters ambiguous mappings
+   or conflicts with the explicit lowering path, the generator must still fail
+   explicitly rather than guessing; missing canonical mappings alone are not an
+   error when another supported explicit lowering path already resolves the
+   concept safely
+
 ## Generated metadata contract
 
 Embassy generation emits more than executable driver methods. It also

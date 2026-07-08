@@ -121,6 +121,9 @@ names in the structural model.
 - Vendor-facing names remain on the structural entities themselves; canonical
   mappings are additive normalization metadata rather than replacements for the
   source-derived names.
+- Repository-managed generators may consume explicit canonical mappings only as
+  additive semantic hints; those mappings must not silently rewrite structural
+  names or replace required profile, topology, or semantic lowering inputs.
 - First-cut coverage may be partial and seeded from the repository's current
   reference bundles and workflows rather than requiring an immediate universal
   vocabulary.
@@ -191,6 +194,10 @@ Embassy profile contract.
 - Embassy generation requires `profiles.mcuSoc` and `profiles.embassyHal`.
 - Generated driver APIs are derived from referenced topology, semantics, and
   reachable structural data rather than a fixed universal method list.
+- Embassy generation may use explicit and unambiguous normalization canonical
+  mappings as secondary cross-vendor resolution hints for supported lowering
+  concepts, but those mappings do not replace explicit profile/topology/semantic
+  closure and must not silently widen the supported subset.
 - Supported lowering may bind through either direct per-block register layouts
   or composite MCU-specific routing/control fabrics when the approved HAIR
   document makes that path explicit and structurally reachable.

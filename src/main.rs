@@ -849,6 +849,8 @@ struct HairDocument {
     #[serde(default)]
     physical: HairPhysical,
     #[serde(default)]
+    normalization: HairNormalization,
+    #[serde(default)]
     profiles: HairProfiles,
 }
 
@@ -1259,6 +1261,38 @@ struct SemanticSideEffect {
 struct HairPhysical {
     #[serde(default)]
     pins: Vec<PhysicalPin>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HairNormalization {
+    #[serde(default)]
+    canonical_terms: Vec<CanonicalTerm>,
+    #[serde(default)]
+    mappings: Vec<NormalizedMapping>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CanonicalTerm {
+    id: String,
+    name: String,
+    scope: String,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NormalizedMapping {
+    id: String,
+    name: String,
+    target_ref: String,
+    #[serde(default)]
+    canonical_term_refs: Vec<String>,
+    #[serde(default)]
+    vendor_names: Vec<String>,
 }
 
 #[allow(dead_code)]
@@ -1724,6 +1758,7 @@ struct EmbassyGenerationModel {
     register_owners: HashMap<String, Vec<String>>,
     registers: HashMap<String, ResolvedRegister>,
     fields: HashMap<String, ResolvedFieldTarget>,
+    canonical_terms_by_target: HashMap<String, BTreeSet<String>>,
     provenance: HairProvenance,
 }
 
@@ -1850,6 +1885,16 @@ impl EmbassyGenerationModel {
             &required_peripherals,
         )?;
         let fields = collect_field_map(&registers, &required_fields)?;
+        let mut canonical_terms_by_target = HashMap::<String, BTreeSet<String>>::new();
+        for mapping in &document.normalization.mappings {
+            if mapping.canonical_term_refs.is_empty() {
+                continue;
+            }
+            canonical_terms_by_target
+                .entry(mapping.target_ref.clone())
+                .or_default()
+                .extend(mapping.canonical_term_refs.iter().cloned());
+        }
 
         let mut drivers = Vec::with_capacity(embassy.driver_instances.len());
         for driver in &embassy.driver_instances {
@@ -2006,6 +2051,7 @@ impl EmbassyGenerationModel {
             register_owners,
             registers,
             fields,
+            canonical_terms_by_target,
             provenance: document.provenance.clone(),
         })
     }
@@ -4713,13 +4759,20 @@ fn render_usart_methods(
     });
 
     let cr1 = try_resolve_target_register_by_name(model, target_ref, "CR1")?;
-    let brr = try_resolve_target_register_by_name(model, target_ref, "BRR")?;
     let cr2 = try_resolve_target_register_by_name(model, target_ref, "CR2")?;
-    if let (Some(cr1), Some(brr), Some(cr2)) = (cr1, brr, cr2) {
-        return render_stm32_usart_methods(
-            model, driver, target_ref, has_tx, has_rx, has_irq, has_tx_dma, has_rx_dma, cr1, brr,
-            cr2,
-        );
+    if let (Some(cr1), Some(cr2)) = (cr1, cr2) {
+        let brr = try_resolve_target_register_by_name_or_canonical_term(
+            model,
+            target_ref,
+            "BRR",
+            "term.register.baud-rate",
+        )?;
+        if let Some(brr) = brr {
+            return render_stm32_usart_methods(
+                model, driver, target_ref, has_tx, has_rx, has_irq, has_tx_dma, has_rx_dma, cr1,
+                brr, cr2,
+            );
+        }
     }
     let conf0 = try_resolve_target_register_by_name(model, target_ref, "CONF0")?;
     let clkdiv = try_resolve_target_register_by_name(model, target_ref, "CLKDIV")?;
@@ -4730,8 +4783,8 @@ fn render_usart_methods(
         (conf0, clkdiv, fifo, status, int_ena)
     {
         return render_esp_uart_methods(
-            driver, has_tx, has_rx, has_irq, has_tx_dma, has_rx_dma, conf0, clkdiv, fifo, status,
-            int_ena,
+            model, driver, has_tx, has_rx, has_irq, has_tx_dma, has_rx_dma, conf0, clkdiv, fifo,
+            status, int_ena,
         );
     }
     Ok(Vec::new())
@@ -4925,7 +4978,7 @@ fn render_stm32_usart_methods(
 ) -> Result<Vec<GeneratedMethod>> {
     let div_mantissa = resolve_register_field(&brr, "DIV_Mantissa")?;
     let div_fraction = resolve_register_field(&brr, "DIV_Fraction")?;
-    let ue = resolve_register_field(&cr1, "UE")?;
+    let ue = resolve_register_field_or_canonical_term(model, &cr1, "UE", "term.field.enable")?;
     let te = resolve_register_field(&cr1, "TE")?;
     let re = resolve_register_field(&cr1, "RE")?;
     let over8 = resolve_register_field(&cr1, "OVER8")?;
@@ -5154,6 +5207,7 @@ fn render_stm32_usart_methods(
 
 #[allow(clippy::too_many_arguments)]
 fn render_esp_uart_methods(
+    model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
     has_tx: bool,
     has_rx: bool,
@@ -5166,7 +5220,12 @@ fn render_esp_uart_methods(
     status: ResolvedRegister,
     int_ena: ResolvedRegister,
 ) -> Result<Vec<GeneratedMethod>> {
-    let clk_en = resolve_register_field(&conf0, "CLK_EN")?;
+    let clk_en = resolve_register_field_or_canonical_term(
+        model,
+        &conf0,
+        "CLK_EN",
+        "term.field.clock-enable",
+    )?;
     let mem_clk_en = try_resolve_register_field(&conf0, "MEM_CLK_EN");
     let parity_en = resolve_register_field(&conf0, "PARITY_EN")?;
     let parity = resolve_register_field(&conf0, "PARITY")?;
@@ -5495,6 +5554,47 @@ fn try_resolve_target_register_by_name(
     try_resolve_target_register_from_template(target, target_base, template, register_name)
 }
 
+fn try_resolve_target_register_by_name_or_canonical_term(
+    model: &EmbassyGenerationModel,
+    target_ref: &str,
+    register_name: &str,
+    canonical_term_ref: &str,
+) -> Result<Option<ResolvedRegister>> {
+    if let Some(register) = try_resolve_target_register_by_name(model, target_ref, register_name)? {
+        return Ok(Some(register));
+    }
+    try_resolve_target_register_by_canonical_term(model, target_ref, canonical_term_ref)
+}
+
+fn try_resolve_target_register_by_canonical_term(
+    model: &EmbassyGenerationModel,
+    target_ref: &str,
+    canonical_term_ref: &str,
+) -> Result<Option<ResolvedRegister>> {
+    let target = model.peripherals.get(target_ref).ok_or_else(|| {
+        anyhow!(
+            "driver target peripheral {} could not be resolved for canonical register lookup",
+            target_ref
+        )
+    })?;
+    let target_base = target.base_address.ok_or_else(|| {
+        anyhow!(
+            "peripheral {} is missing baseAddress required for canonical derived register lookup",
+            target.id
+        )
+    })?;
+    let Some(template) = try_find_register_template_peripheral(model, target)? else {
+        return Ok(None);
+    };
+    try_resolve_target_register_from_template_by_canonical_term(
+        model,
+        target,
+        target_base,
+        template,
+        canonical_term_ref,
+    )
+}
+
 fn try_resolve_register_by_ref(
     model: &EmbassyGenerationModel,
     register_ref: &str,
@@ -5634,6 +5734,85 @@ fn try_resolve_target_register_from_template_by_ref(
         &format!("derived register {register_ref} on {}", target.id),
     )?;
     Ok(Some(resolved))
+}
+
+fn try_resolve_target_register_from_template_by_canonical_term(
+    model: &EmbassyGenerationModel,
+    target: &Peripheral,
+    target_base: u64,
+    template: &Peripheral,
+    canonical_term_ref: &str,
+) -> Result<Option<ResolvedRegister>> {
+    let template_base = template.base_address.ok_or_else(|| {
+        anyhow!(
+            "template peripheral {} is missing baseAddress required for canonical register lookup",
+            template.id
+        )
+    })?;
+
+    let mut registers = HashMap::new();
+    collect_register_members(
+        &mut registers,
+        template.id.as_str(),
+        template_base,
+        0,
+        &template.registers,
+    )?;
+    let mut matches = registers
+        .into_values()
+        .filter(|register| {
+            target_has_canonical_term(model, register.id.as_str(), canonical_term_ref)
+        })
+        .collect::<Vec<_>>();
+    if matches.is_empty() {
+        return Ok(None);
+    }
+    if matches.len() > 1 {
+        let ids = matches
+            .iter()
+            .map(|register| register.id.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        bail!(
+            "peripheral {} exposes multiple registers mapped to canonical term {} through its structural template: {}",
+            target.id,
+            canonical_term_ref,
+            ids
+        );
+    }
+
+    let mut resolved = matches.pop().expect("one matching register");
+    let offset = resolved
+        .absolute_address
+        .checked_sub(template_base)
+        .ok_or_else(|| {
+            anyhow!(
+                "register {} absolute address underflowed relative to template peripheral {}",
+                resolved.id,
+                template.id
+            )
+        })?;
+    resolved.peripheral_ref = target.id.clone();
+    resolved.absolute_address = checked_offset_add(
+        target_base,
+        offset,
+        &format!(
+            "derived canonical register {} on {}",
+            canonical_term_ref, target.id
+        ),
+    )?;
+    Ok(Some(resolved))
+}
+
+fn target_has_canonical_term(
+    model: &EmbassyGenerationModel,
+    target_ref: &str,
+    canonical_term_ref: &str,
+) -> bool {
+    model
+        .canonical_terms_by_target
+        .get(target_ref)
+        .is_some_and(|terms| terms.contains(canonical_term_ref))
 }
 
 fn try_find_register_template_peripheral<'a>(
@@ -5829,6 +6008,27 @@ fn resolve_register_field(register: &ResolvedRegister, field_name: &str) -> Resu
         })
 }
 
+fn resolve_register_field_or_canonical_term(
+    model: &EmbassyGenerationModel,
+    register: &ResolvedRegister,
+    field_name: &str,
+    canonical_term_ref: &str,
+) -> Result<ResolvedField> {
+    if let Some(field) = try_resolve_register_field(register, field_name) {
+        return Ok(field);
+    }
+    try_resolve_register_field_by_canonical_term(model, register, canonical_term_ref)?.ok_or_else(
+        || {
+            anyhow!(
+                "register {} does not contain field {} or any field mapped to canonical term {}",
+                register.id,
+                field_name,
+                canonical_term_ref
+            )
+        },
+    )
+}
+
 fn try_resolve_register_field(
     register: &ResolvedRegister,
     field_name: &str,
@@ -5839,6 +6039,36 @@ fn try_resolve_register_field(
         .iter()
         .find(|field| normalize_search_text(&field.name) == normalized_name)
         .cloned()
+}
+
+fn try_resolve_register_field_by_canonical_term(
+    model: &EmbassyGenerationModel,
+    register: &ResolvedRegister,
+    canonical_term_ref: &str,
+) -> Result<Option<ResolvedField>> {
+    let mut matches = register
+        .fields
+        .iter()
+        .filter(|field| target_has_canonical_term(model, field.id.as_str(), canonical_term_ref))
+        .cloned()
+        .collect::<Vec<_>>();
+    if matches.is_empty() {
+        return Ok(None);
+    }
+    if matches.len() > 1 {
+        let ids = matches
+            .iter()
+            .map(|field| field.id.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        bail!(
+            "register {} exposes multiple fields mapped to canonical term {}: {}",
+            register.id,
+            canonical_term_ref,
+            ids
+        );
+    }
+    Ok(matches.pop())
 }
 
 fn render_register_write_method(
@@ -13221,6 +13451,50 @@ fn host_emulator_tracks_esp_gpio_output_level() {
             .unwrap_or_else(|| panic!("missing fixture peripheral {peripheral_id}"))
     }
 
+    #[test]
+    fn generate_embassy_uses_canonical_mappings_for_renamed_uart_entities() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        rename_fixture_usart_for_canonical_resolution(&mut document);
+        add_fixture_usart_canonical_mappings(&mut document, false);
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("canonicalized uart fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&validated, output_dir.path())
+            .expect("embassy generation should use canonical uart mappings");
+
+        let uart_rs = std::fs::read_to_string(output_dir.path().join("src").join("uart.rs"))
+            .expect("uart.rs");
+        assert!(uart_rs.contains("pub fn enable"));
+        assert!(uart_rs.contains("pub fn disable"));
+        assert!(uart_rs.contains("pub fn set_baud_divider"));
+        assert!(uart_rs.contains("pub fn write_byte"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_ambiguous_canonical_uart_register_mappings() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        rename_fixture_usart_for_canonical_resolution(&mut document);
+        add_fixture_usart_canonical_mappings(&mut document, true);
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("ambiguous canonical uart fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        let error = generate_embassy_crate(&validated, output_dir.path())
+            .expect_err("ambiguous canonical register mapping should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("multiple registers mapped to canonical term term.register.baud-rate")
+        );
+    }
+
     fn write_embassy_fixture(use_custom_driver: bool) -> NamedTempFile {
         let file = NamedTempFile::new().expect("temp file");
         let uart_driver_kind = if use_custom_driver { "custom" } else { "usart" };
@@ -13551,6 +13825,138 @@ fn host_emulator_tracks_esp_gpio_output_level() {
         )
         .expect("write fixture");
         file
+    }
+
+    fn rename_fixture_usart_for_canonical_resolution(document: &mut Value) {
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let usart_template = peripherals
+            .iter_mut()
+            .find(|peripheral| peripheral["id"] == "periph.usart6")
+            .and_then(Value::as_object_mut)
+            .expect("usart6 peripheral");
+        let registers = usart_template
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("usart6 registers");
+        registers
+            .iter_mut()
+            .find(|register| register["id"] == "reg.usart6.brr")
+            .and_then(Value::as_object_mut)
+            .expect("brr register")
+            .insert("name".to_string(), Value::String("BAUDCFG".to_string()));
+        let cr1_fields = registers
+            .iter_mut()
+            .find(|register| register["id"] == "reg.usart6.cr1")
+            .and_then(Value::as_object_mut)
+            .expect("cr1 register")
+            .get_mut("fields")
+            .and_then(Value::as_array_mut)
+            .expect("cr1 fields");
+        cr1_fields
+            .iter_mut()
+            .find(|field| field["id"] == "field.usart6.cr1.ue")
+            .and_then(Value::as_object_mut)
+            .expect("ue field")
+            .insert("name".to_string(), Value::String("ENABLE_GATE".to_string()));
+    }
+
+    fn add_fixture_usart_canonical_mappings(document: &mut Value, ambiguous_baud_register: bool) {
+        if ambiguous_baud_register {
+            let peripherals = document
+                .as_object_mut()
+                .expect("document object")
+                .get_mut("structure")
+                .and_then(Value::as_object_mut)
+                .expect("structure object")
+                .get_mut("device")
+                .and_then(Value::as_object_mut)
+                .expect("device object")
+                .get_mut("peripherals")
+                .and_then(Value::as_array_mut)
+                .expect("peripherals");
+            let usart_template = peripherals
+                .iter_mut()
+                .find(|peripheral| peripheral["id"] == "periph.usart6")
+                .and_then(Value::as_object_mut)
+                .expect("usart6 peripheral");
+            usart_template
+                .get_mut("registers")
+                .and_then(Value::as_array_mut)
+                .expect("usart6 registers")
+                .push(serde_json::json!({
+                    "id": "reg.usart6.alt_baud",
+                    "name": "ALTBAUD",
+                    "kind": "register",
+                    "offsetBytes": 24,
+                    "widthBits": 32,
+                    "fields": [
+                        {
+                            "id": "field.usart6.alt_baud.div_mantissa",
+                            "name": "DIV_Mantissa",
+                            "bitRange": { "lsb": 4, "msb": 15 }
+                        },
+                        {
+                            "id": "field.usart6.alt_baud.div_fraction",
+                            "name": "DIV_Fraction",
+                            "bitRange": { "lsb": 0, "msb": 3 }
+                        }
+                    ]
+                }));
+        }
+
+        document.as_object_mut().expect("document object").insert(
+            "normalization".to_string(),
+            serde_json::json!({
+                "canonicalTerms": [
+                    {
+                        "id": "term.register.baud-rate",
+                        "name": "Baud-rate register",
+                        "scope": "register"
+                    },
+                    {
+                        "id": "term.field.enable",
+                        "name": "Enable",
+                        "scope": "field"
+                    }
+                ],
+                "mappings": [
+                    {
+                        "id": "norm.reg.usart6.brr",
+                        "name": "USART6 baud-rate register",
+                        "targetRef": "reg.usart6.brr",
+                        "canonicalTermRefs": ["term.register.baud-rate"]
+                    },
+                    {
+                        "id": "norm.field.usart6.cr1.ue",
+                        "name": "USART6 enable field",
+                        "targetRef": "field.usart6.cr1.ue",
+                        "canonicalTermRefs": ["term.field.enable"]
+                    }
+                ]
+            }),
+        );
+        if ambiguous_baud_register {
+            document["normalization"]["mappings"]
+                .as_array_mut()
+                .expect("normalization mappings")
+                .push(serde_json::json!({
+                    "id": "norm.reg.usart6.alt-baud",
+                    "name": "USART6 alternate baud-rate register",
+                    "targetRef": "reg.usart6.alt_baud",
+                    "canonicalTermRefs": ["term.register.baud-rate"]
+                }));
+        }
     }
 
     fn write_temp_json(document: &Value) -> NamedTempFile {

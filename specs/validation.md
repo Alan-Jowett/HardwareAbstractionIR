@@ -106,6 +106,10 @@ cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-
 - The emitted crate contains `Cargo.toml`, `src\lib.rs`, `src\metadata.rs`,
   and generated driver modules justified by the reference document's profile
   scope.
+- When a reference document carries explicit canonical normalization mappings,
+  the generator may consume them only as additive lowering hints for supported
+  equivalent concepts; missing or ambiguous mappings must not mask unsupported
+  lowering inputs.
 - The ESP32-C3 reference bundle succeeds without weakening the executable
   lowering contract, demonstrating support for a non-STM32/TM4C GPIO/routing
   family plus any claimed async/DMA-backed UART/I2C/SPI/ADC paths.
@@ -144,6 +148,9 @@ in realistic device bundles.
   present, mappings remain additive metadata: vendor-facing entity names are
   still preserved in `structure`, and each mapping resolves to one or more
   document-defined canonical terms.
+- When repository-managed lowering consumes canonical mappings, it does so as an
+  additive resolution aid; the document is not treated as if normalization
+  silently replaced the explicit structural or profile contract.
 - Example documents exercise different portions of the schema and generator
   surface.
 
@@ -340,7 +347,8 @@ the core model rather than replacements for it.
 RQ-009 is validated by V-007, V-010, V-011, and V-012. Reference artifact
 review, extraction review, audit review, and governing-spec review together
 check that canonical terminology remains additive normalization metadata rather
-than a silent rewrite of vendor-facing structure.
+than a silent rewrite of vendor-facing structure, even when generator logic
+uses canonical mappings as secondary hints.
 
 ### 6.10 RQ-010 validation coverage
 
@@ -371,7 +379,9 @@ interrupt attribution is incomplete or ambiguous.
 RQ-014 is validated by V-001, V-005, V-008, V-010, and V-011. The regression
 suite, Embassy generation path, generated crate inspection, extraction review,
 and audit review jointly test the profile-derived Embassy contract across both
-classic register-layout MCUs and composite-routing MCUs such as ESP32-C3.
+classic register-layout MCUs and composite-routing MCUs such as ESP32-C3,
+including any approved use of canonical mappings as additive variance-reduction
+hints rather than replacements for explicit lowering inputs.
 
 ### 6.15 RQ-015 validation coverage
 

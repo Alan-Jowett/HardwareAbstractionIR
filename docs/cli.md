@@ -45,6 +45,7 @@ First-cut behavior:
 - map the HAIR device, peripherals, interrupts, registers, fields, enumerated values, reset values, and access metadata when those concepts are representable in SVD
 - emit a complete CMSIS-SVD CPU block, including revision, endianness, MPU/FPU flags, interrupt priority bits, and the HAIR `vendorSystemTimerConfig` flag mapped to SVD `vendorSystickConfig`
 - preserve declared `structure.device.interrupts[]` as the authoritative device interrupt inventory; peripheral `interruptRefs` are the primary attribution path, and the generator may fall back only to one unambiguous same-name peripheral match before failing explicitly on interrupts it cannot attribute safely
+- keep emitted SVD names and structure vendor-faithful rather than renaming them through normalization canonical terms
 - fail explicitly when SVD-required data is missing or when a structure that must appear in the SVD cannot be lowered safely
 
 First-cut exclusions:
@@ -64,6 +65,7 @@ First-cut behavior:
 - consume the hardware facts from the core layers plus the canonical MCU topology in `profiles.mcuSoc`
 - require an explicit `profiles.embassyHal` contract for the supported generated drivers
 - derive the emitted Rust API surface from the approved topology and semantic lowering inputs in the HAIR document rather than from fixed placeholder signatures per driver kind
+- allow explicit `normalization.canonicalTerms[]` / `normalization.mappings[]` to act as secondary lowering hints for equivalent supported concepts across vendor naming schemes, without replacing the required profile/topology/semantic inputs
 - allow a `gpio-port` driver instance to lower into a per-pin GPIO API surface when the approved HAIR routes and structural controls justify that shape
 - preserve the generator-relevant structured subset of referenced topology and semantic inputs in the emitted Rust metadata so downstream code does not lose control refs, remap data, or executable semantic structure that the approved HAIR document already provides
 - emit register-level code only for methods that can be justified by explicit HAIR lowering inputs, and fail explicitly when the requested or implied behavior is underspecified
@@ -74,6 +76,7 @@ First-cut exclusions:
 - silent fallback from unsupported hardware to placeholder stubs
 - fixed success-return driver methods that are disconnected from the input document's approved lowering data
 - inference of driver contracts purely from vendor naming without the approved profile data
+- treating canonical mappings as a substitute for explicit profile, topology, or semantic lowering inputs
 - silent widening of first-cut GPIO support into alternate-function or EXTI helpers when the approved profile did not request or justify them
 - pretending that generic schema validity alone is enough for Embassy generation readiness
 
