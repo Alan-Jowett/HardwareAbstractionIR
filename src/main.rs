@@ -9652,52 +9652,80 @@ mod tests {
         )
         .expect("document");
 
-        document
+        let normalization = document
             .as_object_mut()
             .expect("reference document should be an object")
-            .insert(
-                "normalization".to_string(),
+            .entry("normalization".to_string())
+            .or_insert_with(|| serde_json::json!({}));
+        let normalization = normalization
+            .as_object_mut()
+            .expect("normalization should be an object");
+        let extend_unique = |items: &mut Vec<Value>, additions: [Value; 3]| {
+            for addition in additions {
+                let addition_id = addition
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .expect("normalization entry should have an id");
+                if items
+                    .iter()
+                    .all(|existing| existing.get("id").and_then(Value::as_str) != Some(addition_id))
+                {
+                    items.push(addition);
+                }
+            }
+        };
+        extend_unique(
+            normalization
+                .entry("canonicalTerms".to_string())
+                .or_insert_with(|| serde_json::json!([]))
+                .as_array_mut()
+                .expect("canonicalTerms should be an array"),
+            [
                 serde_json::json!({
-                    "canonicalTerms": [
-                        {
-                            "id": "term.peripheral.uart",
-                            "name": "UART",
-                            "scope": "peripheral"
-                        },
-                        {
-                            "id": "term.register.baud-rate",
-                            "name": "Baud-rate register",
-                            "scope": "register"
-                        },
-                        {
-                            "id": "term.field.enable",
-                            "name": "Enable",
-                            "scope": "field"
-                        }
-                    ],
-                    "mappings": [
-                        {
-                            "id": "norm.uart4",
-                            "name": "UART4 normalization",
-                            "targetRef": "periph.uart4",
-                            "canonicalTermRefs": ["term.peripheral.uart"]
-                        },
-                        {
-                            "id": "norm.uart4-brr",
-                            "name": "UART4 BRR normalization",
-                            "targetRef": "reg.uart4.brr",
-                            "canonicalTermRefs": ["term.register.baud-rate"]
-                        },
-                        {
-                            "id": "norm.uart4-ue",
-                            "name": "UART4 UE normalization",
-                            "targetRef": "field.uart4.ctlr1.ue",
-                            "canonicalTermRefs": ["term.field.enable"],
-                            "vendorNames": ["UE"]
-                        }
-                    ]
+                    "id": "term.peripheral.uart",
+                    "name": "UART",
+                    "scope": "peripheral"
                 }),
-            );
+                serde_json::json!({
+                    "id": "term.register.baud-rate",
+                    "name": "Baud-rate register",
+                    "scope": "register"
+                }),
+                serde_json::json!({
+                    "id": "term.field.enable",
+                    "name": "Enable",
+                    "scope": "field"
+                }),
+            ],
+        );
+        extend_unique(
+            normalization
+                .entry("mappings".to_string())
+                .or_insert_with(|| serde_json::json!([]))
+                .as_array_mut()
+                .expect("mappings should be an array"),
+            [
+                serde_json::json!({
+                    "id": "norm.uart4",
+                    "name": "UART4 normalization",
+                    "targetRef": "periph.uart4",
+                    "canonicalTermRefs": ["term.peripheral.uart"]
+                }),
+                serde_json::json!({
+                    "id": "norm.uart4-brr",
+                    "name": "UART4 BRR normalization",
+                    "targetRef": "reg.uart4.brr",
+                    "canonicalTermRefs": ["term.register.baud-rate"]
+                }),
+                serde_json::json!({
+                    "id": "norm.uart4-ue",
+                    "name": "UART4 UE normalization",
+                    "targetRef": "field.uart4.ctlr1.ue",
+                    "canonicalTermRefs": ["term.field.enable"],
+                    "vendorNames": ["UE"]
+                }),
+            ],
+        );
 
         let mut file = NamedTempFile::new().expect("temp file");
         serde_json::to_writer(&mut file, &document).expect("write temp file");

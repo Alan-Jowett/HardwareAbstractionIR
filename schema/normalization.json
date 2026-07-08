@@ -42,6 +42,17 @@
   },
   "additionalProperties": false,
   "$defs": {
+    "canonicalTermRef": {
+      "allOf": [
+        {
+          "$ref": "common.json#/$defs/entityRef"
+        },
+        {
+          "type": "string",
+          "pattern": "^term\\."
+        }
+      ]
+    },
     "entityBase": {
       "allOf": [
         {
@@ -130,7 +141,7 @@
             "broaderTermRefs": {
               "type": "array",
               "items": {
-                "$ref": "common.json#/$defs/entityRef"
+                "$ref": "#/$defs/canonicalTermRef"
               },
               "uniqueItems": true
             }
@@ -156,7 +167,7 @@
             "canonicalTermRefs": {
               "type": "array",
               "items": {
-                "$ref": "common.json#/$defs/entityRef"
+                "$ref": "#/$defs/canonicalTermRef"
               },
               "minItems": 1,
               "uniqueItems": true
