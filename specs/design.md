@@ -123,6 +123,13 @@ per-entity mappings from structural entities to one or more of those terms.
 This keeps the source-derived vendor names in `structure` while making
 cross-vendor comparability explicit and reviewable.
 
+Repository-managed generators may also consume those mappings as additive
+semantic lookup hints when a supported lowering path needs to recognize
+equivalent cross-vendor concepts without rewriting the source-derived
+structural names. In that role, normalization remains secondary to explicit
+profile, topology, semantic, and structural reachability rules; it does not
+become a replacement executable schema.
+
 **Supports:** RQ-003, RQ-009, RQ-010
 
 ### 3.7 Validation layer
@@ -176,6 +183,16 @@ the emitted behavior structurally reachable without guesswork. Likewise,
 interrupt-driven and DMA-backed UART/I2C/SPI/ADC behavior is part of the
 supported subset only when the driver instance names the full interrupt, DMA,
 pin, and semantic closure required for real lowering.
+
+When a document also carries explicit normalization canonical mappings, Embassy
+lowering may use those mappings as secondary resolution hints for supported
+register, field, or peripheral concepts that recur across vendors. This is a
+variance-reduction aid for the lowering implementation, not permission to infer
+new behavior, bypass required profile data, or rename the source-derived
+structural model. Ambiguous canonical mappings, or canonicalized lowering paths
+that conflict with the explicit profile/structural contract, must fail
+explicitly. Absent canonical mappings are not by themselves an error when some
+other supported explicit lowering path still resolves the concept safely.
 
 **Supports:** RQ-008, RQ-010, RQ-014
 
@@ -261,6 +278,10 @@ through explicit `interruptRefs` or through one unambiguous same-name
 peripheral match. Otherwise the generator fails explicitly rather than
 inventing or silently dropping SVD interrupt attribution.
 
+SVD lowering remains vendor-faithful: normalization canonical terminology may
+improve cross-vendor reasoning elsewhere in the repository, but it does not
+silently rename emitted SVD peripherals, registers, or fields.
+
 **Supports:** RQ-010, RQ-013, RQ-016
 
 ### 6.5 `generate embassy`
@@ -275,6 +296,9 @@ resolution, and profile-specific failure contracts before writing output. Its
 lowering path is intentionally family-aware rather than vendor-name-driven:
 multiple register-layout or routing-fabric strategies may satisfy the same
 driver kind when they all preserve the same evidence-bounded API contract.
+Explicit canonical normalization mappings may further reduce internal lowering
+variance by helping the generator recognize equivalent supported concepts
+across vendor naming schemes without changing the document's structural names.
 
 **Supports:** RQ-010, RQ-014, RQ-016
 
@@ -382,7 +406,8 @@ RQ-009 is realized by the normalization-layer design in Section 3.6. Canonical
 terminology is modeled as additive normalization metadata rather than as a
 rewrite of source-derived structural names, and mappings may bind one entity to
 more than one canonical term when the vendor-facing entity bundles multiple
-concepts.
+concepts. When generators consume these mappings, they do so only as additive
+semantic hints layered on top of the explicit lowering contract.
 
 ### 9.10 RQ-010 design coverage
 
@@ -415,7 +440,8 @@ requiring safe peripheral attribution for emitted SVD interrupt blocks.
 RQ-014 is realized by the MCU/SoC and Embassy profile designs in Section 4 and
 the Embassy CLI path in Section 6.5. Embassy generation resolves driver
 instances from explicit canonical topology and profile-declared lowering
-contracts.
+contracts, with optional normalization canonical mappings available as
+secondary variance-reduction hints when they are explicit and unambiguous.
 
 ### 9.15 RQ-015 design coverage
 

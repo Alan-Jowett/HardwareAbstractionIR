@@ -236,6 +236,12 @@ document may define or import a seeded set of canonical peripheral, register,
 and field terms, then map one vendor-facing entity to one or more of those
 canonical terms without rewriting the source-derived structural names.
 
+Repository-managed generators may consume those mappings as **secondary**
+cross-vendor lookup hints when a supported lowering path needs to recognize
+equivalent concepts across vendor naming schemes. That does not turn
+`normalization` into a replacement for explicit profile/topology/semantic input,
+and it does not authorize silent renaming of the structural model.
+
 ## `schema/validation.json`
 
 The validation layer defines explicit rules that can be applied to HAIR documents.
