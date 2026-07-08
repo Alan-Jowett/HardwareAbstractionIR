@@ -162,6 +162,14 @@ machines.
 The design intent is explicit: generated APIs are derived from approved
 lowering inputs, not from a fixed placeholder method list per `driverKind`.
 The profile also preserves a structured metadata surface for downstream use.
+The same contract must accommodate more than one hardware-lowering family for a
+given driver kind. In particular, GPIO lowering may come either from a classic
+single-block register layout or from a composite route/control path such as
+ESP32-C3 GPIO + IO MUX + GPIO Matrix, provided the approved HAIR records make
+the emitted behavior structurally reachable without guesswork. Likewise,
+interrupt-driven and DMA-backed UART/I2C/SPI/ADC behavior is part of the
+supported subset only when the driver instance names the full interrupt, DMA,
+pin, and semantic closure required for real lowering.
 
 **Supports:** RQ-008, RQ-009, RQ-013
 
@@ -257,7 +265,10 @@ It generates `Cargo.toml`, `src\lib.rs`, `src\metadata.rs`, and one or more
 module files derived from the resolved driver set.
 
 The generator enforces driver-kind support, scope checks, reference
-resolution, and profile-specific failure contracts before writing output.
+resolution, and profile-specific failure contracts before writing output. Its
+lowering path is intentionally family-aware rather than vendor-name-driven:
+multiple register-layout or routing-fabric strategies may satisfy the same
+driver kind when they all preserve the same evidence-bounded API contract.
 
 **Supports:** RQ-009, RQ-013, RQ-015
 

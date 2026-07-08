@@ -1533,6 +1533,19 @@ struct ResolvedBitmaskGpioPinLowering {
 }
 
 #[derive(Debug, Clone)]
+struct ResolvedEspGpioPinLowering {
+    role_index: usize,
+    pin_name: String,
+    accessor_name: String,
+    bit_mask: u32,
+    io_mux_addr: u64,
+    fun_wpd_mask: u32,
+    fun_wpu_mask: u32,
+    fun_ie_mask: u32,
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Clone)]
 enum ResolvedGpioPortLowering {
     IndexedFields {
         moder: ResolvedRegister,
@@ -1549,6 +1562,16 @@ enum ResolvedGpioPortLowering {
         pur: ResolvedRegister,
         pdr: ResolvedRegister,
         pins: Vec<ResolvedBitmaskGpioPinLowering>,
+    },
+    EspRegisters {
+        out: ResolvedRegister,
+        out_w1ts: ResolvedRegister,
+        out_w1tc: ResolvedRegister,
+        enable: ResolvedRegister,
+        enable_w1ts: ResolvedRegister,
+        enable_w1tc: ResolvedRegister,
+        input: ResolvedRegister,
+        pins: Vec<ResolvedEspGpioPinLowering>,
     },
 }
 
@@ -2869,12 +2892,6 @@ fn validate_driver_requirements(
                     driver.id
                 );
             }
-            if requirements.clock_bindings.is_empty() && requirements.reset_bindings.is_empty() {
-                bail!(
-                    "gpio-port driver {} requires clock or reset bindings for first-cut executable lowering",
-                    driver.id
-                );
-            }
         }
         "uart" | "usart" => {
             if requirements.pin_roles.is_empty() {
@@ -2900,6 +2917,28 @@ fn validate_driver_requirements(
                     driver.id
                 );
             }
+            if !requirements.dma_routes.is_empty() && requirements.interrupt_routes.is_empty() {
+                bail!(
+                    "{} driver {} requires interrupt routes for async DMA-backed operation",
+                    driver.driver_kind,
+                    driver.id
+                );
+            }
+        }
+        "adc" => {
+            if !requirements.dma_routes.is_empty() && requirements.interrupt_routes.is_empty() {
+                bail!(
+                    "{} driver {} requires interrupt routes for async DMA-backed operation",
+                    driver.driver_kind,
+                    driver.id
+                );
+            }
+            if requirements.init_operations.is_empty() {
+                bail!(
+                    "adc driver {} requires at least one init operation",
+                    driver.id
+                );
+            }
         }
         "timer" | "pwm" => {
             let is_time_driver = has_time_driver_tag(&driver.capability_tags);
@@ -2921,14 +2960,6 @@ fn validate_driver_requirements(
                 bail!(
                     "{} driver {} requires at least one operation",
                     driver.driver_kind,
-                    driver.id
-                );
-            }
-        }
-        "adc" => {
-            if requirements.init_operations.is_empty() {
-                bail!(
-                    "adc driver {} requires at least one init operation",
                     driver.id
                 );
             }
@@ -3209,6 +3240,8 @@ fn render_driver_methods(
     methods.extend(render_gpio_methods(model, driver)?);
     methods.extend(render_pin_route_methods(model, driver)?);
     methods.extend(render_usart_methods(model, driver)?);
+    methods.extend(render_spi_methods(model, driver)?);
+    methods.extend(render_adc_methods(model, driver)?);
     methods.extend(render_operation_methods(model, driver)?);
     methods.extend(render_state_machine_methods(model, driver)?);
     methods.extend(render_time_driver_methods(driver));
@@ -3296,14 +3329,11 @@ fn render_clock_binding_methods(
                 .get(&binding.consumer_ref)
                 .cloned()
                 .unwrap_or_else(|| last_ref_segment(&binding.consumer_ref).to_string());
-            let register = resolve_control_register(
+            let (register, field) = resolve_control_target(
                 model,
                 &binding.control_refs,
                 "clock binding",
                 &binding.id,
-            )?;
-            let field = resolve_control_field(
-                register,
                 &[
                     binding.name.clone(),
                     subject.clone(),
@@ -3374,14 +3404,11 @@ fn render_reset_binding_methods(
                 .get(&binding.target_ref)
                 .cloned()
                 .unwrap_or_else(|| last_ref_segment(&binding.target_ref).to_string());
-            let register = resolve_control_register(
+            let (register, field) = resolve_control_target(
                 model,
                 &binding.control_refs,
                 "reset binding",
                 &binding.id,
-            )?;
-            let field = resolve_control_field(
-                register,
                 &[
                     binding.name.clone(),
                     subject.clone(),
@@ -3634,6 +3661,51 @@ fn render_gpio_methods(
                 });
             }
         }
+        ResolvedGpioPortLowering::EspRegisters {
+            out,
+            out_w1ts,
+            out_w1tc,
+            enable,
+            enable_w1ts,
+            enable_w1tc,
+            input,
+            pins,
+        } => {
+            for pin in pins {
+                let mut code = format!(
+                    "    /// Access the {} pin on {}.\n",
+                    render_comment_text(&pin.pin_name),
+                    render_comment_text(&driver.name)
+                );
+                code.push_str(&format!(
+                    "    pub fn {}(&self) -> {} {{\n",
+                    pin.accessor_name, flex_type
+                ));
+                code.push_str(&format!(
+                    "        {} {{\n            resources: self.resources,\n            role: &self.resources.pins[{}],\n            pin_name: {},\n            out_addr: 0x{:X}u64,\n            out_w1ts_addr: 0x{:X}u64,\n            out_w1tc_addr: 0x{:X}u64,\n            enable_addr: 0x{:X}u64,\n            enable_w1ts_addr: 0x{:X}u64,\n            enable_w1tc_addr: 0x{:X}u64,\n            input_addr: 0x{:X}u64,\n            io_mux_addr: 0x{:X}u64,\n            bit_mask: 0x{:08X}u32,\n            fun_wpd_mask: 0x{:08X}u32,\n            fun_wpu_mask: 0x{:08X}u32,\n            fun_ie_mask: 0x{:08X}u32,\n        }}\n",
+                    flex_type,
+                    pin.role_index,
+                    render_rust_string(&pin.pin_name),
+                    out.absolute_address,
+                    out_w1ts.absolute_address,
+                    out_w1tc.absolute_address,
+                    enable.absolute_address,
+                    enable_w1ts.absolute_address,
+                    enable_w1tc.absolute_address,
+                    input.absolute_address,
+                    pin.io_mux_addr,
+                    pin.bit_mask,
+                    pin.fun_wpd_mask,
+                    pin.fun_wpu_mask,
+                    pin.fun_ie_mask,
+                ));
+                code.push_str("    }\n");
+                methods.push(GeneratedMethod {
+                    name: pin.accessor_name.clone(),
+                    code,
+                });
+            }
+        }
     }
     Ok(methods)
 }
@@ -3682,6 +3754,20 @@ fn render_gpio_support_items(
             out.push_str("    pdr_addr: u64,\n");
             out.push_str("    data_alias_addr: u64,\n");
             out.push_str("    bit_mask: u32,\n");
+        }
+        ResolvedGpioPortLowering::EspRegisters { .. } => {
+            out.push_str("    out_addr: u64,\n");
+            out.push_str("    out_w1ts_addr: u64,\n");
+            out.push_str("    out_w1tc_addr: u64,\n");
+            out.push_str("    enable_addr: u64,\n");
+            out.push_str("    enable_w1ts_addr: u64,\n");
+            out.push_str("    enable_w1tc_addr: u64,\n");
+            out.push_str("    input_addr: u64,\n");
+            out.push_str("    io_mux_addr: u64,\n");
+            out.push_str("    bit_mask: u32,\n");
+            out.push_str("    fun_wpd_mask: u32,\n");
+            out.push_str("    fun_wpu_mask: u32,\n");
+            out.push_str("    fun_ie_mask: u32,\n");
         }
     }
     out.push_str("}\n\n");
@@ -3859,6 +3945,71 @@ fn render_gpio_support_items(
             out.push_str("        Ok(())\n");
             out.push_str("    }\n\n");
         }
+        ResolvedGpioPortLowering::EspRegisters { .. } => {
+            out.push_str(
+                "    pub fn set_as_input(&self, pull: Pull) -> Result<(), metadata::Error> {\n",
+            );
+            out.push_str("        self.set_pull(pull)?;\n");
+            out.push_str(
+                "        modify_u32(self.io_mux_addr, self.fun_ie_mask, self.fun_ie_mask)?;\n",
+            );
+            out.push_str("        write_u32(self.enable_w1tc_addr, self.bit_mask)?;\n");
+            out.push_str("        Ok(())\n");
+            out.push_str("    }\n\n");
+            out.push_str(
+                "    pub fn set_as_output(&self, initial_level: Level) -> Result<(), metadata::Error> {\n",
+            );
+            out.push_str("        self.set_level(initial_level)?;\n");
+            out.push_str(
+                "        modify_u32(self.io_mux_addr, self.fun_ie_mask, 0x00000000u32)?;\n",
+            );
+            out.push_str("        write_u32(self.enable_w1ts_addr, self.bit_mask)?;\n");
+            out.push_str("        Ok(())\n");
+            out.push_str("    }\n\n");
+            out.push_str(
+                "    pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {\n",
+            );
+            out.push_str("        let set_mask = match pull {\n");
+            out.push_str("            Pull::None => 0x00000000u32,\n");
+            out.push_str("            Pull::Up => self.fun_wpu_mask,\n");
+            out.push_str("            Pull::Down => self.fun_wpd_mask,\n");
+            out.push_str("        };\n");
+            out.push_str(
+                "        modify_u32(self.io_mux_addr, self.fun_wpu_mask | self.fun_wpd_mask, set_mask)?;\n",
+            );
+            out.push_str("        Ok(())\n");
+            out.push_str("    }\n\n");
+            out.push_str("    pub fn is_high(&self) -> Result<bool, metadata::Error> {\n");
+            out.push_str("        Ok((read_u32(self.input_addr)? & self.bit_mask) != 0)\n");
+            out.push_str("    }\n\n");
+            out.push_str("    pub fn is_low(&self) -> Result<bool, metadata::Error> {\n");
+            out.push_str("        Ok(!self.is_high()?)\n");
+            out.push_str("    }\n\n");
+            out.push_str("    pub fn get_level(&self) -> Result<Level, metadata::Error> {\n");
+            out.push_str("        Ok(if self.is_high()? { Level::High } else { Level::Low })\n");
+            out.push_str("    }\n\n");
+            out.push_str("    pub fn is_set_high(&self) -> Result<bool, metadata::Error> {\n");
+            out.push_str("        Ok((read_u32(self.out_addr)? & self.bit_mask) != 0)\n");
+            out.push_str("    }\n\n");
+            out.push_str("    pub fn is_set_low(&self) -> Result<bool, metadata::Error> {\n");
+            out.push_str("        Ok(!self.is_set_high()?)\n");
+            out.push_str("    }\n\n");
+            out.push_str(
+                "    pub fn get_output_level(&self) -> Result<Level, metadata::Error> {\n",
+            );
+            out.push_str(
+                "        Ok(if self.is_set_high()? { Level::High } else { Level::Low })\n",
+            );
+            out.push_str("    }\n\n");
+            out.push_str("    pub fn set_high(&self) -> Result<(), metadata::Error> {\n");
+            out.push_str("        write_u32(self.out_w1ts_addr, self.bit_mask)?;\n");
+            out.push_str("        Ok(())\n");
+            out.push_str("    }\n\n");
+            out.push_str("    pub fn set_low(&self) -> Result<(), metadata::Error> {\n");
+            out.push_str("        write_u32(self.out_w1tc_addr, self.bit_mask)?;\n");
+            out.push_str("        Ok(())\n");
+            out.push_str("    }\n\n");
+        }
     }
     out.push_str("    pub fn set_level(&self, level: Level) -> Result<(), metadata::Error> {\n");
     out.push_str("        match level {\n");
@@ -3927,8 +4078,23 @@ fn resolve_gpio_port_lowering(
     )? {
         return resolve_bitmask_gpio_port_lowering(model, driver);
     }
+    if supports_gpio_register_layout(
+        model,
+        target_ref,
+        &[
+            "OUT",
+            "OUT_W1TS",
+            "OUT_W1TC",
+            "ENABLE",
+            "ENABLE_W1TS",
+            "ENABLE_W1TC",
+            "IN",
+        ],
+    )? {
+        return resolve_esp_gpio_port_lowering(model, driver);
+    }
     bail!(
-        "gpio-port driver {} target {} does not expose a supported GPIO register layout; expected either indexed-field registers [MODER, PUPDR, IDR, ODR, BSRR] or bitmask registers [DIR, AFSEL, DEN, PUR, PDR, DATA]",
+        "gpio-port driver {} target {} does not expose a supported GPIO register layout; expected either indexed-field registers [MODER, PUPDR, IDR, ODR, BSRR], bitmask registers [DIR, AFSEL, DEN, PUR, PDR, DATA], or ESP-style registers [OUT, OUT_W1TS, OUT_W1TC, ENABLE, ENABLE_W1TS, ENABLE_W1TC, IN]",
         driver.id,
         target_ref
     );
@@ -4159,6 +4325,122 @@ fn resolve_bitmask_gpio_port_lowering(
     })
 }
 
+fn resolve_esp_gpio_port_lowering(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<ResolvedGpioPortLowering> {
+    let target_ref = driver.target.target_ref.as_str();
+    let out = resolve_gpio_register32(model, target_ref, "OUT", driver)?;
+    let out_w1ts = resolve_gpio_register32(model, target_ref, "OUT_W1TS", driver)?;
+    let out_w1tc = resolve_gpio_register32(model, target_ref, "OUT_W1TC", driver)?;
+    let enable = resolve_gpio_register32(model, target_ref, "ENABLE", driver)?;
+    let enable_w1ts = resolve_gpio_register32(model, target_ref, "ENABLE_W1TS", driver)?;
+    let enable_w1tc = resolve_gpio_register32(model, target_ref, "ENABLE_W1TC", driver)?;
+    let input = resolve_gpio_register32(model, target_ref, "IN", driver)?;
+    let mut pins = Vec::with_capacity(driver.pin_roles.len());
+    let mut seen_accessors = BTreeSet::new();
+
+    for (role_index, pin_role) in driver.pin_roles.iter().enumerate() {
+        let [route] = pin_role.routes.as_slice() else {
+            bail!(
+                "gpio-port driver {} pin role {} requires exactly one route for first-cut per-pin lowering, found {}",
+                driver.id,
+                pin_role.role,
+                pin_role.routes.len()
+            );
+        };
+        if route.peripheral_ref != target_ref {
+            bail!(
+                "gpio-port driver {} pin role {} references pin route {} for {} instead of {}",
+                driver.id,
+                pin_role.role,
+                route.id,
+                route.peripheral_ref,
+                target_ref
+            );
+        }
+        let pin = model
+            .pins
+            .iter()
+            .find(|candidate| candidate.id == route.pin_ref)
+            .ok_or_else(|| {
+                anyhow!(
+                    "gpio-port driver {} route {} references unknown physical pin {}",
+                    driver.id,
+                    route.id,
+                    route.pin_ref
+                )
+            })?;
+        let pin_index = pin.index.ok_or_else(|| {
+            anyhow!(
+                "gpio-port driver {} route {} references pin {} without an index required for lowering",
+                driver.id,
+                route.id,
+                pin.id
+            )
+        })?;
+        let accessor_name = to_rust_method_name(&pin.name);
+        if !seen_accessors.insert(accessor_name.clone()) {
+            bail!(
+                "gpio-port driver {} would generate duplicate pin accessor {}",
+                driver.id,
+                accessor_name
+            );
+        }
+
+        let bit_mask = resolve_esp_gpio_bit_mask(&out, pin_index, driver, "OUT", "DATA_ORIG")?;
+        for (register, register_name, field_name) in [
+            (&out_w1ts, "OUT_W1TS", "OUT_W1TS"),
+            (&out_w1tc, "OUT_W1TC", "OUT_W1TC"),
+            (&enable, "ENABLE", "DATA"),
+            (&enable_w1ts, "ENABLE_W1TS", "ENABLE_W1TS"),
+            (&enable_w1tc, "ENABLE_W1TC", "ENABLE_W1TC"),
+            (&input, "IN", "DATA_NEXT"),
+        ] {
+            let register_mask =
+                resolve_esp_gpio_bit_mask(register, pin_index, driver, register_name, field_name)?;
+            if register_mask != bit_mask {
+                bail!(
+                    "gpio-port driver {} pin index {} uses inconsistent bit masks across ESP GPIO registers: OUT=0x{:X}, {}=0x{:X}",
+                    driver.id,
+                    pin_index,
+                    bit_mask,
+                    register_name,
+                    register_mask
+                );
+            }
+        }
+
+        let io_mux_register =
+            resolve_gpio_register32(model, "per.io_mux", &format!("GPIO{pin_index}"), driver)?;
+        let fun_wpd = resolve_register_field(&io_mux_register, "FUN_WPD")?;
+        let fun_wpu = resolve_register_field(&io_mux_register, "FUN_WPU")?;
+        let fun_ie = resolve_register_field(&io_mux_register, "FUN_IE")?;
+
+        pins.push(ResolvedEspGpioPinLowering {
+            role_index,
+            pin_name: pin.name.clone(),
+            accessor_name,
+            bit_mask,
+            io_mux_addr: io_mux_register.absolute_address,
+            fun_wpd_mask: field_bit_mask(&fun_wpd, &io_mux_register)?,
+            fun_wpu_mask: field_bit_mask(&fun_wpu, &io_mux_register)?,
+            fun_ie_mask: field_bit_mask(&fun_ie, &io_mux_register)?,
+        });
+    }
+
+    Ok(ResolvedGpioPortLowering::EspRegisters {
+        out,
+        out_w1ts,
+        out_w1tc,
+        enable,
+        enable_w1ts,
+        enable_w1tc,
+        input,
+        pins,
+    })
+}
+
 fn resolve_gpio_register32(
     model: &EmbassyGenerationModel,
     target_ref: &str,
@@ -4196,6 +4478,54 @@ fn resolve_bitmask_gpio_bit_mask(
     if field.lsb != 0 {
         bail!(
             "gpio-port driver {} requires {} GPIO field {} to start at bit 0 for bitmask lowering, found lsb {}",
+            driver.id,
+            register_name,
+            field.name,
+            field.lsb
+        );
+    }
+    let bit = field.lsb.checked_add(pin_index).ok_or_else(|| {
+        anyhow!(
+            "gpio-port driver {} pin index {} overflowed {} field {}",
+            driver.id,
+            pin_index,
+            register_name,
+            field.name
+        )
+    })?;
+    if bit > field.msb {
+        bail!(
+            "gpio-port driver {} pin index {} is outside {} field {} bit range {}..={}",
+            driver.id,
+            pin_index,
+            register_name,
+            field.name,
+            field.lsb,
+            field.msb
+        );
+    }
+    1u32.checked_shl(bit).ok_or_else(|| {
+        anyhow!(
+            "gpio-port driver {} pin index {} produced an invalid bit position {} for {}",
+            driver.id,
+            pin_index,
+            bit,
+            register_name
+        )
+    })
+}
+
+fn resolve_esp_gpio_bit_mask(
+    register: &ResolvedRegister,
+    pin_index: u32,
+    driver: &ResolvedDriverInstance,
+    register_name: &str,
+    field_name: &str,
+) -> Result<u32> {
+    let field = resolve_register_field(register, field_name)?;
+    if field.lsb != 0 {
+        bail!(
+            "gpio-port driver {} requires {} field {} to start at bit 0 for ESP GPIO lowering, found lsb {}",
             driver.id,
             register_name,
             field.name,
@@ -4304,28 +4634,235 @@ fn render_usart_methods(
     }
 
     let target_ref = driver.target.target_ref.as_str();
-    let has_tx = driver.pin_roles.iter().any(|role| role.signal == "TX");
-    let has_rx = driver.pin_roles.iter().any(|role| role.signal == "RX");
+    let has_tx = driver.pin_roles.iter().any(|role| {
+        role.role.eq_ignore_ascii_case("tx")
+            || role.signal.eq_ignore_ascii_case("tx")
+            || role.signal.ends_with("TXD")
+    });
+    let has_rx = driver.pin_roles.iter().any(|role| {
+        role.role.eq_ignore_ascii_case("rx")
+            || role.signal.eq_ignore_ascii_case("rx")
+            || role.signal.ends_with("RXD")
+    });
     let has_irq = !driver.interrupt_routes.is_empty();
+    let has_tx_dma = driver.dma_routes.iter().any(|route| {
+        route
+            .signal
+            .as_deref()
+            .is_some_and(|signal| signal.eq_ignore_ascii_case("tx"))
+    });
+    let has_rx_dma = driver.dma_routes.iter().any(|route| {
+        route
+            .signal
+            .as_deref()
+            .is_some_and(|signal| signal.eq_ignore_ascii_case("rx"))
+    });
+
+    let cr1 = try_resolve_target_register_by_name(model, target_ref, "CR1")?;
+    let brr = try_resolve_target_register_by_name(model, target_ref, "BRR")?;
+    let cr2 = try_resolve_target_register_by_name(model, target_ref, "CR2")?;
+    if let (Some(cr1), Some(brr), Some(cr2)) = (cr1, brr, cr2) {
+        return render_stm32_usart_methods(
+            model, driver, target_ref, has_tx, has_rx, has_irq, has_tx_dma, has_rx_dma, cr1, brr,
+            cr2,
+        );
+    }
+    let conf0 = try_resolve_target_register_by_name(model, target_ref, "CONF0")?;
+    let clkdiv = try_resolve_target_register_by_name(model, target_ref, "CLKDIV")?;
+    let fifo = try_resolve_target_register_by_name(model, target_ref, "FIFO")?;
+    let status = try_resolve_target_register_by_name(model, target_ref, "STATUS")?;
+    let int_ena = try_resolve_target_register_by_name(model, target_ref, "INT_ENA")?;
+    if let (Some(conf0), Some(clkdiv), Some(fifo), Some(status), Some(int_ena)) =
+        (conf0, clkdiv, fifo, status, int_ena)
+    {
+        return render_esp_uart_methods(
+            driver, has_tx, has_rx, has_irq, has_tx_dma, has_rx_dma, conf0, clkdiv, fifo, status,
+            int_ena,
+        );
+    }
+    Ok(Vec::new())
+}
+
+fn render_spi_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    if driver.driver_kind != "spi" {
+        return Ok(Vec::new());
+    }
+
     let has_tx_dma = driver
         .dma_routes
         .iter()
-        .any(|route| route.signal.as_deref() == Some("TX"));
+        .any(|route| route.direction == "memory-to-peripheral");
     let has_rx_dma = driver
         .dma_routes
         .iter()
-        .any(|route| route.signal.as_deref() == Some("RX"));
+        .any(|route| route.direction == "peripheral-to-memory");
+    let has_irq = !driver.interrupt_routes.is_empty();
+    if !has_tx_dma && !has_rx_dma && !has_irq {
+        return Ok(Vec::new());
+    }
 
-    let Some(cr1) = try_resolve_target_register_by_name(model, target_ref, "CR1")? else {
+    let target_ref = driver.target.target_ref.as_str();
+    if model
+        .peripherals
+        .get(target_ref)
+        .and_then(|target| target.base_address)
+        .is_none()
+    {
         return Ok(Vec::new());
-    };
-    let Some(brr) = try_resolve_target_register_by_name(model, target_ref, "BRR")? else {
-        return Ok(Vec::new());
-    };
-    let Some(cr2) = try_resolve_target_register_by_name(model, target_ref, "CR2")? else {
-        return Ok(Vec::new());
+    }
+    let dma_conf = match try_resolve_target_register_by_name(model, target_ref, "DMA_CONF")? {
+        Some(register) => register,
+        None => return Ok(Vec::new()),
     };
 
+    let mut methods = Vec::new();
+    if has_tx_dma {
+        let dma_tx_ena = resolve_register_field(&dma_conf, "DMA_TX_ENA")?;
+        methods.push(render_register_write_method(
+            "enable_tx_dma".to_string(),
+            &dma_conf,
+            &dma_tx_ena,
+            1,
+            &format!("Enable the {} TX DMA path.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_tx_dma".to_string(),
+            &dma_conf,
+            &dma_tx_ena,
+            0,
+            &format!("Disable the {} TX DMA path.", driver.name),
+        )?);
+    }
+    if has_rx_dma {
+        let dma_rx_ena = resolve_register_field(&dma_conf, "DMA_RX_ENA")?;
+        methods.push(render_register_write_method(
+            "enable_rx_dma".to_string(),
+            &dma_conf,
+            &dma_rx_ena,
+            1,
+            &format!("Enable the {} RX DMA path.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_rx_dma".to_string(),
+            &dma_conf,
+            &dma_rx_ena,
+            0,
+            &format!("Disable the {} RX DMA path.", driver.name),
+        )?);
+    }
+    if has_irq
+        && let Some(dma_int_ena) =
+            try_resolve_target_register_by_name(model, target_ref, "DMA_INT_ENA")?
+        && let Ok(done_ena) = resolve_register_field(&dma_int_ena, "DMA_SEG_TRANS_DONE_INT_ENA")
+    {
+        methods.push(render_register_write_method(
+            "enable_dma_segment_done_interrupt".to_string(),
+            &dma_int_ena,
+            &done_ena,
+            1,
+            &format!("Enable the {} DMA segment-done interrupt.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_dma_segment_done_interrupt".to_string(),
+            &dma_int_ena,
+            &done_ena,
+            0,
+            &format!("Disable the {} DMA segment-done interrupt.", driver.name),
+        )?);
+    }
+
+    Ok(methods)
+}
+
+fn render_adc_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    if driver.driver_kind != "adc" {
+        return Ok(Vec::new());
+    }
+    if driver.dma_routes.is_empty() && driver.interrupt_routes.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let target_ref = driver.target.target_ref.as_str();
+    let mut methods = Vec::new();
+
+    if !driver.dma_routes.is_empty()
+        && let Some(dma_conf) = try_resolve_target_register_by_name(model, target_ref, "DMA_CONF")?
+    {
+        let apb_adc_trans = resolve_register_field(&dma_conf, "APB_ADC_TRANS")?;
+        methods.push(render_register_write_method(
+            "enable_dma".to_string(),
+            &dma_conf,
+            &apb_adc_trans,
+            1,
+            &format!("Enable the {} DMA path.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_dma".to_string(),
+            &dma_conf,
+            &apb_adc_trans,
+            0,
+            &format!("Disable the {} DMA path.", driver.name),
+        )?);
+
+        let reset_fsm = resolve_register_field(&dma_conf, "APB_ADC_RESET_FSM")?;
+        let mut code =
+            "    pub fn reset_dma_fsm(&self) -> Result<(), metadata::Error> {\n".to_string();
+        code.push_str(&render_register_write_statement(
+            &dma_conf, &reset_fsm, 1, "        ",
+        )?);
+        code.push_str(&render_register_write_statement(
+            &dma_conf, &reset_fsm, 0, "        ",
+        )?);
+        code.push_str("        Ok(())\n    }\n");
+        methods.push(GeneratedMethod {
+            name: "reset_dma_fsm".to_string(),
+            code,
+        });
+    }
+
+    if !driver.interrupt_routes.is_empty()
+        && let Some(int_ena) = try_resolve_target_register_by_name(model, target_ref, "INT_ENA")?
+        && let Ok(done_ena) = resolve_register_field(&int_ena, "APB_SARADC1_DONE_INT_ENA")
+    {
+        methods.push(render_register_write_method(
+            "enable_done_interrupt".to_string(),
+            &int_ena,
+            &done_ena,
+            1,
+            &format!("Enable the {} conversion-done interrupt.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_done_interrupt".to_string(),
+            &int_ena,
+            &done_ena,
+            0,
+            &format!("Disable the {} conversion-done interrupt.", driver.name),
+        )?);
+    }
+
+    Ok(methods)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_stm32_usart_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+    target_ref: &str,
+    has_tx: bool,
+    has_rx: bool,
+    has_irq: bool,
+    has_tx_dma: bool,
+    has_rx_dma: bool,
+    cr1: ResolvedRegister,
+    brr: ResolvedRegister,
+    cr2: ResolvedRegister,
+) -> Result<Vec<GeneratedMethod>> {
     let div_mantissa = resolve_register_field(&brr, "DIV_Mantissa")?;
     let div_fraction = resolve_register_field(&brr, "DIV_Fraction")?;
     let ue = resolve_register_field(&cr1, "UE")?;
@@ -4549,6 +5086,169 @@ fn render_usart_methods(
             &dmar,
             0,
             &format!("Disable the {} RX DMA path.", driver.name),
+        )?);
+    }
+
+    Ok(methods)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_esp_uart_methods(
+    driver: &ResolvedDriverInstance,
+    has_tx: bool,
+    has_rx: bool,
+    has_irq: bool,
+    _has_tx_dma: bool,
+    _has_rx_dma: bool,
+    conf0: ResolvedRegister,
+    clkdiv: ResolvedRegister,
+    fifo: ResolvedRegister,
+    status: ResolvedRegister,
+    int_ena: ResolvedRegister,
+) -> Result<Vec<GeneratedMethod>> {
+    let clk_en = resolve_register_field(&conf0, "CLK_EN")?;
+    let mem_clk_en = try_resolve_register_field(&conf0, "MEM_CLK_EN");
+    let parity_en = resolve_register_field(&conf0, "PARITY_EN")?;
+    let parity = resolve_register_field(&conf0, "PARITY")?;
+    let bit_num = resolve_register_field(&conf0, "BIT_NUM")?;
+    let stop_bit_num = resolve_register_field(&conf0, "STOP_BIT_NUM")?;
+    let clkdiv_field = resolve_register_field(&clkdiv, "CLKDIV")?;
+    let frag_field = resolve_register_field(&clkdiv, "FRAG")?;
+    let rxfifo_cnt = resolve_register_field(&status, "RXFIFO_CNT")?;
+    let txfifo_cnt = resolve_register_field(&status, "TXFIFO_CNT")?;
+    let clkdiv_value_mask = field_value_mask(&clkdiv_field)?;
+    let frag_value_mask = field_value_mask(&frag_field)?;
+    let clkdiv_clear_mask = shifted_field_mask(&clkdiv_field, &clkdiv)?;
+    let frag_clear_mask = shifted_field_mask(&frag_field, &clkdiv)?;
+    let rxfifo_cnt_mask = field_bit_mask_or_range_mask(&rxfifo_cnt, &status)?;
+    let txfifo_cnt_mask = field_bit_mask_or_range_mask(&txfifo_cnt, &status)?;
+
+    let mut methods = Vec::new();
+    methods.push(render_register_write_method(
+        "enable".to_string(),
+        &conf0,
+        &clk_en,
+        1,
+        &format!("Enable {}.", driver.name),
+    )?);
+    methods.push(render_register_write_method(
+        "disable".to_string(),
+        &conf0,
+        &clk_en,
+        0,
+        &format!("Disable {}.", driver.name),
+    )?);
+
+    let mut configure_code =
+        "    pub fn configure_8n1(&self) -> Result<(), metadata::Error> {\n".to_string();
+    configure_code.push_str(&render_register_write_statement(
+        &conf0, &parity_en, 0, "        ",
+    )?);
+    configure_code.push_str(&render_register_write_statement(
+        &conf0, &parity, 0, "        ",
+    )?);
+    configure_code.push_str(&render_register_write_statement(
+        &conf0, &bit_num, 3, "        ",
+    )?);
+    configure_code.push_str(&render_register_write_statement(
+        &conf0,
+        &stop_bit_num,
+        1,
+        "        ",
+    )?);
+    if let Some(mem_clk_en) = mem_clk_en {
+        configure_code.push_str(&render_register_write_statement(
+            &conf0,
+            &mem_clk_en,
+            1,
+            "        ",
+        )?);
+    }
+    configure_code.push_str(&render_register_write_statement(
+        &conf0, &clk_en, 1, "        ",
+    )?);
+    configure_code.push_str("        Ok(())\n    }\n");
+    methods.push(GeneratedMethod {
+        name: "configure_8n1".to_string(),
+        code: configure_code,
+    });
+
+    methods.push(GeneratedMethod {
+        name: "set_baud_divider".to_string(),
+        code: format!(
+            "    pub fn set_baud_divider(&self, divider: u16, fraction: u8) -> Result<(), metadata::Error> {{\n        if u32::from(divider) > 0x{clkdiv_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"UART baud divider exceeds modeled field width\"));\n        }}\n        if u32::from(fraction) > 0x{frag_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"UART baud fraction exceeds modeled field width\"));\n        }}\n        modify_u32(0x{clkdiv_address:X}u64, 0x{combined_clear_mask:08X}u32, ((u32::from(divider) & 0x{clkdiv_value_mask:X}u32) << {clkdiv_lsb}) | ((u32::from(fraction) & 0x{frag_value_mask:X}u32) << {frag_lsb}))?;\n        Ok(())\n    }}\n",
+            clkdiv_address = clkdiv.absolute_address,
+            combined_clear_mask = clkdiv_clear_mask | frag_clear_mask,
+            clkdiv_lsb = clkdiv_field.lsb,
+            frag_lsb = frag_field.lsb,
+        ),
+    });
+
+    if has_tx {
+        methods.push(GeneratedMethod {
+            name: "write_byte".to_string(),
+            code: format!(
+                "    pub fn write_byte(&self, byte: u8) -> Result<(), metadata::Error> {{\n        write_u32(0x{fifo_address:X}u64, u32::from(byte))?;\n        Ok(())\n    }}\n",
+                fifo_address = fifo.absolute_address,
+            ),
+        });
+        methods.push(GeneratedMethod {
+            name: "write_bytes".to_string(),
+            code: "    pub fn write_bytes(&self, bytes: &[u8]) -> Result<(), metadata::Error> {\n        for &byte in bytes {\n            self.write_byte(byte)?;\n        }\n        Ok(())\n    }\n"
+                .to_string(),
+        });
+        methods.push(GeneratedMethod {
+            name: "flush".to_string(),
+            code: format!(
+                "    pub fn flush(&self) -> Result<(), metadata::Error> {{\n        while ((read_u32(0x{status_address:X}u64)? & 0x{txfifo_cnt_mask:08X}u32) >> {txfifo_cnt_lsb}) != 0 {{}}\n        Ok(())\n    }}\n",
+                status_address = status.absolute_address,
+                txfifo_cnt_lsb = txfifo_cnt.lsb,
+            ),
+        });
+    }
+
+    if has_rx {
+        methods.push(GeneratedMethod {
+            name: "read_byte".to_string(),
+            code: format!(
+                "    pub fn read_byte(&self) -> Result<u8, metadata::Error> {{\n        while ((read_u32(0x{status_address:X}u64)? & 0x{rxfifo_cnt_mask:08X}u32) >> {rxfifo_cnt_lsb}) == 0 {{}}\n        Ok((read_u32(0x{fifo_address:X}u64)? & 0xFFu32) as u8)\n    }}\n",
+                status_address = status.absolute_address,
+                fifo_address = fifo.absolute_address,
+                rxfifo_cnt_lsb = rxfifo_cnt.lsb,
+            ),
+        });
+    }
+
+    if has_irq {
+        let txfifo_empty_int_ena = resolve_register_field(&int_ena, "TXFIFO_EMPTY_INT_ENA")?;
+        let rxfifo_full_int_ena = resolve_register_field(&int_ena, "RXFIFO_FULL_INT_ENA")?;
+        methods.push(render_register_write_method(
+            "enable_txe_interrupt".to_string(),
+            &int_ena,
+            &txfifo_empty_int_ena,
+            1,
+            &format!("Enable the {} TXFIFO-empty interrupt.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_txe_interrupt".to_string(),
+            &int_ena,
+            &txfifo_empty_int_ena,
+            0,
+            &format!("Disable the {} TXFIFO-empty interrupt.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "enable_rxne_interrupt".to_string(),
+            &int_ena,
+            &rxfifo_full_int_ena,
+            1,
+            &format!("Enable the {} RXFIFO-full interrupt.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_rxne_interrupt".to_string(),
+            &int_ena,
+            &rxfifo_full_int_ena,
+            0,
+            &format!("Disable the {} RXFIFO-full interrupt.", driver.name),
         )?);
     }
 
@@ -4969,21 +5669,38 @@ fn resolve_transition_effect_write<'a>(
     Ok((register, field_target.field.clone(), value))
 }
 
-fn resolve_control_register<'a>(
+fn resolve_control_target<'a>(
     model: &'a EmbassyGenerationModel,
     control_refs: &[String],
     kind: &str,
     owner_id: &str,
-) -> Result<&'a ResolvedRegister> {
+    subjects: &[String],
+) -> Result<(&'a ResolvedRegister, ResolvedField)> {
     let control_ref = control_refs.first().ok_or_else(|| {
         anyhow!("{kind} {owner_id} is missing controlRefs required for executable lowering")
     })?;
     if control_refs.len() > 1 {
         bail!("{kind} {owner_id} references multiple controlRefs, which is not yet supported");
     }
-    model.registers.get(control_ref).ok_or_else(|| {
-        anyhow!("{kind} {owner_id} references unknown control register {control_ref}")
-    })
+    if let Some(register) = model.registers.get(control_ref) {
+        return Ok((register, resolve_control_field(register, subjects)?));
+    }
+    if let Some(field_target) = model.fields.get(control_ref) {
+        let register = model
+            .registers
+            .get(field_target.register_id.as_str())
+            .ok_or_else(|| {
+                anyhow!(
+                    "{kind} {owner_id} field controlRef {} resolved to unknown register {}",
+                    control_ref,
+                    field_target.register_id
+                )
+            })?;
+        return Ok((register, field_target.field.clone()));
+    }
+    Err(anyhow!(
+        "{kind} {owner_id} references unknown control register {control_ref}"
+    ))
 }
 
 fn resolve_control_field(
@@ -5263,6 +5980,10 @@ fn field_bit_mask(field: &ResolvedField, register: &ResolvedRegister) -> Result<
             register.id
         );
     }
+    shifted_field_mask(field, register)
+}
+
+fn field_bit_mask_or_range_mask(field: &ResolvedField, register: &ResolvedRegister) -> Result<u32> {
     shifted_field_mask(field, register)
 }
 
@@ -7462,6 +8183,39 @@ fn render_host_gpio_emulator_methods(
                 "            _ => Err(metadata::Error::InvalidReference(\"unknown GPIO pin\")),\n        }\n    }\n\n",
             );
         }
+        ResolvedGpioPortLowering::EspRegisters {
+            input,
+            out: out_register,
+            pins,
+            ..
+        } => {
+            out.push_str(
+                "    pub fn set_input_level(&self, pin_name: &str, high: bool) -> Result<(), metadata::Error> {\n        match pin_name {\n",
+            );
+            for pin in &pins {
+                out.push_str(&format!(
+                    "            {} => metadata::modify_u32_for(&self.state, 0x{:X}u64, 0x{:08X}u32, if high {{ 0x{:08X}u32 }} else {{ 0x00000000u32 }})?,\n",
+                    render_rust_string(&pin.pin_name),
+                    input.absolute_address,
+                    pin.bit_mask,
+                    pin.bit_mask,
+                ));
+            }
+            out.push_str(
+                "            _ => return Err(metadata::Error::InvalidReference(\"unknown GPIO pin\")),\n        }\n        Ok(())\n    }\n\n    pub fn output_level(&self, pin_name: &str) -> Result<bool, metadata::Error> {\n        match pin_name {\n",
+            );
+            for pin in &pins {
+                out.push_str(&format!(
+                    "            {} => Ok((metadata::read_u32_for(&self.state, 0x{:X}u64)? & 0x{:08X}u32) != 0),\n",
+                    render_rust_string(&pin.pin_name),
+                    out_register.absolute_address,
+                    pin.bit_mask,
+                ));
+            }
+            out.push_str(
+                "            _ => Err(metadata::Error::InvalidReference(\"unknown GPIO pin\")),\n        }\n    }\n\n",
+            );
+        }
     }
     Ok(out)
 }
@@ -9347,6 +10101,8 @@ fn host_emulator_wires_hal_and_companion_state() {
             std::fs::read_to_string(output_dir.path().join("src").join("adc.rs")).expect("adc.rs");
         let dma_rs =
             std::fs::read_to_string(output_dir.path().join("src").join("dma.rs")).expect("dma.rs");
+        let spi_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("spi.rs")).expect("spi.rs");
 
         assert!(rcc_rs.contains("pub fn enable_usart1_clock"));
         assert!(rcc_rs.contains("pub fn apply_init"));
@@ -9391,11 +10147,17 @@ fn host_emulator_wires_hal_and_companion_state() {
         assert!(uart_rs.contains("pub fn enable_rx_dma"));
         assert!(!uart_rs.contains("pub async fn read"));
         assert!(!uart_rs.contains("pub async fn write"));
+        assert!(spi_rs.contains("pub fn enable_tx_dma"));
+        assert!(spi_rs.contains("pub fn enable_rx_dma"));
+        assert!(spi_rs.contains("pub fn enable_dma_segment_done_interrupt"));
         assert!(timer_rs.contains("pub fn apply_enable"));
         assert!(timer_rs.contains("pub fn transition_disabled_to_enabled"));
         assert!(timer_rs.contains("modify_u16("));
         assert!(pwm_rs.contains("pub fn transition_enabled_to_disabled"));
         assert!(adc_rs.contains("pub fn apply_calibrate"));
+        assert!(adc_rs.contains("pub fn enable_dma"));
+        assert!(adc_rs.contains("pub fn reset_dma_fsm"));
+        assert!(adc_rs.contains("pub fn enable_done_interrupt"));
         assert!(adc_rs.contains("modify_u32("));
         assert!(dma_rs.contains("pub fn enable_clock"));
     }
@@ -12252,7 +13014,15 @@ fn host_emulator_wires_hal_and_companion_state() {
                             ] }
                         ] },
                         { "id": "periph.usart1", "name": "USART1", "kind": "peripheral", "type": "USART", "baseAddress": 1073811456u64, "derivedFromRef": "periph.usart6", "interruptRefs": ["irq.usart1"] },
-                        { "id": "periph.spi1", "name": "SPI1", "kind": "peripheral", "type": "SPI", "interruptRefs": ["irq.spi1"] },
+                        { "id": "periph.spi1", "name": "SPI1", "kind": "peripheral", "type": "SPI", "baseAddress": 1073811648u64, "interruptRefs": ["irq.spi1"], "registers": [
+                            { "id": "reg.spi1.dma_conf", "name": "DMA_CONF", "kind": "register", "offsetBytes": 0, "widthBits": 32, "fields": [
+                                { "id": "field.spi1.dma_conf.dma_rx_ena", "name": "DMA_RX_ENA", "description": "DMA RX enable", "bitRange": { "lsb": 0, "msb": 0 } },
+                                { "id": "field.spi1.dma_conf.dma_tx_ena", "name": "DMA_TX_ENA", "description": "DMA TX enable", "bitRange": { "lsb": 1, "msb": 1 } }
+                            ] },
+                            { "id": "reg.spi1.dma_int_ena", "name": "DMA_INT_ENA", "kind": "register", "offsetBytes": 4, "widthBits": 32, "fields": [
+                                { "id": "field.spi1.dma_int_ena.dma_seg_trans_done_int_ena", "name": "DMA_SEG_TRANS_DONE_INT_ENA", "description": "DMA segment transfer done interrupt enable", "bitRange": { "lsb": 0, "msb": 0 } }
+                            ] }
+                        ] },
                         { "id": "periph.i2c1", "name": "I2C1", "kind": "peripheral", "type": "I2C", "interruptRefs": ["irq.i2c1"] },
                         { "id": "periph.tim1", "name": "TIM1", "kind": "peripheral", "type": "TIM", "interruptRefs": ["irq.tim1"], "baseAddress": 1073812480u64, "registers": [
                             { "id": "reg.tim1.ctlr1", "name": "CTLR1", "kind": "register", "offsetBytes": 0, "widthBits": 16, "fields": [
@@ -12269,6 +13039,13 @@ fn host_emulator_wires_hal_and_companion_state() {
                                 { "id": "field.adc1.ctlr2.adon", "name": "ADON", "description": "ADC enable", "bitRange": { "lsb": 0, "msb": 0 } },
                                 { "id": "field.adc1.ctlr2.cal", "name": "CAL", "description": "Calibration start", "bitRange": { "lsb": 2, "msb": 2 } },
                                 { "id": "field.adc1.ctlr2.rstcal", "name": "RSTCAL", "description": "Reset calibration", "bitRange": { "lsb": 3, "msb": 3 } }
+                            ] },
+                            { "id": "reg.adc1.dma_conf", "name": "DMA_CONF", "kind": "register", "offsetBytes": 12, "widthBits": 32, "fields": [
+                                { "id": "field.adc1.dma_conf.apb_adc_trans", "name": "APB_ADC_TRANS", "description": "ADC DMA transfer enable", "bitRange": { "lsb": 0, "msb": 0 } },
+                                { "id": "field.adc1.dma_conf.apb_adc_reset_fsm", "name": "APB_ADC_RESET_FSM", "description": "ADC DMA state machine reset", "bitRange": { "lsb": 1, "msb": 1 } }
+                            ] },
+                            { "id": "reg.adc1.int_ena", "name": "INT_ENA", "kind": "register", "offsetBytes": 16, "widthBits": 32, "fields": [
+                                { "id": "field.adc1.int_ena.apb_saradc1_done_int_ena", "name": "APB_SARADC1_DONE_INT_ENA", "description": "ADC1 done interrupt enable", "bitRange": { "lsb": 0, "msb": 0 } }
                             ] }
                         ] },
                         { "id": "periph.dma1", "name": "DMA1", "kind": "peripheral", "type": "DMA" },
@@ -12365,6 +13142,8 @@ fn host_emulator_wires_hal_and_companion_state() {
                         "routes": [
                             { "id": "dmaroute.usart1_tx", "name": "USART1 TX DMA", "peripheralRef": "periph.usart1", "signal": "TX", "channelRef": "dma.chan1", "direction": "memory-to-peripheral", "controlRefs": ["reg.rcc.ahbpcenr"] },
                             { "id": "dmaroute.usart1_rx", "name": "USART1 RX DMA", "peripheralRef": "periph.usart1", "signal": "RX", "channelRef": "dma.chan2", "direction": "peripheral-to-memory", "controlRefs": ["reg.rcc.ahbpcenr"] },
+                            { "id": "dmaroute.spi1_tx", "name": "SPI1 TX DMA", "peripheralRef": "periph.spi1", "signal": "MOSI", "channelRef": "dma.chan1", "direction": "memory-to-peripheral", "controlRefs": ["reg.rcc.ahbpcenr"] },
+                            { "id": "dmaroute.spi1_rx", "name": "SPI1 RX DMA", "peripheralRef": "periph.spi1", "signal": "MISO", "channelRef": "dma.chan2", "direction": "peripheral-to-memory", "controlRefs": ["reg.rcc.ahbpcenr"] },
                             { "id": "dmaroute.adc1", "name": "ADC1 DMA", "peripheralRef": "periph.adc1", "signal": "IN0", "channelRef": "dma.chan1", "direction": "peripheral-to-memory", "controlRefs": ["reg.rcc.ahbpcenr"] }
                         ]
                     },
@@ -12396,12 +13175,12 @@ fn host_emulator_wires_hal_and_companion_state() {
                         { "id": "drv.rcc", "name": "Rcc", "targetRef": "block.rcc", "driverKind": "rcc", "modulePath": "rcc", "clockBindingRefs": ["clk.usart1"], "initOperationRefs": ["op.rcc.init"] },
                         { "id": "drv.gpioa", "name": "GpioA", "targetRef": "block.gpioa", "driverKind": "gpio-port", "modulePath": "gpio", "clockBindingRefs": ["clk.gpioa"], "resetBindingRefs": ["rst.gpioa"], "pinRoles": [{ "role": "gpio0", "signal": "GPIO0", "routeRefs": ["pinroute.gpioa.pa0"], "requirement": "required" }] },
                         { "id": "drv.usart1", "name": "Usart1", "targetRef": "block.usart1", "driverKind": uart_driver_kind, "modulePath": "uart", "clockBindingRefs": ["clk.usart1"], "resetBindingRefs": ["rst.usart1"], "interruptRouteRefs": ["iroute.usart1"], "dmaRouteRefs": ["dmaroute.usart1_tx", "dmaroute.usart1_rx"], "pinRoles": [{ "role": "tx", "signal": "TX", "routeRefs": ["pinroute.usart1.tx"], "requirement": "required" }, { "role": "rx", "signal": "RX", "routeRefs": ["pinroute.usart1.rx"], "requirement": "required" }] },
-                        { "id": "drv.spi1", "name": "Spi1", "targetRef": "block.spi1", "driverKind": "spi", "modulePath": "spi", "clockBindingRefs": ["clk.spi1"], "resetBindingRefs": ["rst.spi1"], "interruptRouteRefs": ["iroute.spi1"], "pinRoles": [{ "role": "sck", "signal": "SCK", "routeRefs": ["pinroute.spi1.sck"], "requirement": "required" }, { "role": "mosi", "signal": "MOSI", "routeRefs": ["pinroute.spi1.mosi"], "requirement": "required" }, { "role": "miso", "signal": "MISO", "routeRefs": ["pinroute.spi1.miso"], "requirement": "required" }] },
+                        { "id": "drv.spi1", "name": "Spi1", "targetRef": "block.spi1", "driverKind": "spi", "modulePath": "spi", "clockBindingRefs": ["clk.spi1"], "resetBindingRefs": ["rst.spi1"], "interruptRouteRefs": ["iroute.spi1"], "dmaRouteRefs": ["dmaroute.spi1_tx", "dmaroute.spi1_rx"], "pinRoles": [{ "role": "sck", "signal": "SCK", "routeRefs": ["pinroute.spi1.sck"], "requirement": "required" }, { "role": "mosi", "signal": "MOSI", "routeRefs": ["pinroute.spi1.mosi"], "requirement": "required" }, { "role": "miso", "signal": "MISO", "routeRefs": ["pinroute.spi1.miso"], "requirement": "required" }] },
                         { "id": "drv.i2c1", "name": "I2c1", "targetRef": "block.i2c1", "driverKind": "i2c", "modulePath": "i2c", "clockBindingRefs": ["clk.i2c1"], "resetBindingRefs": ["rst.i2c1"], "interruptRouteRefs": ["iroute.i2c1"], "pinRoles": [{ "role": "scl", "signal": "SCL", "routeRefs": ["pinroute.i2c1.scl"], "requirement": "required" }, { "role": "sda", "signal": "SDA", "routeRefs": ["pinroute.i2c1.sda"], "requirement": "required" }] },
                         { "id": "drv.tim1", "name": "Tim1", "targetRef": "block.tim1", "driverKind": "timer", "modulePath": "timer", "clockBindingRefs": ["clk.tim1"], "resetBindingRefs": ["rst.tim1"], "interruptRouteRefs": ["iroute.tim1"], "pinRoles": [{ "role": "ch1", "signal": "CH1", "routeRefs": ["pinroute.tim1.ch1"], "requirement": "required" }], "initOperationRefs": ["op.tim1.enable"], "stateMachineRefs": ["sm.tim1"] },
                         { "id": "drv.pwm1", "name": "Pwm1", "targetRef": "block.pwm1", "driverKind": "pwm", "modulePath": "pwm", "clockBindingRefs": ["clk.pwm1"], "resetBindingRefs": ["rst.pwm1"], "pinRoles": [{ "role": "out", "signal": "PWM_OUT", "routeRefs": ["pinroute.pwm1.out"], "requirement": "required" }], "initOperationRefs": ["op.pwm1.enable"], "stateMachineRefs": ["sm.pwm1"] },
                         { "id": "drv.adc1", "name": "Adc1", "targetRef": "block.adc1", "driverKind": "adc", "modulePath": "adc", "clockBindingRefs": ["clk.adc1"], "resetBindingRefs": ["rst.adc1"], "interruptRouteRefs": ["iroute.adc1"], "dmaRouteRefs": ["dmaroute.adc1"], "pinRoles": [{ "role": "input0", "signal": "IN0", "routeRefs": ["pinroute.adc1.in0"], "requirement": "required" }], "initOperationRefs": ["op.adc.calibrate"] },
-                        { "id": "drv.dma1", "name": "Dma1", "targetRef": "block.dma1", "driverKind": "dma", "modulePath": "dma", "clockBindingRefs": ["clk.dma1"], "dmaRouteRefs": ["dmaroute.usart1_tx", "dmaroute.usart1_rx", "dmaroute.adc1"] },
+                        { "id": "drv.dma1", "name": "Dma1", "targetRef": "block.dma1", "driverKind": "dma", "modulePath": "dma", "clockBindingRefs": ["clk.dma1"], "dmaRouteRefs": ["dmaroute.usart1_tx", "dmaroute.usart1_rx", "dmaroute.spi1_tx", "dmaroute.spi1_rx", "dmaroute.adc1"] },
                         { "id": "drv.pfic", "name": "Pfic", "targetRef": "block.pfic", "driverKind": "interrupt", "modulePath": "interrupt", "interruptRouteRefs": ["iroute.usart1", "iroute.spi1", "iroute.i2c1", "iroute.tim1", "iroute.adc1"] }
                     ]
                 }

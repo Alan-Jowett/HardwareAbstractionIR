@@ -230,7 +230,7 @@ hoc name matching.
 | `driverKind` | Minimum required supporting data |
 | --- | --- |
 | `rcc` | `profiles.mcuSoc.clockResetTopology`; referenced `clockBindingRefs` / `resetBindingRefs`; binding `controlRefs` plus field-level structure for emitted clock/reset helpers; and referenced semantic operations for any additional emitted RCC operation helpers |
-| `gpio-port` | `profiles.mcuSoc.pinTopology.routes`; clock and/or reset bindings for emitted bring-up helpers in the first cut; and any referenced route `controlRefs` plus structural register/field data for emitted per-pin input/output/pull helpers and output/input readback. For STM32-class lowering paths, the reachable structure typically includes mode, output-latch, output-write, input-sample, and pull-configuration registers/fields (for example `MODER`, `ODR`, `BSRR`, `IDR`, and `PUPDR` when the emitted API claims them). |
+| `gpio-port` | `profiles.mcuSoc.pinTopology.routes`; clock and/or reset bindings for emitted bring-up helpers in the first cut; and any referenced route `controlRefs` plus structural register/field data for emitted per-pin input/output/pull helpers and output/input readback. The reachable lowering path may be a classic single-block GPIO layout or a composite path through explicit routing/control fabrics such as ESP32-C3 GPIO + IO MUX + GPIO Matrix. For STM32-class lowering paths, the reachable structure typically includes mode, output-latch, output-write, input-sample, and pull-configuration registers/fields (for example `MODER`, `ODR`, `BSRR`, `IDR`, and `PUPDR` when the emitted API claims them). |
 | `uart` / `usart` | `pinTopology.routes` always; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted enable/configure/read/write path; `interruptTopology.routes` and `dmaTopology.routes` only for emitted interrupt-driven or DMA-backed APIs |
 | `spi` | `pinTopology.routes`; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted configuration or transfer path; interrupt/DMA routes only when the emitted API claims them |
 | `i2c` | `pinTopology.routes`; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted bus transaction path; interrupt/DMA routes only when the emitted API claims them |
@@ -248,7 +248,7 @@ exact naming contract:
 | `driverKind` | Intended emitted API categories |
 | --- | --- |
 | `rcc` | Per-binding clock-enable / clock-disable / reset-assert / reset-release helpers when justified by the resolved topology and lowering inputs |
-| `gpio-port` | Clock/reset bring-up helpers plus per-pin `Input` / `Output` / `Flex`-style configuration and state helpers only for the behaviors that can be lowered from explicit route controls plus register/field structure. In the first cut that means input/output mode selection, pull configuration, output set/clear, output-state reads, and input-level reads; alternate-function setup and EXTI helpers remain out of scope. |
+| `gpio-port` | Clock/reset bring-up helpers plus per-pin `Input` / `Output` / `Flex`-style configuration and state helpers only for the behaviors that can be lowered from explicit route controls plus register/field structure. In the first cut that means input/output mode selection, pull configuration, output set/clear, output-state reads, and input-level reads; alternate-function setup and EXTI helpers remain out of scope. The same API category may be justified either by a conventional GPIO block or by a composite routing/control path when the approved HAIR records make the effective writes and reads explicit. |
 | `uart` / `usart` | Bring-up helpers and only those polling / interrupt / DMA TX/RX methods whose control/data paths are explicitly modeled |
 | `spi` | Bring-up helpers and only those transfer/control methods whose clocking, enable, and data paths are explicitly modeled |
 | `i2c` | Bring-up helpers and only those bus transaction methods whose start/address/data/stop behavior is explicitly modeled |
@@ -284,6 +284,11 @@ companion emulator/state handles and their observation/control methods.
 10. Host-emulated output derives its package/crate naming from `crate.packageName`
     and `crate.crateName`; the profile does not grow separate host naming
     fields for the first cut.
+11. Async or DMA-backed UART/I2C/SPI/ADC surfaces are supported only when the
+    driver instance names the full interrupt, DMA, pin-routing, and semantic
+    lowering inputs needed for that behavior; otherwise the generator must emit
+    only the supported polling subset or fail explicitly if the requested
+    surface depends on the missing inputs.
 
 ## Failure contract
 

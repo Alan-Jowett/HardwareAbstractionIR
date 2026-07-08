@@ -91,12 +91,14 @@ cargo run -- generate svd evidence\wch\ch32v203c8t6\hair.json --output <svd-outp
 ### V-005 Embassy generation path
 
 **Purpose:** verify that repository-managed Embassy lowering still operates on
-an in-scope reference HAIR document.
+in-scope reference HAIR documents, including a composite-routing ESP32-C3
+bundle.
 
 **Command**
 
 ```powershell
 cargo run -- generate embassy evidence\texas-instruments\lm3s6965\hair.json --output-dir <crate-output-dir>
+cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-dir <crate-output-dir>
 ```
 
 **Expected result**
@@ -104,6 +106,9 @@ cargo run -- generate embassy evidence\texas-instruments\lm3s6965\hair.json --ou
 - The emitted crate contains `Cargo.toml`, `src\lib.rs`, `src\metadata.rs`,
   and generated driver modules justified by the reference document's profile
   scope.
+- The ESP32-C3 reference bundle succeeds without weakening the executable
+  lowering contract, demonstrating support for a non-STM32/TM4C GPIO/routing
+  family plus any claimed async/DMA-backed UART/I2C/SPI/ADC paths.
 
 ## 3. Artifact-level validation
 
@@ -147,6 +152,7 @@ repository contracts.
 - `evidence\st\stm32f405rgt6\generated\stm32f405rgt6.svd`
 - `evidence\st\stm32f405rgt6\generated\embassy\`
 - `evidence\st\stm32f405rgt6\generated\embassy-smoke\`
+- `evidence\espressif\esp32-c3fn4\`
 - `evidence\texas-instruments\lm3s6965\embassy-out\`
 - `evidence\texas-instruments\lm3s6965\embassy-smoke\`
 
@@ -246,6 +252,26 @@ powershell -ExecutionPolicy Bypass -File evidence\texas-instruments\lm3s6965\emb
 - This is an environment-dependent smoke check, not a universal repository
   precondition.
 
+### V-014 QEMU smoke execution for the ESP32-C3 Embassy example
+
+**Purpose:** provide an executable sanity check for the ESP32-C3 generated
+Embassy smoke project under WSL-hosted `qemu-system-riscv32`.
+
+**Command**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File evidence\espressif\esp32-c3fn4\generated\embassy-smoke\run-qemu-smoke.ps1
+```
+
+**Expected result**
+- The smoke firmware builds for `riscv32imc-unknown-none-elf`.
+- QEMU output includes the expected `PASS` confirmation text after exercising
+  generated UART0, GPIO, and interrupt-facing HAL paths.
+
+**Note**
+- This is an environment-dependent smoke check, not a universal repository
+  precondition.
+
 ## 6. Requirement-specific validation coverage
 
 ### 6.1 RQ-001 validation coverage
@@ -324,7 +350,8 @@ interrupt attribution is incomplete or ambiguous.
 
 RQ-013 is validated by V-001, V-005, V-008, V-010, and V-011. The regression
 suite, Embassy generation path, generated crate inspection, extraction review,
-and audit review jointly test the profile-derived Embassy contract.
+and audit review jointly test the profile-derived Embassy contract across both
+classic register-layout MCUs and composite-routing MCUs such as ESP32-C3.
 
 ### 6.14 RQ-014 validation coverage
 

@@ -1,0 +1,51 @@
+{
+  "documentKind": "hair-evidence-manifest",
+  "schemaVersion": "0.1.0",
+  "targetDevice": {
+    "id": "ESP32-C3FN4",
+    "name": "ESP32-C3FN4",
+    "vendor": "Espressif",
+    "family": "ESP32-C3",
+    "variant": "FN4",
+    "package": "QFN32 (5x5 mm)",
+    "architecture": "RISC-V single-core 32-bit MCU/SoC",
+    "notes": "Concrete ESP32-C3FN4 target selected explicitly by the user for the Seeed Studio XIAO ESP32C3 context. Official Seeed pages fetched during discovery confirm ESP32-C3 plus 4 MB flash board context, while the exact FN4 package selection is grounded by the user-approved target identity and the Espressif family datasheet's variant table."
+  },
+  "sources": [
+    {
+      "id": "espressif-esp32-c3-datasheet",
+      "kind": "datasheet",
+      "uri": "https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf",
+      "version": "v2.4",
+      "notes": "Official ESP32-C3 family datasheet. Primary source for device identity, package/flash variants including ESP32-C3FN4, pinout, memory summary, clocks, resets, electrical characteristics, RF characteristics, IO MUX, GPIO matrix, and interrupt matrix overview."
+    },
+    {
+      "id": "espressif-esp32-c3-trm",
+      "kind": "reference-manual",
+      "uri": "https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf",
+      "version": "v1.4",
+      "notes": "Official ESP32-C3 Technical Reference Manual. Primary source for register-level peripheral structure, memory map details, interrupts, system controller blocks, clock/reset behavior, low-power/system infrastructure, and routing fabrics."
+    },
+    {
+      "id": "espressif-esp32-c3-errata",
+      "kind": "errata",
+      "uri": "https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32c3/index.html",
+      "version": "v1.2",
+      "notes": "Official ESP32-C3 errata page. Use to challenge silicon claims and record revision-sensitive limitations or corrections before extraction finalization."
+    },
+    {
+      "id": "espressif-esp-idf-esp32c3",
+      "kind": "sdk",
+      "uri": "https://github.com/espressif/esp-idf/tree/e9da155a72624fce88b8ef2cf3cde9aee2e6067f",
+      "version": "e9da155a72624fce88b8ef2cf3cde9aee2e6067f",
+      "notes": "Commit-pinned official ESP-IDF SDK snapshot. During extraction, prefer the components/soc/esp32c3/include/soc subtree for header-level register, memory, and base-address cross-checks."
+    },
+    {
+      "id": "espressif-esp32c3-svd",
+      "kind": "svd",
+      "uri": "https://raw.githubusercontent.com/espressif/svd/be20aa12560889d6125d144cdb48cf615ac17628/svd/esp32c3.svd",
+      "version": "be20aa12560889d6125d144cdb48cf615ac17628",
+      "notes": "Commit-pinned official Espressif SVD for ESP32-C3. Useful as a machine-readable structural scaffold, but the repository warns that SVDs are still in progress and may omit peripherals, interrupts, and registers."
+    }
+  ]
+}
