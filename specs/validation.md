@@ -79,13 +79,14 @@ reference HAIR document.
 **Command**
 
 ```powershell
-cargo run -- generate svd evidence\st\stm32f405rgt6\hair.json --output <svd-output-path>
+cargo run -- generate svd evidence\wch\ch32v203c8t6\hair.json --output <svd-output-path>
 ```
 
 **Expected result**
 - The command writes one SVD document.
-- Generation preserves the declared device interrupt inventory and required CPU
-  block metadata when the input carries the necessary HAIR data.
+- Generation succeeds when the reference document carries the required CPU
+  metadata and the declared device interrupts can be attributed to peripherals
+  through explicit links or one safe same-name match.
 
 ### V-005 Embassy generation path
 
@@ -314,7 +315,8 @@ alone is not treated as full semantic readiness.
 
 RQ-012 is validated by V-001, V-004, and V-008. The regression suite, SVD
 generation path, and generated-output inspection verify the current SVD
-lowering contract on reference artifacts.
+lowering contract on reference artifacts, including explicit failure when
+interrupt attribution is incomplete or ambiguous.
 
 ### 6.13 RQ-013 validation coverage
 
@@ -331,7 +333,8 @@ contract.
 ### 6.15 RQ-015 validation coverage
 
 RQ-015 is validated by V-001, V-002, V-003, V-004, and V-005. These command
-checks cover successful execution and check-failure boundaries across the
+checks cover successful execution plus the current split between direct
+check-failure outcomes and generator/operational failures across the
 implemented CLI surface.
 
 ## 7. Requirement traceability matrix

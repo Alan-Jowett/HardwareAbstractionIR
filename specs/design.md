@@ -242,7 +242,10 @@ HAIR model to SVD output. Output is written to stdout by default or to
 `--output` when specified.
 
 The SVD path depends on explicit CPU metadata and preserves the device-level
-interrupt inventory even when peripheral linkage is incomplete.
+interrupt inventory only when each declared interrupt can be attributed either
+through explicit `interruptRefs` or through one unambiguous same-name
+peripheral match. Otherwise the generator fails explicitly rather than
+inventing or silently dropping SVD interrupt attribution.
 
 **Supports:** RQ-009, RQ-012, RQ-015
 
@@ -379,7 +382,8 @@ in the model, while the implemented CLI currently enforces schema conformance.
 
 RQ-012 is realized by the structural-layer interrupt and CPU metadata design in
 Section 3.3 and the SVD lowering design in Section 6.4. The SVD path depends
-on explicit device-level interrupt inventory and explicit CPU metadata.
+on explicit device-level interrupt inventory and explicit CPU metadata, while
+requiring safe peripheral attribution for emitted SVD interrupt blocks.
 
 ### 9.13 RQ-013 design coverage
 

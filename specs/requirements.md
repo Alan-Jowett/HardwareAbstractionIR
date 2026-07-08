@@ -19,7 +19,7 @@ The repository shall treat one top-level HAIR document as the description of
 exactly one concrete device variant.
 
 **Acceptance criteria**
-- The top-level document kind is `hair`.
+- `documentKind` is `hair`.
 - `metadata.role` is `device-variant`.
 - `structure.device` describes a single concrete device variant.
 
@@ -155,8 +155,11 @@ when the required SVD-representable data is present.
   fields, enumerated values, reset values, and access metadata when those
   concepts are representable in SVD.
 - Device interrupt inventory is taken from `structure.device.interrupts[]`.
-- Missing peripheral interrupt linkage must not erase a declared device
-  interrupt from generated SVD output.
+- Peripheral `interruptRefs` are the primary attribution path for emitting SVD
+  peripheral interrupt blocks. If a declared device interrupt is not linked,
+  generation may fall back only to one unambiguous same-name peripheral match;
+  otherwise SVD generation fails explicitly rather than silently dropping or
+  ambiguously attributing the interrupt.
 - The input document must provide explicit CPU revision, endianness, interrupt
   priority width, and core feature flags needed by CMSIS-SVD output.
 
@@ -191,9 +194,12 @@ The repository shall preserve stable high-level CLI exit semantics.
 
 **Acceptance criteria**
 - Exit `0` indicates success; for `diff`, it indicates no differences.
-- Exit `1` indicates a requested check failed, such as validation failure or a
-  diff finding.
-- Exit codes greater than `1` indicate operational failures.
+- Exit `1` indicates a requested check failed for commands that report check
+  outcomes directly, such as schema validation failure in `validate` or a diff
+  finding in `diff`.
+- Exit codes greater than `1` indicate operational or generation failures, such
+  as unreadable input, invalid git selectors, schema rejection reached through a
+  generator entry point, or generation failure.
 
 ## Non-goals in the current baseline
 

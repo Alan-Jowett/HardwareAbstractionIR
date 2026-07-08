@@ -43,7 +43,7 @@ First-cut behavior:
 - emit one SVD document to stdout by default or to `--output`
 - map the HAIR device, peripherals, interrupts, registers, fields, enumerated values, reset values, and access metadata when those concepts are representable in SVD
 - emit a complete CMSIS-SVD CPU block, including revision, endianness, MPU/FPU flags, interrupt priority bits, and the HAIR `vendorSystemTimerConfig` flag mapped to SVD `vendorSystickConfig`
-- preserve declared `structure.device.interrupts[]` as the authoritative device interrupt inventory; peripheral `interruptRefs` may refine attribution, but missing linkage must not cause a real device interrupt to disappear from the generated SVD/PAC
+- preserve declared `structure.device.interrupts[]` as the authoritative device interrupt inventory; peripheral `interruptRefs` are the primary attribution path, and the generator may fall back only to one unambiguous same-name peripheral match before failing explicitly on interrupts it cannot attribute safely
 - fail explicitly when SVD-required data is missing or when a structure that must appear in the SVD cannot be lowered safely
 
 First-cut exclusions:
@@ -101,8 +101,8 @@ Non-goals for the first cut:
 ## Exit behavior
 
 - `0`: command succeeded; for `diff`, no differences were found
-- `1`: requested check failed; for example, schema validation failed or `diff` found differences
-- `>1`: operational failure such as unreadable input, invalid git selector, or generation failure
+- `1`: requested check failed for commands that report check outcomes directly; for example, `validate` failed schema conformance or `diff` found differences
+- `>1`: operational or generation failure such as unreadable input, invalid git selector, schema rejection reached through `generate svd` / `generate embassy`, or generation failure
 
 ## Relationship to the schema
 
