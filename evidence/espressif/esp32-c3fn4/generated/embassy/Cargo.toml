@@ -1,0 +1,8 @@
+[package]
+name = "esp32c3fn4-generated"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "esp32c3fn4_generated"
+path = "src/lib.rs"

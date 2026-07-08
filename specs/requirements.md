@@ -173,6 +173,12 @@ Embassy profile contract.
 - Embassy generation requires `profiles.mcuSoc` and `profiles.embassyHal`.
 - Generated driver APIs are derived from referenced topology, semantics, and
   reachable structural data rather than a fixed universal method list.
+- Supported lowering may bind through either direct per-block register layouts
+  or composite MCU-specific routing/control fabrics when the approved HAIR
+  document makes that path explicit and structurally reachable.
+- Async and DMA-backed generated APIs are allowed only when the document
+  carries the interrupt, DMA, pin-routing, and semantic-operation/state-machine
+  facts needed to lower those behaviors deterministically.
 - Unsupported driver kinds, unresolved references, missing lowering inputs,
   and out-of-subset requests fail explicitly.
 
