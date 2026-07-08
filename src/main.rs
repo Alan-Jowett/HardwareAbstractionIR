@@ -236,6 +236,7 @@ fn generate_embassy_host_crate(document: &HairDocument, output_dir: &Path) -> Re
         &model,
         &[("host", "reserved generated host module name host")],
     )?;
+    validate_host_accessor_name_collisions(&model.drivers)?;
     let src_dir = output_dir.join("src");
     fs::create_dir_all(&src_dir)
         .with_context(|| format!("creating output directory {}", src_dir.display()))?;
@@ -2225,6 +2226,57 @@ fn validate_driver_name_collisions(drivers: &[ResolvedDriverInstance]) -> Result
             );
         }
     }
+    Ok(())
+}
+
+fn validate_host_accessor_name_collisions(drivers: &[ResolvedDriverInstance]) -> Result<()> {
+    let mut method_names = HashMap::<String, String>::from([
+        (
+            "new".to_string(),
+            "built-in HostEmulator method new".to_string(),
+        ),
+        (
+            "activate".to_string(),
+            "built-in HostEmulator method activate".to_string(),
+        ),
+        (
+            "activate_scoped".to_string(),
+            "built-in HostEmulator method activate_scoped".to_string(),
+        ),
+        (
+            "clear_active".to_string(),
+            "built-in HostEmulator method clear_active".to_string(),
+        ),
+        (
+            "state".to_string(),
+            "built-in HostEmulator method state".to_string(),
+        ),
+    ]);
+
+    for driver in drivers {
+        let accessor = to_rust_method_name(&driver.name);
+        let accessor_owner = format!("driver {} accessor", driver.id);
+        if let Some(previous) = method_names.insert(accessor.clone(), accessor_owner) {
+            bail!(
+                "{} collides with {} as HostEmulator method {}",
+                driver.id,
+                previous,
+                accessor
+            );
+        }
+
+        let emulator_accessor = format!("{accessor}_emulator");
+        let emulator_owner = format!("driver {} emulator accessor", driver.id);
+        if let Some(previous) = method_names.insert(emulator_accessor.clone(), emulator_owner) {
+            bail!(
+                "{} collides with {} as HostEmulator method {}",
+                driver.id,
+                previous,
+                emulator_accessor
+            );
+        }
+    }
+
     Ok(())
 }
 
@@ -8957,6 +9009,40 @@ fn host_emulator_wires_hal_and_companion_state() {
                 .to_string()
                 .contains("reserved generated host module name host")
         );
+    }
+
+    #[test]
+    fn generate_embassy_host_rejects_colliding_accessor_names() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        drivers[0]
+            .as_object_mut()
+            .expect("rcc driver")
+            .insert("name".to_string(), Value::String("FooBar".to_string()));
+        drivers[1]
+            .as_object_mut()
+            .expect("gpio driver")
+            .insert("name".to_string(), Value::String("FooBAR".to_string()));
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("colliding accessor fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error = generate_embassy_host_crate(&validated, temp.path())
+            .expect_err("host generation should fail");
+        assert!(error.to_string().contains("HostEmulator method foo_bar"));
     }
 
     #[test]
