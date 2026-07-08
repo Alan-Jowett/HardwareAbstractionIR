@@ -72082,6 +72082,3291 @@
       }
     ]
   },
+  "normalization": {
+    "canonicalTerms": [
+      {
+        "id": "term.peripheral.clock-controller",
+        "name": "Clock controller",
+        "scope": "peripheral"
+      },
+      {
+        "id": "term.peripheral.dma-controller",
+        "name": "DMA controller",
+        "scope": "peripheral"
+      },
+      {
+        "id": "term.peripheral.gpio-port",
+        "name": "GPIO port",
+        "scope": "peripheral"
+      },
+      {
+        "id": "term.peripheral.usart",
+        "name": "USART",
+        "scope": "peripheral"
+      },
+      {
+        "id": "term.peripheral.uart",
+        "name": "UART",
+        "scope": "peripheral"
+      },
+      {
+        "id": "term.peripheral.spi",
+        "name": "SPI controller",
+        "scope": "peripheral"
+      },
+      {
+        "id": "term.peripheral.i2c",
+        "name": "I2C controller",
+        "scope": "peripheral"
+      },
+      {
+        "id": "term.peripheral.timer-advanced",
+        "name": "Advanced timer",
+        "scope": "peripheral"
+      },
+      {
+        "id": "term.peripheral.pwm",
+        "name": "PWM controller",
+        "scope": "peripheral"
+      },
+      {
+        "id": "term.peripheral.timer-general",
+        "name": "General-purpose timer",
+        "scope": "peripheral"
+      },
+      {
+        "id": "term.peripheral.adc",
+        "name": "ADC",
+        "scope": "peripheral"
+      },
+      {
+        "id": "term.register.control",
+        "name": "Control register",
+        "scope": "register"
+      },
+      {
+        "id": "term.field.enable",
+        "name": "Enable",
+        "scope": "field"
+      },
+      {
+        "id": "term.register.clock-enable",
+        "name": "Clock-enable register",
+        "scope": "register"
+      },
+      {
+        "id": "term.field.clock-enable",
+        "name": "Clock enable",
+        "scope": "field"
+      },
+      {
+        "id": "term.register.counter",
+        "name": "Counter register",
+        "scope": "register"
+      },
+      {
+        "id": "term.register.prescaler",
+        "name": "Prescaler register",
+        "scope": "register"
+      },
+      {
+        "id": "term.field.prescaler",
+        "name": "Prescaler",
+        "scope": "field"
+      },
+      {
+        "id": "term.register.auto-reload",
+        "name": "Auto-reload register",
+        "scope": "register"
+      },
+      {
+        "id": "term.field.counter-value",
+        "name": "Counter value",
+        "scope": "field"
+      },
+      {
+        "id": "term.register.config",
+        "name": "Configuration register",
+        "scope": "register"
+      },
+      {
+        "id": "term.register.data",
+        "name": "Data register",
+        "scope": "register"
+      },
+      {
+        "id": "term.register.baud-rate",
+        "name": "Baud-rate register",
+        "scope": "register"
+      },
+      {
+        "id": "term.field.busy",
+        "name": "Busy",
+        "scope": "field"
+      },
+      {
+        "id": "term.register.reset-control",
+        "name": "Reset-control register",
+        "scope": "register"
+      },
+      {
+        "id": "term.field.reset-assert",
+        "name": "Reset assert",
+        "scope": "field"
+      },
+      {
+        "id": "term.register.interrupt-enable",
+        "name": "Interrupt-enable register",
+        "scope": "register"
+      },
+      {
+        "id": "term.register.interrupt-status",
+        "name": "Interrupt-status register",
+        "scope": "register"
+      }
+    ],
+    "mappings": [
+      {
+        "id": "norm.periph.rcc",
+        "name": "RCC canonical mapping",
+        "targetRef": "periph.rcc",
+        "canonicalTermRefs": [
+          "term.peripheral.clock-controller"
+        ],
+        "vendorNames": [
+          "RCC"
+        ]
+      },
+      {
+        "id": "norm.periph.dma1",
+        "name": "DMA1 canonical mapping",
+        "targetRef": "periph.dma1",
+        "canonicalTermRefs": [
+          "term.peripheral.dma-controller"
+        ],
+        "vendorNames": [
+          "DMA1"
+        ]
+      },
+      {
+        "id": "norm.periph.gpioa",
+        "name": "GPIOA canonical mapping",
+        "targetRef": "periph.gpioa",
+        "canonicalTermRefs": [
+          "term.peripheral.gpio-port"
+        ],
+        "vendorNames": [
+          "GPIOA"
+        ]
+      },
+      {
+        "id": "norm.periph.gpiob",
+        "name": "GPIOB canonical mapping",
+        "targetRef": "periph.gpiob",
+        "canonicalTermRefs": [
+          "term.peripheral.gpio-port"
+        ],
+        "vendorNames": [
+          "GPIOB"
+        ]
+      },
+      {
+        "id": "norm.periph.gpioc",
+        "name": "GPIOC canonical mapping",
+        "targetRef": "periph.gpioc",
+        "canonicalTermRefs": [
+          "term.peripheral.gpio-port"
+        ],
+        "vendorNames": [
+          "GPIOC"
+        ]
+      },
+      {
+        "id": "norm.periph.gpiod",
+        "name": "GPIOD canonical mapping",
+        "targetRef": "periph.gpiod",
+        "canonicalTermRefs": [
+          "term.peripheral.gpio-port"
+        ],
+        "vendorNames": [
+          "GPIOD"
+        ]
+      },
+      {
+        "id": "norm.periph.usart1",
+        "name": "USART1 canonical mapping",
+        "targetRef": "periph.usart1",
+        "canonicalTermRefs": [
+          "term.peripheral.usart"
+        ],
+        "vendorNames": [
+          "USART1"
+        ]
+      },
+      {
+        "id": "norm.periph.usart2",
+        "name": "USART2 canonical mapping",
+        "targetRef": "periph.usart2",
+        "canonicalTermRefs": [
+          "term.peripheral.usart"
+        ],
+        "vendorNames": [
+          "USART2"
+        ]
+      },
+      {
+        "id": "norm.periph.usart3",
+        "name": "USART3 canonical mapping",
+        "targetRef": "periph.usart3",
+        "canonicalTermRefs": [
+          "term.peripheral.usart"
+        ],
+        "vendorNames": [
+          "USART3"
+        ]
+      },
+      {
+        "id": "norm.periph.uart4",
+        "name": "UART4 canonical mapping",
+        "targetRef": "periph.uart4",
+        "canonicalTermRefs": [
+          "term.peripheral.uart"
+        ],
+        "vendorNames": [
+          "UART4"
+        ]
+      },
+      {
+        "id": "norm.periph.spi1",
+        "name": "SPI1 canonical mapping",
+        "targetRef": "periph.spi1",
+        "canonicalTermRefs": [
+          "term.peripheral.spi"
+        ],
+        "vendorNames": [
+          "SPI1"
+        ]
+      },
+      {
+        "id": "norm.periph.spi2",
+        "name": "SPI2 canonical mapping",
+        "targetRef": "periph.spi2",
+        "canonicalTermRefs": [
+          "term.peripheral.spi"
+        ],
+        "vendorNames": [
+          "SPI2"
+        ]
+      },
+      {
+        "id": "norm.periph.i2c1",
+        "name": "I2C1 canonical mapping",
+        "targetRef": "periph.i2c1",
+        "canonicalTermRefs": [
+          "term.peripheral.i2c"
+        ],
+        "vendorNames": [
+          "I2C1"
+        ]
+      },
+      {
+        "id": "norm.periph.i2c2",
+        "name": "I2C2 canonical mapping",
+        "targetRef": "periph.i2c2",
+        "canonicalTermRefs": [
+          "term.peripheral.i2c"
+        ],
+        "vendorNames": [
+          "I2C2"
+        ]
+      },
+      {
+        "id": "norm.periph.tim1",
+        "name": "TIM1 canonical mapping",
+        "targetRef": "periph.tim1",
+        "canonicalTermRefs": [
+          "term.peripheral.timer-advanced",
+          "term.peripheral.pwm"
+        ],
+        "vendorNames": [
+          "TIM1"
+        ]
+      },
+      {
+        "id": "norm.periph.tim2",
+        "name": "TIM2 canonical mapping",
+        "targetRef": "periph.tim2",
+        "canonicalTermRefs": [
+          "term.peripheral.timer-general",
+          "term.peripheral.pwm"
+        ],
+        "vendorNames": [
+          "TIM2"
+        ]
+      },
+      {
+        "id": "norm.periph.tim3",
+        "name": "TIM3 canonical mapping",
+        "targetRef": "periph.tim3",
+        "canonicalTermRefs": [
+          "term.peripheral.timer-general",
+          "term.peripheral.pwm"
+        ],
+        "vendorNames": [
+          "TIM3"
+        ]
+      },
+      {
+        "id": "norm.periph.tim4",
+        "name": "TIM4 canonical mapping",
+        "targetRef": "periph.tim4",
+        "canonicalTermRefs": [
+          "term.peripheral.timer-general",
+          "term.peripheral.pwm"
+        ],
+        "vendorNames": [
+          "TIM4"
+        ]
+      },
+      {
+        "id": "norm.periph.adc1",
+        "name": "ADC1 canonical mapping",
+        "targetRef": "periph.adc1",
+        "canonicalTermRefs": [
+          "term.peripheral.adc"
+        ],
+        "vendorNames": [
+          "ADC1"
+        ]
+      },
+      {
+        "id": "norm.periph.adc2",
+        "name": "ADC2 canonical mapping",
+        "targetRef": "periph.adc2",
+        "canonicalTermRefs": [
+          "term.peripheral.adc"
+        ],
+        "vendorNames": [
+          "ADC2"
+        ]
+      },
+      {
+        "id": "norm.reg.tim2.ctlr1",
+        "name": "CTLR1 canonical mapping",
+        "targetRef": "reg.tim2.ctlr1",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR1"
+        ]
+      },
+      {
+        "id": "norm.field.tim2.ctlr1.cen",
+        "name": "CEN canonical mapping",
+        "targetRef": "field.tim2.ctlr1.cen",
+        "canonicalTermRefs": [
+          "term.field.enable"
+        ],
+        "vendorNames": [
+          "CEN"
+        ]
+      },
+      {
+        "id": "norm.reg.tim2.ctlr2",
+        "name": "CTLR2 canonical mapping",
+        "targetRef": "reg.tim2.ctlr2",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR2"
+        ]
+      },
+      {
+        "id": "norm.reg.tim2.dmaintenr",
+        "name": "DMAINTENR canonical mapping",
+        "targetRef": "reg.tim2.dmaintenr",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "DMAINTENR"
+        ]
+      },
+      {
+        "id": "norm.field.tim_dmaintenr.uie",
+        "name": "UIE canonical mapping",
+        "targetRef": "field.tim_dmaintenr.uie",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "UIE"
+        ]
+      },
+      {
+        "id": "norm.field.tim_dmaintenr.cc1ie",
+        "name": "CC1IE canonical mapping",
+        "targetRef": "field.tim_dmaintenr.cc1ie",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "CC1IE"
+        ]
+      },
+      {
+        "id": "norm.field.tim_dmaintenr.cc2ie",
+        "name": "CC2IE canonical mapping",
+        "targetRef": "field.tim_dmaintenr.cc2ie",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "CC2IE"
+        ]
+      },
+      {
+        "id": "norm.field.tim_dmaintenr.cc3ie",
+        "name": "CC3IE canonical mapping",
+        "targetRef": "field.tim_dmaintenr.cc3ie",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "CC3IE"
+        ]
+      },
+      {
+        "id": "norm.field.tim_dmaintenr.cc4ie",
+        "name": "CC4IE canonical mapping",
+        "targetRef": "field.tim_dmaintenr.cc4ie",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "CC4IE"
+        ]
+      },
+      {
+        "id": "norm.field.tim_dmaintenr.comie",
+        "name": "COMIE canonical mapping",
+        "targetRef": "field.tim_dmaintenr.comie",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "COMIE"
+        ]
+      },
+      {
+        "id": "norm.field.tim_dmaintenr.tie",
+        "name": "TIE canonical mapping",
+        "targetRef": "field.tim_dmaintenr.tie",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TIE"
+        ]
+      },
+      {
+        "id": "norm.field.tim_dmaintenr.bie",
+        "name": "BIE canonical mapping",
+        "targetRef": "field.tim_dmaintenr.bie",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "BIE"
+        ]
+      },
+      {
+        "id": "norm.field.tim_dmaintenr.ude",
+        "name": "UDE canonical mapping",
+        "targetRef": "field.tim_dmaintenr.ude",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "UDE"
+        ]
+      },
+      {
+        "id": "norm.field.tim_dmaintenr.cc1de",
+        "name": "CC1DE canonical mapping",
+        "targetRef": "field.tim_dmaintenr.cc1de",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "CC1DE"
+        ]
+      },
+      {
+        "id": "norm.field.tim_dmaintenr.cc2de",
+        "name": "CC2DE canonical mapping",
+        "targetRef": "field.tim_dmaintenr.cc2de",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "CC2DE"
+        ]
+      },
+      {
+        "id": "norm.field.tim_dmaintenr.cc3de",
+        "name": "CC3DE canonical mapping",
+        "targetRef": "field.tim_dmaintenr.cc3de",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "CC3DE"
+        ]
+      },
+      {
+        "id": "norm.field.tim_dmaintenr.cc4de",
+        "name": "CC4DE canonical mapping",
+        "targetRef": "field.tim_dmaintenr.cc4de",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "CC4DE"
+        ]
+      },
+      {
+        "id": "norm.field.tim_dmaintenr.comde",
+        "name": "COMDE canonical mapping",
+        "targetRef": "field.tim_dmaintenr.comde",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "COMDE"
+        ]
+      },
+      {
+        "id": "norm.field.tim_dmaintenr.tde",
+        "name": "TDE canonical mapping",
+        "targetRef": "field.tim_dmaintenr.tde",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TDE"
+        ]
+      },
+      {
+        "id": "norm.reg.tim2.cnt",
+        "name": "CNT canonical mapping",
+        "targetRef": "reg.tim2.cnt",
+        "canonicalTermRefs": [
+          "term.register.counter"
+        ],
+        "vendorNames": [
+          "CNT"
+        ]
+      },
+      {
+        "id": "norm.reg.tim2.psc",
+        "name": "PSC canonical mapping",
+        "targetRef": "reg.tim2.psc",
+        "canonicalTermRefs": [
+          "term.register.prescaler"
+        ],
+        "vendorNames": [
+          "PSC"
+        ]
+      },
+      {
+        "id": "norm.field.tim_psc.psc",
+        "name": "PSC canonical mapping",
+        "targetRef": "field.tim_psc.psc",
+        "canonicalTermRefs": [
+          "term.field.prescaler"
+        ],
+        "vendorNames": [
+          "PSC"
+        ]
+      },
+      {
+        "id": "norm.reg.tim2.atrlr",
+        "name": "ATRLR canonical mapping",
+        "targetRef": "reg.tim2.atrlr",
+        "canonicalTermRefs": [
+          "term.register.auto-reload"
+        ],
+        "vendorNames": [
+          "ATRLR"
+        ]
+      },
+      {
+        "id": "norm.reg.tim3.ctlr1",
+        "name": "CTLR1 canonical mapping",
+        "targetRef": "reg.tim3.ctlr1",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR1"
+        ]
+      },
+      {
+        "id": "norm.field.tim3.ctlr1.cen",
+        "name": "CEN canonical mapping",
+        "targetRef": "field.tim3.ctlr1.cen",
+        "canonicalTermRefs": [
+          "term.field.enable"
+        ],
+        "vendorNames": [
+          "CEN"
+        ]
+      },
+      {
+        "id": "norm.reg.tim3.ctlr2",
+        "name": "CTLR2 canonical mapping",
+        "targetRef": "reg.tim3.ctlr2",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR2"
+        ]
+      },
+      {
+        "id": "norm.reg.tim3.dmaintenr",
+        "name": "DMAINTENR canonical mapping",
+        "targetRef": "reg.tim3.dmaintenr",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "DMAINTENR"
+        ]
+      },
+      {
+        "id": "norm.reg.tim3.cnt",
+        "name": "CNT canonical mapping",
+        "targetRef": "reg.tim3.cnt",
+        "canonicalTermRefs": [
+          "term.register.counter"
+        ],
+        "vendorNames": [
+          "CNT"
+        ]
+      },
+      {
+        "id": "norm.field.tim_cnt.cnt",
+        "name": "CNT canonical mapping",
+        "targetRef": "field.tim_cnt.cnt",
+        "canonicalTermRefs": [
+          "term.field.counter-value"
+        ],
+        "vendorNames": [
+          "CNT"
+        ]
+      },
+      {
+        "id": "norm.reg.tim3.psc",
+        "name": "PSC canonical mapping",
+        "targetRef": "reg.tim3.psc",
+        "canonicalTermRefs": [
+          "term.register.prescaler"
+        ],
+        "vendorNames": [
+          "PSC"
+        ]
+      },
+      {
+        "id": "norm.reg.tim3.atrlr",
+        "name": "ATRLR canonical mapping",
+        "targetRef": "reg.tim3.atrlr",
+        "canonicalTermRefs": [
+          "term.register.auto-reload"
+        ],
+        "vendorNames": [
+          "ATRLR"
+        ]
+      },
+      {
+        "id": "norm.reg.tim4.ctlr1",
+        "name": "CTLR1 canonical mapping",
+        "targetRef": "reg.tim4.ctlr1",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR1"
+        ]
+      },
+      {
+        "id": "norm.field.tim4.ctlr1.cen",
+        "name": "CEN canonical mapping",
+        "targetRef": "field.tim4.ctlr1.cen",
+        "canonicalTermRefs": [
+          "term.field.enable"
+        ],
+        "vendorNames": [
+          "CEN"
+        ]
+      },
+      {
+        "id": "norm.reg.tim4.ctlr2",
+        "name": "CTLR2 canonical mapping",
+        "targetRef": "reg.tim4.ctlr2",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR2"
+        ]
+      },
+      {
+        "id": "norm.reg.tim4.dmaintenr",
+        "name": "DMAINTENR canonical mapping",
+        "targetRef": "reg.tim4.dmaintenr",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "DMAINTENR"
+        ]
+      },
+      {
+        "id": "norm.reg.tim4.cnt",
+        "name": "CNT canonical mapping",
+        "targetRef": "reg.tim4.cnt",
+        "canonicalTermRefs": [
+          "term.register.counter"
+        ],
+        "vendorNames": [
+          "CNT"
+        ]
+      },
+      {
+        "id": "norm.reg.tim4.psc",
+        "name": "PSC canonical mapping",
+        "targetRef": "reg.tim4.psc",
+        "canonicalTermRefs": [
+          "term.register.prescaler"
+        ],
+        "vendorNames": [
+          "PSC"
+        ]
+      },
+      {
+        "id": "norm.reg.tim4.atrlr",
+        "name": "ATRLR canonical mapping",
+        "targetRef": "reg.tim4.atrlr",
+        "canonicalTermRefs": [
+          "term.register.auto-reload"
+        ],
+        "vendorNames": [
+          "ATRLR"
+        ]
+      },
+      {
+        "id": "norm.reg.wwdg.cfgr",
+        "name": "CFGR canonical mapping",
+        "targetRef": "reg.wwdg.cfgr",
+        "canonicalTermRefs": [
+          "term.register.config"
+        ],
+        "vendorNames": [
+          "CFGR"
+        ]
+      },
+      {
+        "id": "norm.reg.iwdg.pscr",
+        "name": "PSCR canonical mapping",
+        "targetRef": "reg.iwdg.pscr",
+        "canonicalTermRefs": [
+          "term.register.prescaler"
+        ],
+        "vendorNames": [
+          "PSCR"
+        ]
+      },
+      {
+        "id": "norm.field.iwdg_pscr.pr",
+        "name": "PR canonical mapping",
+        "targetRef": "field.iwdg_pscr.pr",
+        "canonicalTermRefs": [
+          "term.field.prescaler"
+        ],
+        "vendorNames": [
+          "PR"
+        ]
+      },
+      {
+        "id": "norm.reg.spi2.ctlr1",
+        "name": "CTLR1 canonical mapping",
+        "targetRef": "reg.spi2.ctlr1",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR1"
+        ]
+      },
+      {
+        "id": "norm.reg.spi2.ctlr2",
+        "name": "CTLR2 canonical mapping",
+        "targetRef": "reg.spi2.ctlr2",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR2"
+        ]
+      },
+      {
+        "id": "norm.field.spi_statr.txe",
+        "name": "TXE canonical mapping",
+        "targetRef": "field.spi_statr.txe",
+        "canonicalTermRefs": [
+          "term.field.enable"
+        ],
+        "vendorNames": [
+          "TXE"
+        ]
+      },
+      {
+        "id": "norm.reg.spi2.datar",
+        "name": "DATAR canonical mapping",
+        "targetRef": "reg.spi2.datar",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DATAR"
+        ]
+      },
+      {
+        "id": "norm.field.usart_statr.txe",
+        "name": "TXE canonical mapping",
+        "targetRef": "field.usart_statr.txe",
+        "canonicalTermRefs": [
+          "term.field.enable"
+        ],
+        "vendorNames": [
+          "TXE"
+        ]
+      },
+      {
+        "id": "norm.reg.usart2.datar",
+        "name": "DATAR canonical mapping",
+        "targetRef": "reg.usart2.datar",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DATAR"
+        ]
+      },
+      {
+        "id": "norm.reg.usart2.brr",
+        "name": "BRR canonical mapping",
+        "targetRef": "reg.usart2.brr",
+        "canonicalTermRefs": [
+          "term.register.baud-rate"
+        ],
+        "vendorNames": [
+          "BRR"
+        ]
+      },
+      {
+        "id": "norm.reg.usart2.ctlr1",
+        "name": "CTLR1 canonical mapping",
+        "targetRef": "reg.usart2.ctlr1",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR1"
+        ]
+      },
+      {
+        "id": "norm.field.usart_ctlr1.ue",
+        "name": "UE canonical mapping",
+        "targetRef": "field.usart_ctlr1.ue",
+        "canonicalTermRefs": [
+          "term.field.enable"
+        ],
+        "vendorNames": [
+          "UE"
+        ]
+      },
+      {
+        "id": "norm.reg.usart2.ctlr2",
+        "name": "CTLR2 canonical mapping",
+        "targetRef": "reg.usart2.ctlr2",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR2"
+        ]
+      },
+      {
+        "id": "norm.reg.usart2.ctlr3",
+        "name": "CTLR3 canonical mapping",
+        "targetRef": "reg.usart2.ctlr3",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR3"
+        ]
+      },
+      {
+        "id": "norm.reg.usart3.datar",
+        "name": "DATAR canonical mapping",
+        "targetRef": "reg.usart3.datar",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DATAR"
+        ]
+      },
+      {
+        "id": "norm.reg.usart3.brr",
+        "name": "BRR canonical mapping",
+        "targetRef": "reg.usart3.brr",
+        "canonicalTermRefs": [
+          "term.register.baud-rate"
+        ],
+        "vendorNames": [
+          "BRR"
+        ]
+      },
+      {
+        "id": "norm.reg.usart3.ctlr1",
+        "name": "CTLR1 canonical mapping",
+        "targetRef": "reg.usart3.ctlr1",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR1"
+        ]
+      },
+      {
+        "id": "norm.reg.usart3.ctlr2",
+        "name": "CTLR2 canonical mapping",
+        "targetRef": "reg.usart3.ctlr2",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR2"
+        ]
+      },
+      {
+        "id": "norm.reg.usart3.ctlr3",
+        "name": "CTLR3 canonical mapping",
+        "targetRef": "reg.usart3.ctlr3",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR3"
+        ]
+      },
+      {
+        "id": "norm.reg.uart4.datar",
+        "name": "DATAR canonical mapping",
+        "targetRef": "reg.uart4.datar",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DATAR"
+        ]
+      },
+      {
+        "id": "norm.reg.uart4.brr",
+        "name": "BRR canonical mapping",
+        "targetRef": "reg.uart4.brr",
+        "canonicalTermRefs": [
+          "term.register.baud-rate"
+        ],
+        "vendorNames": [
+          "BRR"
+        ]
+      },
+      {
+        "id": "norm.reg.uart4.ctlr1",
+        "name": "CTLR1 canonical mapping",
+        "targetRef": "reg.uart4.ctlr1",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR1"
+        ]
+      },
+      {
+        "id": "norm.reg.uart4.ctlr2",
+        "name": "CTLR2 canonical mapping",
+        "targetRef": "reg.uart4.ctlr2",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR2"
+        ]
+      },
+      {
+        "id": "norm.reg.uart4.ctlr3",
+        "name": "CTLR3 canonical mapping",
+        "targetRef": "reg.uart4.ctlr3",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR3"
+        ]
+      },
+      {
+        "id": "norm.reg.i2c1.ctlr1",
+        "name": "CTLR1 canonical mapping",
+        "targetRef": "reg.i2c1.ctlr1",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR1"
+        ]
+      },
+      {
+        "id": "norm.reg.i2c1.ctlr2",
+        "name": "CTLR2 canonical mapping",
+        "targetRef": "reg.i2c1.ctlr2",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR2"
+        ]
+      },
+      {
+        "id": "norm.reg.i2c1.datar",
+        "name": "DATAR canonical mapping",
+        "targetRef": "reg.i2c1.datar",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DATAR"
+        ]
+      },
+      {
+        "id": "norm.field.i2c_star1.txe",
+        "name": "TXE canonical mapping",
+        "targetRef": "field.i2c_star1.txe",
+        "canonicalTermRefs": [
+          "term.field.enable"
+        ],
+        "vendorNames": [
+          "TXE"
+        ]
+      },
+      {
+        "id": "norm.field.i2c_star2.busy",
+        "name": "BUSY canonical mapping",
+        "targetRef": "field.i2c_star2.busy",
+        "canonicalTermRefs": [
+          "term.field.busy"
+        ],
+        "vendorNames": [
+          "BUSY"
+        ]
+      },
+      {
+        "id": "norm.reg.i2c2.ctlr1",
+        "name": "CTLR1 canonical mapping",
+        "targetRef": "reg.i2c2.ctlr1",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR1"
+        ]
+      },
+      {
+        "id": "norm.reg.i2c2.ctlr2",
+        "name": "CTLR2 canonical mapping",
+        "targetRef": "reg.i2c2.ctlr2",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR2"
+        ]
+      },
+      {
+        "id": "norm.reg.i2c2.datar",
+        "name": "DATAR canonical mapping",
+        "targetRef": "reg.i2c2.datar",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DATAR"
+        ]
+      },
+      {
+        "id": "norm.reg.can1.intenr",
+        "name": "INTENR canonical mapping",
+        "targetRef": "reg.can1.intenr",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "INTENR"
+        ]
+      },
+      {
+        "id": "norm.field.can_intenr.tmeie",
+        "name": "TMEIE canonical mapping",
+        "targetRef": "field.can_intenr.tmeie",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TMEIE"
+        ]
+      },
+      {
+        "id": "norm.field.can_intenr.fmpie0",
+        "name": "FMPIE0 canonical mapping",
+        "targetRef": "field.can_intenr.fmpie0",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "FMPIE0"
+        ]
+      },
+      {
+        "id": "norm.field.can_intenr.ffie0",
+        "name": "FFIE0 canonical mapping",
+        "targetRef": "field.can_intenr.ffie0",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "FFIE0"
+        ]
+      },
+      {
+        "id": "norm.field.can_intenr.fovie0",
+        "name": "FOVIE0 canonical mapping",
+        "targetRef": "field.can_intenr.fovie0",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "FOVIE0"
+        ]
+      },
+      {
+        "id": "norm.field.can_intenr.fmpie1",
+        "name": "FMPIE1 canonical mapping",
+        "targetRef": "field.can_intenr.fmpie1",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "FMPIE1"
+        ]
+      },
+      {
+        "id": "norm.field.can_intenr.ffie1",
+        "name": "FFIE1 canonical mapping",
+        "targetRef": "field.can_intenr.ffie1",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "FFIE1"
+        ]
+      },
+      {
+        "id": "norm.field.can_intenr.fovie1",
+        "name": "FOVIE1 canonical mapping",
+        "targetRef": "field.can_intenr.fovie1",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "FOVIE1"
+        ]
+      },
+      {
+        "id": "norm.field.can_intenr.ewgie",
+        "name": "EWGIE canonical mapping",
+        "targetRef": "field.can_intenr.ewgie",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "EWGIE"
+        ]
+      },
+      {
+        "id": "norm.field.can_intenr.epvie",
+        "name": "EPVIE canonical mapping",
+        "targetRef": "field.can_intenr.epvie",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "EPVIE"
+        ]
+      },
+      {
+        "id": "norm.field.can_intenr.bofie",
+        "name": "BOFIE canonical mapping",
+        "targetRef": "field.can_intenr.bofie",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "BOFIE"
+        ]
+      },
+      {
+        "id": "norm.field.can_intenr.lecie",
+        "name": "LECIE canonical mapping",
+        "targetRef": "field.can_intenr.lecie",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "LECIE"
+        ]
+      },
+      {
+        "id": "norm.field.can_intenr.errie",
+        "name": "ERRIE canonical mapping",
+        "targetRef": "field.can_intenr.errie",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "ERRIE"
+        ]
+      },
+      {
+        "id": "norm.field.can_intenr.wkuie",
+        "name": "WKUIE canonical mapping",
+        "targetRef": "field.can_intenr.wkuie",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "WKUIE"
+        ]
+      },
+      {
+        "id": "norm.field.can_intenr.slkie",
+        "name": "SLKIE canonical mapping",
+        "targetRef": "field.can_intenr.slkie",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "SLKIE"
+        ]
+      },
+      {
+        "id": "norm.reg.exti.intenr",
+        "name": "INTENR canonical mapping",
+        "targetRef": "reg.exti.intenr",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "INTENR"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr0",
+        "name": "MR0 canonical mapping",
+        "targetRef": "field.exti_intenr.mr0",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR0"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr1",
+        "name": "MR1 canonical mapping",
+        "targetRef": "field.exti_intenr.mr1",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR1"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr2",
+        "name": "MR2 canonical mapping",
+        "targetRef": "field.exti_intenr.mr2",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR2"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr3",
+        "name": "MR3 canonical mapping",
+        "targetRef": "field.exti_intenr.mr3",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR3"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr4",
+        "name": "MR4 canonical mapping",
+        "targetRef": "field.exti_intenr.mr4",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR4"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr5",
+        "name": "MR5 canonical mapping",
+        "targetRef": "field.exti_intenr.mr5",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR5"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr6",
+        "name": "MR6 canonical mapping",
+        "targetRef": "field.exti_intenr.mr6",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR6"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr7",
+        "name": "MR7 canonical mapping",
+        "targetRef": "field.exti_intenr.mr7",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR7"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr8",
+        "name": "MR8 canonical mapping",
+        "targetRef": "field.exti_intenr.mr8",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR8"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr9",
+        "name": "MR9 canonical mapping",
+        "targetRef": "field.exti_intenr.mr9",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR9"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr10",
+        "name": "MR10 canonical mapping",
+        "targetRef": "field.exti_intenr.mr10",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR10"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr11",
+        "name": "MR11 canonical mapping",
+        "targetRef": "field.exti_intenr.mr11",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR11"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr12",
+        "name": "MR12 canonical mapping",
+        "targetRef": "field.exti_intenr.mr12",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR12"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr13",
+        "name": "MR13 canonical mapping",
+        "targetRef": "field.exti_intenr.mr13",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR13"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr14",
+        "name": "MR14 canonical mapping",
+        "targetRef": "field.exti_intenr.mr14",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR14"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr15",
+        "name": "MR15 canonical mapping",
+        "targetRef": "field.exti_intenr.mr15",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR15"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr16",
+        "name": "MR16 canonical mapping",
+        "targetRef": "field.exti_intenr.mr16",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR16"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr17",
+        "name": "MR17 canonical mapping",
+        "targetRef": "field.exti_intenr.mr17",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR17"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr18",
+        "name": "MR18 canonical mapping",
+        "targetRef": "field.exti_intenr.mr18",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR18"
+        ]
+      },
+      {
+        "id": "norm.field.exti_intenr.mr19",
+        "name": "MR19 canonical mapping",
+        "targetRef": "field.exti_intenr.mr19",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR19"
+        ]
+      },
+      {
+        "id": "norm.reg.exti.evenr",
+        "name": "EVENR canonical mapping",
+        "targetRef": "reg.exti.evenr",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "EVENR"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr0",
+        "name": "MR0 canonical mapping",
+        "targetRef": "field.exti_evenr.mr0",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR0"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr1",
+        "name": "MR1 canonical mapping",
+        "targetRef": "field.exti_evenr.mr1",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR1"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr2",
+        "name": "MR2 canonical mapping",
+        "targetRef": "field.exti_evenr.mr2",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR2"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr3",
+        "name": "MR3 canonical mapping",
+        "targetRef": "field.exti_evenr.mr3",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR3"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr4",
+        "name": "MR4 canonical mapping",
+        "targetRef": "field.exti_evenr.mr4",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR4"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr5",
+        "name": "MR5 canonical mapping",
+        "targetRef": "field.exti_evenr.mr5",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR5"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr6",
+        "name": "MR6 canonical mapping",
+        "targetRef": "field.exti_evenr.mr6",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR6"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr7",
+        "name": "MR7 canonical mapping",
+        "targetRef": "field.exti_evenr.mr7",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR7"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr8",
+        "name": "MR8 canonical mapping",
+        "targetRef": "field.exti_evenr.mr8",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR8"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr9",
+        "name": "MR9 canonical mapping",
+        "targetRef": "field.exti_evenr.mr9",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR9"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr10",
+        "name": "MR10 canonical mapping",
+        "targetRef": "field.exti_evenr.mr10",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR10"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr11",
+        "name": "MR11 canonical mapping",
+        "targetRef": "field.exti_evenr.mr11",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR11"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr12",
+        "name": "MR12 canonical mapping",
+        "targetRef": "field.exti_evenr.mr12",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR12"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr13",
+        "name": "MR13 canonical mapping",
+        "targetRef": "field.exti_evenr.mr13",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR13"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr14",
+        "name": "MR14 canonical mapping",
+        "targetRef": "field.exti_evenr.mr14",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR14"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr15",
+        "name": "MR15 canonical mapping",
+        "targetRef": "field.exti_evenr.mr15",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR15"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr16",
+        "name": "MR16 canonical mapping",
+        "targetRef": "field.exti_evenr.mr16",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR16"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr17",
+        "name": "MR17 canonical mapping",
+        "targetRef": "field.exti_evenr.mr17",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR17"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr18",
+        "name": "MR18 canonical mapping",
+        "targetRef": "field.exti_evenr.mr18",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR18"
+        ]
+      },
+      {
+        "id": "norm.field.exti_evenr.mr19",
+        "name": "MR19 canonical mapping",
+        "targetRef": "field.exti_evenr.mr19",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "MR19"
+        ]
+      },
+      {
+        "id": "norm.reg.exti.rtenr",
+        "name": "RTENR canonical mapping",
+        "targetRef": "reg.exti.rtenr",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "RTENR"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr0",
+        "name": "TR0 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr0",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR0"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr1",
+        "name": "TR1 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr1",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR1"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr2",
+        "name": "TR2 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr2",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR2"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr3",
+        "name": "TR3 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr3",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR3"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr4",
+        "name": "TR4 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr4",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR4"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr5",
+        "name": "TR5 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr5",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR5"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr6",
+        "name": "TR6 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr6",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR6"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr7",
+        "name": "TR7 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr7",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR7"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr8",
+        "name": "TR8 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr8",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR8"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr9",
+        "name": "TR9 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr9",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR9"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr10",
+        "name": "TR10 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr10",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR10"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr11",
+        "name": "TR11 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr11",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR11"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr12",
+        "name": "TR12 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr12",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR12"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr13",
+        "name": "TR13 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr13",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR13"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr14",
+        "name": "TR14 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr14",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR14"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr15",
+        "name": "TR15 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr15",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR15"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr16",
+        "name": "TR16 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr16",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR16"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr17",
+        "name": "TR17 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr17",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR17"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr18",
+        "name": "TR18 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr18",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR18"
+        ]
+      },
+      {
+        "id": "norm.field.exti_rtenr.tr19",
+        "name": "TR19 canonical mapping",
+        "targetRef": "field.exti_rtenr.tr19",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR19"
+        ]
+      },
+      {
+        "id": "norm.reg.exti.ftenr",
+        "name": "FTENR canonical mapping",
+        "targetRef": "reg.exti.ftenr",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "FTENR"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr0",
+        "name": "TR0 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr0",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR0"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr1",
+        "name": "TR1 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr1",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR1"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr2",
+        "name": "TR2 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr2",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR2"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr3",
+        "name": "TR3 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr3",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR3"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr4",
+        "name": "TR4 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr4",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR4"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr5",
+        "name": "TR5 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr5",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR5"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr6",
+        "name": "TR6 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr6",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR6"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr7",
+        "name": "TR7 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr7",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR7"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr8",
+        "name": "TR8 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr8",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR8"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr9",
+        "name": "TR9 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr9",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR9"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr10",
+        "name": "TR10 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr10",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR10"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr11",
+        "name": "TR11 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr11",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR11"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr12",
+        "name": "TR12 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr12",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR12"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr13",
+        "name": "TR13 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr13",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR13"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr14",
+        "name": "TR14 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr14",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR14"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr15",
+        "name": "TR15 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr15",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR15"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr16",
+        "name": "TR16 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr16",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR16"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr17",
+        "name": "TR17 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr17",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR17"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr18",
+        "name": "TR18 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr18",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR18"
+        ]
+      },
+      {
+        "id": "norm.field.exti_ftenr.tr19",
+        "name": "TR19 canonical mapping",
+        "targetRef": "field.exti_ftenr.tr19",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TR19"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioa.cfglr",
+        "name": "CFGLR canonical mapping",
+        "targetRef": "reg.gpioa.cfglr",
+        "canonicalTermRefs": [
+          "term.register.config"
+        ],
+        "vendorNames": [
+          "CFGLR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioa.cfghr",
+        "name": "CFGHR canonical mapping",
+        "targetRef": "reg.gpioa.cfghr",
+        "canonicalTermRefs": [
+          "term.register.config"
+        ],
+        "vendorNames": [
+          "CFGHR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiob.cfglr",
+        "name": "CFGLR canonical mapping",
+        "targetRef": "reg.gpiob.cfglr",
+        "canonicalTermRefs": [
+          "term.register.config"
+        ],
+        "vendorNames": [
+          "CFGLR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiob.cfghr",
+        "name": "CFGHR canonical mapping",
+        "targetRef": "reg.gpiob.cfghr",
+        "canonicalTermRefs": [
+          "term.register.config"
+        ],
+        "vendorNames": [
+          "CFGHR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioc.cfglr",
+        "name": "CFGLR canonical mapping",
+        "targetRef": "reg.gpioc.cfglr",
+        "canonicalTermRefs": [
+          "term.register.config"
+        ],
+        "vendorNames": [
+          "CFGLR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpioc.cfghr",
+        "name": "CFGHR canonical mapping",
+        "targetRef": "reg.gpioc.cfghr",
+        "canonicalTermRefs": [
+          "term.register.config"
+        ],
+        "vendorNames": [
+          "CFGHR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiod.cfglr",
+        "name": "CFGLR canonical mapping",
+        "targetRef": "reg.gpiod.cfglr",
+        "canonicalTermRefs": [
+          "term.register.config"
+        ],
+        "vendorNames": [
+          "CFGLR"
+        ]
+      },
+      {
+        "id": "norm.reg.gpiod.cfghr",
+        "name": "CFGHR canonical mapping",
+        "targetRef": "reg.gpiod.cfghr",
+        "canonicalTermRefs": [
+          "term.register.config"
+        ],
+        "vendorNames": [
+          "CFGHR"
+        ]
+      },
+      {
+        "id": "norm.reg.adc1.ctlr1",
+        "name": "CTLR1 canonical mapping",
+        "targetRef": "reg.adc1.ctlr1",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR1"
+        ]
+      },
+      {
+        "id": "norm.reg.adc1.ctlr2",
+        "name": "CTLR2 canonical mapping",
+        "targetRef": "reg.adc1.ctlr2",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR2"
+        ]
+      },
+      {
+        "id": "norm.field.adc_ctlr2.adon",
+        "name": "ADON canonical mapping",
+        "targetRef": "field.adc_ctlr2.adon",
+        "canonicalTermRefs": [
+          "term.field.enable"
+        ],
+        "vendorNames": [
+          "ADON"
+        ]
+      },
+      {
+        "id": "norm.reg.adc2.ctlr1",
+        "name": "CTLR1 canonical mapping",
+        "targetRef": "reg.adc2.ctlr1",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR1"
+        ]
+      },
+      {
+        "id": "norm.reg.adc2.ctlr2",
+        "name": "CTLR2 canonical mapping",
+        "targetRef": "reg.adc2.ctlr2",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR2"
+        ]
+      },
+      {
+        "id": "norm.reg.tim1.ctlr1",
+        "name": "CTLR1 canonical mapping",
+        "targetRef": "reg.tim1.ctlr1",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR1"
+        ]
+      },
+      {
+        "id": "norm.field.tim1.ctlr1.cen",
+        "name": "CEN canonical mapping",
+        "targetRef": "field.tim1.ctlr1.cen",
+        "canonicalTermRefs": [
+          "term.field.enable"
+        ],
+        "vendorNames": [
+          "CEN"
+        ]
+      },
+      {
+        "id": "norm.reg.tim1.ctlr2",
+        "name": "CTLR2 canonical mapping",
+        "targetRef": "reg.tim1.ctlr2",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR2"
+        ]
+      },
+      {
+        "id": "norm.reg.tim1.dmaintenr",
+        "name": "DMAINTENR canonical mapping",
+        "targetRef": "reg.tim1.dmaintenr",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "DMAINTENR"
+        ]
+      },
+      {
+        "id": "norm.reg.tim1.cnt",
+        "name": "CNT canonical mapping",
+        "targetRef": "reg.tim1.cnt",
+        "canonicalTermRefs": [
+          "term.register.counter"
+        ],
+        "vendorNames": [
+          "CNT"
+        ]
+      },
+      {
+        "id": "norm.reg.tim1.psc",
+        "name": "PSC canonical mapping",
+        "targetRef": "reg.tim1.psc",
+        "canonicalTermRefs": [
+          "term.register.prescaler"
+        ],
+        "vendorNames": [
+          "PSC"
+        ]
+      },
+      {
+        "id": "norm.reg.tim1.atrlr",
+        "name": "ATRLR canonical mapping",
+        "targetRef": "reg.tim1.atrlr",
+        "canonicalTermRefs": [
+          "term.register.auto-reload"
+        ],
+        "vendorNames": [
+          "ATRLR"
+        ]
+      },
+      {
+        "id": "norm.reg.spi1.ctlr1",
+        "name": "CTLR1 canonical mapping",
+        "targetRef": "reg.spi1.ctlr1",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR1"
+        ]
+      },
+      {
+        "id": "norm.reg.spi1.ctlr2",
+        "name": "CTLR2 canonical mapping",
+        "targetRef": "reg.spi1.ctlr2",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR2"
+        ]
+      },
+      {
+        "id": "norm.reg.spi1.datar",
+        "name": "DATAR canonical mapping",
+        "targetRef": "reg.spi1.datar",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DATAR"
+        ]
+      },
+      {
+        "id": "norm.reg.usart1.datar",
+        "name": "DATAR canonical mapping",
+        "targetRef": "reg.usart1.datar",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DATAR"
+        ]
+      },
+      {
+        "id": "norm.reg.usart1.brr",
+        "name": "BRR canonical mapping",
+        "targetRef": "reg.usart1.brr",
+        "canonicalTermRefs": [
+          "term.register.baud-rate"
+        ],
+        "vendorNames": [
+          "BRR"
+        ]
+      },
+      {
+        "id": "norm.reg.usart1.ctlr1",
+        "name": "CTLR1 canonical mapping",
+        "targetRef": "reg.usart1.ctlr1",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR1"
+        ]
+      },
+      {
+        "id": "norm.reg.usart1.ctlr2",
+        "name": "CTLR2 canonical mapping",
+        "targetRef": "reg.usart1.ctlr2",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR2"
+        ]
+      },
+      {
+        "id": "norm.reg.usart1.ctlr3",
+        "name": "CTLR3 canonical mapping",
+        "targetRef": "reg.usart1.ctlr3",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CTLR3"
+        ]
+      },
+      {
+        "id": "norm.reg.dma1.cfgr",
+        "name": "CFGR canonical mapping",
+        "targetRef": "reg.dma1.cfgr",
+        "canonicalTermRefs": [
+          "term.register.config"
+        ],
+        "vendorNames": [
+          "CFGR"
+        ]
+      },
+      {
+        "id": "norm.field.dma_cfgr1.en",
+        "name": "EN canonical mapping",
+        "targetRef": "field.dma_cfgr1.en",
+        "canonicalTermRefs": [
+          "term.field.enable"
+        ],
+        "vendorNames": [
+          "EN"
+        ]
+      },
+      {
+        "id": "norm.reg.dma1.cntr",
+        "name": "CNTR canonical mapping",
+        "targetRef": "reg.dma1.cntr",
+        "canonicalTermRefs": [
+          "term.register.counter"
+        ],
+        "vendorNames": [
+          "CNTR"
+        ]
+      },
+      {
+        "id": "norm.field.dma_cntr1.ndt",
+        "name": "NDT canonical mapping",
+        "targetRef": "field.dma_cntr1.ndt",
+        "canonicalTermRefs": [
+          "term.field.counter-value"
+        ],
+        "vendorNames": [
+          "NDT"
+        ]
+      },
+      {
+        "id": "norm.reg.rcc.apb2prstr",
+        "name": "APB2PRSTR canonical mapping",
+        "targetRef": "reg.rcc.apb2prstr",
+        "canonicalTermRefs": [
+          "term.register.reset-control"
+        ],
+        "vendorNames": [
+          "APB2PRSTR"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2prstr.afiorst",
+        "name": "AFIORST canonical mapping",
+        "targetRef": "field.rcc_apb2prstr.afiorst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "AFIORST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2prstr.ioparst",
+        "name": "IOPARST canonical mapping",
+        "targetRef": "field.rcc_apb2prstr.ioparst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "IOPARST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2prstr.iopbrst",
+        "name": "IOPBRST canonical mapping",
+        "targetRef": "field.rcc_apb2prstr.iopbrst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "IOPBRST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2prstr.iopcrst",
+        "name": "IOPCRST canonical mapping",
+        "targetRef": "field.rcc_apb2prstr.iopcrst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "IOPCRST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2prstr.iopdrst",
+        "name": "IOPDRST canonical mapping",
+        "targetRef": "field.rcc_apb2prstr.iopdrst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "IOPDRST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2prstr.adc1rst",
+        "name": "ADC1RST canonical mapping",
+        "targetRef": "field.rcc_apb2prstr.adc1rst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "ADC1RST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2prstr.adc2rst",
+        "name": "ADC2RST canonical mapping",
+        "targetRef": "field.rcc_apb2prstr.adc2rst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "ADC2RST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2prstr.tim1rst",
+        "name": "TIM1RST canonical mapping",
+        "targetRef": "field.rcc_apb2prstr.tim1rst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "TIM1RST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2prstr.spi1rst",
+        "name": "SPI1RST canonical mapping",
+        "targetRef": "field.rcc_apb2prstr.spi1rst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "SPI1RST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2prstr.usart1rst",
+        "name": "USART1RST canonical mapping",
+        "targetRef": "field.rcc_apb2prstr.usart1rst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "USART1RST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2prstr.ioperst",
+        "name": "IOPERST canonical mapping",
+        "targetRef": "field.rcc_apb2prstr.ioperst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "IOPERST"
+        ]
+      },
+      {
+        "id": "norm.reg.rcc.apb1prstr",
+        "name": "APB1PRSTR canonical mapping",
+        "targetRef": "reg.rcc.apb1prstr",
+        "canonicalTermRefs": [
+          "term.register.reset-control"
+        ],
+        "vendorNames": [
+          "APB1PRSTR"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1prstr.tim2rst",
+        "name": "TIM2RST canonical mapping",
+        "targetRef": "field.rcc_apb1prstr.tim2rst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "TIM2RST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1prstr.tim3rst",
+        "name": "TIM3RST canonical mapping",
+        "targetRef": "field.rcc_apb1prstr.tim3rst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "TIM3RST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1prstr.wwdgrst",
+        "name": "WWDGRST canonical mapping",
+        "targetRef": "field.rcc_apb1prstr.wwdgrst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "WWDGRST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1prstr.usart2rst",
+        "name": "USART2RST canonical mapping",
+        "targetRef": "field.rcc_apb1prstr.usart2rst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "USART2RST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1prstr.i2c1rst",
+        "name": "I2C1RST canonical mapping",
+        "targetRef": "field.rcc_apb1prstr.i2c1rst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "I2C1RST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1prstr.can1rst",
+        "name": "CAN1RST canonical mapping",
+        "targetRef": "field.rcc_apb1prstr.can1rst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "CAN1RST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1prstr.bkprst",
+        "name": "BKPRST canonical mapping",
+        "targetRef": "field.rcc_apb1prstr.bkprst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "BKPRST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1prstr.pwrrst",
+        "name": "PWRRST canonical mapping",
+        "targetRef": "field.rcc_apb1prstr.pwrrst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "PWRRST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1prstr.tim4rst",
+        "name": "TIM4RST canonical mapping",
+        "targetRef": "field.rcc_apb1prstr.tim4rst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "TIM4RST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1prstr.spi2rst",
+        "name": "SPI2RST canonical mapping",
+        "targetRef": "field.rcc_apb1prstr.spi2rst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "SPI2RST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1prstr.usart3rst",
+        "name": "USART3RST canonical mapping",
+        "targetRef": "field.rcc_apb1prstr.usart3rst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "USART3RST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1prstr.i2c2rst",
+        "name": "I2C2RST canonical mapping",
+        "targetRef": "field.rcc_apb1prstr.i2c2rst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "I2C2RST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1prstr.usbrst",
+        "name": "USBRST canonical mapping",
+        "targetRef": "field.rcc_apb1prstr.usbrst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "USBRST"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1prstr.usart4rst",
+        "name": "USART4RST canonical mapping",
+        "targetRef": "field.rcc_apb1prstr.usart4rst",
+        "canonicalTermRefs": [
+          "term.field.reset-assert"
+        ],
+        "vendorNames": [
+          "USART4RST"
+        ]
+      },
+      {
+        "id": "norm.reg.rcc.ahbpcenr",
+        "name": "AHBPCENR canonical mapping",
+        "targetRef": "reg.rcc.ahbpcenr",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "AHBPCENR"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_ahbpcenr.dma1en",
+        "name": "DMA1EN canonical mapping",
+        "targetRef": "field.rcc_ahbpcenr.dma1en",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "DMA1EN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_ahbpcenr.sramen",
+        "name": "SRAMEN canonical mapping",
+        "targetRef": "field.rcc_ahbpcenr.sramen",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "SRAMEN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_ahbpcenr.flitfen",
+        "name": "FLITFEN canonical mapping",
+        "targetRef": "field.rcc_ahbpcenr.flitfen",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "FLITFEN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_ahbpcenr.crcen",
+        "name": "CRCEN canonical mapping",
+        "targetRef": "field.rcc_ahbpcenr.crcen",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "CRCEN"
+        ]
+      },
+      {
+        "id": "norm.reg.rcc.apb2pcenr",
+        "name": "APB2PCENR canonical mapping",
+        "targetRef": "reg.rcc.apb2pcenr",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "APB2PCENR"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2pcenr.afioen",
+        "name": "AFIOEN canonical mapping",
+        "targetRef": "field.rcc_apb2pcenr.afioen",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "AFIOEN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2pcenr.iopaen",
+        "name": "IOPAEN canonical mapping",
+        "targetRef": "field.rcc_apb2pcenr.iopaen",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "IOPAEN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2pcenr.iopben",
+        "name": "IOPBEN canonical mapping",
+        "targetRef": "field.rcc_apb2pcenr.iopben",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "IOPBEN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2pcenr.iopcen",
+        "name": "IOPCEN canonical mapping",
+        "targetRef": "field.rcc_apb2pcenr.iopcen",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "IOPCEN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2pcenr.iopden",
+        "name": "IOPDEN canonical mapping",
+        "targetRef": "field.rcc_apb2pcenr.iopden",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "IOPDEN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2pcenr.adc1en",
+        "name": "ADC1EN canonical mapping",
+        "targetRef": "field.rcc_apb2pcenr.adc1en",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "ADC1EN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2pcenr.adc2en",
+        "name": "ADC2EN canonical mapping",
+        "targetRef": "field.rcc_apb2pcenr.adc2en",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "ADC2EN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2pcenr.tim1en",
+        "name": "TIM1EN canonical mapping",
+        "targetRef": "field.rcc_apb2pcenr.tim1en",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TIM1EN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2pcenr.spi1en",
+        "name": "SPI1EN canonical mapping",
+        "targetRef": "field.rcc_apb2pcenr.spi1en",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "SPI1EN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb2pcenr.usart1en",
+        "name": "USART1EN canonical mapping",
+        "targetRef": "field.rcc_apb2pcenr.usart1en",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "USART1EN"
+        ]
+      },
+      {
+        "id": "norm.reg.rcc.apb1pcenr",
+        "name": "APB1PCENR canonical mapping",
+        "targetRef": "reg.rcc.apb1pcenr",
+        "canonicalTermRefs": [
+          "term.register.clock-enable"
+        ],
+        "vendorNames": [
+          "APB1PCENR"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1pcenr.tim2en",
+        "name": "TIM2EN canonical mapping",
+        "targetRef": "field.rcc_apb1pcenr.tim2en",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TIM2EN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1pcenr.tim3en",
+        "name": "TIM3EN canonical mapping",
+        "targetRef": "field.rcc_apb1pcenr.tim3en",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TIM3EN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1pcenr.tim4en",
+        "name": "TIM4EN canonical mapping",
+        "targetRef": "field.rcc_apb1pcenr.tim4en",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "TIM4EN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1pcenr.wwdgen",
+        "name": "WWDGEN canonical mapping",
+        "targetRef": "field.rcc_apb1pcenr.wwdgen",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "WWDGEN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1pcenr.usart2en",
+        "name": "USART2EN canonical mapping",
+        "targetRef": "field.rcc_apb1pcenr.usart2en",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "USART2EN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1pcenr.spi2en",
+        "name": "SPI2EN canonical mapping",
+        "targetRef": "field.rcc_apb1pcenr.spi2en",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "SPI2EN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1pcenr.usart3en",
+        "name": "USART3EN canonical mapping",
+        "targetRef": "field.rcc_apb1pcenr.usart3en",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "USART3EN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1pcenr.i2c1en",
+        "name": "I2C1EN canonical mapping",
+        "targetRef": "field.rcc_apb1pcenr.i2c1en",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "I2C1EN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1pcenr.i2c2en",
+        "name": "I2C2EN canonical mapping",
+        "targetRef": "field.rcc_apb1pcenr.i2c2en",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "I2C2EN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1pcenr.bkpen",
+        "name": "BKPEN canonical mapping",
+        "targetRef": "field.rcc_apb1pcenr.bkpen",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "BKPEN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1pcenr.pwren",
+        "name": "PWREN canonical mapping",
+        "targetRef": "field.rcc_apb1pcenr.pwren",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "PWREN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1pcenr.usben",
+        "name": "USBEN canonical mapping",
+        "targetRef": "field.rcc_apb1pcenr.usben",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "USBEN"
+        ]
+      },
+      {
+        "id": "norm.field.rcc_apb1pcenr.usart4en",
+        "name": "USART4EN canonical mapping",
+        "targetRef": "field.rcc_apb1pcenr.usart4en",
+        "canonicalTermRefs": [
+          "term.field.clock-enable"
+        ],
+        "vendorNames": [
+          "USART4EN"
+        ]
+      },
+      {
+        "id": "norm.reg.rcc.ahbrstr",
+        "name": "AHBRSTR canonical mapping",
+        "targetRef": "reg.rcc.ahbrstr",
+        "canonicalTermRefs": [
+          "term.register.reset-control"
+        ],
+        "vendorNames": [
+          "AHBRSTR"
+        ]
+      },
+      {
+        "id": "norm.reg.crc.datar",
+        "name": "DATAR canonical mapping",
+        "targetRef": "reg.crc.datar",
+        "canonicalTermRefs": [
+          "term.register.data"
+        ],
+        "vendorNames": [
+          "DATAR"
+        ]
+      },
+      {
+        "id": "norm.reg.opa.cr",
+        "name": "CR canonical mapping",
+        "targetRef": "reg.opa.cr",
+        "canonicalTermRefs": [
+          "term.register.control"
+        ],
+        "vendorNames": [
+          "CR"
+        ]
+      },
+      {
+        "id": "norm.reg.usbfsd.int_en",
+        "name": "INT_EN canonical mapping",
+        "targetRef": "reg.usbfsd.int_en",
+        "canonicalTermRefs": [
+          "term.register.interrupt-enable"
+        ],
+        "vendorNames": [
+          "INT_EN"
+        ]
+      },
+      {
+        "id": "norm.reg.usbfsd.int_st",
+        "name": "INT_ST canonical mapping",
+        "targetRef": "reg.usbfsd.int_st",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "INT_ST"
+        ]
+      },
+      {
+        "id": "norm.reg.usbfsh.int_en",
+        "name": "INT_EN canonical mapping",
+        "targetRef": "reg.usbfsh.int_en",
+        "canonicalTermRefs": [
+          "term.register.interrupt-enable"
+        ],
+        "vendorNames": [
+          "INT_EN"
+        ]
+      },
+      {
+        "id": "norm.reg.usbfsh.int_st",
+        "name": "INT_ST canonical mapping",
+        "targetRef": "reg.usbfsh.int_st",
+        "canonicalTermRefs": [
+          "term.register.interrupt-status"
+        ],
+        "vendorNames": [
+          "INT_ST"
+        ]
+      }
+    ]
+  },
   "profiles": {
     "mcuSoc": {
       "profileKind": "mcu-soc",
