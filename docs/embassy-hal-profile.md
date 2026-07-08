@@ -329,6 +329,87 @@ companion emulator/state handles and their observation/control methods.
     Serial/JTAG link; the generator must not silently substitute a reset or
     attach pattern that is not explicitly modeled.
 
+## Building a bootable ESP32-C3 image around a generated Embassy crate
+
+`hair generate embassy` emits a generated HAL crate, not a complete flash-ready
+application image. For Espressif parts such as the ESP32-C3, a standalone image
+that boots through the normal ROM + second-stage flash boot flow must still
+conform to Espressif's app-image contract.
+
+The checked-in reference for that packaging is:
+
+- `evidence\espressif\esp32-c3fn4\generated\embassy-usb-smoke\Cargo.toml`
+- `evidence\espressif\esp32-c3fn4\generated\embassy-usb-smoke\.cargo\config.toml`
+- `evidence\espressif\esp32-c3fn4\generated\embassy-usb-smoke\src\main.rs`
+
+For the current ESP32-C3 first cut, that means the application crate should:
+
+1. depend on the generated Embassy crate plus `esp-hal`
+2. use `esp-bootloader-esp-idf` so the resulting ELF carries the boot metadata
+   and layout expected by Espressif's flash boot chain
+3. emit an app descriptor with `esp_bootloader_esp_idf::esp_app_desc!();`
+4. link with `-Tlinkall.x`
+5. package the release ELF into an ESP32-C3 flash image before writing it to
+   the factory app slot
+
+Minimal project shape:
+
+```toml
+[dependencies]
+esp-bootloader-esp-idf = { version = "0.5.0", features = ["esp32c3"] }
+esp-hal = { version = "1.1.1", features = ["esp32c3"] }
+esp32c3fn4_generated = { package = "esp32c3fn4-generated", path = "../embassy" }
+panic-halt = "1.0"
+```
+
+```toml
+[build]
+target = "riscv32imc-unknown-none-elf"
+
+[target.riscv32imc-unknown-none-elf]
+rustflags = ["-C", "link-arg=-Tlinkall.x"]
+```
+
+```rust
+#![no_std]
+#![no_main]
+
+use esp_hal as _;
+use panic_halt as _;
+
+esp_bootloader_esp_idf::esp_app_desc!();
+
+#[esp_hal::main]
+fn main() -> ! {
+    let _peripherals = esp_hal::init(esp_hal::Config::default());
+    loop {}
+}
+```
+
+Build, package, and flash flow:
+
+```powershell
+Set-Location evidence\espressif\esp32-c3fn4\generated\embassy-usb-smoke
+cargo build --release
+python -m esptool --chip esp32c3 elf2image --flash-mode dio --flash-freq 40m --flash-size 4MB `
+  -o target\riscv32imc-unknown-none-elf\release\embassy-usb-smoke.bin `
+  target\riscv32imc-unknown-none-elf\release\embassy-usb-smoke
+python -m esptool --chip esp32c3 --port COM6 write-flash 0x10000 `
+  target\riscv32imc-unknown-none-elf\release\embassy-usb-smoke.bin
+espflash monitor -p COM6
+```
+
+Notes:
+
+- The generated Embassy HAL crate itself is reusable; the boot-image packaging
+  lives in the board/application crate wrapped around it.
+- For the current tool versions in this repository, `esptool elf2image` is the
+  reliable path for packaging the final flash image. Direct `espflash flash
+  <elf>` packaging may not work for this crate shape.
+- This boot-packaging guidance is ESP32-C3-specific. Other families may require
+  different vendor boot metadata, different linker arguments, or no extra
+  packaging step at all.
+
 ## Failure contract
 
 For Embassy generation, the following cases must fail explicitly:

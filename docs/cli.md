@@ -64,6 +64,8 @@ First-cut behavior:
 - generate a compilable crate directory rather than a single stdout artifact
 - consume the hardware facts from the core layers plus the canonical MCU topology in `profiles.mcuSoc`
 - require an explicit `profiles.embassyHal` contract for the supported generated drivers
+- emit the generated HAL crate only; any vendor-specific bootable application
+  image packaging still lives in the consumer board/application crate
 - derive the emitted Rust API surface from the approved topology and semantic lowering inputs in the HAIR document rather than from fixed placeholder signatures per driver kind
 - allow explicit `normalization.canonicalTerms[]` / `normalization.mappings[]` to act as secondary lowering hints for equivalent supported concepts across vendor naming schemes, without replacing the required profile/topology/semantic inputs
 - allow a `gpio-port` driver instance to lower into a per-pin GPIO API surface when the approved HAIR routes and structural controls justify that shape
@@ -76,6 +78,12 @@ First-cut behavior:
 - preserve the generator-relevant structured subset of referenced topology and semantic inputs in the emitted Rust metadata so downstream code does not lose control refs, remap data, or executable semantic structure that the approved HAIR document already provides
 - emit register-level code only for methods that can be justified by explicit HAIR lowering inputs, and fail explicitly when the requested or implied behavior is underspecified
 - fail explicitly when the input document falls outside the documented supported subset or omits generator-required topology, semantics, or bindings documented in `docs/embassy-hal-profile.md`
+
+On some vendors, a board-level application crate must add extra boot-image
+packaging around the generated HAL crate. For the current ESP32-C3 flow, see
+`docs/embassy-hal-profile.md` for the reference `esp-hal` +
+`esp-bootloader-esp-idf` + `esptool elf2image` path used to produce a flashable
+image from the generated Embassy output.
 
 First-cut exclusions:
 
