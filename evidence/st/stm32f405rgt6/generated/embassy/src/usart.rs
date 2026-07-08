@@ -94,6 +94,7 @@ pub struct Usart1Resources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -107,6 +108,7 @@ pub const DRV_USART1_RESOURCES: Usart1Resources = Usart1Resources {
     pins: DRV_USART1_PIN_ROLES,
     init_operations: DRV_USART1_INIT_OPERATIONS,
     state_machines: DRV_USART1_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_USART1_CAPABILITY_TAGS,
 };
 
@@ -357,6 +359,7 @@ pub struct Usart2Resources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -370,6 +373,7 @@ pub const DRV_USART2_RESOURCES: Usart2Resources = Usart2Resources {
     pins: DRV_USART2_PIN_ROLES,
     init_operations: DRV_USART2_INIT_OPERATIONS,
     state_machines: DRV_USART2_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_USART2_CAPABILITY_TAGS,
 };
 
@@ -547,6 +551,7 @@ pub struct Usart3Resources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -560,6 +565,7 @@ pub const DRV_USART3_RESOURCES: Usart3Resources = Usart3Resources {
     pins: DRV_USART3_PIN_ROLES,
     init_operations: DRV_USART3_INIT_OPERATIONS,
     state_machines: DRV_USART3_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_USART3_CAPABILITY_TAGS,
 };
 
@@ -735,6 +741,7 @@ pub struct Usart6Resources {
     pub pins: &'static [metadata::PinRole],
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
+    pub lowering_pattern: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -748,6 +755,7 @@ pub const DRV_USART6_RESOURCES: Usart6Resources = Usart6Resources {
     pins: DRV_USART6_PIN_ROLES,
     init_operations: DRV_USART6_INIT_OPERATIONS,
     state_machines: DRV_USART6_STATE_MACHINES,
+    lowering_pattern: None,
     capability_tags: DRV_USART6_CAPABILITY_TAGS,
 };
 
