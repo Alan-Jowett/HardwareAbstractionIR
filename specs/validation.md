@@ -255,7 +255,8 @@ powershell -ExecutionPolicy Bypass -File evidence\texas-instruments\lm3s6965\emb
 ### V-014 QEMU smoke execution for the ESP32-C3 Embassy example
 
 **Purpose:** provide an executable sanity check for the ESP32-C3 generated
-Embassy smoke project under WSL-hosted `qemu-system-riscv32`.
+Embassy smoke project under the pinned `sonde-esp-dev` container's
+`qemu-system-riscv32`.
 
 **Command**
 
@@ -266,11 +267,14 @@ powershell -ExecutionPolicy Bypass -File evidence\espressif\esp32-c3fn4\generate
 **Expected result**
 - The smoke firmware builds for `riscv32imc-unknown-none-elf`.
 - QEMU output includes the expected `PASS` confirmation text after exercising
-  generated UART0, GPIO, and interrupt-facing HAL paths.
+  generated UART0 and interrupt-facing HAL paths.
 
 **Note**
 - This is an environment-dependent smoke check, not a universal repository
   precondition.
+- The current ESP32-C3 QEMU path validates boot, UART, and interrupt behavior.
+  GPIO output state is not asserted there because the emulator does not expose
+  enough observable GPIO state for a reliable runtime check.
 
 ## 6. Requirement-specific validation coverage
 

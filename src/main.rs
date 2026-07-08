@@ -1538,7 +1538,14 @@ struct ResolvedEspGpioPinLowering {
     pin_name: String,
     accessor_name: String,
     bit_mask: u32,
+    out_sel_cfg_addr: u64,
+    out_sel_clear_mask: u32,
+    out_sel_gpio_mask: u32,
+    inv_sel_mask: u32,
+    oen_sel_mask: u32,
+    oen_inv_sel_mask: u32,
     io_mux_addr: u64,
+    mcu_sel_mask: u32,
     fun_wpd_mask: u32,
     fun_wpu_mask: u32,
     fun_ie_mask: u32,
@@ -3682,7 +3689,7 @@ fn render_gpio_methods(
                     pin.accessor_name, flex_type
                 ));
                 code.push_str(&format!(
-                    "        {} {{\n            resources: self.resources,\n            role: &self.resources.pins[{}],\n            pin_name: {},\n            out_addr: 0x{:X}u64,\n            out_w1ts_addr: 0x{:X}u64,\n            out_w1tc_addr: 0x{:X}u64,\n            enable_addr: 0x{:X}u64,\n            enable_w1ts_addr: 0x{:X}u64,\n            enable_w1tc_addr: 0x{:X}u64,\n            input_addr: 0x{:X}u64,\n            io_mux_addr: 0x{:X}u64,\n            bit_mask: 0x{:08X}u32,\n            fun_wpd_mask: 0x{:08X}u32,\n            fun_wpu_mask: 0x{:08X}u32,\n            fun_ie_mask: 0x{:08X}u32,\n        }}\n",
+                    "        {} {{\n            resources: self.resources,\n            role: &self.resources.pins[{}],\n            pin_name: {},\n            out_addr: 0x{:X}u64,\n            out_w1ts_addr: 0x{:X}u64,\n            out_w1tc_addr: 0x{:X}u64,\n            enable_addr: 0x{:X}u64,\n            enable_w1ts_addr: 0x{:X}u64,\n            enable_w1tc_addr: 0x{:X}u64,\n            input_addr: 0x{:X}u64,\n            out_sel_cfg_addr: 0x{:X}u64,\n            out_sel_clear_mask: 0x{:08X}u32,\n            out_sel_gpio_mask: 0x{:08X}u32,\n            inv_sel_mask: 0x{:08X}u32,\n            oen_sel_mask: 0x{:08X}u32,\n            oen_inv_sel_mask: 0x{:08X}u32,\n            io_mux_addr: 0x{:X}u64,\n            mcu_sel_mask: 0x{:08X}u32,\n            bit_mask: 0x{:08X}u32,\n            fun_wpd_mask: 0x{:08X}u32,\n            fun_wpu_mask: 0x{:08X}u32,\n            fun_ie_mask: 0x{:08X}u32,\n        }}\n",
                     flex_type,
                     pin.role_index,
                     render_rust_string(&pin.pin_name),
@@ -3693,7 +3700,14 @@ fn render_gpio_methods(
                     enable_w1ts.absolute_address,
                     enable_w1tc.absolute_address,
                     input.absolute_address,
+                    pin.out_sel_cfg_addr,
+                    pin.out_sel_clear_mask,
+                    pin.out_sel_gpio_mask,
+                    pin.inv_sel_mask,
+                    pin.oen_sel_mask,
+                    pin.oen_inv_sel_mask,
                     pin.io_mux_addr,
+                    pin.mcu_sel_mask,
                     pin.bit_mask,
                     pin.fun_wpd_mask,
                     pin.fun_wpu_mask,
@@ -3763,7 +3777,14 @@ fn render_gpio_support_items(
             out.push_str("    enable_w1ts_addr: u64,\n");
             out.push_str("    enable_w1tc_addr: u64,\n");
             out.push_str("    input_addr: u64,\n");
+            out.push_str("    out_sel_cfg_addr: u64,\n");
+            out.push_str("    out_sel_clear_mask: u32,\n");
+            out.push_str("    out_sel_gpio_mask: u32,\n");
+            out.push_str("    inv_sel_mask: u32,\n");
+            out.push_str("    oen_sel_mask: u32,\n");
+            out.push_str("    oen_inv_sel_mask: u32,\n");
             out.push_str("    io_mux_addr: u64,\n");
+            out.push_str("    mcu_sel_mask: u32,\n");
             out.push_str("    bit_mask: u32,\n");
             out.push_str("    fun_wpd_mask: u32,\n");
             out.push_str("    fun_wpu_mask: u32,\n");
@@ -3951,7 +3972,7 @@ fn render_gpio_support_items(
             );
             out.push_str("        self.set_pull(pull)?;\n");
             out.push_str(
-                "        modify_u32(self.io_mux_addr, self.fun_ie_mask, self.fun_ie_mask)?;\n",
+                "        modify_u32(self.io_mux_addr, self.mcu_sel_mask | self.fun_ie_mask, self.fun_ie_mask)?;\n",
             );
             out.push_str("        write_u32(self.enable_w1tc_addr, self.bit_mask)?;\n");
             out.push_str("        Ok(())\n");
@@ -3959,9 +3980,12 @@ fn render_gpio_support_items(
             out.push_str(
                 "    pub fn set_as_output(&self, initial_level: Level) -> Result<(), metadata::Error> {\n",
             );
+            out.push_str(
+                "        modify_u32(self.out_sel_cfg_addr, self.out_sel_clear_mask | self.inv_sel_mask | self.oen_sel_mask | self.oen_inv_sel_mask, self.out_sel_gpio_mask)?;\n",
+            );
             out.push_str("        self.set_level(initial_level)?;\n");
             out.push_str(
-                "        modify_u32(self.io_mux_addr, self.fun_ie_mask, 0x00000000u32)?;\n",
+                "        modify_u32(self.io_mux_addr, self.mcu_sel_mask | self.fun_ie_mask, 0x00000000u32)?;\n",
             );
             out.push_str("        write_u32(self.enable_w1ts_addr, self.bit_mask)?;\n");
             out.push_str("        Ok(())\n");
@@ -4337,6 +4361,7 @@ fn resolve_esp_gpio_port_lowering(
     let enable_w1ts = resolve_gpio_register32(model, target_ref, "ENABLE_W1TS", driver)?;
     let enable_w1tc = resolve_gpio_register32(model, target_ref, "ENABLE_W1TC", driver)?;
     let input = resolve_gpio_register32(model, target_ref, "IN", driver)?;
+    const ESP_SIG_GPIO_OUT_IDX: u32 = 128;
     let mut pins = Vec::with_capacity(driver.pin_roles.len());
     let mut seen_accessors = BTreeSet::new();
 
@@ -4413,16 +4438,45 @@ fn resolve_esp_gpio_port_lowering(
 
         let io_mux_register =
             resolve_gpio_register32(model, "per.io_mux", &format!("GPIO{pin_index}"), driver)?;
+        let out_sel_cfg_register = resolve_gpio_register32(
+            model,
+            target_ref,
+            &format!("FUNC{pin_index}_OUT_SEL_CFG"),
+            driver,
+        )?;
+        let out_sel = resolve_register_field(&out_sel_cfg_register, "OUT_SEL")?;
+        let inv_sel = resolve_register_field(&out_sel_cfg_register, "INV_SEL")?;
+        let oen_sel = resolve_register_field(&out_sel_cfg_register, "OEN_SEL")?;
+        let oen_inv_sel = resolve_register_field(&out_sel_cfg_register, "OEN_INV_SEL")?;
+        let mcu_sel = resolve_register_field(&io_mux_register, "MCU_SEL")?;
         let fun_wpd = resolve_register_field(&io_mux_register, "FUN_WPD")?;
         let fun_wpu = resolve_register_field(&io_mux_register, "FUN_WPU")?;
         let fun_ie = resolve_register_field(&io_mux_register, "FUN_IE")?;
+        let out_sel_value_mask = field_value_mask(&out_sel)?;
+        if u64::from(ESP_SIG_GPIO_OUT_IDX) > out_sel_value_mask {
+            bail!(
+                "gpio-port driver {} pin index {} cannot encode SIG_GPIO_OUT_IDX={} into {}.OUT_SEL width {}",
+                driver.id,
+                pin_index,
+                ESP_SIG_GPIO_OUT_IDX,
+                out_sel_cfg_register.name,
+                out_sel.msb - out_sel.lsb + 1
+            );
+        }
 
         pins.push(ResolvedEspGpioPinLowering {
             role_index,
             pin_name: pin.name.clone(),
             accessor_name,
             bit_mask,
+            out_sel_cfg_addr: out_sel_cfg_register.absolute_address,
+            out_sel_clear_mask: shifted_field_mask(&out_sel, &out_sel_cfg_register)?,
+            out_sel_gpio_mask: ESP_SIG_GPIO_OUT_IDX << out_sel.lsb,
+            inv_sel_mask: field_bit_mask(&inv_sel, &out_sel_cfg_register)?,
+            oen_sel_mask: field_bit_mask(&oen_sel, &out_sel_cfg_register)?,
+            oen_inv_sel_mask: field_bit_mask(&oen_inv_sel, &out_sel_cfg_register)?,
             io_mux_addr: io_mux_register.absolute_address,
+            mcu_sel_mask: shifted_field_mask(&mcu_sel, &io_mux_register)?,
             fun_wpd_mask: field_bit_mask(&fun_wpd, &io_mux_register)?,
             fun_wpu_mask: field_bit_mask(&fun_wpu, &io_mux_register)?,
             fun_ie_mask: field_bit_mask(&fun_ie, &io_mux_register)?,
@@ -4705,13 +4759,19 @@ fn render_spi_methods(
     }
 
     let target_ref = driver.target.target_ref.as_str();
-    if model
-        .peripherals
-        .get(target_ref)
-        .and_then(|target| target.base_address)
-        .is_none()
-    {
-        return Ok(Vec::new());
+    let target = model.peripherals.get(target_ref).ok_or_else(|| {
+        anyhow!(
+            "spi driver {} references unknown target peripheral {}",
+            driver.id,
+            target_ref
+        )
+    })?;
+    if target.base_address.is_none() {
+        bail!(
+            "spi driver {} target peripheral {} is missing baseAddress required for executable lowering",
+            driver.id,
+            target_ref
+        );
     }
     let dma_conf = match try_resolve_target_register_by_name(model, target_ref, "DMA_CONF")? {
         Some(register) => register,
@@ -5699,7 +5759,7 @@ fn resolve_control_target<'a>(
         return Ok((register, field_target.field.clone()));
     }
     Err(anyhow!(
-        "{kind} {owner_id} references unknown control register {control_ref}"
+        "{kind} {owner_id} references unknown control target {control_ref}; expected either a register id or a field id"
     ))
 }
 
@@ -12455,6 +12515,85 @@ fn host_emulator_wires_hal_and_companion_state() {
             generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
         assert!(error.to_string().contains("DMA route"));
         assert!(error.to_string().contains("instead of periph.usart1"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_spi_without_base_address_for_executable_lowering() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        peripherals
+            .iter_mut()
+            .find(|peripheral| peripheral.get("id").and_then(Value::as_str) == Some("periph.spi1"))
+            .expect("spi1 peripheral")
+            .as_object_mut()
+            .expect("spi1 peripheral object")
+            .remove("baseAddress");
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("spi fixture without baseAddress should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("spi driver drv.spi1"));
+        assert!(error.to_string().contains("missing baseAddress"));
+    }
+
+    #[test]
+    fn generate_embassy_reports_unknown_control_target_kind() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let bindings = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("clockResetTopology")
+            .and_then(Value::as_object_mut)
+            .expect("clockResetTopology object")
+            .get_mut("clockBindings")
+            .and_then(Value::as_array_mut)
+            .expect("clock bindings");
+        bindings
+            .iter_mut()
+            .find(|binding| binding.get("id").and_then(Value::as_str) == Some("clk.spi1"))
+            .expect("spi1 clock binding")
+            .as_object_mut()
+            .expect("spi1 clock binding object")
+            .insert(
+                "controlRefs".to_string(),
+                serde_json::json!(["field.does.not.exist"]),
+            );
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("invalid control target fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains("clock binding clk.spi1"));
+        assert!(error.to_string().contains("unknown control target"));
+        assert!(
+            error
+                .to_string()
+                .contains("expected either a register id or a field id")
+        );
     }
 
     #[test]

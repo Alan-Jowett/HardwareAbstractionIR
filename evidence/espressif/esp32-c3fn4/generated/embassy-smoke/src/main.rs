@@ -4,14 +4,11 @@
 use core::hint::spin_loop;
 use core::ptr::read_volatile;
 
-use esp32c3fn4_generated::gpio::{DRV_GPIO_RESOURCES, GPIOPort, Level, Pull};
 use esp32c3fn4_generated::interrupt::{DRV_IRQ_RESOURCES, InterruptMatrix};
 use esp32c3fn4_generated::uart::{DRV_UART0_RESOURCES, Uart0};
 use panic_halt as _;
 use riscv_rt::entry;
 
-const GPIO_OUT_REG: *const u32 = 0x6000_4004 as *const u32;
-const GPIO8_MASK: u32 = 1 << 8;
 const UART_INT_ENA_REG: *const u32 = 0x6000_000C as *const u32;
 const UART_RXFIFO_FULL_INT_ENA: u32 = 1 << 0;
 const UART_TXFIFO_EMPTY_INT_ENA: u32 = 1 << 1;
@@ -53,33 +50,6 @@ fn init_uart0() -> Uart0 {
         .unwrap();
     uart.enable().unwrap();
     uart
-}
-
-fn smoke_gpio(uart: &Uart0) {
-    note(uart, "smoke_gpio:start\r\n");
-    let gpio = GPIOPort::new(DRV_GPIO_RESOURCES).unwrap();
-    let pin = gpio.gpio8().into_output(Level::Low).unwrap();
-    expect(
-        uart,
-        "gpio8 should start low",
-        (read_reg(GPIO_OUT_REG) & GPIO8_MASK) == 0 && pin.is_set_low().unwrap(),
-    );
-    pin.set_high().unwrap();
-    expect(
-        uart,
-        "gpio8 should go high",
-        (read_reg(GPIO_OUT_REG) & GPIO8_MASK) != 0 && pin.is_set_high().unwrap(),
-    );
-    pin.set_low().unwrap();
-    expect(
-        uart,
-        "gpio8 should return low",
-        (read_reg(GPIO_OUT_REG) & GPIO8_MASK) == 0 && pin.is_set_low().unwrap(),
-    );
-    let input = pin.into_flex().into_input(Pull::Up).unwrap();
-    input.set_pull(Pull::Down).unwrap();
-    let _pin = input.into_flex();
-    note(uart, "smoke_gpio:ok\r\n");
 }
 
 fn smoke_interrupts(uart: &Uart0) {
@@ -125,7 +95,6 @@ fn smoke_interrupts(uart: &Uart0) {
 fn main() -> ! {
     let uart = init_uart0();
     note(&uart, "ESP32-C3 HAL smoke start\r\n");
-    smoke_gpio(&uart);
     smoke_interrupts(&uart);
     note(&uart, "PASS\r\n");
     loop {
