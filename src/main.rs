@@ -9720,7 +9720,7 @@ mod tests {
                 serde_json::json!({
                     "id": "norm.uart4-ue",
                     "name": "UART4 UE normalization",
-                    "targetRef": "field.uart4.ctlr1.ue",
+                    "targetRef": "field.usart_ctlr1.ue",
                     "canonicalTermRefs": ["term.field.enable"],
                     "vendorNames": ["UE"]
                 }),
