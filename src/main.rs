@@ -2255,6 +2255,13 @@ fn validate_host_accessor_name_collisions(drivers: &[ResolvedDriverInstance]) ->
 
     for driver in drivers {
         let accessor = to_rust_method_name(&driver.name);
+        if is_rust_keyword(&accessor) {
+            bail!(
+                "driver {} normalizes to reserved Rust keyword {} as HostEmulator method",
+                driver.id,
+                accessor
+            );
+        }
         let accessor_owner = format!("driver {} accessor", driver.id);
         if let Some(previous) = method_names.insert(accessor.clone(), accessor_owner) {
             bail!(
@@ -7343,7 +7350,7 @@ fn render_host_time_driver_support_items(driver: &ResolvedDriverInstance) -> Str
         to_rust_const_name(&driver.id).to_lowercase()
     );
     format!(
-        "\nuse std::sync::Mutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nconst SYST_CSR_ADDRESS: u64 = 0xE000_E010;\nconst SYST_RVR_ADDRESS: u64 = 0xE000_E014;\nconst SYST_CVR_ADDRESS: u64 = 0xE000_E018;\nconst SYST_CSR_ENABLE: u32 = 1 << 0;\nconst SYST_CSR_TICKINT: u32 = 1 << 1;\nconst SYST_CSR_CLKSOURCE: u32 = 1 << 2;\nconst SYST_RELOAD_VALUE: u32 = 15;\n\nstruct GeneratedSystickTimeDriverState {{\n    initialized: bool,\n    ticks: u64,\n    queue: EmbassyTimeQueue,\n}}\n\nstruct GeneratedSystickTimeDriver {{\n    state: Mutex<GeneratedSystickTimeDriverState>,\n}}\n\nimpl GeneratedSystickTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            state: Mutex::new(GeneratedSystickTimeDriverState {{\n                initialized: false,\n                ticks: 0,\n                queue: EmbassyTimeQueue::new(),\n            }}),\n        }}\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if state.initialized {{\n            return Ok(());\n        }}\n        state.ticks = 0;\n        metadata::write_u32(SYST_CSR_ADDRESS, 0)?;\n        metadata::write_u32(SYST_RVR_ADDRESS, SYST_RELOAD_VALUE)?;\n        metadata::write_u32(SYST_CVR_ADDRESS, 0)?;\n        metadata::write_u32(\n            SYST_CSR_ADDRESS,\n            SYST_CSR_ENABLE | SYST_CSR_TICKINT | SYST_CSR_CLKSOURCE,\n        )?;\n        state.initialized = true;\n        Ok(())\n    }}\n\n    fn advance(&self, ticks: u64) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if !state.initialized {{\n            return;\n        }}\n        for _ in 0..ticks {{\n            state.ticks = state.ticks.wrapping_add(1);\n            let now = state.ticks;\n            let _ = state.queue.next_expiration(now);\n        }}\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedSystickTimeDriver {{\n    fn now(&self) -> u64 {{\n        self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).ticks\n    }}\n\n    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        let now = state.ticks;\n        let _ = state.queue.schedule_wake(at, waker);\n        let _ = state.queue.next_expiration(now);\n    }}\n}}\n\nembassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedSystickTimeDriver = GeneratedSystickTimeDriver::new());\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.init()\n}}\n\nfn {advance_fn}(ticks: u64) {{\n    GENERATED_TIME_DRIVER.advance(ticks)\n}}\n"
+        "\nuse std::sync::Mutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nconst SYST_CSR_ADDRESS: u64 = 0xE000_E010;\nconst SYST_RVR_ADDRESS: u64 = 0xE000_E014;\nconst SYST_CVR_ADDRESS: u64 = 0xE000_E018;\nconst SYST_CSR_ENABLE: u32 = 1 << 0;\nconst SYST_CSR_TICKINT: u32 = 1 << 1;\nconst SYST_CSR_CLKSOURCE: u32 = 1 << 2;\nconst SYST_RELOAD_VALUE: u32 = 15;\n\nstruct GeneratedSystickTimeDriverState {{\n    initialized: bool,\n    ticks: u64,\n    queue: EmbassyTimeQueue,\n}}\n\nstruct GeneratedSystickTimeDriver {{\n    state: Mutex<GeneratedSystickTimeDriverState>,\n}}\n\nimpl GeneratedSystickTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            state: Mutex::new(GeneratedSystickTimeDriverState {{\n                initialized: false,\n                ticks: 0,\n                queue: EmbassyTimeQueue::new(),\n            }}),\n        }}\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if state.initialized {{\n            return Ok(());\n        }}\n        state.ticks = 0;\n        metadata::write_u32(SYST_CSR_ADDRESS, 0)?;\n        metadata::write_u32(SYST_RVR_ADDRESS, SYST_RELOAD_VALUE)?;\n        metadata::write_u32(SYST_CVR_ADDRESS, 0)?;\n        metadata::write_u32(\n            SYST_CSR_ADDRESS,\n            SYST_CSR_ENABLE | SYST_CSR_TICKINT | SYST_CSR_CLKSOURCE,\n        )?;\n        state.initialized = true;\n        Ok(())\n    }}\n\n    fn advance(&self, ticks: u64) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if !state.initialized {{\n            return;\n        }}\n        state.ticks = state.ticks.wrapping_add(ticks);\n        let now = state.ticks;\n        let _ = state.queue.next_expiration(now);\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedSystickTimeDriver {{\n    fn now(&self) -> u64 {{\n        self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).ticks\n    }}\n\n    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        let now = state.ticks;\n        let _ = state.queue.schedule_wake(at, waker);\n        let _ = state.queue.next_expiration(now);\n    }}\n}}\n\nembassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedSystickTimeDriver = GeneratedSystickTimeDriver::new());\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.init()\n}}\n\nfn {advance_fn}(ticks: u64) {{\n    GENERATED_TIME_DRIVER.advance(ticks)\n}}\n"
     )
 }
 
@@ -9046,6 +9053,40 @@ fn host_emulator_wires_hal_and_companion_state() {
     }
 
     #[test]
+    fn generate_embassy_host_rejects_keyword_accessor_names() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        drivers[0]
+            .as_object_mut()
+            .expect("rcc driver")
+            .insert("name".to_string(), Value::String("Type".to_string()));
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("keyword accessor fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error = generate_embassy_host_crate(&validated, temp.path())
+            .expect_err("host generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("reserved Rust keyword type as HostEmulator method")
+        );
+    }
+
+    #[test]
     fn generate_embassy_host_supports_interrupt_scoped_time_driver() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let fixture = write_embassy_fixture(false);
@@ -9164,6 +9205,8 @@ fn host_emulator_wires_hal_and_companion_state() {
         assert!(host_rs.contains("pub fn time_emulator(&self)"));
         assert!(time_rs.contains("init_time_driver"));
         assert!(time_rs.contains("advance_drv_time_time_driver"));
+        assert!(time_rs.contains("state.ticks = state.ticks.wrapping_add(ticks);"));
+        assert!(!time_rs.contains("for _ in 0..ticks"));
         assert!(time_rs.contains("time_driver_impl!"));
 
         let cargo_output = Command::new("cargo")
