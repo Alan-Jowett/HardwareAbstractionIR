@@ -341,16 +341,19 @@ impl EmbassyTimeDriver for GeneratedHardwareTimerTimeDriver {
     }
 
     fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {
+        let should_rearm = critical_section::with(|cs| {
+            self.queue.borrow(cs).borrow_mut().schedule_wake(at, waker)
+        });
+        if !should_rearm {
+            return;
+        }
+        let now = self.read_now();
         critical_section::with(|cs| {
-            let now = self.read_now();
-            let mut queue = self.queue.borrow(cs).borrow_mut();
-            if queue.schedule_wake(at, waker) {
-                let next = queue.next_expiration(now);
-                if next == u64::MAX {
-                    self.disarm_alarm();
-                } else {
-                    self.arm_alarm(next);
-                }
+            let next = self.queue.borrow(cs).borrow_mut().next_expiration(now);
+            if next == u64::MAX {
+                self.disarm_alarm();
+            } else {
+                self.arm_alarm(next);
             }
         });
     }
