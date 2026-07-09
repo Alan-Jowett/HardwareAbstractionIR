@@ -9,5 +9,5 @@ path = "src/lib.rs"
 
 [dependencies]
 critical-section = "1.2"
-embassy-time-driver = "0.2.2"
+embassy-time-driver = { version = "0.2.2", features = ["tick-hz-16_000_000"] }
 embassy-time-queue-utils = { version = "0.3.2", features = ["generic-queue-8"] }

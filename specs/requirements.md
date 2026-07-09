@@ -223,6 +223,13 @@ Embassy profile contract.
   explicitly. A hardware-timer-backed time base is allowed only when the
   approved timer, interrupt, semantic, and structural inputs justify both the
   async wake behavior and any claimed blocking delay helpers deterministically.
+  For a hardware-timer-backed path, the generated core contract shall remain
+  runtime-agnostic: it must expose the generated wake handler plus the unique
+  approved interrupt-route metadata needed by a downstream runtime layer to bind
+  and enable that interrupt without repository guesswork. The same profile entry
+  shall also carry the explicit Embassy tick rate used by that hardware timer so
+  generated async timing behavior and generated Cargo metadata agree on the
+  duration unit.
 - Unsupported driver kinds, unresolved references, missing lowering inputs,
   and out-of-subset requests fail explicitly.
 

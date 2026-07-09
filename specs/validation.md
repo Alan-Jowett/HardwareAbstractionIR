@@ -130,7 +130,11 @@ cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-
   time-base architecture. Existing SysTick-backed paths must remain valid, while
   hardware-timer-backed paths must fail explicitly unless they justify both the
   async wake behavior and any claimed blocking delay helpers from approved HAIR
-  data.
+  data. For approved hardware-timer paths, the emitted core contract must also
+  preserve the unique interrupt-route metadata and wake-handler hook needed for
+  a downstream runtime layer to bind and enable the interrupt explicitly, plus
+  the explicit Embassy tick rate needed to keep generated async durations
+  aligned with the modeled hardware timer.
 
 ## 3. Artifact-level validation
 

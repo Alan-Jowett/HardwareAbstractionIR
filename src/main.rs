@@ -1648,6 +1648,8 @@ struct EmbassyDriverInstance {
     #[serde(default)]
     time_driver_source: Option<String>,
     #[serde(default)]
+    time_driver_tick_hz: Option<u64>,
+    #[serde(default)]
     clock_binding_refs: Vec<String>,
     #[serde(default)]
     reset_binding_refs: Vec<String>,
@@ -1699,6 +1701,7 @@ struct ResolvedDriverInstance {
     module_name: String,
     lowering_pattern: Option<String>,
     time_driver_source: Option<String>,
+    time_driver_tick_hz: Option<u64>,
     target: McuCanonicalBlock,
     clock_bindings: Vec<McuClockBinding>,
     reset_bindings: Vec<McuResetBinding>,
@@ -1744,6 +1747,10 @@ fn has_time_driver_tag(tags: &[String]) -> bool {
 
 fn time_driver_source(driver: &ResolvedDriverInstance) -> Option<&str> {
     driver.time_driver_source.as_deref()
+}
+
+fn time_driver_tick_hz(driver: &ResolvedDriverInstance) -> Option<u64> {
+    driver.time_driver_tick_hz
 }
 
 fn has_usb_preserve_link_lowering(pattern: Option<&str>) -> bool {
@@ -2044,6 +2051,7 @@ impl EmbassyGenerationModel {
                 module_name,
                 lowering_pattern: driver.lowering_pattern.clone(),
                 time_driver_source: driver.time_driver_source.clone(),
+                time_driver_tick_hz: driver.time_driver_tick_hz,
                 target,
                 clock_bindings,
                 reset_bindings,
@@ -2439,6 +2447,13 @@ fn validate_driver_module_scope(driver: &EmbassyDriverInstance, module_name: &st
             EMBASSY_TIME_DRIVER_TAG
         );
     }
+    if driver.time_driver_tick_hz.is_some() && !has_time_driver_tag(&driver.capability_tags) {
+        bail!(
+            "driver {} declares timeDriverTickHz without capability tag {}",
+            driver.id,
+            EMBASSY_TIME_DRIVER_TAG
+        );
+    }
     Ok(())
 }
 
@@ -2469,6 +2484,14 @@ fn validate_capability_tag_contracts(drivers: &[ResolvedDriverInstance]) -> Resu
         })?;
         match source {
             EMBASSY_TIME_DRIVER_SOURCE_SYSTICK => {
+                if driver.time_driver_tick_hz.is_some() {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} and must not declare timeDriverTickHz; SysTick timing defines its own tick rate",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source
+                    );
+                }
                 if driver.driver_kind != "interrupt" {
                     bail!(
                         "driver {} claims capability tag {} with timeDriverSource {} but has unsupported driver kind {}; SysTick timing requires interrupt lowering",
@@ -2508,6 +2531,22 @@ fn validate_capability_tag_contracts(drivers: &[ResolvedDriverInstance]) -> Resu
                 }
             }
             EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER => {
+                let tick_hz = driver.time_driver_tick_hz.ok_or_else(|| {
+                    anyhow!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but omits required timeDriverTickHz",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source
+                    )
+                })?;
+                if tick_hz == 0 {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but timeDriverTickHz must be greater than zero",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source
+                    );
+                }
                 if driver.driver_kind != "timer" {
                     bail!(
                         "driver {} claims capability tag {} with timeDriverSource {} but has unsupported driver kind {}; hardware-timer timing requires a timer driver",
@@ -3357,11 +3396,41 @@ fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
         .iter()
         .any(|driver| has_time_driver_tag(&driver.capability_tags))
     {
-        out.push_str(
-            "\n[dependencies]\ncritical-section = \"1.2\"\nembassy-time-driver = \"0.2.2\"\nembassy-time-queue-utils = { version = \"0.3.2\", features = [\"generic-queue-8\"] }\n",
-        );
+        out.push_str("\n[dependencies]\ncritical-section = \"1.2\"\n");
+        out.push_str(&format!(
+            "{}\n",
+            render_embassy_time_driver_dependency(&model.drivers)
+        ));
+        out.push_str("embassy-time-queue-utils = { version = \"0.3.2\", features = [\"generic-queue-8\"] }\n");
     }
     out
+}
+
+fn render_tick_hz_feature(hz: u64) -> String {
+    let digits = hz.to_string();
+    let mut output = String::with_capacity(digits.len() + digits.len() / 3);
+    for (index, ch) in digits.chars().enumerate() {
+        if index != 0 && (digits.len() - index).is_multiple_of(3) {
+            output.push('_');
+        }
+        output.push(ch);
+    }
+    format!("tick-hz-{output}")
+}
+
+fn render_embassy_time_driver_dependency(drivers: &[ResolvedDriverInstance]) -> String {
+    let time_driver = drivers
+        .iter()
+        .find(|driver| has_time_driver_tag(&driver.capability_tags));
+    if let Some(driver) = time_driver
+        && let Some(tick_hz) = time_driver_tick_hz(driver)
+    {
+        return format!(
+            "embassy-time-driver = {{ version = \"0.2.2\", features = [{}] }}",
+            render_rust_string(&render_tick_hz_feature(tick_hz))
+        );
+    }
+    "embassy-time-driver = \"0.2.2\"".to_string()
 }
 
 fn render_embassy_lib_rs(model: &EmbassyGenerationModel) -> String {
@@ -9149,9 +9218,12 @@ fn render_embassy_host_cargo_toml(model: &EmbassyGenerationModel) -> String {
         .iter()
         .any(|driver| has_time_driver_tag(&driver.capability_tags))
     {
-        out.push_str(
-            "\n[dependencies]\nembassy-time-driver = \"0.2.2\"\nembassy-time-queue-utils = { version = \"0.3.2\", features = [\"generic-queue-8\"] }\n",
-        );
+        out.push_str("\n[dependencies]\n");
+        out.push_str(&format!(
+            "{}\n",
+            render_embassy_time_driver_dependency(&model.drivers)
+        ));
+        out.push_str("embassy-time-queue-utils = { version = \"0.3.2\", features = [\"generic-queue-8\"] }\n");
     }
     out
 }
@@ -11841,6 +11913,10 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             "timeDriverSource".to_string(),
             Value::String(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER.to_string()),
         );
+        tim1.insert(
+            "timeDriverTickHz".to_string(),
+            serde_json::json!(16_000_000u64),
+        );
 
         let file = write_temp_json(&document);
         let validated = load_validated_hair_document(file.path(), &repo_root)
@@ -11851,9 +11927,12 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
 
         let time_rs = std::fs::read_to_string(output_dir.path().join("src").join("time.rs"))
             .expect("generated time module");
+        let cargo_toml = std::fs::read_to_string(output_dir.path().join("Cargo.toml"))
+            .expect("generated Cargo.toml");
         assert!(time_rs.contains("generated_drv_tim1_time_driver_interrupt"));
         assert!(time_rs.contains("generated_drv_tim1_time_driver_delay_ticks"));
         assert!(time_rs.contains("GeneratedHardwareTimerTimeDriver"));
+        assert!(cargo_toml.contains("tick-hz-16_000_000"));
 
         let cargo_output = Command::new("cargo")
             .arg("check")
@@ -14121,17 +14200,183 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             "timeDriverSource".to_string(),
             Value::String(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER.to_string()),
         );
+        tim1.insert(
+            "timeDriverTickHz".to_string(),
+            serde_json::json!(16_000_000u64),
+        );
 
         let file = write_temp_json(&document);
         let validated = load_validated_hair_document(file.path(), &repo_root)
             .expect("time-driver timer fixture should validate");
         let output_dir = tempdir().expect("tempdir");
         generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
+        let cargo_toml = std::fs::read_to_string(output_dir.path().join("Cargo.toml"))
+            .expect("generated Cargo.toml");
         let time_rs = std::fs::read_to_string(output_dir.path().join("src").join("time.rs"))
             .expect("generated time module");
         assert!(time_rs.contains("delay_ticks"));
         assert!(time_rs.contains("generated_drv_tim1_time_driver_interrupt"));
         assert!(time_rs.contains("TARGET0_HI"));
+        assert!(cargo_toml.contains("tick-hz-16_000_000"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_hardware_timer_time_driver_without_tick_rate() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals
+            .iter_mut()
+            .find(|peripheral| {
+                peripheral
+                    .as_object()
+                    .and_then(|item| item.get("id"))
+                    .and_then(Value::as_str)
+                    == Some("periph.tim1")
+            })
+            .and_then(Value::as_object_mut)
+            .expect("tim1 peripheral");
+        let registers = tim1
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 registers");
+        registers.extend([
+            serde_json::json!({ "id": "reg.tim1.conf", "name": "CONF", "kind": "register", "offsetBytes": 4, "widthBits": 32, "fields": [
+                { "id": "field.tim1.conf.clk_en", "name": "CLK_EN", "bitRange": { "lsb": 0, "msb": 0 } },
+                { "id": "field.tim1.conf.target0_work_en", "name": "TARGET0_WORK_EN", "bitRange": { "lsb": 1, "msb": 1 } },
+                { "id": "field.tim1.conf.timer_unit0_work_en", "name": "TIMER_UNIT0_WORK_EN", "bitRange": { "lsb": 2, "msb": 2 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_op", "name": "UNIT0_OP", "kind": "register", "offsetBytes": 8, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_op.timer_unit0_value_valid", "name": "TIMER_UNIT0_VALUE_VALID", "bitRange": { "lsb": 0, "msb": 0 } },
+                { "id": "field.tim1.unit0_op.timer_unit0_update", "name": "TIMER_UNIT0_UPDATE", "bitRange": { "lsb": 1, "msb": 1 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_value_hi", "name": "UNIT0_VALUE_HI", "kind": "register", "offsetBytes": 12, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_value_hi.timer_unit0_value_hi", "name": "TIMER_UNIT0_VALUE_HI", "bitRange": { "lsb": 0, "msb": 19 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_value_lo", "name": "UNIT0_VALUE_LO", "kind": "register", "offsetBytes": 16, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_value_lo.timer_unit0_value_lo", "name": "TIMER_UNIT0_VALUE_LO", "bitRange": { "lsb": 0, "msb": 31 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_hi", "name": "TARGET0_HI", "kind": "register", "offsetBytes": 20, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_hi.timer_target0_hi", "name": "TIMER_TARGET0_HI", "bitRange": { "lsb": 0, "msb": 19 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_lo", "name": "TARGET0_LO", "kind": "register", "offsetBytes": 24, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_lo.timer_target0_lo", "name": "TIMER_TARGET0_LO", "bitRange": { "lsb": 0, "msb": 31 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_conf", "name": "TARGET0_CONF", "kind": "register", "offsetBytes": 28, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_conf.target0_period", "name": "TARGET0_PERIOD", "bitRange": { "lsb": 0, "msb": 7 } },
+                { "id": "field.tim1.target0_conf.target0_period_mode", "name": "TARGET0_PERIOD_MODE", "bitRange": { "lsb": 8, "msb": 8 } },
+                { "id": "field.tim1.target0_conf.target0_timer_unit_sel", "name": "TARGET0_TIMER_UNIT_SEL", "bitRange": { "lsb": 9, "msb": 9 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.comp0_load", "name": "COMP0_LOAD", "kind": "register", "offsetBytes": 32, "widthBits": 32, "fields": [
+                { "id": "field.tim1.comp0_load.timer_comp0_load", "name": "TIMER_COMP0_LOAD", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.int_ena", "name": "INT_ENA", "kind": "register", "offsetBytes": 36, "widthBits": 32, "fields": [
+                { "id": "field.tim1.int_ena.target0_int_ena", "name": "TARGET0_INT_ENA", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.int_clr", "name": "INT_CLR", "kind": "register", "offsetBytes": 40, "widthBits": 32, "fields": [
+                { "id": "field.tim1.int_clr.target0_int_clr", "name": "TARGET0_INT_CLR", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+        ]);
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        operations.push(serde_json::json!({
+            "id": "op.tim1.clear_target0",
+            "name": "Clear TIM1 target0 interrupt",
+            "kind": "mode-transition",
+            "targetRefs": ["periph.tim1"],
+            "steps": [{
+                "index": 0,
+                "action": "write",
+                "targetRef": "reg.tim1.int_clr",
+                "expression": { "language": "plain", "text": "Set TARGET0_INT_CLR = 1" }
+            }]
+        }));
+
+        let interrupt_sources = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("interruptTopology")
+            .and_then(Value::as_object_mut)
+            .expect("interrupt topology")
+            .get_mut("sources")
+            .and_then(Value::as_array_mut)
+            .expect("interrupt sources");
+        interrupt_sources
+            .iter_mut()
+            .find(|source| {
+                source
+                    .as_object()
+                    .and_then(|item| item.get("id"))
+                    .and_then(Value::as_str)
+                    == Some("isrc.tim1")
+            })
+            .and_then(Value::as_object_mut)
+            .expect("tim1 interrupt source")
+            .insert(
+                "clearOperationRefs".to_string(),
+                serde_json::json!(["op.tim1.clear_target0"]),
+            );
+
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let tim1 = drivers[5].as_object_mut().expect("timer driver");
+        tim1.insert("modulePath".to_string(), Value::String("time".to_string()));
+        tim1.insert(
+            "capabilityTags".to_string(),
+            serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
+        );
+        tim1.insert(
+            "timeDriverSource".to_string(),
+            Value::String(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER.to_string()),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("hardware timer time-driver fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("omits required timeDriverTickHz")
+        );
     }
 
     #[test]

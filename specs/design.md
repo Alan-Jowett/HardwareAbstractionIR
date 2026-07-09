@@ -213,6 +213,17 @@ driver also exposes blocking delay helpers, those helpers must come from the
 same approved counter/alarm semantics instead of from repository-invented
 timing behavior.
 
+The generated core contract for that hardware-timer path must stay
+runtime-agnostic. In practice, that means the generated Embassy module may emit
+timer initialization, blocking delay helpers, the wake-handler entry point, and
+metadata describing the unique approved interrupt route, but it must not assume
+one specific board runtime owns interrupt binding. A board-level runtime layer
+may use that contract to map and enable the interrupt on a concrete platform
+such as ESP32-C3 without making `esp-hal` part of the core generated HAL model.
+That same contract must also preserve the timer tick frequency explicitly so the
+generated crate can select the matching `embassy-time-driver` tick-rate feature
+instead of silently falling back to Embassy's 1 MHz default.
+
 When a document also carries explicit normalization canonical mappings, Embassy
 lowering may use those mappings as secondary resolution hints for supported
 register, field, or peripheral concepts that recur across vendors. This is a
