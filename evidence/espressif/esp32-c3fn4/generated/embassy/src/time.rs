@@ -300,7 +300,7 @@ impl GeneratedHardwareTimerTimeDriver {
         must_modify_u32(GENERATED_TIME_INT_ENA_ADDRESS, GENERATED_TIME_INT_ENA_TARGET0_MASK, 0u32);
     }
 
-                    fn acknowledge_interrupt(&self) {
+    fn acknowledge_interrupt(&self) {
         must_modify_u32(0x6002306Cu64, 0x00000001u32, 0x00000001u32);
     }
 
@@ -340,7 +340,7 @@ impl EmbassyTimeDriver for GeneratedHardwareTimerTimeDriver {
         self.read_now()
     }
 
-                    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {
+    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {
         critical_section::with(|cs| {
             let now = self.read_now();
             let mut queue = self.queue.borrow(cs).borrow_mut();
