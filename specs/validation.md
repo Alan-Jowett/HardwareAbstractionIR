@@ -124,6 +124,17 @@ cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-
   Serial/JTAG path), generation succeeds only when the profile carries that
   explicit selector and the referenced semantic operations justify the emitted
   attach/reset-preservation sequence; otherwise generation fails explicitly.
+- If a driver instance claims `embassy-time-driver`, generation succeeds only
+  when the profile carries an explicit `timeDriverSource` selector and the
+  referenced interrupt, semantic, and structural inputs justify that exact
+  time-base architecture. Existing SysTick-backed paths must remain valid, while
+  hardware-timer-backed paths must fail explicitly unless they justify both the
+  async wake behavior and any claimed blocking delay helpers from approved HAIR
+  data. For approved hardware-timer paths, the emitted core contract must also
+  preserve the unique interrupt-route metadata and wake-handler hook needed for
+  a downstream runtime layer to bind and enable the interrupt explicitly, plus
+  the explicit Embassy tick rate needed to keep generated async durations
+  aligned with the modeled hardware timer.
 
 ## 3. Artifact-level validation
 

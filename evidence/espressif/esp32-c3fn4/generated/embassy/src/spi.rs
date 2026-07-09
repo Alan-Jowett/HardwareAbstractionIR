@@ -96,6 +96,7 @@ pub struct Spi2Resources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -110,6 +111,7 @@ pub const DRV_SPI2_RESOURCES: Spi2Resources = Spi2Resources {
     init_operations: DRV_SPI2_INIT_OPERATIONS,
     state_machines: DRV_SPI2_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_SPI2_CAPABILITY_TAGS,
 };
 

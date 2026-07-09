@@ -201,6 +201,29 @@ preserve a boot-established USB Serial/JTAG link instead of emitting a generic
 reset-and-reattach sequence; that distinction belongs in the approved profile
 contract plus referenced semantic operations, not in ad hoc code generation.
 
+Time-base support follows the same explicit-contract rule. The existing
+SysTick-backed `embassy-time-driver` path remains valid, but it is not the only
+allowed architecture. When a document claims a hardware-timer-backed Embassy
+time base, that choice must also be selected explicitly in
+`profiles.embassyHal` rather than inferred from `driverKind` or capability tags
+alone. The timer-backed path must remain evidence-bounded: the approved HAIR
+inputs need to justify how the timer is configured, started, acknowledged,
+advanced, and connected to the wake interrupt path. If the generated timer
+driver also exposes blocking delay helpers, those helpers must come from the
+same approved counter/alarm semantics instead of from repository-invented
+timing behavior.
+
+The generated core contract for that hardware-timer path must stay
+runtime-agnostic. In practice, that means the generated Embassy module may emit
+timer initialization, blocking delay helpers, the wake-handler entry point, and
+metadata describing the unique approved interrupt route, but it must not assume
+one specific board runtime owns interrupt binding. A board-level runtime layer
+may use that contract to map and enable the interrupt on a concrete platform
+such as ESP32-C3 without making `esp-hal` part of the core generated HAL model.
+That same contract must also preserve the timer tick frequency explicitly so the
+generated crate can select the matching `embassy-time-driver` tick-rate feature
+instead of silently falling back to Embassy's 1 MHz default.
+
 When a document also carries explicit normalization canonical mappings, Embassy
 lowering may use those mappings as secondary resolution hints for supported
 register, field, or peripheral concepts that recur across vendors. This is a

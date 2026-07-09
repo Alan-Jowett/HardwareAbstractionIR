@@ -7,5 +7,6 @@ pub mod i2c;
 pub mod interrupt;
 pub mod rcc;
 pub mod spi;
+pub mod time;
 pub mod uart;
 pub mod usb;

@@ -92,6 +92,7 @@ pub struct UsbSerialJtagResources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -106,6 +107,7 @@ pub const DRV_USB_DEVICE_RESOURCES: UsbSerialJtagResources = UsbSerialJtagResour
     init_operations: DRV_USB_DEVICE_INIT_OPERATIONS,
     state_machines: DRV_USB_DEVICE_STATE_MACHINES,
     lowering_pattern: Some("serial-jtag-preserve-link"),
+    time_driver_source: None,
     capability_tags: DRV_USB_DEVICE_CAPABILITY_TAGS,
 };
 
@@ -135,7 +137,7 @@ impl UsbSerialJtag {
     /// Queue one byte for the UsbSerialJtag Serial IN endpoint.
     pub fn write_serial_byte(&self, byte: u8) -> Result<(), metadata::Error> {
         while !self.serial_in_ready()? {}
-        write_u32(0x60043000u64, u32::from(byte))?;
+        write_u32(0x60043000u64, u32::from(byte) << 0)?;
         Ok(())
     }
 
@@ -150,7 +152,7 @@ impl UsbSerialJtag {
     /// Read one byte from the UsbSerialJtag Serial OUT endpoint.
     pub fn read_serial_byte(&self) -> Result<u8, metadata::Error> {
         while !self.serial_out_data_available()? {}
-        Ok((read_u32(0x60043000u64)? & 0x000000FFu32) as u8)
+        Ok(((read_u32(0x60043000u64)? & 0x000000FFu32) >> 0) as u8)
     }
 
     /// Read bytes from the UsbSerialJtag Serial OUT endpoint into the supplied buffer.

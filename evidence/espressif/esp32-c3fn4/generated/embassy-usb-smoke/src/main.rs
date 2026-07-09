@@ -1,26 +1,30 @@
 #![no_std]
 #![no_main]
 
-use core::hint::spin_loop;
-
+use embassy_executor::{Executor, task};
+use embassy_time::{Duration, Timer};
 use esp_hal as _;
 use esp32c3fn4_generated::{
     gpio::{DRV_GPIO_RESOURCES, GPIOPort, GPIOPortOutput, Level},
+    time::{DRV_TIME_RESOURCES, SystemTimer, generated_drv_time_time_driver_interrupt},
     usb::{DRV_USB_DEVICE_RESOURCES, UsbSerialJtag},
 };
 use panic_halt as _;
+use static_cell::StaticCell;
 
-const SHORT_DELAY_CYCLES: usize = 2_000_000;
-const LONG_DELAY_CYCLES: usize = 20_000_000;
-const USB_READY_POLL_CYCLES: usize = 50_000;
-const USB_READY_MAX_POLLS: usize = 200;
+const USB_READY_POLL_INTERVAL: Duration = Duration::from_millis(10);
+const HEARTBEAT_ON_INTERVAL: Duration = Duration::from_millis(100);
+const HEARTBEAT_OFF_INTERVAL: Duration = Duration::from_millis(400);
+const HELLO_INTERVAL: Duration = Duration::from_secs(1);
+
+static EXECUTOR: StaticCell<Executor> = StaticCell::new();
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-fn delay(cycles: usize) {
-    for _ in 0..cycles {
-        spin_loop();
-    }
+#[allow(non_snake_case)]
+#[unsafe(no_mangle)]
+extern "C" fn SYSTIMER_TARGET0() {
+    generated_drv_time_time_driver_interrupt();
 }
 
 fn note(usb: &UsbSerialJtag, message: &str) {
@@ -38,54 +42,54 @@ fn init_status_led() -> GPIOPortOutput {
     gpio.gpio10().into_output(Level::High).unwrap()
 }
 
-fn blink_code(led: &GPIOPortOutput, pulses: usize) {
-    for _ in 0..pulses {
-        led.set_low().unwrap();
-        delay(SHORT_DELAY_CYCLES);
-        led.set_high().unwrap();
-        delay(SHORT_DELAY_CYCLES);
-    }
-    delay(LONG_DELAY_CYCLES / 4);
+fn init_time() {
+    let timer = SystemTimer::new(DRV_TIME_RESOURCES).unwrap();
+    timer.init_time_driver().unwrap();
+    esp_hal::interrupt::enable(
+        esp_hal::peripherals::Interrupt::SYSTIMER_TARGET0,
+        esp_hal::interrupt::Priority::Priority1,
+    );
 }
 
-fn blink_forever(led: &GPIOPortOutput, pulses: usize) -> ! {
+async fn wait_for_usb_ready(usb: &UsbSerialJtag) {
     loop {
-        blink_code(led, pulses);
-        delay(LONG_DELAY_CYCLES / 2);
+        if usb.serial_in_ready().unwrap_or(false) {
+            return;
+        }
+        Timer::after(USB_READY_POLL_INTERVAL).await;
     }
 }
 
-fn wait_for_usb_ready(usb: &UsbSerialJtag) -> bool {
-    for _ in 0..USB_READY_MAX_POLLS {
-        if usb.serial_in_ready().unwrap_or(false) {
-            return true;
-        }
-        delay(USB_READY_POLL_CYCLES);
+#[task]
+async fn heartbeat_task(led: GPIOPortOutput) {
+    loop {
+        led.set_low().unwrap();
+        Timer::after(HEARTBEAT_ON_INTERVAL).await;
+        led.set_high().unwrap();
+        Timer::after(HEARTBEAT_OFF_INTERVAL).await;
     }
-    false
+}
+
+#[task]
+async fn usb_logger_task(usb: UsbSerialJtag) {
+    wait_for_usb_ready(&usb).await;
+    note(&usb, "ESP32-C3 USB Serial/JTAG smoke start\r\n");
+    loop {
+        note(&usb, "Hello World over USB Serial/JTAG\r\n");
+        Timer::after(HELLO_INTERVAL).await;
+    }
 }
 
 #[esp_hal::main]
 fn main() -> ! {
     let _peripherals = esp_hal::init(esp_hal::Config::default());
-    let led = init_status_led();
-    blink_code(&led, 1);
-
+    init_time();
     let usb = init_usb_serial_jtag();
-    blink_code(&led, 2);
+    let led = init_status_led();
 
-    if !wait_for_usb_ready(&usb) {
-        blink_forever(&led, 5);
-    }
-    blink_code(&led, 3);
-
-    note(&usb, "ESP32-C3 USB Serial/JTAG smoke start\r\n");
-    blink_code(&led, 4);
-
-    loop {
-        led.set_low().unwrap();
-        note(&usb, "Hello World over USB Serial/JTAG\r\n");
-        led.set_high().unwrap();
-        delay(LONG_DELAY_CYCLES);
-    }
+    let executor = EXECUTOR.init(Executor::new());
+    executor.run(|spawner| {
+        spawner.spawn(heartbeat_task(led)).unwrap();
+        spawner.spawn(usb_logger_task(usb)).unwrap();
+    })
 }

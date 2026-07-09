@@ -1646,6 +1646,10 @@ struct EmbassyDriverInstance {
     #[serde(default)]
     lowering_pattern: Option<String>,
     #[serde(default)]
+    time_driver_source: Option<String>,
+    #[serde(default)]
+    time_driver_tick_hz: Option<u64>,
+    #[serde(default)]
     clock_binding_refs: Vec<String>,
     #[serde(default)]
     reset_binding_refs: Vec<String>,
@@ -1696,6 +1700,8 @@ struct ResolvedDriverInstance {
     driver_kind: String,
     module_name: String,
     lowering_pattern: Option<String>,
+    time_driver_source: Option<String>,
+    time_driver_tick_hz: Option<u64>,
     target: McuCanonicalBlock,
     clock_bindings: Vec<McuClockBinding>,
     reset_bindings: Vec<McuResetBinding>,
@@ -1730,11 +1736,21 @@ struct DriverResourceScopeInputs<'a> {
 }
 
 const EMBASSY_TIME_DRIVER_TAG: &str = "embassy-time-driver";
+const EMBASSY_TIME_DRIVER_SOURCE_SYSTICK: &str = "systick";
+const EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER: &str = "hardware-timer";
 const USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK: &str = "serial-jtag-preserve-link";
 const USB_PRESERVE_LINK_OPERATION_ID: &str = "op.usb_device.preserve_serial_jtag_link";
 
 fn has_time_driver_tag(tags: &[String]) -> bool {
     tags.iter().any(|tag| tag == EMBASSY_TIME_DRIVER_TAG)
+}
+
+fn time_driver_source(driver: &ResolvedDriverInstance) -> Option<&str> {
+    driver.time_driver_source.as_deref()
+}
+
+fn time_driver_tick_hz(driver: &ResolvedDriverInstance) -> Option<u64> {
+    driver.time_driver_tick_hz
 }
 
 fn has_usb_preserve_link_lowering(pattern: Option<&str>) -> bool {
@@ -1766,6 +1782,7 @@ struct EmbassyGenerationModel {
     interrupts: Vec<Interrupt>,
     pins: Vec<PhysicalPin>,
     drivers: Vec<ResolvedDriverInstance>,
+    operations: HashMap<String, SemanticOperation>,
     peripherals: HashMap<String, Peripheral>,
     peripheral_names: HashMap<String, String>,
     register_owners: HashMap<String, Vec<String>>,
@@ -2033,6 +2050,8 @@ impl EmbassyGenerationModel {
                 driver_kind: driver.driver_kind.clone(),
                 module_name,
                 lowering_pattern: driver.lowering_pattern.clone(),
+                time_driver_source: driver.time_driver_source.clone(),
+                time_driver_tick_hz: driver.time_driver_tick_hz,
                 target,
                 clock_bindings,
                 reset_bindings,
@@ -2061,6 +2080,10 @@ impl EmbassyGenerationModel {
             interrupts: document.structure.device.interrupts.clone(),
             pins: document.physical.pins.clone(),
             drivers,
+            operations: operations
+                .iter()
+                .map(|(id, operation)| ((*id).to_string(), operation.clone()))
+                .collect(),
             peripherals,
             peripheral_names,
             register_owners,
@@ -2417,6 +2440,20 @@ fn validate_driver_module_scope(driver: &EmbassyDriverInstance, module_name: &st
             EMBASSY_TIME_DRIVER_TAG
         );
     }
+    if driver.time_driver_source.is_some() && !has_time_driver_tag(&driver.capability_tags) {
+        bail!(
+            "driver {} declares timeDriverSource without capability tag {}",
+            driver.id,
+            EMBASSY_TIME_DRIVER_TAG
+        );
+    }
+    if driver.time_driver_tick_hz.is_some() && !has_time_driver_tag(&driver.capability_tags) {
+        bail!(
+            "driver {} declares timeDriverTickHz without capability tag {}",
+            driver.id,
+            EMBASSY_TIME_DRIVER_TAG
+        );
+    }
     Ok(())
 }
 
@@ -2438,38 +2475,149 @@ fn validate_capability_tag_contracts(drivers: &[ResolvedDriverInstance]) -> Resu
         );
     }
     if let Some(driver) = time_drivers.first() {
-        if driver.driver_kind != "interrupt" {
-            bail!(
-                "driver {} claims capability tag {} but has unsupported driver kind {}; first-cut generated async timing currently requires interrupt lowering bound to SysTick",
-                driver.id,
-                EMBASSY_TIME_DRIVER_TAG,
-                driver.driver_kind
-            );
-        }
-        if driver.target.block_class != "interrupt-controller" {
-            bail!(
-                "driver {} claims capability tag {} with interrupt lowering, but target block {} is not an interrupt-controller",
-                driver.id,
-                EMBASSY_TIME_DRIVER_TAG,
-                driver.target.id
-            );
-        }
-        if driver.interrupt_routes.len() != 1 {
-            bail!(
-                "driver {} claims capability tag {} but must reference exactly one SysTick interrupt route",
+        let source = time_driver_source(driver).ok_or_else(|| {
+            anyhow!(
+                "driver {} claims capability tag {} but omits required timeDriverSource",
                 driver.id,
                 EMBASSY_TIME_DRIVER_TAG
-            );
-        }
-        let route = &driver.interrupt_routes[0];
-        if !is_systick_interrupt_ref(&route.interrupt_ref) {
-            bail!(
-                "driver {} claims capability tag {} but route {} targets {}; first-cut generated async timing currently requires the SysTick exception",
-                driver.id,
-                EMBASSY_TIME_DRIVER_TAG,
-                route.id,
-                route.interrupt_ref
-            );
+            )
+        })?;
+        match source {
+            EMBASSY_TIME_DRIVER_SOURCE_SYSTICK => {
+                if driver.time_driver_tick_hz.is_some() {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} and must not declare timeDriverTickHz; SysTick timing defines its own tick rate",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source
+                    );
+                }
+                if driver.driver_kind != "interrupt" {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but has unsupported driver kind {}; SysTick timing requires interrupt lowering",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source,
+                        driver.driver_kind
+                    );
+                }
+                if driver.target.block_class != "interrupt-controller" {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {}, but target block {} is not an interrupt-controller",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source,
+                        driver.target.id
+                    );
+                }
+                if driver.interrupt_routes.len() != 1 {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but must reference exactly one SysTick interrupt route",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source
+                    );
+                }
+                let route = &driver.interrupt_routes[0];
+                if !is_systick_interrupt_ref(&route.interrupt_ref) {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but route {} targets {}; SysTick timing requires the SysTick exception",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source,
+                        route.id,
+                        route.interrupt_ref
+                    );
+                }
+            }
+            EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER => {
+                let tick_hz = driver.time_driver_tick_hz.ok_or_else(|| {
+                    anyhow!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but omits required timeDriverTickHz",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source
+                    )
+                })?;
+                if tick_hz == 0 {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but timeDriverTickHz must be greater than zero",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source
+                    );
+                }
+                if driver.driver_kind != "timer" {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but has unsupported driver kind {}; hardware-timer timing requires a timer driver",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source,
+                        driver.driver_kind
+                    );
+                }
+                if driver.target.block_class != "timer-general" {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but target block {} is not timer-general",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source,
+                        driver.target.id
+                    );
+                }
+                if driver.interrupt_routes.len() != 1 || driver.interrupt_sources.len() != 1 {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but must reference exactly one timer interrupt route/source pair",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source
+                    );
+                }
+                let interrupt_source = &driver.interrupt_sources[0];
+                if interrupt_source.kind != "timer" {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but interrupt source {} is kind {} instead of timer",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source,
+                        interrupt_source.id,
+                        interrupt_source.kind
+                    );
+                }
+                if interrupt_source.clear_operation_refs.len() != 1 {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but interrupt source {} must expose exactly one clear operation",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source,
+                        interrupt_source.id
+                    );
+                }
+                if driver.clock_bindings.len() > 1 {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but first-cut hardware-timer timing supports at most one clock binding",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source
+                    );
+                }
+                if driver.reset_bindings.len() > 1 {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but first-cut hardware-timer timing supports at most one reset binding",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source
+                    );
+                }
+            }
+            other => {
+                bail!(
+                    "driver {} claims capability tag {} with unsupported timeDriverSource {}",
+                    driver.id,
+                    EMBASSY_TIME_DRIVER_TAG,
+                    other
+                );
+            }
         }
     }
     Ok(())
@@ -3248,11 +3396,41 @@ fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
         .iter()
         .any(|driver| has_time_driver_tag(&driver.capability_tags))
     {
-        out.push_str(
-            "\n[dependencies]\ncritical-section = \"1.2\"\nembassy-time-driver = \"0.2.2\"\nembassy-time-queue-utils = { version = \"0.3.2\", features = [\"generic-queue-8\"] }\n",
-        );
+        out.push_str("\n[dependencies]\ncritical-section = \"1.2\"\n");
+        out.push_str(&format!(
+            "{}\n",
+            render_embassy_time_driver_dependency(&model.drivers)
+        ));
+        out.push_str("embassy-time-queue-utils = { version = \"0.3.2\", features = [\"generic-queue-8\"] }\n");
     }
     out
+}
+
+fn render_tick_hz_feature(hz: u64) -> String {
+    let digits = hz.to_string();
+    let mut output = String::with_capacity(digits.len() + digits.len() / 3);
+    for (index, ch) in digits.chars().enumerate() {
+        if index != 0 && (digits.len() - index).is_multiple_of(3) {
+            output.push('_');
+        }
+        output.push(ch);
+    }
+    format!("tick-hz-{output}")
+}
+
+fn render_embassy_time_driver_dependency(drivers: &[ResolvedDriverInstance]) -> String {
+    let time_driver = drivers
+        .iter()
+        .find(|driver| has_time_driver_tag(&driver.capability_tags));
+    if let Some(driver) = time_driver
+        && let Some(tick_hz) = time_driver_tick_hz(driver)
+    {
+        return format!(
+            "embassy-time-driver = {{ version = \"0.2.2\", features = [{}] }}",
+            render_rust_string(&render_tick_hz_feature(tick_hz))
+        );
+    }
+    "embassy-time-driver = \"0.2.2\"".to_string()
 }
 
 fn render_embassy_lib_rs(model: &EmbassyGenerationModel) -> String {
@@ -3401,10 +3579,11 @@ fn render_driver_instance(
         render_named_entity_slice(&driver.capability_tags)
     ));
     out.push_str(&format!(
-        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub lowering_pattern: Option<&'static str>,\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    lowering_pattern: {lowering_pattern},\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n{support_items}",
+        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub lowering_pattern: Option<&'static str>,\n    pub time_driver_source: Option<&'static str>,\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    lowering_pattern: {lowering_pattern},\n    time_driver_source: {time_driver_source},\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n{support_items}",
         type_name = driver.type_name,
         const_prefix = const_prefix,
         lowering_pattern = render_optional_rust_string(driver.lowering_pattern.as_deref()),
+        time_driver_source = render_optional_rust_string(driver.time_driver_source.as_deref()),
         methods = render_driver_methods(model, driver)?,
         support_items = support_items
     ));
@@ -3420,7 +3599,7 @@ fn render_driver_support_items(
         out.push_str(&render_gpio_support_items(model, driver)?);
     }
     if has_time_driver_tag(&driver.capability_tags) {
-        out.push_str(&render_time_driver_support_items(model, driver));
+        out.push_str(&render_time_driver_support_items(model, driver)?);
     }
     Ok(out)
 }
@@ -3447,7 +3626,7 @@ fn render_driver_methods(
     methods.extend(render_usb_device_methods(model, driver)?);
     methods.extend(render_operation_methods(model, driver)?);
     methods.extend(render_state_machine_methods(model, driver)?);
-    methods.extend(render_time_driver_methods(driver));
+    methods.extend(render_time_driver_methods(driver)?);
 
     if methods.is_empty() {
         bail!(
@@ -3455,19 +3634,6 @@ fn render_driver_methods(
             driver.id,
             driver.driver_kind
         );
-    }
-
-    fn render_time_driver_methods(driver: &ResolvedDriverInstance) -> Vec<GeneratedMethod> {
-        if !has_time_driver_tag(&driver.capability_tags) {
-            return Vec::new();
-        }
-        vec![GeneratedMethod {
-            name: "init_time_driver".to_string(),
-            code: format!(
-                "    pub fn init_time_driver(&self) -> Result<(), metadata::Error> {{\n        initialize_{}_time_driver()\n    }}\n",
-                to_rust_const_name(&driver.id).to_lowercase()
-            ),
-        }]
     }
 
     let mut seen = BTreeSet::new();
@@ -3486,21 +3652,149 @@ fn render_driver_methods(
     Ok(rendered)
 }
 
+fn render_time_driver_methods(driver: &ResolvedDriverInstance) -> Result<Vec<GeneratedMethod>> {
+    if !has_time_driver_tag(&driver.capability_tags) {
+        return Ok(Vec::new());
+    }
+
+    let driver_prefix = to_rust_const_name(&driver.id).to_lowercase();
+    match time_driver_source(driver) {
+        Some(EMBASSY_TIME_DRIVER_SOURCE_SYSTICK) => Ok(vec![GeneratedMethod {
+            name: "init_time_driver".to_string(),
+            code: format!(
+                "    pub fn init_time_driver(&self) -> Result<(), metadata::Error> {{\n        initialize_{driver_prefix}_time_driver()\n    }}\n",
+            ),
+        }]),
+        Some(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER) => {
+            let mut init_code =
+                "    pub fn init_time_driver(&self) -> Result<(), metadata::Error> {\n".to_string();
+            if !driver.clock_bindings.is_empty() {
+                init_code.push_str("        self.enable_clock()?;\n");
+            }
+            if !driver.reset_bindings.is_empty() {
+                init_code.push_str("        self.release_reset()?;\n");
+            }
+            for operation in &driver.init_operations {
+                init_code.push_str(&format!(
+                    "        self.apply_{}()?;\n",
+                    operation_method_slug(operation)
+                ));
+            }
+            init_code.push_str(&format!(
+                "        initialize_{driver_prefix}_time_driver()\n    }}\n"
+            ));
+            Ok(vec![
+                GeneratedMethod {
+                    name: "init_time_driver".to_string(),
+                    code: init_code,
+                },
+                GeneratedMethod {
+                    name: "now_ticks".to_string(),
+                    code: format!(
+                        "    pub fn now_ticks(&self) -> u64 {{\n        generated_{driver_prefix}_time_driver_now()\n    }}\n"
+                    ),
+                },
+                GeneratedMethod {
+                    name: "delay_ticks".to_string(),
+                    code: format!(
+                        "    pub fn delay_ticks(&self, ticks: u64) -> Result<(), metadata::Error> {{\n        generated_{driver_prefix}_time_driver_delay_ticks(ticks)\n    }}\n"
+                    ),
+                },
+                GeneratedMethod {
+                    name: "on_time_driver_interrupt".to_string(),
+                    code: format!(
+                        "    pub fn on_time_driver_interrupt(&self) {{\n        generated_{driver_prefix}_time_driver_interrupt();\n    }}\n"
+                    ),
+                },
+            ])
+        }
+        Some(other) => bail!(
+            "driver {} uses unsupported timeDriverSource {} for generated time-driver methods",
+            driver.id,
+            other
+        ),
+        None => bail!(
+            "driver {} claims capability tag {} but omits required timeDriverSource",
+            driver.id,
+            EMBASSY_TIME_DRIVER_TAG
+        ),
+    }
+}
+
 fn render_mmio_helpers() -> &'static str {
     "#[allow(dead_code)]\nfn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {\n    let address = usize::try_from(address)\n        .map_err(|_| metadata::Error::Unsupported(\"MMIO address does not fit usize on this target\"))?;\n    if address % align != 0 {\n        return Err(metadata::Error::Unsupported(\"MMIO address is not naturally aligned for the target register width\"));\n    }\n    Ok(address)\n}\n\n#[allow(dead_code)]\nfn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u8>())?;\n    unsafe {\n        let current = read_volatile(address as *const u8);\n        write_volatile(address as *mut u8, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u16>())?;\n    unsafe {\n        let current = read_volatile(address as *const u16);\n        write_volatile(address as *mut u16, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        let current = read_volatile(address as *const u32);\n        write_volatile(address as *mut u32, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn read_u32(address: u64) -> Result<u32, metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe { Ok(read_volatile(address as *const u32)) }\n}\n\n#[allow(dead_code)]\nfn write_u32(address: u64, value: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        write_volatile(address as *mut u32, value);\n    }\n    Ok(())\n}\n"
 }
 
 fn render_time_driver_support_items(
-    _model: &EmbassyGenerationModel,
+    model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
-) -> String {
-    let init_fn = format!(
-        "initialize_{}_time_driver",
-        to_rust_const_name(&driver.id).to_lowercase()
-    );
-    format!(
-        "\nuse core::cell::{{Cell, RefCell}};\nuse critical_section::Mutex as CriticalSectionMutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nconst SYST_CSR_ADDRESS: u64 = 0xE000_E010;\nconst SYST_RVR_ADDRESS: u64 = 0xE000_E014;\nconst SYST_CVR_ADDRESS: u64 = 0xE000_E018;\nconst SYST_CSR_ENABLE: u32 = 1 << 0;\nconst SYST_CSR_TICKINT: u32 = 1 << 1;\nconst SYST_CSR_CLKSOURCE: u32 = 1 << 2;\nconst SYST_RELOAD_VALUE: u32 = 15;\n\nstruct GeneratedSystickTimeDriver {{\n    initialized: CriticalSectionMutex<Cell<bool>>,\n    ticks: CriticalSectionMutex<Cell<u64>>,\n    queue: CriticalSectionMutex<RefCell<EmbassyTimeQueue>>,\n}}\n\nimpl GeneratedSystickTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            initialized: CriticalSectionMutex::new(Cell::new(false)),\n            ticks: CriticalSectionMutex::new(Cell::new(0)),\n            queue: CriticalSectionMutex::new(RefCell::new(EmbassyTimeQueue::new())),\n        }}\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        critical_section::with(|cs| {{\n            if self.initialized.borrow(cs).get() {{\n                return Ok(());\n            }}\n            self.ticks.borrow(cs).set(0);\n            write_u32(SYST_CSR_ADDRESS, 0)?;\n            write_u32(SYST_RVR_ADDRESS, SYST_RELOAD_VALUE)?;\n            write_u32(SYST_CVR_ADDRESS, 0)?;\n            write_u32(\n                SYST_CSR_ADDRESS,\n                SYST_CSR_ENABLE | SYST_CSR_TICKINT | SYST_CSR_CLKSOURCE,\n            )?;\n            self.initialized.borrow(cs).set(true);\n            Ok(())\n        }})\n    }}\n\n    fn on_systick(&self) {{\n        critical_section::with(|cs| {{\n            if !self.initialized.borrow(cs).get() {{\n                return;\n            }}\n            let now = self.ticks.borrow(cs).get().wrapping_add(1);\n            self.ticks.borrow(cs).set(now);\n            let _ = self.queue.borrow(cs).borrow_mut().next_expiration(now);\n        }});\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedSystickTimeDriver {{\n    fn now(&self) -> u64 {{\n        critical_section::with(|cs| self.ticks.borrow(cs).get())\n    }}\n\n    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {{\n        critical_section::with(|cs| {{\n            let now = self.ticks.borrow(cs).get();\n            let mut queue = self.queue.borrow(cs).borrow_mut();\n            let _ = queue.schedule_wake(at, waker);\n            let _ = queue.next_expiration(now);\n        }});\n    }}\n}}\n\n        embassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedSystickTimeDriver = GeneratedSystickTimeDriver::new());\n\n#[allow(dead_code)]\n#[allow(non_snake_case)]\n#[unsafe(no_mangle)]\nextern \"C\" fn SysTick() {{\n    GENERATED_TIME_DRIVER.on_systick();\n}}\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.init()\n}}\n"
-    )
+) -> Result<String> {
+    let driver_prefix = to_rust_const_name(&driver.id).to_lowercase();
+    let init_fn = format!("initialize_{driver_prefix}_time_driver");
+    match time_driver_source(driver) {
+        Some(EMBASSY_TIME_DRIVER_SOURCE_SYSTICK) => Ok(format!(
+            "\nuse core::cell::{{Cell, RefCell}};\nuse critical_section::Mutex as CriticalSectionMutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nconst SYST_CSR_ADDRESS: u64 = 0xE000_E010;\nconst SYST_RVR_ADDRESS: u64 = 0xE000_E014;\nconst SYST_CVR_ADDRESS: u64 = 0xE000_E018;\nconst SYST_CSR_ENABLE: u32 = 1 << 0;\nconst SYST_CSR_TICKINT: u32 = 1 << 1;\nconst SYST_CSR_CLKSOURCE: u32 = 1 << 2;\nconst SYST_RELOAD_VALUE: u32 = 15;\n\nstruct GeneratedSystickTimeDriver {{\n    initialized: CriticalSectionMutex<Cell<bool>>,\n    ticks: CriticalSectionMutex<Cell<u64>>,\n    queue: CriticalSectionMutex<RefCell<EmbassyTimeQueue>>,\n}}\n\nimpl GeneratedSystickTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            initialized: CriticalSectionMutex::new(Cell::new(false)),\n            ticks: CriticalSectionMutex::new(Cell::new(0)),\n            queue: CriticalSectionMutex::new(RefCell::new(EmbassyTimeQueue::new())),\n        }}\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        critical_section::with(|cs| {{\n            if self.initialized.borrow(cs).get() {{\n                return Ok(());\n            }}\n            self.ticks.borrow(cs).set(0);\n            write_u32(SYST_CSR_ADDRESS, 0)?;\n            write_u32(SYST_RVR_ADDRESS, SYST_RELOAD_VALUE)?;\n            write_u32(SYST_CVR_ADDRESS, 0)?;\n            write_u32(\n                SYST_CSR_ADDRESS,\n                SYST_CSR_ENABLE | SYST_CSR_TICKINT | SYST_CSR_CLKSOURCE,\n            )?;\n            self.initialized.borrow(cs).set(true);\n            Ok(())\n        }})\n    }}\n\n    fn on_systick(&self) {{\n        critical_section::with(|cs| {{\n            if !self.initialized.borrow(cs).get() {{\n                return;\n            }}\n            let now = self.ticks.borrow(cs).get().wrapping_add(1);\n            self.ticks.borrow(cs).set(now);\n            let _ = self.queue.borrow(cs).borrow_mut().next_expiration(now);\n        }});\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedSystickTimeDriver {{\n    fn now(&self) -> u64 {{\n        critical_section::with(|cs| self.ticks.borrow(cs).get())\n    }}\n\n    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {{\n        critical_section::with(|cs| {{\n            let now = self.ticks.borrow(cs).get();\n            let mut queue = self.queue.borrow(cs).borrow_mut();\n            let _ = queue.schedule_wake(at, waker);\n            let _ = queue.next_expiration(now);\n        }});\n    }}\n}}\n\nembassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedSystickTimeDriver = GeneratedSystickTimeDriver::new());\n\n#[allow(dead_code)]\n#[allow(non_snake_case)]\n#[unsafe(no_mangle)]\nextern \"C\" fn SysTick() {{\n    GENERATED_TIME_DRIVER.on_systick();\n}}\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.init()\n}}\n"
+        )),
+        Some(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER) => {
+            let layout = resolve_hardware_timer_time_driver_layout(model, driver)?;
+            let clear_must_statement = layout
+                .clear_statement
+                .replace("modify_u8(", "must_modify_u8(")
+                .replace("modify_u16(", "must_modify_u16(")
+                .replace("modify_u32(", "must_modify_u32(")
+                .replace("write_u32(", "must_write_u32(")
+                .replace("?;\n", ";\n");
+            let disarm_alarm = "    fn disarm_alarm(&self) {\n        must_modify_u32(GENERATED_TIME_INT_ENA_ADDRESS, GENERATED_TIME_INT_ENA_TARGET0_MASK, 0u32);\n    }\n";
+            let acknowledge_interrupt =
+                format!("    fn acknowledge_interrupt(&self) {{\n{clear_must_statement}    }}\n");
+            let schedule_wake_impl = "    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {\n        let should_rearm = critical_section::with(|cs| {\n            self.queue.borrow(cs).borrow_mut().schedule_wake(at, waker)\n        });\n        if !should_rearm {\n            return;\n        }\n        let now = self.read_now();\n        critical_section::with(|cs| {\n            let next = self.queue.borrow(cs).borrow_mut().next_expiration(now);\n            if next == u64::MAX {\n                self.disarm_alarm();\n            } else {\n                self.arm_alarm(next);\n            }\n        });\n    }\n";
+            Ok(format!(
+                "\nuse core::cell::{{Cell, RefCell}};\nuse critical_section::Mutex as CriticalSectionMutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nconst GENERATED_TIME_CONF_ADDRESS: u64 = 0x{conf_addr:X}u64;\nconst GENERATED_TIME_CONF_CLK_EN_MASK: u32 = 0x{conf_clk_en_mask:08X}u32;\nconst GENERATED_TIME_CONF_TARGET0_WORK_EN_MASK: u32 = 0x{conf_target0_work_en_mask:08X}u32;\nconst GENERATED_TIME_CONF_UNIT0_WORK_EN_MASK: u32 = 0x{conf_unit0_work_en_mask:08X}u32;\nconst GENERATED_TIME_UNIT0_OP_ADDRESS: u64 = 0x{unit0_op_addr:X}u64;\nconst GENERATED_TIME_UNIT0_OP_VALUE_VALID_MASK: u32 = 0x{unit0_value_valid_mask:08X}u32;\nconst GENERATED_TIME_UNIT0_OP_UPDATE_MASK: u32 = 0x{unit0_update_mask:08X}u32;\nconst GENERATED_TIME_UNIT0_VALUE_HI_ADDRESS: u64 = 0x{unit0_value_hi_addr:X}u64;\nconst GENERATED_TIME_UNIT0_VALUE_HI_MASK: u32 = 0x{unit0_value_hi_mask:08X}u32;\nconst GENERATED_TIME_UNIT0_VALUE_HI_SHIFT: u32 = {unit0_value_hi_shift};\nconst GENERATED_TIME_UNIT0_VALUE_LO_ADDRESS: u64 = 0x{unit0_value_lo_addr:X}u64;\nconst GENERATED_TIME_UNIT0_VALUE_LO_MASK: u32 = 0x{unit0_value_lo_mask:08X}u32;\nconst GENERATED_TIME_UNIT0_VALUE_LO_SHIFT: u32 = {unit0_value_lo_shift};\nconst GENERATED_TIME_TARGET0_HI_ADDRESS: u64 = 0x{target0_hi_addr:X}u64;\nconst GENERATED_TIME_TARGET0_HI_MASK: u32 = 0x{target0_hi_mask:08X}u32;\nconst GENERATED_TIME_TARGET0_HI_SHIFT: u32 = {target0_hi_shift};\nconst GENERATED_TIME_TARGET0_LO_ADDRESS: u64 = 0x{target0_lo_addr:X}u64;\nconst GENERATED_TIME_TARGET0_LO_MASK: u32 = 0x{target0_lo_mask:08X}u32;\nconst GENERATED_TIME_TARGET0_LO_SHIFT: u32 = {target0_lo_shift};\nconst GENERATED_TIME_TARGET0_CONF_ADDRESS: u64 = 0x{target0_conf_addr:X}u64;\nconst GENERATED_TIME_TARGET0_PERIOD_MASK: u32 = 0x{target0_period_mask:08X}u32;\nconst GENERATED_TIME_TARGET0_PERIOD_MODE_MASK: u32 = 0x{target0_period_mode_mask:08X}u32;\nconst GENERATED_TIME_TARGET0_UNIT_SEL_MASK: u32 = 0x{target0_unit_sel_mask:08X}u32;\nconst GENERATED_TIME_COMP0_LOAD_ADDRESS: u64 = 0x{comp0_load_addr:X}u64;\nconst GENERATED_TIME_COMP0_LOAD_MASK: u32 = 0x{comp0_load_mask:08X}u32;\nconst GENERATED_TIME_COMP0_LOAD_SHIFT: u32 = {comp0_load_shift};\nconst GENERATED_TIME_INT_ENA_ADDRESS: u64 = 0x{int_ena_addr:X}u64;\nconst GENERATED_TIME_INT_ENA_TARGET0_MASK: u32 = 0x{int_ena_mask:08X}u32;\n\nstruct GeneratedHardwareTimerTimeDriver {{\n    initialized: CriticalSectionMutex<Cell<bool>>,\n    queue: CriticalSectionMutex<RefCell<EmbassyTimeQueue>>,\n}}\n\nimpl GeneratedHardwareTimerTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            initialized: CriticalSectionMutex::new(Cell::new(false)),\n            queue: CriticalSectionMutex::new(RefCell::new(EmbassyTimeQueue::new())),\n        }}\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        critical_section::with(|cs| {{\n            if self.initialized.borrow(cs).get() {{\n                return Ok(());\n            }}\n            modify_u32(\n                GENERATED_TIME_CONF_ADDRESS,\n                0u32,\n                GENERATED_TIME_CONF_CLK_EN_MASK\n                    | GENERATED_TIME_CONF_TARGET0_WORK_EN_MASK\n                    | GENERATED_TIME_CONF_UNIT0_WORK_EN_MASK,\n            )?;\n            modify_u32(\n                GENERATED_TIME_TARGET0_CONF_ADDRESS,\n                GENERATED_TIME_TARGET0_PERIOD_MASK\n                    | GENERATED_TIME_TARGET0_PERIOD_MODE_MASK\n                    | GENERATED_TIME_TARGET0_UNIT_SEL_MASK,\n                0u32,\n            )?;\n            modify_u32(GENERATED_TIME_INT_ENA_ADDRESS, GENERATED_TIME_INT_ENA_TARGET0_MASK, 0u32)?;\n{clear_statement}            self.initialized.borrow(cs).set(true);\n            Ok(())\n        }})\n    }}\n\n    fn read_now(&self) -> u64 {{\n        must_modify_u32(\n            GENERATED_TIME_UNIT0_OP_ADDRESS,\n            GENERATED_TIME_UNIT0_OP_UPDATE_MASK,\n            GENERATED_TIME_UNIT0_OP_UPDATE_MASK,\n        );\n        loop {{\n            if (must_read_u32(GENERATED_TIME_UNIT0_OP_ADDRESS) & GENERATED_TIME_UNIT0_OP_VALUE_VALID_MASK) != 0 {{\n                let high = ((must_read_u32(GENERATED_TIME_UNIT0_VALUE_HI_ADDRESS) & GENERATED_TIME_UNIT0_VALUE_HI_MASK) >> GENERATED_TIME_UNIT0_VALUE_HI_SHIFT) as u64;\n                let low = ((must_read_u32(GENERATED_TIME_UNIT0_VALUE_LO_ADDRESS) & GENERATED_TIME_UNIT0_VALUE_LO_MASK) >> GENERATED_TIME_UNIT0_VALUE_LO_SHIFT) as u64;\n                return (high << 32) | low;\n            }}\n        }}\n    }}\n\n    fn arm_alarm(&self, at: u64) {{\n        let high = ((at >> 32) as u32) << GENERATED_TIME_TARGET0_HI_SHIFT;\n        let low = (at as u32) << GENERATED_TIME_TARGET0_LO_SHIFT;\n        must_modify_u32(GENERATED_TIME_TARGET0_HI_ADDRESS, GENERATED_TIME_TARGET0_HI_MASK, high & GENERATED_TIME_TARGET0_HI_MASK);\n        must_modify_u32(GENERATED_TIME_TARGET0_LO_ADDRESS, GENERATED_TIME_TARGET0_LO_MASK, low & GENERATED_TIME_TARGET0_LO_MASK);\n        must_modify_u32(\n            GENERATED_TIME_TARGET0_CONF_ADDRESS,\n            GENERATED_TIME_TARGET0_PERIOD_MASK | GENERATED_TIME_TARGET0_PERIOD_MODE_MASK | GENERATED_TIME_TARGET0_UNIT_SEL_MASK,\n            0u32,\n        );\n        must_modify_u32(\n            GENERATED_TIME_COMP0_LOAD_ADDRESS,\n            GENERATED_TIME_COMP0_LOAD_MASK,\n            (1u32 << GENERATED_TIME_COMP0_LOAD_SHIFT) & GENERATED_TIME_COMP0_LOAD_MASK,\n        );\n        must_modify_u32(\n            GENERATED_TIME_INT_ENA_ADDRESS,\n            GENERATED_TIME_INT_ENA_TARGET0_MASK,\n            GENERATED_TIME_INT_ENA_TARGET0_MASK,\n        );\n    }}\n\n{disarm_alarm}\n{acknowledge_interrupt}\n    fn on_interrupt(&self) {{\n        critical_section::with(|cs| {{\n            if !self.initialized.borrow(cs).get() {{\n                return;\n            }}\n            self.acknowledge_interrupt();\n            let now = self.read_now();\n            let mut queue = self.queue.borrow(cs).borrow_mut();\n            let next = queue.next_expiration(now);\n            if next == u64::MAX {{\n                self.disarm_alarm();\n            }} else {{\n                self.arm_alarm(next);\n            }}\n        }});\n    }}\n\n    fn delay_ticks(&self, ticks: u64) -> Result<(), metadata::Error> {{\n        let start = self.read_now();\n        let deadline = start.wrapping_add(ticks);\n        loop {{\n            let now = self.read_now();\n            if now.wrapping_sub(deadline) < (1u64 << 63) {{\n                break;\n            }}\n            core::hint::spin_loop();\n        }}\n        Ok(())\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedHardwareTimerTimeDriver {{\n    fn now(&self) -> u64 {{\n        self.read_now()\n    }}\n\n{schedule_wake_impl}}}\n\n#[allow(dead_code)]\nfn must_read_u32(address: u64) -> u32 {{\n    read_u32(address).expect(\"generated time-driver MMIO read\")\n}}\n\n#[allow(dead_code)]\nfn must_modify_u8(address: u64, clear_mask: u8, set_mask: u8) {{\n    modify_u8(address, clear_mask, set_mask).expect(\"generated time-driver MMIO write\")\n}}\n\n#[allow(dead_code)]\nfn must_modify_u16(address: u64, clear_mask: u16, set_mask: u16) {{\n    modify_u16(address, clear_mask, set_mask).expect(\"generated time-driver MMIO write\")\n}}\n\n#[allow(dead_code)]\nfn must_modify_u32(address: u64, clear_mask: u32, set_mask: u32) {{\n    modify_u32(address, clear_mask, set_mask).expect(\"generated time-driver MMIO write\")\n}}\n\n#[allow(dead_code)]\nfn must_write_u32(address: u64, value: u32) {{\n    write_u32(address, value).expect(\"generated time-driver MMIO write\")\n}}\n\nembassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedHardwareTimerTimeDriver = GeneratedHardwareTimerTimeDriver::new());\n\n#[allow(dead_code)]\npub fn generated_{driver_prefix}_time_driver_interrupt() {{\n    GENERATED_TIME_DRIVER.on_interrupt();\n}}\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.init()\n}}\n\nfn generated_{driver_prefix}_time_driver_now() -> u64 {{\n    GENERATED_TIME_DRIVER.now()\n}}\n\nfn generated_{driver_prefix}_time_driver_delay_ticks(ticks: u64) -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.delay_ticks(ticks)\n}}\n",
+                conf_addr = layout.conf_clk_en.register.absolute_address,
+                conf_clk_en_mask = layout.conf_clk_en.mask,
+                conf_target0_work_en_mask = layout.conf_target0_work_en.mask,
+                conf_unit0_work_en_mask = layout.conf_unit0_work_en.mask,
+                unit0_op_addr = layout.unit0_op_update.register.absolute_address,
+                unit0_value_valid_mask = layout.unit0_op_value_valid.mask,
+                unit0_update_mask = layout.unit0_op_update.mask,
+                unit0_value_hi_addr = layout.unit0_value_hi.register.absolute_address,
+                unit0_value_hi_mask = layout.unit0_value_hi.mask,
+                unit0_value_hi_shift = layout.unit0_value_hi.lsb,
+                unit0_value_lo_addr = layout.unit0_value_lo.register.absolute_address,
+                unit0_value_lo_mask = layout.unit0_value_lo.mask,
+                unit0_value_lo_shift = layout.unit0_value_lo.lsb,
+                target0_hi_addr = layout.target0_hi.register.absolute_address,
+                target0_hi_mask = layout.target0_hi.mask,
+                target0_hi_shift = layout.target0_hi.lsb,
+                target0_lo_addr = layout.target0_lo.register.absolute_address,
+                target0_lo_mask = layout.target0_lo.mask,
+                target0_lo_shift = layout.target0_lo.lsb,
+                target0_conf_addr = layout.target0_conf_period.register.absolute_address,
+                target0_period_mask = layout.target0_conf_period.mask,
+                target0_period_mode_mask = layout.target0_conf_period_mode.mask,
+                target0_unit_sel_mask = layout.target0_conf_unit_sel.mask,
+                comp0_load_addr = layout.comp0_load.register.absolute_address,
+                comp0_load_mask = layout.comp0_load.mask,
+                comp0_load_shift = layout.comp0_load.lsb,
+                int_ena_addr = layout.int_ena_target0.register.absolute_address,
+                int_ena_mask = layout.int_ena_target0.mask,
+                clear_statement = layout.clear_statement,
+                disarm_alarm = disarm_alarm,
+                acknowledge_interrupt = acknowledge_interrupt,
+                schedule_wake_impl = schedule_wake_impl,
+            ))
+        }
+        Some(other) => bail!(
+            "driver {} uses unsupported timeDriverSource {} for generated time-driver support",
+            driver.id,
+            other
+        ),
+        None => bail!(
+            "driver {} claims capability tag {} but omits required timeDriverSource",
+            driver.id,
+            EMBASSY_TIME_DRIVER_TAG
+        ),
+    }
 }
 
 fn render_gpio_module_prelude() -> &'static str {
@@ -6004,6 +6298,226 @@ fn resolve_target_register_by_name(
             )
         },
     )
+}
+
+#[derive(Debug, Clone)]
+struct TimeDriverFieldAccess {
+    register: ResolvedRegister,
+    mask: u32,
+    lsb: u32,
+}
+
+struct HardwareTimerTimeDriverLayout {
+    conf_clk_en: TimeDriverFieldAccess,
+    conf_target0_work_en: TimeDriverFieldAccess,
+    conf_unit0_work_en: TimeDriverFieldAccess,
+    unit0_op_value_valid: TimeDriverFieldAccess,
+    unit0_op_update: TimeDriverFieldAccess,
+    unit0_value_hi: TimeDriverFieldAccess,
+    unit0_value_lo: TimeDriverFieldAccess,
+    target0_hi: TimeDriverFieldAccess,
+    target0_lo: TimeDriverFieldAccess,
+    target0_conf_period: TimeDriverFieldAccess,
+    target0_conf_period_mode: TimeDriverFieldAccess,
+    target0_conf_unit_sel: TimeDriverFieldAccess,
+    comp0_load: TimeDriverFieldAccess,
+    int_ena_target0: TimeDriverFieldAccess,
+    clear_statement: String,
+}
+
+fn resolve_time_driver_field_access(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+    register_name: &str,
+    field_name: &str,
+) -> Result<TimeDriverFieldAccess> {
+    let register =
+        resolve_target_register_by_name(model, &driver.target.target_ref, register_name)?;
+    let field = resolve_register_field(&register, field_name)?;
+    Ok(TimeDriverFieldAccess {
+        mask: field_bit_mask_or_range_mask(&field, &register)?,
+        lsb: field.lsb,
+        register,
+    })
+}
+
+fn render_time_driver_clear_statement(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    let driver_target_ref = driver.target.target_ref.as_str();
+    let [interrupt_source] = driver.interrupt_sources.as_slice() else {
+        bail!(
+            "driver {} must resolve exactly one interrupt source for generated time-driver clearing",
+            driver.id
+        );
+    };
+    let [clear_ref] = interrupt_source.clear_operation_refs.as_slice() else {
+        bail!(
+            "driver {} interrupt source {} must expose exactly one clear operation",
+            driver.id,
+            interrupt_source.id
+        );
+    };
+    let operation = model.operations.get(clear_ref).ok_or_else(|| {
+        anyhow!(
+            "driver {} interrupt source {} references unknown clear operation {}",
+            driver.id,
+            interrupt_source.id,
+            clear_ref
+        )
+    })?;
+    for operation_target in &operation.target_refs {
+        if operation_target != driver_target_ref {
+            bail!(
+                "driver {} clear operation {} targets {} instead of {}",
+                driver.id,
+                operation.id,
+                operation_target,
+                driver_target_ref
+            );
+        }
+    }
+    if operation.steps.len() != 1 {
+        bail!(
+            "driver {} clear operation {} must use exactly one write step for first-cut generated time-driver clearing",
+            driver.id,
+            operation.id
+        );
+    }
+    let step = &operation.steps[0];
+    if step.action != "write" {
+        bail!(
+            "driver {} clear operation {} uses unsupported action {}",
+            driver.id,
+            operation.id,
+            step.action
+        );
+    }
+    let step_target_ref = step.target_ref.as_deref().ok_or_else(|| {
+        anyhow!(
+            "driver {} clear operation {} step {} is missing targetRef",
+            driver.id,
+            operation.id,
+            step.index
+        )
+    })?;
+    let register = model.registers.get(step_target_ref).ok_or_else(|| {
+        anyhow!(
+            "driver {} clear operation {} step {} references unknown register {}",
+            driver.id,
+            operation.id,
+            step.index,
+            step_target_ref
+        )
+    })?;
+    if register.peripheral_ref != driver_target_ref {
+        bail!(
+            "driver {} clear operation {} step {} references register {} on {} instead of {}",
+            driver.id,
+            operation.id,
+            step.index,
+            step_target_ref,
+            register.peripheral_ref,
+            driver_target_ref
+        );
+    }
+    let parsed = parse_field_write_expression(
+        step.expression.as_ref(),
+        step.value.as_ref(),
+        &operation.id,
+        step.index,
+    )?;
+    let field = resolve_register_field(register, &parsed.field_name)?;
+    render_register_write_statement(register, &field, parsed.value, "        ")
+}
+
+fn resolve_hardware_timer_time_driver_layout(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<HardwareTimerTimeDriverLayout> {
+    Ok(HardwareTimerTimeDriverLayout {
+        conf_clk_en: resolve_time_driver_field_access(model, driver, "CONF", "CLK_EN")?,
+        conf_target0_work_en: resolve_time_driver_field_access(
+            model,
+            driver,
+            "CONF",
+            "TARGET0_WORK_EN",
+        )?,
+        conf_unit0_work_en: resolve_time_driver_field_access(
+            model,
+            driver,
+            "CONF",
+            "TIMER_UNIT0_WORK_EN",
+        )?,
+        unit0_op_value_valid: resolve_time_driver_field_access(
+            model,
+            driver,
+            "UNIT0_OP",
+            "TIMER_UNIT0_VALUE_VALID",
+        )?,
+        unit0_op_update: resolve_time_driver_field_access(
+            model,
+            driver,
+            "UNIT0_OP",
+            "TIMER_UNIT0_UPDATE",
+        )?,
+        unit0_value_hi: resolve_time_driver_field_access(
+            model,
+            driver,
+            "UNIT0_VALUE_HI",
+            "TIMER_UNIT0_VALUE_HI",
+        )?,
+        unit0_value_lo: resolve_time_driver_field_access(
+            model,
+            driver,
+            "UNIT0_VALUE_LO",
+            "TIMER_UNIT0_VALUE_LO",
+        )?,
+        target0_hi: resolve_time_driver_field_access(
+            model,
+            driver,
+            "TARGET0_HI",
+            "TIMER_TARGET0_HI",
+        )?,
+        target0_lo: resolve_time_driver_field_access(
+            model,
+            driver,
+            "TARGET0_LO",
+            "TIMER_TARGET0_LO",
+        )?,
+        target0_conf_period: resolve_time_driver_field_access(
+            model,
+            driver,
+            "TARGET0_CONF",
+            "TARGET0_PERIOD",
+        )?,
+        target0_conf_period_mode: resolve_time_driver_field_access(
+            model,
+            driver,
+            "TARGET0_CONF",
+            "TARGET0_PERIOD_MODE",
+        )?,
+        target0_conf_unit_sel: resolve_time_driver_field_access(
+            model,
+            driver,
+            "TARGET0_CONF",
+            "TARGET0_TIMER_UNIT_SEL",
+        )?,
+        comp0_load: resolve_time_driver_field_access(
+            model,
+            driver,
+            "COMP0_LOAD",
+            "TIMER_COMP0_LOAD",
+        )?,
+        int_ena_target0: resolve_time_driver_field_access(
+            model,
+            driver,
+            "INT_ENA",
+            "TARGET0_INT_ENA",
+        )?,
+        clear_statement: render_time_driver_clear_statement(model, driver)?,
+    })
 }
 
 fn try_resolve_target_register_by_name(
@@ -8734,9 +9248,12 @@ fn render_embassy_host_cargo_toml(model: &EmbassyGenerationModel) -> String {
         .iter()
         .any(|driver| has_time_driver_tag(&driver.capability_tags))
     {
-        out.push_str(
-            "\n[dependencies]\nembassy-time-driver = \"0.2.2\"\nembassy-time-queue-utils = { version = \"0.3.2\", features = [\"generic-queue-8\"] }\n",
-        );
+        out.push_str("\n[dependencies]\n");
+        out.push_str(&format!(
+            "{}\n",
+            render_embassy_time_driver_dependency(&model.drivers)
+        ));
+        out.push_str("embassy-time-queue-utils = { version = \"0.3.2\", features = [\"generic-queue-8\"] }\n");
     }
     out
 }
@@ -8970,10 +9487,11 @@ fn render_embassy_host_driver_instance(
         render_named_entity_slice(&driver.capability_tags)
     ));
     out.push_str(&format!(
-        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub lowering_pattern: Option<&'static str>,\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    lowering_pattern: {lowering_pattern},\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n{support_items}\n{emulator_items}",
+        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub lowering_pattern: Option<&'static str>,\n    pub time_driver_source: Option<&'static str>,\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    lowering_pattern: {lowering_pattern},\n    time_driver_source: {time_driver_source},\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n{support_items}\n{emulator_items}",
         type_name = driver.type_name,
         const_prefix = const_prefix,
         lowering_pattern = render_optional_rust_string(driver.lowering_pattern.as_deref()),
+        time_driver_source = render_optional_rust_string(driver.time_driver_source.as_deref()),
         methods = render_driver_methods(model, driver)?,
         support_items = support_items,
         emulator_items = emulator_items
@@ -8990,23 +9508,33 @@ fn render_embassy_host_driver_support_items(
         out.push_str(&render_gpio_support_items(model, driver)?);
     }
     if has_time_driver_tag(&driver.capability_tags) {
-        out.push_str(&render_host_time_driver_support_items(driver));
+        out.push_str(&render_host_time_driver_support_items(driver)?);
     }
     Ok(out)
 }
 
-fn render_host_time_driver_support_items(driver: &ResolvedDriverInstance) -> String {
-    let init_fn = format!(
-        "initialize_{}_time_driver",
-        to_rust_const_name(&driver.id).to_lowercase()
-    );
-    let advance_fn = format!(
-        "advance_{}_time_driver",
-        to_rust_const_name(&driver.id).to_lowercase()
-    );
-    format!(
-        "\nuse std::sync::Mutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nconst SYST_CSR_ADDRESS: u64 = 0xE000_E010;\nconst SYST_RVR_ADDRESS: u64 = 0xE000_E014;\nconst SYST_CVR_ADDRESS: u64 = 0xE000_E018;\nconst SYST_CSR_ENABLE: u32 = 1 << 0;\nconst SYST_CSR_TICKINT: u32 = 1 << 1;\nconst SYST_CSR_CLKSOURCE: u32 = 1 << 2;\nconst SYST_RELOAD_VALUE: u32 = 15;\n\nstruct GeneratedSystickTimeDriverState {{\n    initialized: bool,\n    ticks: u64,\n    queue: EmbassyTimeQueue,\n}}\n\nstruct GeneratedSystickTimeDriver {{\n    state: Mutex<GeneratedSystickTimeDriverState>,\n}}\n\nimpl GeneratedSystickTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            state: Mutex::new(GeneratedSystickTimeDriverState {{\n                initialized: false,\n                ticks: 0,\n                queue: EmbassyTimeQueue::new(),\n            }}),\n        }}\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if state.initialized {{\n            return Ok(());\n        }}\n        state.ticks = 0;\n        metadata::write_u32(SYST_CSR_ADDRESS, 0)?;\n        metadata::write_u32(SYST_RVR_ADDRESS, SYST_RELOAD_VALUE)?;\n        metadata::write_u32(SYST_CVR_ADDRESS, 0)?;\n        metadata::write_u32(\n            SYST_CSR_ADDRESS,\n            SYST_CSR_ENABLE | SYST_CSR_TICKINT | SYST_CSR_CLKSOURCE,\n        )?;\n        state.initialized = true;\n        Ok(())\n    }}\n\n    fn advance(&self, ticks: u64) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if !state.initialized {{\n            return;\n        }}\n        state.ticks = state.ticks.wrapping_add(ticks);\n        let now = state.ticks;\n        let _ = state.queue.next_expiration(now);\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedSystickTimeDriver {{\n    fn now(&self) -> u64 {{\n        self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).ticks\n    }}\n\n    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        let now = state.ticks;\n        let _ = state.queue.schedule_wake(at, waker);\n        let _ = state.queue.next_expiration(now);\n    }}\n}}\n\nembassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedSystickTimeDriver = GeneratedSystickTimeDriver::new());\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.init()\n}}\n\nfn {advance_fn}(ticks: u64) {{\n    GENERATED_TIME_DRIVER.advance(ticks)\n}}\n"
-    )
+fn render_host_time_driver_support_items(driver: &ResolvedDriverInstance) -> Result<String> {
+    let driver_prefix = to_rust_const_name(&driver.id).to_lowercase();
+    let init_fn = format!("initialize_{driver_prefix}_time_driver");
+    let advance_fn = format!("advance_{driver_prefix}_time_driver");
+    match time_driver_source(driver) {
+        Some(EMBASSY_TIME_DRIVER_SOURCE_SYSTICK) => Ok(format!(
+            "\nuse std::sync::Mutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nconst SYST_CSR_ADDRESS: u64 = 0xE000_E010;\nconst SYST_RVR_ADDRESS: u64 = 0xE000_E014;\nconst SYST_CVR_ADDRESS: u64 = 0xE000_E018;\nconst SYST_CSR_ENABLE: u32 = 1 << 0;\nconst SYST_CSR_TICKINT: u32 = 1 << 1;\nconst SYST_CSR_CLKSOURCE: u32 = 1 << 2;\nconst SYST_RELOAD_VALUE: u32 = 15;\n\nstruct GeneratedSystickTimeDriverState {{\n    initialized: bool,\n    ticks: u64,\n    queue: EmbassyTimeQueue,\n}}\n\nstruct GeneratedSystickTimeDriver {{\n    state: Mutex<GeneratedSystickTimeDriverState>,\n}}\n\nimpl GeneratedSystickTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            state: Mutex::new(GeneratedSystickTimeDriverState {{\n                initialized: false,\n                ticks: 0,\n                queue: EmbassyTimeQueue::new(),\n            }}),\n        }}\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if state.initialized {{\n            return Ok(());\n        }}\n        state.ticks = 0;\n        metadata::write_u32(SYST_CSR_ADDRESS, 0)?;\n        metadata::write_u32(SYST_RVR_ADDRESS, SYST_RELOAD_VALUE)?;\n        metadata::write_u32(SYST_CVR_ADDRESS, 0)?;\n        metadata::write_u32(\n            SYST_CSR_ADDRESS,\n            SYST_CSR_ENABLE | SYST_CSR_TICKINT | SYST_CSR_CLKSOURCE,\n        )?;\n        state.initialized = true;\n        Ok(())\n    }}\n\n    fn advance(&self, ticks: u64) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if !state.initialized {{\n            return;\n        }}\n        state.ticks = state.ticks.wrapping_add(ticks);\n        let now = state.ticks;\n        let _ = state.queue.next_expiration(now);\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedSystickTimeDriver {{\n    fn now(&self) -> u64 {{\n        self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).ticks\n    }}\n\n    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        let now = state.ticks;\n        let _ = state.queue.schedule_wake(at, waker);\n        let _ = state.queue.next_expiration(now);\n    }}\n}}\n\nembassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedSystickTimeDriver = GeneratedSystickTimeDriver::new());\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.init()\n}}\n\nfn {advance_fn}(ticks: u64) {{\n    GENERATED_TIME_DRIVER.advance(ticks)\n}}\n"
+        )),
+        Some(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER) => Ok(format!(
+            "\nuse std::sync::Mutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nstruct GeneratedHardwareTimerTimeDriverState {{\n    initialized: bool,\n    ticks: u64,\n    queue: EmbassyTimeQueue,\n}}\n\nstruct GeneratedHardwareTimerTimeDriver {{\n    state: Mutex<GeneratedHardwareTimerTimeDriverState>,\n}}\n\nimpl GeneratedHardwareTimerTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            state: Mutex::new(GeneratedHardwareTimerTimeDriverState {{\n                initialized: false,\n                ticks: 0,\n                queue: EmbassyTimeQueue::new(),\n            }}),\n        }}\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if state.initialized {{\n            return Ok(());\n        }}\n        state.ticks = 0;\n        state.initialized = true;\n        Ok(())\n    }}\n\n    fn advance(&self, ticks: u64) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if !state.initialized {{\n            return;\n        }}\n        state.ticks = state.ticks.wrapping_add(ticks);\n        let now = state.ticks;\n        let _ = state.queue.next_expiration(now);\n    }}\n\n    fn on_interrupt(&self) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        let now = state.ticks;\n        let _ = state.queue.next_expiration(now);\n    }}\n\n    fn delay_ticks(&self, ticks: u64) -> Result<(), metadata::Error> {{\n        self.advance(ticks);\n        Ok(())\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedHardwareTimerTimeDriver {{\n    fn now(&self) -> u64 {{\n        self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).ticks\n    }}\n\n    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        let now = state.ticks;\n        let _ = state.queue.schedule_wake(at, waker);\n        let _ = state.queue.next_expiration(now);\n    }}\n}}\n\nembassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedHardwareTimerTimeDriver = GeneratedHardwareTimerTimeDriver::new());\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.init()\n}}\n\nfn {advance_fn}(ticks: u64) {{\n    GENERATED_TIME_DRIVER.advance(ticks)\n}}\n\nfn generated_{driver_prefix}_time_driver_now() -> u64 {{\n    GENERATED_TIME_DRIVER.now()\n}}\n\nfn generated_{driver_prefix}_time_driver_delay_ticks(ticks: u64) -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.delay_ticks(ticks)\n}}\n\npub fn generated_{driver_prefix}_time_driver_interrupt() {{\n    GENERATED_TIME_DRIVER.on_interrupt();\n}}\n"
+        )),
+        Some(other) => bail!(
+            "driver {} uses unsupported timeDriverSource {} for generated host time-driver support",
+            driver.id,
+            other
+        ),
+        None => bail!(
+            "driver {} claims capability tag {} but omits required timeDriverSource",
+            driver.id,
+            EMBASSY_TIME_DRIVER_TAG
+        ),
+    }
 }
 
 fn render_embassy_host_driver_emulator(
@@ -11225,6 +11753,10 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             "capabilityTags".to_string(),
             serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
         );
+        time_driver.insert(
+            "timeDriverSource".to_string(),
+            Value::String(EMBASSY_TIME_DRIVER_SOURCE_SYSTICK.to_string()),
+        );
         drivers.push(Value::Object(time_driver));
 
         let file = write_temp_json(&document);
@@ -11261,6 +11793,185 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(
             cargo_output.status.success(),
             "generated time-driver host crate should compile:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&cargo_output.stdout),
+            String::from_utf8_lossy(&cargo_output.stderr)
+        );
+    }
+
+    #[test]
+    fn generate_embassy_host_supports_hardware_timer_scoped_time_driver() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals
+            .iter_mut()
+            .find(|peripheral| {
+                peripheral
+                    .as_object()
+                    .and_then(|item| item.get("id"))
+                    .and_then(Value::as_str)
+                    == Some("periph.tim1")
+            })
+            .and_then(Value::as_object_mut)
+            .expect("tim1 peripheral");
+        let registers = tim1
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 registers");
+        registers.extend([
+            serde_json::json!({ "id": "reg.tim1.conf", "name": "CONF", "kind": "register", "offsetBytes": 4, "widthBits": 32, "fields": [
+                { "id": "field.tim1.conf.clk_en", "name": "CLK_EN", "bitRange": { "lsb": 0, "msb": 0 } },
+                { "id": "field.tim1.conf.target0_work_en", "name": "TARGET0_WORK_EN", "bitRange": { "lsb": 1, "msb": 1 } },
+                { "id": "field.tim1.conf.timer_unit0_work_en", "name": "TIMER_UNIT0_WORK_EN", "bitRange": { "lsb": 2, "msb": 2 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_op", "name": "UNIT0_OP", "kind": "register", "offsetBytes": 8, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_op.timer_unit0_value_valid", "name": "TIMER_UNIT0_VALUE_VALID", "bitRange": { "lsb": 0, "msb": 0 } },
+                { "id": "field.tim1.unit0_op.timer_unit0_update", "name": "TIMER_UNIT0_UPDATE", "bitRange": { "lsb": 1, "msb": 1 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_value_hi", "name": "UNIT0_VALUE_HI", "kind": "register", "offsetBytes": 12, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_value_hi.timer_unit0_value_hi", "name": "TIMER_UNIT0_VALUE_HI", "bitRange": { "lsb": 0, "msb": 19 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_value_lo", "name": "UNIT0_VALUE_LO", "kind": "register", "offsetBytes": 16, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_value_lo.timer_unit0_value_lo", "name": "TIMER_UNIT0_VALUE_LO", "bitRange": { "lsb": 0, "msb": 31 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_hi", "name": "TARGET0_HI", "kind": "register", "offsetBytes": 20, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_hi.timer_target0_hi", "name": "TIMER_TARGET0_HI", "bitRange": { "lsb": 0, "msb": 19 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_lo", "name": "TARGET0_LO", "kind": "register", "offsetBytes": 24, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_lo.timer_target0_lo", "name": "TIMER_TARGET0_LO", "bitRange": { "lsb": 0, "msb": 31 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_conf", "name": "TARGET0_CONF", "kind": "register", "offsetBytes": 28, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_conf.target0_period", "name": "TARGET0_PERIOD", "bitRange": { "lsb": 0, "msb": 7 } },
+                { "id": "field.tim1.target0_conf.target0_period_mode", "name": "TARGET0_PERIOD_MODE", "bitRange": { "lsb": 8, "msb": 8 } },
+                { "id": "field.tim1.target0_conf.target0_timer_unit_sel", "name": "TARGET0_TIMER_UNIT_SEL", "bitRange": { "lsb": 9, "msb": 9 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.comp0_load", "name": "COMP0_LOAD", "kind": "register", "offsetBytes": 32, "widthBits": 32, "fields": [
+                { "id": "field.tim1.comp0_load.timer_comp0_load", "name": "TIMER_COMP0_LOAD", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.int_ena", "name": "INT_ENA", "kind": "register", "offsetBytes": 36, "widthBits": 32, "fields": [
+                { "id": "field.tim1.int_ena.target0_int_ena", "name": "TARGET0_INT_ENA", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.int_clr", "name": "INT_CLR", "kind": "register", "offsetBytes": 40, "widthBits": 32, "fields": [
+                { "id": "field.tim1.int_clr.target0_int_clr", "name": "TARGET0_INT_CLR", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+        ]);
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        operations.push(serde_json::json!({
+            "id": "op.tim1.clear_target0",
+            "name": "Clear TIM1 target0 interrupt",
+            "kind": "mode-transition",
+            "targetRefs": ["periph.tim1"],
+            "steps": [{
+                "index": 0,
+                "action": "write",
+                "targetRef": "reg.tim1.int_clr",
+                "expression": { "language": "plain", "text": "Set TARGET0_INT_CLR = 1" }
+            }]
+        }));
+
+        let interrupt_sources = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("interruptTopology")
+            .and_then(Value::as_object_mut)
+            .expect("interrupt topology")
+            .get_mut("sources")
+            .and_then(Value::as_array_mut)
+            .expect("interrupt sources");
+        interrupt_sources
+            .iter_mut()
+            .find(|source| {
+                source
+                    .as_object()
+                    .and_then(|item| item.get("id"))
+                    .and_then(Value::as_str)
+                    == Some("isrc.tim1")
+            })
+            .and_then(Value::as_object_mut)
+            .expect("tim1 interrupt source")
+            .insert(
+                "clearOperationRefs".to_string(),
+                serde_json::json!(["op.tim1.clear_target0"]),
+            );
+
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let tim1 = drivers[5].as_object_mut().expect("timer driver");
+        tim1.insert("modulePath".to_string(), Value::String("time".to_string()));
+        tim1.insert(
+            "capabilityTags".to_string(),
+            serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
+        );
+        tim1.insert(
+            "timeDriverSource".to_string(),
+            Value::String(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER.to_string()),
+        );
+        tim1.insert(
+            "timeDriverTickHz".to_string(),
+            serde_json::json!(16_000_000u64),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("hardware timer time-driver fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+        generate_embassy_host_crate(&validated, output_dir.path())
+            .expect("embassy-host generation");
+
+        let time_rs = std::fs::read_to_string(output_dir.path().join("src").join("time.rs"))
+            .expect("generated time module");
+        let cargo_toml = std::fs::read_to_string(output_dir.path().join("Cargo.toml"))
+            .expect("generated Cargo.toml");
+        assert!(time_rs.contains("generated_drv_tim1_time_driver_interrupt"));
+        assert!(time_rs.contains("generated_drv_tim1_time_driver_delay_ticks"));
+        assert!(time_rs.contains("GeneratedHardwareTimerTimeDriver"));
+        assert!(cargo_toml.contains("tick-hz-16_000_000"));
+
+        let cargo_output = Command::new("cargo")
+            .arg("check")
+            .current_dir(output_dir.path())
+            .output()
+            .expect("cargo check");
+        assert!(
+            cargo_output.status.success(),
+            "generated hardware timer host crate should compile:\nstdout:\n{}\nstderr:\n{}",
             String::from_utf8_lossy(&cargo_output.stdout),
             String::from_utf8_lossy(&cargo_output.stderr)
         );
@@ -13310,6 +14021,10 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             "capabilityTags".to_string(),
             serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
         );
+        time_driver.insert(
+            "timeDriverSource".to_string(),
+            Value::String(EMBASSY_TIME_DRIVER_SOURCE_SYSTICK.to_string()),
+        );
         drivers.push(Value::Object(time_driver));
 
         let file = write_temp_json(&document);
@@ -13334,10 +14049,165 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
     }
 
     #[test]
-    fn generate_embassy_rejects_timer_scoped_time_driver() {
+    fn generate_embassy_rejects_time_driver_without_source_selector() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let fixture = write_embassy_fixture(false);
         let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let interrupt = drivers[9].as_object_mut().expect("interrupt driver");
+        interrupt.insert("modulePath".to_string(), Value::String("time".to_string()));
+        interrupt.insert(
+            "capabilityTags".to_string(),
+            serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("time-driver without source fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(
+            error
+                .to_string()
+                .contains("omits required timeDriverSource")
+        );
+    }
+
+    #[test]
+    fn generate_embassy_supports_hardware_timer_scoped_time_driver() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals
+            .iter_mut()
+            .find(|peripheral| {
+                peripheral
+                    .as_object()
+                    .and_then(|item| item.get("id"))
+                    .and_then(Value::as_str)
+                    == Some("periph.tim1")
+            })
+            .and_then(Value::as_object_mut)
+            .expect("tim1 peripheral");
+        let registers = tim1
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 registers");
+        registers.extend([
+            serde_json::json!({ "id": "reg.tim1.conf", "name": "CONF", "kind": "register", "offsetBytes": 4, "widthBits": 32, "fields": [
+                { "id": "field.tim1.conf.clk_en", "name": "CLK_EN", "bitRange": { "lsb": 0, "msb": 0 } },
+                { "id": "field.tim1.conf.target0_work_en", "name": "TARGET0_WORK_EN", "bitRange": { "lsb": 1, "msb": 1 } },
+                { "id": "field.tim1.conf.timer_unit0_work_en", "name": "TIMER_UNIT0_WORK_EN", "bitRange": { "lsb": 2, "msb": 2 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_op", "name": "UNIT0_OP", "kind": "register", "offsetBytes": 8, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_op.timer_unit0_value_valid", "name": "TIMER_UNIT0_VALUE_VALID", "bitRange": { "lsb": 0, "msb": 0 } },
+                { "id": "field.tim1.unit0_op.timer_unit0_update", "name": "TIMER_UNIT0_UPDATE", "bitRange": { "lsb": 1, "msb": 1 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_value_hi", "name": "UNIT0_VALUE_HI", "kind": "register", "offsetBytes": 12, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_value_hi.timer_unit0_value_hi", "name": "TIMER_UNIT0_VALUE_HI", "bitRange": { "lsb": 0, "msb": 19 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_value_lo", "name": "UNIT0_VALUE_LO", "kind": "register", "offsetBytes": 16, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_value_lo.timer_unit0_value_lo", "name": "TIMER_UNIT0_VALUE_LO", "bitRange": { "lsb": 0, "msb": 31 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_hi", "name": "TARGET0_HI", "kind": "register", "offsetBytes": 20, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_hi.timer_target0_hi", "name": "TIMER_TARGET0_HI", "bitRange": { "lsb": 0, "msb": 19 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_lo", "name": "TARGET0_LO", "kind": "register", "offsetBytes": 24, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_lo.timer_target0_lo", "name": "TIMER_TARGET0_LO", "bitRange": { "lsb": 0, "msb": 31 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_conf", "name": "TARGET0_CONF", "kind": "register", "offsetBytes": 28, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_conf.target0_period", "name": "TARGET0_PERIOD", "bitRange": { "lsb": 0, "msb": 7 } },
+                { "id": "field.tim1.target0_conf.target0_period_mode", "name": "TARGET0_PERIOD_MODE", "bitRange": { "lsb": 8, "msb": 8 } },
+                { "id": "field.tim1.target0_conf.target0_timer_unit_sel", "name": "TARGET0_TIMER_UNIT_SEL", "bitRange": { "lsb": 9, "msb": 9 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.comp0_load", "name": "COMP0_LOAD", "kind": "register", "offsetBytes": 32, "widthBits": 32, "fields": [
+                { "id": "field.tim1.comp0_load.timer_comp0_load", "name": "TIMER_COMP0_LOAD", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.int_ena", "name": "INT_ENA", "kind": "register", "offsetBytes": 36, "widthBits": 32, "fields": [
+                { "id": "field.tim1.int_ena.target0_int_ena", "name": "TARGET0_INT_ENA", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.int_clr", "name": "INT_CLR", "kind": "register", "offsetBytes": 40, "widthBits": 32, "fields": [
+                { "id": "field.tim1.int_clr.target0_int_clr", "name": "TARGET0_INT_CLR", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+        ]);
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        operations.push(serde_json::json!({
+            "id": "op.tim1.clear_target0",
+            "name": "Clear TIM1 target0 interrupt",
+            "kind": "mode-transition",
+            "targetRefs": ["periph.tim1"],
+            "steps": [{
+                "index": 0,
+                "action": "write",
+                "targetRef": "reg.tim1.int_clr",
+                "expression": { "language": "plain", "text": "Set TARGET0_INT_CLR = 1" }
+            }]
+        }));
+
+        let interrupt_sources = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("interruptTopology")
+            .and_then(Value::as_object_mut)
+            .expect("interrupt topology")
+            .get_mut("sources")
+            .and_then(Value::as_array_mut)
+            .expect("interrupt sources");
+        interrupt_sources
+            .iter_mut()
+            .find(|source| {
+                source
+                    .as_object()
+                    .and_then(|item| item.get("id"))
+                    .and_then(Value::as_str)
+                    == Some("isrc.tim1")
+            })
+            .and_then(Value::as_object_mut)
+            .expect("tim1 interrupt source")
+            .insert(
+                "clearOperationRefs".to_string(),
+                serde_json::json!(["op.tim1.clear_target0"]),
+            );
+
         let drivers = document
             .as_object_mut()
             .expect("document object")
@@ -13356,19 +14226,351 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             "capabilityTags".to_string(),
             serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
         );
-        tim1.insert("pinRoles".to_string(), serde_json::json!([]));
+        tim1.insert(
+            "timeDriverSource".to_string(),
+            Value::String(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER.to_string()),
+        );
+        tim1.insert(
+            "timeDriverTickHz".to_string(),
+            serde_json::json!(16_000_000u64),
+        );
 
         let file = write_temp_json(&document);
         let validated = load_validated_hair_document(file.path(), &repo_root)
             .expect("time-driver timer fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+        generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
+        let cargo_toml = std::fs::read_to_string(output_dir.path().join("Cargo.toml"))
+            .expect("generated Cargo.toml");
+        let time_rs = std::fs::read_to_string(output_dir.path().join("src").join("time.rs"))
+            .expect("generated time module");
+        assert!(time_rs.contains("delay_ticks"));
+        assert!(time_rs.contains("generated_drv_tim1_time_driver_interrupt"));
+        assert!(time_rs.contains("TARGET0_HI"));
+        assert!(time_rs.contains("fn disarm_alarm(&self)"));
+        assert!(time_rs.contains("let should_rearm = critical_section::with(|cs| {"));
+        assert!(!time_rs.contains("                    fn "));
+        assert!(cargo_toml.contains("tick-hz-16_000_000"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_hardware_timer_time_driver_without_tick_rate() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals
+            .iter_mut()
+            .find(|peripheral| {
+                peripheral
+                    .as_object()
+                    .and_then(|item| item.get("id"))
+                    .and_then(Value::as_str)
+                    == Some("periph.tim1")
+            })
+            .and_then(Value::as_object_mut)
+            .expect("tim1 peripheral");
+        let registers = tim1
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 registers");
+        registers.extend([
+            serde_json::json!({ "id": "reg.tim1.conf", "name": "CONF", "kind": "register", "offsetBytes": 4, "widthBits": 32, "fields": [
+                { "id": "field.tim1.conf.clk_en", "name": "CLK_EN", "bitRange": { "lsb": 0, "msb": 0 } },
+                { "id": "field.tim1.conf.target0_work_en", "name": "TARGET0_WORK_EN", "bitRange": { "lsb": 1, "msb": 1 } },
+                { "id": "field.tim1.conf.timer_unit0_work_en", "name": "TIMER_UNIT0_WORK_EN", "bitRange": { "lsb": 2, "msb": 2 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_op", "name": "UNIT0_OP", "kind": "register", "offsetBytes": 8, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_op.timer_unit0_value_valid", "name": "TIMER_UNIT0_VALUE_VALID", "bitRange": { "lsb": 0, "msb": 0 } },
+                { "id": "field.tim1.unit0_op.timer_unit0_update", "name": "TIMER_UNIT0_UPDATE", "bitRange": { "lsb": 1, "msb": 1 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_value_hi", "name": "UNIT0_VALUE_HI", "kind": "register", "offsetBytes": 12, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_value_hi.timer_unit0_value_hi", "name": "TIMER_UNIT0_VALUE_HI", "bitRange": { "lsb": 0, "msb": 19 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_value_lo", "name": "UNIT0_VALUE_LO", "kind": "register", "offsetBytes": 16, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_value_lo.timer_unit0_value_lo", "name": "TIMER_UNIT0_VALUE_LO", "bitRange": { "lsb": 0, "msb": 31 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_hi", "name": "TARGET0_HI", "kind": "register", "offsetBytes": 20, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_hi.timer_target0_hi", "name": "TIMER_TARGET0_HI", "bitRange": { "lsb": 0, "msb": 19 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_lo", "name": "TARGET0_LO", "kind": "register", "offsetBytes": 24, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_lo.timer_target0_lo", "name": "TIMER_TARGET0_LO", "bitRange": { "lsb": 0, "msb": 31 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_conf", "name": "TARGET0_CONF", "kind": "register", "offsetBytes": 28, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_conf.target0_period", "name": "TARGET0_PERIOD", "bitRange": { "lsb": 0, "msb": 7 } },
+                { "id": "field.tim1.target0_conf.target0_period_mode", "name": "TARGET0_PERIOD_MODE", "bitRange": { "lsb": 8, "msb": 8 } },
+                { "id": "field.tim1.target0_conf.target0_timer_unit_sel", "name": "TARGET0_TIMER_UNIT_SEL", "bitRange": { "lsb": 9, "msb": 9 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.comp0_load", "name": "COMP0_LOAD", "kind": "register", "offsetBytes": 32, "widthBits": 32, "fields": [
+                { "id": "field.tim1.comp0_load.timer_comp0_load", "name": "TIMER_COMP0_LOAD", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.int_ena", "name": "INT_ENA", "kind": "register", "offsetBytes": 36, "widthBits": 32, "fields": [
+                { "id": "field.tim1.int_ena.target0_int_ena", "name": "TARGET0_INT_ENA", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.int_clr", "name": "INT_CLR", "kind": "register", "offsetBytes": 40, "widthBits": 32, "fields": [
+                { "id": "field.tim1.int_clr.target0_int_clr", "name": "TARGET0_INT_CLR", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+        ]);
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        operations.push(serde_json::json!({
+            "id": "op.tim1.clear_target0",
+            "name": "Clear TIM1 target0 interrupt",
+            "kind": "mode-transition",
+            "targetRefs": ["periph.tim1"],
+            "steps": [{
+                "index": 0,
+                "action": "write",
+                "targetRef": "reg.tim1.int_clr",
+                "expression": { "language": "plain", "text": "Set TARGET0_INT_CLR = 1" }
+            }]
+        }));
+
+        let interrupt_sources = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("interruptTopology")
+            .and_then(Value::as_object_mut)
+            .expect("interrupt topology")
+            .get_mut("sources")
+            .and_then(Value::as_array_mut)
+            .expect("interrupt sources");
+        interrupt_sources
+            .iter_mut()
+            .find(|source| {
+                source
+                    .as_object()
+                    .and_then(|item| item.get("id"))
+                    .and_then(Value::as_str)
+                    == Some("isrc.tim1")
+            })
+            .and_then(Value::as_object_mut)
+            .expect("tim1 interrupt source")
+            .insert(
+                "clearOperationRefs".to_string(),
+                serde_json::json!(["op.tim1.clear_target0"]),
+            );
+
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let tim1 = drivers[5].as_object_mut().expect("timer driver");
+        tim1.insert("modulePath".to_string(), Value::String("time".to_string()));
+        tim1.insert(
+            "capabilityTags".to_string(),
+            serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
+        );
+        tim1.insert(
+            "timeDriverSource".to_string(),
+            Value::String(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER.to_string()),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("hardware timer time-driver fixture should validate");
         let temp = tempdir().expect("tempdir");
         let error =
             generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
         assert!(
             error
                 .to_string()
-                .contains("currently requires interrupt lowering bound to SysTick")
+                .contains("omits required timeDriverTickHz")
         );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_hardware_timer_clear_operation_outside_driver_scope() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals
+            .iter_mut()
+            .find(|peripheral| {
+                peripheral
+                    .as_object()
+                    .and_then(|item| item.get("id"))
+                    .and_then(Value::as_str)
+                    == Some("periph.tim1")
+            })
+            .and_then(Value::as_object_mut)
+            .expect("tim1 peripheral");
+        let registers = tim1
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 registers");
+        registers.extend([
+            serde_json::json!({ "id": "reg.tim1.conf", "name": "CONF", "kind": "register", "offsetBytes": 4, "widthBits": 32, "fields": [
+                { "id": "field.tim1.conf.clk_en", "name": "CLK_EN", "bitRange": { "lsb": 0, "msb": 0 } },
+                { "id": "field.tim1.conf.target0_work_en", "name": "TARGET0_WORK_EN", "bitRange": { "lsb": 1, "msb": 1 } },
+                { "id": "field.tim1.conf.timer_unit0_work_en", "name": "TIMER_UNIT0_WORK_EN", "bitRange": { "lsb": 2, "msb": 2 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_op", "name": "UNIT0_OP", "kind": "register", "offsetBytes": 8, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_op.timer_unit0_value_valid", "name": "TIMER_UNIT0_VALUE_VALID", "bitRange": { "lsb": 0, "msb": 0 } },
+                { "id": "field.tim1.unit0_op.timer_unit0_update", "name": "TIMER_UNIT0_UPDATE", "bitRange": { "lsb": 1, "msb": 1 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_value_hi", "name": "UNIT0_VALUE_HI", "kind": "register", "offsetBytes": 12, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_value_hi.timer_unit0_value_hi", "name": "TIMER_UNIT0_VALUE_HI", "bitRange": { "lsb": 0, "msb": 19 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_value_lo", "name": "UNIT0_VALUE_LO", "kind": "register", "offsetBytes": 16, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_value_lo.timer_unit0_value_lo", "name": "TIMER_UNIT0_VALUE_LO", "bitRange": { "lsb": 0, "msb": 31 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_hi", "name": "TARGET0_HI", "kind": "register", "offsetBytes": 20, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_hi.timer_target0_hi", "name": "TIMER_TARGET0_HI", "bitRange": { "lsb": 0, "msb": 19 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_lo", "name": "TARGET0_LO", "kind": "register", "offsetBytes": 24, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_lo.timer_target0_lo", "name": "TIMER_TARGET0_LO", "bitRange": { "lsb": 0, "msb": 31 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_conf", "name": "TARGET0_CONF", "kind": "register", "offsetBytes": 28, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_conf.target0_period", "name": "TARGET0_PERIOD", "bitRange": { "lsb": 0, "msb": 7 } },
+                { "id": "field.tim1.target0_conf.target0_period_mode", "name": "TARGET0_PERIOD_MODE", "bitRange": { "lsb": 8, "msb": 8 } },
+                { "id": "field.tim1.target0_conf.target0_timer_unit_sel", "name": "TARGET0_TIMER_UNIT_SEL", "bitRange": { "lsb": 9, "msb": 9 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.comp0_load", "name": "COMP0_LOAD", "kind": "register", "offsetBytes": 32, "widthBits": 32, "fields": [
+                { "id": "field.tim1.comp0_load.timer_comp0_load", "name": "TIMER_COMP0_LOAD", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.int_ena", "name": "INT_ENA", "kind": "register", "offsetBytes": 36, "widthBits": 32, "fields": [
+                { "id": "field.tim1.int_ena.target0_int_ena", "name": "TARGET0_INT_ENA", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.int_clr", "name": "INT_CLR", "kind": "register", "offsetBytes": 40, "widthBits": 32, "fields": [
+                { "id": "field.tim1.int_clr.target0_int_clr", "name": "TARGET0_INT_CLR", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+        ]);
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        operations.push(serde_json::json!({
+            "id": "op.tim1.clear_target0",
+            "name": "Clear TIM1 target0 interrupt",
+            "kind": "mode-transition",
+            "targetRefs": ["periph.usart1"],
+            "steps": [{
+                "index": 0,
+                "action": "write",
+                "targetRef": "reg.tim1.int_clr",
+                "expression": { "language": "plain", "text": "Set TARGET0_INT_CLR = 1" }
+            }]
+        }));
+
+        let interrupt_sources = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("interruptTopology")
+            .and_then(Value::as_object_mut)
+            .expect("interrupt topology")
+            .get_mut("sources")
+            .and_then(Value::as_array_mut)
+            .expect("interrupt sources");
+        interrupt_sources
+            .iter_mut()
+            .find(|source| {
+                source
+                    .as_object()
+                    .and_then(|item| item.get("id"))
+                    .and_then(Value::as_str)
+                    == Some("isrc.tim1")
+            })
+            .and_then(Value::as_object_mut)
+            .expect("tim1 interrupt source")
+            .insert(
+                "clearOperationRefs".to_string(),
+                serde_json::json!(["op.tim1.clear_target0"]),
+            );
+
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let tim1 = drivers[5].as_object_mut().expect("timer driver");
+        tim1.insert("modulePath".to_string(), Value::String("time".to_string()));
+        tim1.insert(
+            "capabilityTags".to_string(),
+            serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
+        );
+        tim1.insert(
+            "timeDriverSource".to_string(),
+            Value::String(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER.to_string()),
+        );
+        tim1.insert(
+            "timeDriverTickHz".to_string(),
+            serde_json::json!(16_000_000u64),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("hardware timer time-driver fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains(
+            "clear operation op.tim1.clear_target0 targets periph.usart1 instead of periph.tim1"
+        ));
     }
 
     #[test]
@@ -13430,6 +14632,10 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         interrupt.insert(
             "capabilityTags".to_string(),
             serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
+        );
+        interrupt.insert(
+            "timeDriverSource".to_string(),
+            Value::String(EMBASSY_TIME_DRIVER_SOURCE_SYSTICK.to_string()),
         );
         interrupt.insert("interruptRouteRefs".to_string(), serde_json::json!([]));
         let file = write_temp_json(&document);

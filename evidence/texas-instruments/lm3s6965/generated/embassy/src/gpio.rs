@@ -111,6 +111,7 @@ pub struct GPIOAResources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -125,6 +126,7 @@ pub const DRV_GPIOA_RESOURCES: GPIOAResources = GPIOAResources {
     init_operations: DRV_GPIOA_INIT_OPERATIONS,
     state_machines: DRV_GPIOA_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_GPIOA_CAPABILITY_TAGS,
 };
 
@@ -523,6 +525,7 @@ pub struct GPIOBResources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -537,6 +540,7 @@ pub const DRV_GPIOB_RESOURCES: GPIOBResources = GPIOBResources {
     init_operations: DRV_GPIOB_INIT_OPERATIONS,
     state_machines: DRV_GPIOB_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_GPIOB_CAPABILITY_TAGS,
 };
 
@@ -935,6 +939,7 @@ pub struct GPIOCResources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -949,6 +954,7 @@ pub const DRV_GPIOC_RESOURCES: GPIOCResources = GPIOCResources {
     init_operations: DRV_GPIOC_INIT_OPERATIONS,
     state_machines: DRV_GPIOC_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_GPIOC_CAPABILITY_TAGS,
 };
 
@@ -1347,6 +1353,7 @@ pub struct GPIODResources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -1361,6 +1368,7 @@ pub const DRV_GPIOD_RESOURCES: GPIODResources = GPIODResources {
     init_operations: DRV_GPIOD_INIT_OPERATIONS,
     state_machines: DRV_GPIOD_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_GPIOD_CAPABILITY_TAGS,
 };
 
@@ -1755,6 +1763,7 @@ pub struct GPIOEResources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -1769,6 +1778,7 @@ pub const DRV_GPIOE_RESOURCES: GPIOEResources = GPIOEResources {
     init_operations: DRV_GPIOE_INIT_OPERATIONS,
     state_machines: DRV_GPIOE_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_GPIOE_CAPABILITY_TAGS,
 };
 
@@ -2099,6 +2109,7 @@ pub struct GPIOFResources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -2113,6 +2124,7 @@ pub const DRV_GPIOF_RESOURCES: GPIOFResources = GPIOFResources {
     init_operations: DRV_GPIOF_INIT_OPERATIONS,
     state_machines: DRV_GPIOF_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_GPIOF_CAPABILITY_TAGS,
 };
 

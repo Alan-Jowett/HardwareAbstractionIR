@@ -90,6 +90,7 @@ pub struct TimeResources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -104,6 +105,7 @@ pub const DRV_TIME_RESOURCES: TimeResources = TimeResources {
     init_operations: DRV_TIME_INIT_OPERATIONS,
     state_machines: DRV_TIME_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: Some("systick"),
     capability_tags: DRV_TIME_CAPABILITY_TAGS,
 };
 
@@ -205,7 +207,7 @@ impl EmbassyTimeDriver for GeneratedSystickTimeDriver {
     }
 }
 
-        embassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedSystickTimeDriver = GeneratedSystickTimeDriver::new());
+embassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedSystickTimeDriver = GeneratedSystickTimeDriver::new());
 
 #[allow(dead_code)]
 #[allow(non_snake_case)]
