@@ -6355,6 +6355,7 @@ fn render_time_driver_clear_statement(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
 ) -> Result<String> {
+    let driver_target_ref = driver.target.target_ref.as_str();
     let [interrupt_source] = driver.interrupt_sources.as_slice() else {
         bail!(
             "driver {} must resolve exactly one interrupt source for generated time-driver clearing",
@@ -6376,6 +6377,17 @@ fn render_time_driver_clear_statement(
             clear_ref
         )
     })?;
+    for operation_target in &operation.target_refs {
+        if operation_target != driver_target_ref {
+            bail!(
+                "driver {} clear operation {} targets {} instead of {}",
+                driver.id,
+                operation.id,
+                operation_target,
+                driver_target_ref
+            );
+        }
+    }
     if operation.steps.len() != 1 {
         bail!(
             "driver {} clear operation {} must use exactly one write step for first-cut generated time-driver clearing",
@@ -6392,7 +6404,7 @@ fn render_time_driver_clear_statement(
             step.action
         );
     }
-    let target_ref = step.target_ref.as_deref().ok_or_else(|| {
+    let step_target_ref = step.target_ref.as_deref().ok_or_else(|| {
         anyhow!(
             "driver {} clear operation {} step {} is missing targetRef",
             driver.id,
@@ -6400,15 +6412,26 @@ fn render_time_driver_clear_statement(
             step.index
         )
     })?;
-    let register = model.registers.get(target_ref).ok_or_else(|| {
+    let register = model.registers.get(step_target_ref).ok_or_else(|| {
         anyhow!(
             "driver {} clear operation {} step {} references unknown register {}",
             driver.id,
             operation.id,
             step.index,
-            target_ref
+            step_target_ref
         )
     })?;
+    if register.peripheral_ref != driver_target_ref {
+        bail!(
+            "driver {} clear operation {} step {} references register {} on {} instead of {}",
+            driver.id,
+            operation.id,
+            step.index,
+            step_target_ref,
+            register.peripheral_ref,
+            driver_target_ref
+        );
+    }
     let parsed = parse_field_write_expression(
         step.expression.as_ref(),
         step.value.as_ref(),
@@ -14394,6 +14417,167 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
                 .to_string()
                 .contains("omits required timeDriverTickHz")
         );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_hardware_timer_clear_operation_outside_driver_scope() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim1 = peripherals
+            .iter_mut()
+            .find(|peripheral| {
+                peripheral
+                    .as_object()
+                    .and_then(|item| item.get("id"))
+                    .and_then(Value::as_str)
+                    == Some("periph.tim1")
+            })
+            .and_then(Value::as_object_mut)
+            .expect("tim1 peripheral");
+        let registers = tim1
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("tim1 registers");
+        registers.extend([
+            serde_json::json!({ "id": "reg.tim1.conf", "name": "CONF", "kind": "register", "offsetBytes": 4, "widthBits": 32, "fields": [
+                { "id": "field.tim1.conf.clk_en", "name": "CLK_EN", "bitRange": { "lsb": 0, "msb": 0 } },
+                { "id": "field.tim1.conf.target0_work_en", "name": "TARGET0_WORK_EN", "bitRange": { "lsb": 1, "msb": 1 } },
+                { "id": "field.tim1.conf.timer_unit0_work_en", "name": "TIMER_UNIT0_WORK_EN", "bitRange": { "lsb": 2, "msb": 2 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_op", "name": "UNIT0_OP", "kind": "register", "offsetBytes": 8, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_op.timer_unit0_value_valid", "name": "TIMER_UNIT0_VALUE_VALID", "bitRange": { "lsb": 0, "msb": 0 } },
+                { "id": "field.tim1.unit0_op.timer_unit0_update", "name": "TIMER_UNIT0_UPDATE", "bitRange": { "lsb": 1, "msb": 1 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_value_hi", "name": "UNIT0_VALUE_HI", "kind": "register", "offsetBytes": 12, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_value_hi.timer_unit0_value_hi", "name": "TIMER_UNIT0_VALUE_HI", "bitRange": { "lsb": 0, "msb": 19 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.unit0_value_lo", "name": "UNIT0_VALUE_LO", "kind": "register", "offsetBytes": 16, "widthBits": 32, "fields": [
+                { "id": "field.tim1.unit0_value_lo.timer_unit0_value_lo", "name": "TIMER_UNIT0_VALUE_LO", "bitRange": { "lsb": 0, "msb": 31 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_hi", "name": "TARGET0_HI", "kind": "register", "offsetBytes": 20, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_hi.timer_target0_hi", "name": "TIMER_TARGET0_HI", "bitRange": { "lsb": 0, "msb": 19 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_lo", "name": "TARGET0_LO", "kind": "register", "offsetBytes": 24, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_lo.timer_target0_lo", "name": "TIMER_TARGET0_LO", "bitRange": { "lsb": 0, "msb": 31 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.target0_conf", "name": "TARGET0_CONF", "kind": "register", "offsetBytes": 28, "widthBits": 32, "fields": [
+                { "id": "field.tim1.target0_conf.target0_period", "name": "TARGET0_PERIOD", "bitRange": { "lsb": 0, "msb": 7 } },
+                { "id": "field.tim1.target0_conf.target0_period_mode", "name": "TARGET0_PERIOD_MODE", "bitRange": { "lsb": 8, "msb": 8 } },
+                { "id": "field.tim1.target0_conf.target0_timer_unit_sel", "name": "TARGET0_TIMER_UNIT_SEL", "bitRange": { "lsb": 9, "msb": 9 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.comp0_load", "name": "COMP0_LOAD", "kind": "register", "offsetBytes": 32, "widthBits": 32, "fields": [
+                { "id": "field.tim1.comp0_load.timer_comp0_load", "name": "TIMER_COMP0_LOAD", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.int_ena", "name": "INT_ENA", "kind": "register", "offsetBytes": 36, "widthBits": 32, "fields": [
+                { "id": "field.tim1.int_ena.target0_int_ena", "name": "TARGET0_INT_ENA", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+            serde_json::json!({ "id": "reg.tim1.int_clr", "name": "INT_CLR", "kind": "register", "offsetBytes": 40, "widthBits": 32, "fields": [
+                { "id": "field.tim1.int_clr.target0_int_clr", "name": "TARGET0_INT_CLR", "bitRange": { "lsb": 0, "msb": 0 } }
+            ]}),
+        ]);
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        operations.push(serde_json::json!({
+            "id": "op.tim1.clear_target0",
+            "name": "Clear TIM1 target0 interrupt",
+            "kind": "mode-transition",
+            "targetRefs": ["periph.usart1"],
+            "steps": [{
+                "index": 0,
+                "action": "write",
+                "targetRef": "reg.tim1.int_clr",
+                "expression": { "language": "plain", "text": "Set TARGET0_INT_CLR = 1" }
+            }]
+        }));
+
+        let interrupt_sources = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("interruptTopology")
+            .and_then(Value::as_object_mut)
+            .expect("interrupt topology")
+            .get_mut("sources")
+            .and_then(Value::as_array_mut)
+            .expect("interrupt sources");
+        interrupt_sources
+            .iter_mut()
+            .find(|source| {
+                source
+                    .as_object()
+                    .and_then(|item| item.get("id"))
+                    .and_then(Value::as_str)
+                    == Some("isrc.tim1")
+            })
+            .and_then(Value::as_object_mut)
+            .expect("tim1 interrupt source")
+            .insert(
+                "clearOperationRefs".to_string(),
+                serde_json::json!(["op.tim1.clear_target0"]),
+            );
+
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let tim1 = drivers[5].as_object_mut().expect("timer driver");
+        tim1.insert("modulePath".to_string(), Value::String("time".to_string()));
+        tim1.insert(
+            "capabilityTags".to_string(),
+            serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
+        );
+        tim1.insert(
+            "timeDriverSource".to_string(),
+            Value::String(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER.to_string()),
+        );
+        tim1.insert(
+            "timeDriverTickHz".to_string(),
+            serde_json::json!(16_000_000u64),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("hardware timer time-driver fixture should validate");
+        let temp = tempdir().expect("tempdir");
+        let error =
+            generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
+        assert!(error.to_string().contains(
+            "clear operation op.tim1.clear_target0 targets periph.usart1 instead of periph.tim1"
+        ));
     }
 
     #[test]
