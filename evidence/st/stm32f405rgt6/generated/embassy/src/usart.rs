@@ -95,6 +95,7 @@ pub struct Usart1Resources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -109,6 +110,7 @@ pub const DRV_USART1_RESOURCES: Usart1Resources = Usart1Resources {
     init_operations: DRV_USART1_INIT_OPERATIONS,
     state_machines: DRV_USART1_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_USART1_CAPABILITY_TAGS,
 };
 
@@ -360,6 +362,7 @@ pub struct Usart2Resources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -374,6 +377,7 @@ pub const DRV_USART2_RESOURCES: Usart2Resources = Usart2Resources {
     init_operations: DRV_USART2_INIT_OPERATIONS,
     state_machines: DRV_USART2_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_USART2_CAPABILITY_TAGS,
 };
 
@@ -552,6 +556,7 @@ pub struct Usart3Resources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -566,6 +571,7 @@ pub const DRV_USART3_RESOURCES: Usart3Resources = Usart3Resources {
     init_operations: DRV_USART3_INIT_OPERATIONS,
     state_machines: DRV_USART3_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_USART3_CAPABILITY_TAGS,
 };
 
@@ -742,6 +748,7 @@ pub struct Usart6Resources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -756,6 +763,7 @@ pub const DRV_USART6_RESOURCES: Usart6Resources = Usart6Resources {
     init_operations: DRV_USART6_INIT_OPERATIONS,
     state_machines: DRV_USART6_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_USART6_CAPABILITY_TAGS,
 };
 

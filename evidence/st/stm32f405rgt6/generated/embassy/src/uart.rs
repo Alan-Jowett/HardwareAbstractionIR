@@ -92,6 +92,7 @@ pub struct Uart4Resources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -106,6 +107,7 @@ pub const DRV_UART4_RESOURCES: Uart4Resources = Uart4Resources {
     init_operations: DRV_UART4_INIT_OPERATIONS,
     state_machines: DRV_UART4_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_UART4_CAPABILITY_TAGS,
 };
 
@@ -281,6 +283,7 @@ pub struct Uart5Resources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -295,6 +298,7 @@ pub const DRV_UART5_RESOURCES: Uart5Resources = Uart5Resources {
     init_operations: DRV_UART5_INIT_OPERATIONS,
     state_machines: DRV_UART5_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_UART5_CAPABILITY_TAGS,
 };
 
