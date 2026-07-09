@@ -1,0 +1,83 @@
+{
+  "documentKind": "hair-evidence-manifest",
+  "schemaVersion": "0.1.0",
+  "targetDevice": {
+    "id": "CH32V203G6U6",
+    "name": "CH32V203G6U6",
+    "vendor": "WCH",
+    "family": "CH32V203",
+    "variant": "G6U6",
+    "package": "QFN28",
+    "architecture": "QingKe V4B",
+    "notes": "Exact target selected from the user's QT Py CH32V203 request after clarifying that the manifest should target the MCU rather than the board. Adafruit board collateral is internally inconsistent about G6 versus G8, so this manifest uses the user-approved CH32V203G6U6 exact variant backed by the exact-variant ch32-data entry and by Adafruit's G6/32KB wording."
+  },
+  "sources": [
+    {
+      "id": "wch-ch32v203-datasheet",
+      "kind": "datasheet",
+      "uri": "https://www.wch.cn/downloads/CH32V203DS0_PDF.html",
+      "notes": "Official WCH CH32V203 family datasheet. Best authoritative source for exact-variant identity, package, memory sizing, feature inventory, and electrical coverage for CH32V203G6U6."
+    },
+    {
+      "id": "wch-ch32fv2x-v3x-rm",
+      "kind": "reference-manual",
+      "uri": "https://www.wch.cn/downloads/CH32FV2x_V3xRM_PDF.html",
+      "notes": "Official WCH family reference manual for CH32V2x/V3x peripherals and registers. Primary source for register structure, fields, clocks, resets, and peripheral semantics."
+    },
+    {
+      "id": "openwch-ch32v20x-sdk",
+      "kind": "sdk",
+      "uri": "https://github.com/openwch/ch32v20x/tree/804daf39a21af99be64c5abe0ea4bdaf361eb2e4",
+      "version": "804daf39a21af99be64c5abe0ea4bdaf361eb2e4",
+      "notes": "Official openwch repository with SDK material, examples, headers, startup code, and package-group assets for the CH32V20x family."
+    },
+    {
+      "id": "openwch-ch32v20x-header",
+      "kind": "vendor-header",
+      "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h",
+      "version": "V1.0.1",
+      "notes": "Official WCH peripheral access header. The CH32V20x_D6 grouping explicitly includes CH32V203G6 and provides IRQ names, peripheral types, and register definitions."
+    },
+    {
+      "id": "openwch-ch32v20x-startup-d6",
+      "kind": "source-code",
+      "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Startup/startup_ch32v20x_D6.S",
+      "version": "V1.0.2",
+      "notes": "Official WCH startup file for the D6 subset that includes CH32V203G6. Useful to cross-check interrupt vector ordering and D6 subgroup membership."
+    },
+    {
+      "id": "openwch-ch32v20x-adc-dma-example",
+      "kind": "source-code",
+      "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/ADC/ADC_DMA/User/main.c",
+      "version": "V1.0.1",
+      "notes": "Official WCH ADC DMA example for the CH32V20x family. Useful to ground the ADC1 DMA path and transfer direction without relying on community inference."
+    },
+    {
+      "id": "openwch-ch32v20x-tim-dma-example",
+      "kind": "source-code",
+      "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/TIM/TIM_DMA/User/main.c",
+      "version": "V1.0.1",
+      "notes": "Official WCH timer DMA example for the CH32V20x family. Useful to ground at least one concrete timer DMA route and direction."
+    },
+    {
+      "id": "qingke-v4-processor-manual",
+      "kind": "other",
+      "uri": "https://www.wch.cn/downloads/QingKeV4_Processor_Manual_PDF.html",
+      "notes": "Official architecture-level QingKe V4 processor manual referenced by the openwch material. Useful when core and exception behavior are underspecified in the family datasheet and reference manual."
+    },
+    {
+      "id": "ch32-rs-ch32v203xx-svd",
+      "kind": "svd",
+      "uri": "https://raw.githubusercontent.com/ch32-rs/ch32-rs/9b4ee66500b956bc87fbf83aa28ad245b39ebd15/svd/vendor/CH32V203xx.svd",
+      "version": "9b4ee66500b956bc87fbf83aa28ad245b39ebd15",
+      "notes": "Community-maintained CH32V203 family SVD from ch32-rs. Not vendor-authored, but useful as an auditable metadata-rich gap-filler for register descriptions, reset values, field descriptions, and access metadata."
+    },
+    {
+      "id": "ch32-rs-ch32v203g6u6-yaml",
+      "kind": "generated",
+      "uri": "https://raw.githubusercontent.com/ch32-rs/ch32-data/a515903589cfbc342dc6ad0d13c02b4382da5628/data/chips/CH32V203G6U6.yaml",
+      "version": "a515903589cfbc342dc6ad0d13c02b4382da5628",
+      "notes": "Community-curated exact-variant machine-readable chip description for CH32V203G6U6. Useful as an exact-variant cross-check for package, memory sizing, device id, and included peripheral fragments."
+    }
+  ]
+}

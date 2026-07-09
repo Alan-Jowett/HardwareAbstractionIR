@@ -1,0 +1,8 @@
+[package]
+name = "ch32v203g6u6-embassy-hal"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "ch32v203g6u6_embassy_hal"
+path = "src/lib.rs"
