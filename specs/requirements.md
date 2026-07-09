@@ -216,6 +216,13 @@ Embassy profile contract.
   explicit lowering selector for that family and the referenced semantic
   operations shall justify the exact attach/reset-preservation pattern the
   generator emits.
+- If a driver instance claims capability tag `embassy-time-driver`, the profile
+  shall also carry an explicit selector distinguishing the existing
+  SysTick-backed path from any hardware-timer-backed path. A SysTick-backed time
+  base is allowed only when the approved interrupt-path inputs justify it
+  explicitly. A hardware-timer-backed time base is allowed only when the
+  approved timer, interrupt, semantic, and structural inputs justify both the
+  async wake behavior and any claimed blocking delay helpers deterministically.
 - Unsupported driver kinds, unresolved references, missing lowering inputs,
   and out-of-subset requests fail explicitly.
 

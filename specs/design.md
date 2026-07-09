@@ -201,6 +201,18 @@ preserve a boot-established USB Serial/JTAG link instead of emitting a generic
 reset-and-reattach sequence; that distinction belongs in the approved profile
 contract plus referenced semantic operations, not in ad hoc code generation.
 
+Time-base support follows the same explicit-contract rule. The existing
+SysTick-backed `embassy-time-driver` path remains valid, but it is not the only
+allowed architecture. When a document claims a hardware-timer-backed Embassy
+time base, that choice must also be selected explicitly in
+`profiles.embassyHal` rather than inferred from `driverKind` or capability tags
+alone. The timer-backed path must remain evidence-bounded: the approved HAIR
+inputs need to justify how the timer is configured, started, acknowledged,
+advanced, and connected to the wake interrupt path. If the generated timer
+driver also exposes blocking delay helpers, those helpers must come from the
+same approved counter/alarm semantics instead of from repository-invented
+timing behavior.
+
 When a document also carries explicit normalization canonical mappings, Embassy
 lowering may use those mappings as secondary resolution hints for supported
 register, field, or peripheral concepts that recur across vendors. This is a

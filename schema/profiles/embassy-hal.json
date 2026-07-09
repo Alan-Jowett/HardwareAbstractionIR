@@ -68,6 +68,14 @@
         "serial-jtag-preserve-link"
       ]
     },
+    "timeDriverSource": {
+      "type": "string",
+      "description": "Optional generator-facing selector for driver instances that claim capability tag `embassy-time-driver`. `systick` preserves the existing SysTick-backed time-base path on an interrupt driver instance. `hardware-timer` selects a timer-backed async time base on a timer driver instance when the document carries the explicit interrupt, semantic, and structural facts needed for delay helpers plus Embassy wake scheduling.",
+      "enum": [
+        "systick",
+        "hardware-timer"
+      ]
+    },
     "resourceRequirement": {
       "type": "string",
       "enum": [
@@ -156,6 +164,9 @@
             "loweringPattern": {
               "$ref": "#/$defs/loweringPattern"
             },
+            "timeDriverSource": {
+              "$ref": "#/$defs/timeDriverSource"
+            },
             "clockBindingRefs": {
               "description": "Referenced clock bindings that may justify emitted clock-gating or bring-up helpers when those bindings and their linked structural/semantic data are sufficient for real lowering.",
               "type": "array",
@@ -213,7 +224,7 @@
               "uniqueItems": true
             },
             "capabilityTags": {
-              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique interrupt driver instance that provides generated SysTick-backed Embassy async timing support when the document explicitly carries the required interrupt-path and startup lowering data.",
+              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support. The accompanying `timeDriverSource` selector determines whether that support is the existing SysTick-backed interrupt path or an explicitly modeled hardware-timer-backed path.",
               "type": "array",
               "items": {
                 "type": "string"

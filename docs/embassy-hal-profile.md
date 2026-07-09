@@ -260,7 +260,7 @@ hoc name matching.
 | `uart` / `usart` | `pinTopology.routes` always; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted enable/configure/read/write path; `interruptTopology.routes` and `dmaTopology.routes` only for emitted interrupt-driven or DMA-backed APIs |
 | `spi` | `pinTopology.routes`; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted configuration or transfer path; interrupt/DMA routes only when the emitted API claims them |
 | `i2c` | `pinTopology.routes`; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted bus transaction path; interrupt/DMA routes only when the emitted API claims them |
-| `timer` / `pwm` | `pinTopology.routes` for exposed channels; target-local `semantics.stateMachines` and `semantics.operations` for mode transitions; state-machine transitions with exactly one supported effect targeting a field for first-cut lowering; and structural register/field data for emitted enable/disable/channel/duty behavior |
+| `timer` / `pwm` | `pinTopology.routes` for exposed channels; target-local `semantics.stateMachines` and `semantics.operations` for mode transitions; state-machine transitions with exactly one supported effect targeting a field for first-cut lowering; structural register/field data for emitted enable/disable/channel/duty behavior; and, if the driver instance also claims blocking delay helpers or `embassy-time-driver`, the explicit interrupt routes plus semantic/structural counter, alarm, clear/ack, and reload facts needed for that timing path |
 | `adc` | `semantics.operations` for calibration/init/enable; structural register/field data for any emitted conversion or sample path; pin/electrical data for exposed analog inputs; `dmaTopology.routes` only when the emitted API claims DMA-backed sampling |
 | `dma` | `profiles.mcuSoc.dmaTopology.routes` and the referenced `dmaTopology.channels`; any referenced route `controlRefs`; and structural register/field data for emitted channel enable/launch/status helpers |
 | `interrupt` | `structure.device.interrupts`, `profiles.mcuSoc.interruptTopology.routes`, and the referenced `interruptTopology.sources`; plus any clear/ack operations or control refs required by emitted helper methods |
@@ -279,10 +279,10 @@ exact naming contract:
 | `uart` / `usart` | Bring-up helpers and only those polling / interrupt / DMA TX/RX methods whose control/data paths are explicitly modeled |
 | `spi` | Bring-up helpers and only those transfer/control methods whose clocking, enable, and data paths are explicitly modeled |
 | `i2c` | Bring-up helpers and only those bus transaction methods whose start/address/data/stop behavior is explicitly modeled |
-| `timer` / `pwm` | Enable/disable/mode/channel helpers derived from state machines, operations, route controls, and structural register data |
+| `timer` / `pwm` | Enable/disable/mode/channel helpers derived from state machines, operations, route controls, and structural register data; plus blocking delay/timebase helpers and, when selected as `timeDriverSource = "hardware-timer"`, generated Embassy async time-base support only when the approved timer counter/alarm path is explicitly modeled |
 | `adc` | Calibration/enable helpers plus only those conversion/sample methods whose trigger/start/complete/data path is explicitly modeled |
 | `dma` | Channel-oriented enable/configure/launch/status helpers derived from DMA topology and any referenced controls |
-| `interrupt` | IRQ enums plus bind/clear/ack helpers justified by the interrupt inventory, routes, and source-level operations; and, when tagged `embassy-time-driver`, the generated SysTick-backed async time-base support module |
+| `interrupt` | IRQ enums plus bind/clear/ack helpers justified by the interrupt inventory, routes, and source-level operations; and, when tagged `embassy-time-driver` with `timeDriverSource = "systick"`, the generated SysTick-backed async time-base support module |
 | `usb-device` | Bring-up helpers plus only those endpoint-oriented and/or serial-style USB methods whose attach, reset, interrupt, and data paths are explicitly modeled; device-specific helpers are allowed when they remain traceable to the approved USB lowering path rather than to inferred generic USB behavior. When `loweringPattern = "serial-jtag-preserve-link"`, the emitted bring-up sequence must preserve the boot-established USB Serial/JTAG link instead of synthesizing an unconditional reset-and-reattach sequence |
 
 The generator may choose exact Rust names and signatures, but those names
@@ -308,7 +308,7 @@ companion emulator/state handles and their observation/control methods.
 6. `initOperationRefs` and `stateMachineRefs` should be treated as executable lowering inputs, not as documentation-only labels.
 7. A driver instance should not be interpreted as claiming every imaginable operation for its `driverKind`; it only claims the subset that the referenced topology and semantics can justify.
 8. A `gpio-port` driver instance may still lower to a per-pin generated API surface; the HAIR contract stays rooted at the port block while each emitted pin helper must remain traceable to explicit `pinRoles`, routes, and reachable structural controls for that pin.
-9. Capability tag `embassy-time-driver` reserves that driver instance as the crate's generated async timing provider in the first cut. At most one driver instance may claim it, and in the current first cut it must be an `interrupt` driver instance whose single route targets SysTick.
+9. Capability tag `embassy-time-driver` reserves that driver instance as the crate's generated async timing provider in the first cut. At most one driver instance may claim it, and it must also declare `timeDriverSource`.
 10. Host-emulated output derives its package/crate naming from `crate.packageName`
     and `crate.crateName`; the profile does not grow separate host naming
     fields for the first cut.
@@ -328,6 +328,17 @@ companion emulator/state handles and their observation/control methods.
     justify a bring-up path that preserves an already boot-established USB
     Serial/JTAG link; the generator must not silently substitute a reset or
     attach pattern that is not explicitly modeled.
+14. If a driver instance claims `embassy-time-driver`, `timeDriverSource`
+    becomes part of the executable lowering contract. `systick` preserves the
+    existing SysTick-backed interrupt path. `hardware-timer` selects an
+    explicitly modeled timer-backed time base and must not be inferred from
+    `driverKind` or capability tags alone.
+15. A `hardware-timer` time-driver claim must remain rooted in a `timer`
+    driver instance whose approved HAIR inputs justify timer start, running
+    state, compare/alarm or wrap behavior, interrupt acknowledgement, and the
+    counter facts needed for any emitted blocking delay helpers.
+16. A `systick` time-driver claim must remain rooted in an `interrupt` driver
+    instance whose approved route inventory explicitly targets SysTick.
 
 ## Building a bootable ESP32-C3 image around a generated Embassy crate
 
@@ -419,18 +430,20 @@ For Embassy generation, the following cases must fail explicitly:
 3. a data-path API such as transfer, transaction, sample, or DMA-backed I/O would require behavior that is not explicitly modeled
 4. the input document carries only resource metadata for a claimed behavior, with no executable lowering path
 5. referenced semantic operations or state machines target a different peripheral than the driver instance, or a lowered state transition effect cannot be represented as one supported field write in the first cut
-6. async timing support is requested or claimed, but no unique `embassy-time-driver` instance carries the SysTick interrupt inventory and startup closure needed to drive the generated tick source
-7. a `usb-device` API would require inferred USB protocol state, endpoint
+6. async timing support is requested or claimed, but no unique `embassy-time-driver` instance carries the explicit source selection plus interrupt/semantic/startup closure needed to drive the generated tick source
+7. a claimed `embassy-time-driver` instance omits `timeDriverSource`, uses a source that contradicts the driver kind, or lacks the interrupt/semantic/structural closure required for that source
+8. a timer-backed delay or time-base API would require inferred counter, alarm, wrap, or acknowledgement behavior beyond the approved HAIR records
+9. a `usb-device` API would require inferred USB protocol state, endpoint
    semantics, or serial-style behavior that is not explicitly modeled by the
    approved clock/reset, interrupt, pin, semantic, and structural inputs
-8. a selected `loweringPattern` requires semantic or structural bring-up
+10. a selected `loweringPattern` requires semantic or structural bring-up
    inputs that are absent, contradictory, or would force the generator to
    invent a different attach/reset sequence
-9. host-emulated generation would expose a HAL-visible device without a paired
+11. host-emulated generation would expose a HAL-visible device without a paired
    emulator/state handle
-10. a requested host-only observation or control surface would require
+12. a requested host-only observation or control surface would require
    unsupported inference beyond the approved lowering inputs
-11. host-emulated execution would depend on background wall-clock progression
+13. host-emulated execution would depend on background wall-clock progression
    rather than explicit deterministic test control in the first cut
 
 Generators may emit a smaller API surface than another document of the

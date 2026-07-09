@@ -92,6 +92,7 @@ pub struct Uart0Resources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -106,6 +107,7 @@ pub const DRV_UART0_RESOURCES: Uart0Resources = Uart0Resources {
     init_operations: DRV_UART0_INIT_OPERATIONS,
     state_machines: DRV_UART0_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_UART0_CAPABILITY_TAGS,
 };
 

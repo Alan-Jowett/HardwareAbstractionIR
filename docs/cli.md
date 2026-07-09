@@ -75,6 +75,11 @@ First-cut behavior:
   document models that path explicitly, and require an explicit profile-level
   lowering selector when the chosen USB family has materially distinct
   bring-up behavior
+- allow generated async timing support only when the profile names a unique
+  `embassy-time-driver` instance plus an explicit time-driver source contract,
+  preserving the existing SysTick-backed path and allowing reusable
+  hardware-timer-backed lowering when the document models that timer path
+  explicitly
 - preserve the generator-relevant structured subset of referenced topology and semantic inputs in the emitted Rust metadata so downstream code does not lose control refs, remap data, or executable semantic structure that the approved HAIR document already provides
 - emit register-level code only for methods that can be justified by explicit HAIR lowering inputs, and fail explicitly when the requested or implied behavior is underspecified
 - fail explicitly when the input document falls outside the documented supported subset or omits generator-required topology, semantics, or bindings documented in `docs/embassy-hal-profile.md`
