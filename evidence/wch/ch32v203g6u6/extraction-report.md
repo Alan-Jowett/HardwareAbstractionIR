@@ -51,7 +51,8 @@
 
 - **Requested scope:** full Embassy driver inventory justified by the approved evidence
 - **Driver instances emitted:** 17 total — RCC; USART1/2; SPI1; I2C1; TIM1/2/3/4 timers; TIM1/2/3/4 PWM; ADC1/2; DMA1; PFIC interrupt
-- **Supporting records present:** 24 canonical blocks, 17 clock bindings, 16 reset bindings, 36 interrupt sources, 36 interrupt routes, 8 DMA channels, 10 DMA routes, 118 pin routes, 6 semantic operations, and 4 state machines
+- **Supporting records in the extracted HAIR profiles:** 24 canonical blocks, 17 clock bindings, 16 reset bindings, 36 interrupt sources, 36 interrupt routes, 8 DMA channels, 10 DMA routes, 118 pin routes, 6 semantic operations, and 4 state machines
+- **Checked-in Embassy crate materialization:** the generated crate currently exposes 7 DMA channels and 9 DMA routes in `generated/embassy/src/dma.rs`; the extracted HAIR profile also retains the TIM1 update DMA route on DMA1 channel 8 even though that extra route/channel pair is not emitted in the checked-in Embassy artifact surface
 - **Direct vs inherited lowering data:** retained Embassy drivers resolve directly to extracted core per-peripheral registers/fields; topology metadata comes from explicit transitive fragments reachable from the exact-variant YAML (`family/`, `peripherals/`, `interrupts/`, `dma/`) and remains reference-resolvable without guessing
 - **Omitted candidate driver instances:**
   - `gpio-port` for GPIOA/GPIOB/GPIOD — omitted because `hair generate embassy` rejects the CH32 `CFGLR/CFGHR/INDR/OUTDR/BSHR/BCR` GPIO contract as an unsupported lowering family
