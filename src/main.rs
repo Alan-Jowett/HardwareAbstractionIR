@@ -1637,6 +1637,18 @@ struct EmbassyCrateMetadata {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct EmbassyTimeDriverBindings {
+    counter_ref: String,
+    alarm_ref: String,
+    #[serde(default)]
+    alarm_apply_operation_refs: Vec<String>,
+    interrupt_enable_ref: String,
+    interrupt_pending_ref: String,
+    interrupt_clear_operation_ref: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct EmbassyDriverInstance {
     id: String,
     name: String,
@@ -1649,6 +1661,8 @@ struct EmbassyDriverInstance {
     time_driver_source: Option<String>,
     #[serde(default)]
     time_driver_tick_hz: Option<u64>,
+    #[serde(default)]
+    time_driver_bindings: Option<EmbassyTimeDriverBindings>,
     #[serde(default)]
     clock_binding_refs: Vec<String>,
     #[serde(default)]
@@ -1702,6 +1716,7 @@ struct ResolvedDriverInstance {
     lowering_pattern: Option<String>,
     time_driver_source: Option<String>,
     time_driver_tick_hz: Option<u64>,
+    time_driver_bindings: Option<EmbassyTimeDriverBindings>,
     target: McuCanonicalBlock,
     clock_bindings: Vec<McuClockBinding>,
     reset_bindings: Vec<McuResetBinding>,
@@ -1738,6 +1753,7 @@ struct DriverResourceScopeInputs<'a> {
 const EMBASSY_TIME_DRIVER_TAG: &str = "embassy-time-driver";
 const EMBASSY_TIME_DRIVER_SOURCE_SYSTICK: &str = "systick";
 const EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER: &str = "hardware-timer";
+const TIMER_LOWERING_COUNTER_COMPARE: &str = "counter-compare-timer";
 const USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK: &str = "serial-jtag-preserve-link";
 const USB_PRESERVE_LINK_OPERATION_ID: &str = "op.usb_device.preserve_serial_jtag_link";
 
@@ -1753,12 +1769,24 @@ fn time_driver_tick_hz(driver: &ResolvedDriverInstance) -> Option<u64> {
     driver.time_driver_tick_hz
 }
 
+fn time_driver_bindings(driver: &ResolvedDriverInstance) -> Option<&EmbassyTimeDriverBindings> {
+    driver.time_driver_bindings.as_ref()
+}
+
 fn has_usb_preserve_link_lowering(pattern: Option<&str>) -> bool {
     matches!(pattern, Some(USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK))
 }
 
+fn has_counter_compare_timer_lowering(pattern: Option<&str>) -> bool {
+    matches!(pattern, Some(TIMER_LOWERING_COUNTER_COMPARE))
+}
+
 fn driver_uses_usb_preserve_link_lowering(driver: &ResolvedDriverInstance) -> bool {
     has_usb_preserve_link_lowering(driver.lowering_pattern.as_deref())
+}
+
+fn driver_uses_counter_compare_timer_lowering(driver: &ResolvedDriverInstance) -> bool {
+    has_counter_compare_timer_lowering(driver.lowering_pattern.as_deref())
 }
 
 fn is_systick_interrupt_ref(interrupt_ref: &str) -> bool {
@@ -2052,6 +2080,7 @@ impl EmbassyGenerationModel {
                 lowering_pattern: driver.lowering_pattern.clone(),
                 time_driver_source: driver.time_driver_source.clone(),
                 time_driver_tick_hz: driver.time_driver_tick_hz,
+                time_driver_bindings: driver.time_driver_bindings.clone(),
                 target,
                 clock_bindings,
                 reset_bindings,
@@ -2454,6 +2483,13 @@ fn validate_driver_module_scope(driver: &EmbassyDriverInstance, module_name: &st
             EMBASSY_TIME_DRIVER_TAG
         );
     }
+    if driver.time_driver_bindings.is_some() && !has_time_driver_tag(&driver.capability_tags) {
+        bail!(
+            "driver {} declares timeDriverBindings without capability tag {}",
+            driver.id,
+            EMBASSY_TIME_DRIVER_TAG
+        );
+    }
     Ok(())
 }
 
@@ -2487,6 +2523,14 @@ fn validate_capability_tag_contracts(drivers: &[ResolvedDriverInstance]) -> Resu
                 if driver.time_driver_tick_hz.is_some() {
                     bail!(
                         "driver {} claims capability tag {} with timeDriverSource {} and must not declare timeDriverTickHz; SysTick timing defines its own tick rate",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source
+                    );
+                }
+                if driver.time_driver_bindings.is_some() {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} and must not declare timeDriverBindings",
                         driver.id,
                         EMBASSY_TIME_DRIVER_TAG,
                         source
@@ -2607,6 +2651,17 @@ fn validate_capability_tag_contracts(drivers: &[ResolvedDriverInstance]) -> Resu
                         driver.id,
                         EMBASSY_TIME_DRIVER_TAG,
                         source
+                    );
+                }
+                if driver_uses_counter_compare_timer_lowering(driver)
+                    && time_driver_bindings(driver).is_none()
+                {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} and loweringPattern {} but omits required timeDriverBindings",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source,
+                        TIMER_LOWERING_COUNTER_COMPARE
                     );
                 }
             }
@@ -3233,24 +3288,51 @@ fn validate_driver_lowering_pattern(
         return Ok(());
     };
 
-    if driver.driver_kind != "usb-device" {
-        bail!(
-            "driver {} uses loweringPattern {} but first-cut lowering patterns are only supported on usb-device drivers",
-            driver.id,
-            pattern
-        );
-    }
-
     match pattern {
         USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK => {
-            validate_usb_preserve_link_lowering(driver, init_operations)
+            if driver.driver_kind != "usb-device" {
+                bail!(
+                    "driver {} uses loweringPattern {} but that lowering is only supported on usb-device drivers",
+                    driver.id,
+                    pattern
+                );
+            }
+            validate_usb_preserve_link_lowering(driver, init_operations)?
         }
+        TIMER_LOWERING_COUNTER_COMPARE => validate_counter_compare_timer_lowering(driver)?,
         other => bail!(
             "driver {} uses unsupported loweringPattern {}",
             driver.id,
             other
         ),
     }
+    Ok(())
+}
+
+fn validate_counter_compare_timer_lowering(driver: &EmbassyDriverInstance) -> Result<()> {
+    if driver.driver_kind != "timer" {
+        bail!(
+            "driver {} uses loweringPattern {} but that lowering is only supported on timer drivers",
+            driver.id,
+            TIMER_LOWERING_COUNTER_COMPARE
+        );
+    }
+    if driver.time_driver_source.as_deref() != Some(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER) {
+        bail!(
+            "driver {} uses loweringPattern {} but must also declare timeDriverSource {}",
+            driver.id,
+            TIMER_LOWERING_COUNTER_COMPARE,
+            EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER
+        );
+    }
+    if driver.time_driver_bindings.is_none() {
+        bail!(
+            "driver {} uses loweringPattern {} but omits required timeDriverBindings",
+            driver.id,
+            TIMER_LOWERING_COUNTER_COMPARE
+        );
+    }
+    Ok(())
 }
 
 fn validate_usb_preserve_link_lowering(
@@ -3477,8 +3559,9 @@ fn render_interrupt_module(
     drivers: &[&ResolvedDriverInstance],
 ) -> Result<String> {
     let mut out = format!(
-        "//! Generated Embassy-style interrupt module for {}.\n\nuse crate::metadata;\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Irq {{\n",
-        render_comment_text(&model.device_name)
+        "//! Generated Embassy-style interrupt module for {}.\n\nuse crate::metadata;\nuse core::ptr::{{read_volatile, write_volatile}};\n\n{}\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Irq {{\n",
+        render_comment_text(&model.device_name),
+        render_mmio_helpers()
     );
     for interrupt in &model.interrupts {
         out.push_str(&format!(
@@ -3595,6 +3678,9 @@ fn render_driver_support_items(
     driver: &ResolvedDriverInstance,
 ) -> Result<String> {
     let mut out = String::new();
+    if driver_uses_pfic_runtime_support(driver) {
+        out.push_str(render_pfic_interrupt_support_items());
+    }
     if driver.driver_kind == "gpio-port" {
         out.push_str(&render_gpio_support_items(model, driver)?);
     }
@@ -3615,6 +3701,23 @@ fn render_driver_methods(
             code: "    pub fn bind(&self) -> &'static [metadata::InterruptRoute] {\n        self.resources.interrupts\n    }\n"
                 .to_string(),
         });
+        if driver_uses_pfic_runtime_support(driver) {
+            methods.push(GeneratedMethod {
+                name: "enable_irq".to_string(),
+                code: "    pub fn enable_irq(&self, irq: Irq) -> Result<(), metadata::Error> {\n        let external_index = pfic_external_irq_index(irq)?;\n        let register = pfic_register_address(PFIC_IENR_BASE_ADDRESS, external_index);\n        write_u32(register, pfic_irq_bit(external_index))\n    }\n"
+                    .to_string(),
+            });
+            methods.push(GeneratedMethod {
+                name: "disable_irq".to_string(),
+                code: "    pub fn disable_irq(&self, irq: Irq) -> Result<(), metadata::Error> {\n        let external_index = pfic_external_irq_index(irq)?;\n        let register = pfic_register_address(PFIC_IRER_BASE_ADDRESS, external_index);\n        write_u32(register, pfic_irq_bit(external_index))\n    }\n"
+                    .to_string(),
+            });
+            methods.push(GeneratedMethod {
+                name: "is_irq_active".to_string(),
+                code: "    pub fn is_irq_active(&self, irq: Irq) -> Result<bool, metadata::Error> {\n        let external_index = pfic_external_irq_index(irq)?;\n        let register = pfic_register_address(PFIC_IACTR_BASE_ADDRESS, external_index);\n        Ok((read_u32(register)? & pfic_irq_bit(external_index)) != 0)\n    }\n"
+                    .to_string(),
+            });
+        }
     }
     methods.extend(render_clock_binding_methods(model, driver)?);
     methods.extend(render_reset_binding_methods(model, driver)?);
@@ -3650,6 +3753,17 @@ fn render_driver_methods(
         rendered.push('\n');
     }
     Ok(rendered)
+}
+
+fn driver_uses_pfic_runtime_support(driver: &ResolvedDriverInstance) -> bool {
+    driver.driver_kind == "interrupt"
+        && driver.module_name == "interrupt"
+        && driver.target.block_class == "interrupt-controller"
+        && (driver.target.id == "block.pfic" || driver.target.name.eq_ignore_ascii_case("PFIC"))
+}
+
+fn render_pfic_interrupt_support_items() -> &'static str {
+    "\nconst PFIC_EXTERNAL_IRQ_OFFSET: u32 = 16;\nconst PFIC_IENR_BASE_ADDRESS: u64 = 0xE000_E100;\nconst PFIC_IRER_BASE_ADDRESS: u64 = 0xE000_E180;\nconst PFIC_IACTR_BASE_ADDRESS: u64 = 0xE000_E300;\n\nfn pfic_external_irq_index(irq: Irq) -> Result<u32, metadata::Error> {\n    (irq as u32)\n        .checked_sub(PFIC_EXTERNAL_IRQ_OFFSET)\n        .ok_or(metadata::Error::Unsupported(\"PFIC runtime helpers only support external interrupts\"))\n}\n\nfn pfic_register_address(base: u64, external_index: u32) -> u64 {\n    base + u64::from((external_index / 32) * 4)\n}\n\nfn pfic_irq_bit(external_index: u32) -> u32 {\n    1u32 << (external_index % 32)\n}\n"
 }
 
 fn render_time_driver_methods(driver: &ResolvedDriverInstance) -> Result<Vec<GeneratedMethod>> {
@@ -3722,7 +3836,7 @@ fn render_time_driver_methods(driver: &ResolvedDriverInstance) -> Result<Vec<Gen
 }
 
 fn render_mmio_helpers() -> &'static str {
-    "#[allow(dead_code)]\nfn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {\n    let address = usize::try_from(address)\n        .map_err(|_| metadata::Error::Unsupported(\"MMIO address does not fit usize on this target\"))?;\n    if address % align != 0 {\n        return Err(metadata::Error::Unsupported(\"MMIO address is not naturally aligned for the target register width\"));\n    }\n    Ok(address)\n}\n\n#[allow(dead_code)]\nfn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u8>())?;\n    unsafe {\n        let current = read_volatile(address as *const u8);\n        write_volatile(address as *mut u8, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u16>())?;\n    unsafe {\n        let current = read_volatile(address as *const u16);\n        write_volatile(address as *mut u16, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        let current = read_volatile(address as *const u32);\n        write_volatile(address as *mut u32, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn read_u32(address: u64) -> Result<u32, metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe { Ok(read_volatile(address as *const u32)) }\n}\n\n#[allow(dead_code)]\nfn write_u32(address: u64, value: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        write_volatile(address as *mut u32, value);\n    }\n    Ok(())\n}\n"
+    "#[allow(dead_code)]\nfn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {\n    let address = usize::try_from(address)\n        .map_err(|_| metadata::Error::Unsupported(\"MMIO address does not fit usize on this target\"))?;\n    if address % align != 0 {\n        return Err(metadata::Error::Unsupported(\"MMIO address is not naturally aligned for the target register width\"));\n    }\n    Ok(address)\n}\n\n#[allow(dead_code)]\nfn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u8>())?;\n    unsafe {\n        let current = read_volatile(address as *const u8);\n        write_volatile(address as *mut u8, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u16>())?;\n    unsafe {\n        let current = read_volatile(address as *const u16);\n        write_volatile(address as *mut u16, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        let current = read_volatile(address as *const u32);\n        write_volatile(address as *mut u32, (current & !clear_mask) | set_mask);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn read_u8(address: u64) -> Result<u8, metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u8>())?;\n    unsafe { Ok(read_volatile(address as *const u8)) }\n}\n\n#[allow(dead_code)]\nfn read_u16(address: u64) -> Result<u16, metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u16>())?;\n    unsafe { Ok(read_volatile(address as *const u16)) }\n}\n\n#[allow(dead_code)]\nfn read_u32(address: u64) -> Result<u32, metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe { Ok(read_volatile(address as *const u32)) }\n}\n\n#[allow(dead_code)]\nfn write_u8(address: u64, value: u8) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u8>())?;\n    unsafe {\n        write_volatile(address as *mut u8, value);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u16>())?;\n    unsafe {\n        write_volatile(address as *mut u16, value);\n    }\n    Ok(())\n}\n\n#[allow(dead_code)]\nfn write_u32(address: u64, value: u32) -> Result<(), metadata::Error> {\n    let address = checked_address(address, core::mem::align_of::<u32>())?;\n    unsafe {\n        write_volatile(address as *mut u32, value);\n    }\n    Ok(())\n}\n"
 }
 
 fn render_time_driver_support_items(
@@ -3736,6 +3850,14 @@ fn render_time_driver_support_items(
             "\nuse core::cell::{{Cell, RefCell}};\nuse critical_section::Mutex as CriticalSectionMutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nconst SYST_CSR_ADDRESS: u64 = 0xE000_E010;\nconst SYST_RVR_ADDRESS: u64 = 0xE000_E014;\nconst SYST_CVR_ADDRESS: u64 = 0xE000_E018;\nconst SYST_CSR_ENABLE: u32 = 1 << 0;\nconst SYST_CSR_TICKINT: u32 = 1 << 1;\nconst SYST_CSR_CLKSOURCE: u32 = 1 << 2;\nconst SYST_RELOAD_VALUE: u32 = 15;\n\nstruct GeneratedSystickTimeDriver {{\n    initialized: CriticalSectionMutex<Cell<bool>>,\n    ticks: CriticalSectionMutex<Cell<u64>>,\n    queue: CriticalSectionMutex<RefCell<EmbassyTimeQueue>>,\n}}\n\nimpl GeneratedSystickTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            initialized: CriticalSectionMutex::new(Cell::new(false)),\n            ticks: CriticalSectionMutex::new(Cell::new(0)),\n            queue: CriticalSectionMutex::new(RefCell::new(EmbassyTimeQueue::new())),\n        }}\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        critical_section::with(|cs| {{\n            if self.initialized.borrow(cs).get() {{\n                return Ok(());\n            }}\n            self.ticks.borrow(cs).set(0);\n            write_u32(SYST_CSR_ADDRESS, 0)?;\n            write_u32(SYST_RVR_ADDRESS, SYST_RELOAD_VALUE)?;\n            write_u32(SYST_CVR_ADDRESS, 0)?;\n            write_u32(\n                SYST_CSR_ADDRESS,\n                SYST_CSR_ENABLE | SYST_CSR_TICKINT | SYST_CSR_CLKSOURCE,\n            )?;\n            self.initialized.borrow(cs).set(true);\n            Ok(())\n        }})\n    }}\n\n    fn on_systick(&self) {{\n        critical_section::with(|cs| {{\n            if !self.initialized.borrow(cs).get() {{\n                return;\n            }}\n            let now = self.ticks.borrow(cs).get().wrapping_add(1);\n            self.ticks.borrow(cs).set(now);\n            let _ = self.queue.borrow(cs).borrow_mut().next_expiration(now);\n        }});\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedSystickTimeDriver {{\n    fn now(&self) -> u64 {{\n        critical_section::with(|cs| self.ticks.borrow(cs).get())\n    }}\n\n    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {{\n        critical_section::with(|cs| {{\n            let now = self.ticks.borrow(cs).get();\n            let mut queue = self.queue.borrow(cs).borrow_mut();\n            let _ = queue.schedule_wake(at, waker);\n            let _ = queue.next_expiration(now);\n        }});\n    }}\n}}\n\nembassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedSystickTimeDriver = GeneratedSystickTimeDriver::new());\n\n#[allow(dead_code)]\n#[allow(non_snake_case)]\n#[unsafe(no_mangle)]\nextern \"C\" fn SysTick() {{\n    GENERATED_TIME_DRIVER.on_systick();\n}}\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.init()\n}}\n"
         )),
         Some(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER) => {
+            if driver_uses_counter_compare_timer_lowering(driver) {
+                let layout = resolve_counter_compare_timer_time_driver_layout(model, driver)?;
+                return render_counter_compare_time_driver_support_items(
+                    &driver_prefix,
+                    &init_fn,
+                    &layout,
+                );
+            }
             let layout = resolve_hardware_timer_time_driver_layout(model, driver)?;
             let clear_must_statement = layout
                 .clear_statement
@@ -3795,6 +3917,110 @@ fn render_time_driver_support_items(
             EMBASSY_TIME_DRIVER_TAG
         ),
     }
+}
+
+fn render_counter_compare_time_driver_support_items(
+    driver_prefix: &str,
+    init_fn: &str,
+    layout: &CounterCompareTimerTimeDriverLayout,
+) -> Result<String> {
+    let clear_must_statement = layout
+        .clear_statement
+        .replace("modify_u8(", "must_modify_u8(")
+        .replace("modify_u16(", "must_modify_u16(")
+        .replace("modify_u32(", "must_modify_u32(")
+        .replace("write_u8(", "must_write_u8(")
+        .replace("write_u16(", "must_write_u16(")
+        .replace("write_u32(", "must_write_u32(")
+        .replace("?;\n", ";\n");
+    let alarm_apply_must_statement = layout
+        .alarm_apply_statement
+        .replace("modify_u8(", "must_modify_u8(")
+        .replace("modify_u16(", "must_modify_u16(")
+        .replace("modify_u32(", "must_modify_u32(")
+        .replace("write_u8(", "must_write_u8(")
+        .replace("write_u16(", "must_write_u16(")
+        .replace("write_u32(", "must_write_u32(")
+        .replace("?;\n", ";\n");
+
+    let read_counter_impl = match layout.counter.register.width_bits {
+        8 => "        let raw = must_read_u8(GENERATED_TIME_COUNTER_ADDRESS) as u32;\n        ((raw & GENERATED_TIME_COUNTER_MASK) >> GENERATED_TIME_COUNTER_SHIFT) as u32\n".to_string(),
+        16 => "        let raw = must_read_u16(GENERATED_TIME_COUNTER_ADDRESS) as u32;\n        ((raw & GENERATED_TIME_COUNTER_MASK) >> GENERATED_TIME_COUNTER_SHIFT) as u32\n".to_string(),
+        32 => "        let raw = must_read_u32(GENERATED_TIME_COUNTER_ADDRESS);\n        ((raw & GENERATED_TIME_COUNTER_MASK) >> GENERATED_TIME_COUNTER_SHIFT) as u32\n".to_string(),
+        other => bail!(
+            "counter-compare time driver uses unsupported counter register width {}",
+            other
+        ),
+    };
+
+    let alarm_write_impl = match layout.compare.register.width_bits {
+        8 => {
+            "        let raw = (((at as u32) << GENERATED_TIME_COMPARE_SHIFT) & GENERATED_TIME_COMPARE_MASK) as u8;\n        must_modify_u8(GENERATED_TIME_COMPARE_ADDRESS, GENERATED_TIME_COMPARE_MASK as u8, raw);\n".to_string()
+        }
+        16 => {
+            "        let raw = (((at as u32) << GENERATED_TIME_COMPARE_SHIFT) & GENERATED_TIME_COMPARE_MASK) as u16;\n        must_modify_u16(GENERATED_TIME_COMPARE_ADDRESS, GENERATED_TIME_COMPARE_MASK as u16, raw);\n".to_string()
+        }
+        32 => {
+            "        let raw = (((at as u32) << GENERATED_TIME_COMPARE_SHIFT) & GENERATED_TIME_COMPARE_MASK) as u32;\n        must_modify_u32(GENERATED_TIME_COMPARE_ADDRESS, GENERATED_TIME_COMPARE_MASK, raw);\n".to_string()
+        }
+        other => bail!(
+            "counter-compare time driver uses unsupported compare register width {}",
+            other
+        ),
+    };
+
+    let set_alarm_enable_impl = match layout.interrupt_enable.register.width_bits {
+        8 => {
+            "        let set_mask = enabled.then_some(GENERATED_TIME_INTERRUPT_ENABLE_MASK as u8).unwrap_or(0u8);\n        must_modify_u8(GENERATED_TIME_INTERRUPT_ENABLE_ADDRESS, GENERATED_TIME_INTERRUPT_ENABLE_MASK as u8, set_mask);\n".to_string()
+        }
+        16 => {
+            "        let set_mask = enabled.then_some(GENERATED_TIME_INTERRUPT_ENABLE_MASK as u16).unwrap_or(0u16);\n        must_modify_u16(GENERATED_TIME_INTERRUPT_ENABLE_ADDRESS, GENERATED_TIME_INTERRUPT_ENABLE_MASK as u16, set_mask);\n".to_string()
+        }
+        32 => {
+            "        let set_mask = enabled.then_some(GENERATED_TIME_INTERRUPT_ENABLE_MASK).unwrap_or(0u32);\n        must_modify_u32(GENERATED_TIME_INTERRUPT_ENABLE_ADDRESS, GENERATED_TIME_INTERRUPT_ENABLE_MASK, set_mask);\n".to_string()
+        }
+        other => bail!(
+            "counter-compare time driver uses unsupported interrupt-enable register width {}",
+            other
+        ),
+    };
+
+    let alarm_pending_impl = match layout.interrupt_pending.register.width_bits {
+        8 => {
+            "        (must_read_u8(GENERATED_TIME_INTERRUPT_PENDING_ADDRESS) & (GENERATED_TIME_INTERRUPT_PENDING_MASK as u8)) != 0\n".to_string()
+        }
+        16 => {
+            "        (must_read_u16(GENERATED_TIME_INTERRUPT_PENDING_ADDRESS) & (GENERATED_TIME_INTERRUPT_PENDING_MASK as u16)) != 0\n".to_string()
+        }
+        32 => {
+            "        (must_read_u32(GENERATED_TIME_INTERRUPT_PENDING_ADDRESS) & GENERATED_TIME_INTERRUPT_PENDING_MASK) != 0\n".to_string()
+        }
+        other => bail!(
+            "counter-compare time driver uses unsupported interrupt-pending register width {}",
+            other
+        ),
+    };
+
+    Ok(format!(
+        "\nuse core::cell::{{Cell, RefCell}};\nuse critical_section::Mutex as CriticalSectionMutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nconst GENERATED_TIME_COUNTER_ADDRESS: u64 = 0x{counter_addr:X}u64;\nconst GENERATED_TIME_COUNTER_MASK: u32 = 0x{counter_mask:08X}u32;\nconst GENERATED_TIME_COUNTER_SHIFT: u32 = {counter_shift};\nconst GENERATED_TIME_COUNTER_BITS: u32 = {counter_bits};\nconst GENERATED_TIME_COMPARE_ADDRESS: u64 = 0x{compare_addr:X}u64;\nconst GENERATED_TIME_COMPARE_MASK: u32 = 0x{compare_mask:08X}u32;\nconst GENERATED_TIME_COMPARE_SHIFT: u32 = {compare_shift};\nconst GENERATED_TIME_INTERRUPT_ENABLE_ADDRESS: u64 = 0x{enable_addr:X}u64;\nconst GENERATED_TIME_INTERRUPT_ENABLE_MASK: u32 = 0x{enable_mask:08X}u32;\nconst GENERATED_TIME_INTERRUPT_PENDING_ADDRESS: u64 = 0x{pending_addr:X}u64;\nconst GENERATED_TIME_INTERRUPT_PENDING_MASK: u32 = 0x{pending_mask:08X}u32;\n\nstruct GeneratedCounterCompareTimeDriver {{\n    initialized: CriticalSectionMutex<Cell<bool>>,\n    wraps: CriticalSectionMutex<Cell<u64>>,\n    last_raw: CriticalSectionMutex<Cell<u32>>,\n    queue: CriticalSectionMutex<RefCell<EmbassyTimeQueue>>,\n}}\n\nimpl GeneratedCounterCompareTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            initialized: CriticalSectionMutex::new(Cell::new(false)),\n            wraps: CriticalSectionMutex::new(Cell::new(0)),\n            last_raw: CriticalSectionMutex::new(Cell::new(0)),\n            queue: CriticalSectionMutex::new(RefCell::new(EmbassyTimeQueue::new())),\n        }}\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        critical_section::with(|cs| {{\n            if self.initialized.borrow(cs).get() {{\n                return Ok(());\n            }}\n            self.set_alarm_enabled(false);\n{clear_statement}            self.wraps.borrow(cs).set(0);\n            self.last_raw.borrow(cs).set(self.read_raw_counter());\n            self.initialized.borrow(cs).set(true);\n            Ok(())\n        }})\n    }}\n\n    fn read_raw_counter(&self) -> u32 {{\n{read_counter_impl}    }}\n\n    fn read_now(&self) -> u64 {{\n        critical_section::with(|cs| {{\n            let raw = self.read_raw_counter();\n            let last = self.last_raw.borrow(cs).get();\n            let mut wraps = self.wraps.borrow(cs).get();\n            if raw < last {{\n                wraps = wraps.wrapping_add(1);\n                self.wraps.borrow(cs).set(wraps);\n            }}\n            self.last_raw.borrow(cs).set(raw);\n            (wraps << GENERATED_TIME_COUNTER_BITS) | u64::from(raw)\n        }})\n    }}\n\n    fn arm_alarm(&self, at: u64) {{\n{alarm_write_impl}{alarm_apply_impl}        self.set_alarm_enabled(true);\n    }}\n\n    fn set_alarm_enabled(&self, enabled: bool) {{\n{set_alarm_enable_impl}    }}\n\n    fn acknowledge_interrupt(&self) {{\n{clear_statement}    }}\n\n    fn is_alarm_pending(&self) -> bool {{\n{alarm_pending_impl}    }}\n        \n    fn on_interrupt(&self) {{\n        if !critical_section::with(|cs| self.initialized.borrow(cs).get()) || !self.is_alarm_pending() {{\n            return;\n        }}\n        self.acknowledge_interrupt();\n        let now = self.read_now();\n        critical_section::with(|cs| {{\n            let mut queue = self.queue.borrow(cs).borrow_mut();\n            let next = queue.next_expiration(now);\n            if next == u64::MAX {{\n                self.set_alarm_enabled(false);\n            }} else {{\n                self.arm_alarm(next);\n            }}\n        }});\n    }}\n\n    fn delay_ticks(&self, ticks: u64) -> Result<(), metadata::Error> {{\n        let start = self.read_now();\n        let deadline = start.wrapping_add(ticks);\n        loop {{\n            let now = self.read_now();\n            if now.wrapping_sub(deadline) < (1u64 << 63) {{\n                break;\n            }}\n            core::hint::spin_loop();\n        }}\n        Ok(())\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedCounterCompareTimeDriver {{\n    fn now(&self) -> u64 {{\n        self.read_now()\n    }}\n\n    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {{\n        let should_rearm = critical_section::with(|cs| {{\n            self.queue.borrow(cs).borrow_mut().schedule_wake(at, waker)\n        }});\n        if !should_rearm {{\n            return;\n        }}\n        let now = self.read_now();\n        critical_section::with(|cs| {{\n            let next = self.queue.borrow(cs).borrow_mut().next_expiration(now);\n            if next == u64::MAX {{\n                self.set_alarm_enabled(false);\n            }} else {{\n                self.arm_alarm(next);\n            }}\n        }});\n    }}\n}}\n\n#[allow(dead_code)]\nfn must_read_u8(address: u64) -> u8 {{\n    read_u8(address).expect(\"generated time-driver MMIO read\")\n}}\n\n#[allow(dead_code)]\nfn must_read_u16(address: u64) -> u16 {{\n    read_u16(address).expect(\"generated time-driver MMIO read\")\n}}\n\n#[allow(dead_code)]\nfn must_read_u32(address: u64) -> u32 {{\n    read_u32(address).expect(\"generated time-driver MMIO read\")\n}}\n\n#[allow(dead_code)]\nfn must_modify_u8(address: u64, clear_mask: u8, set_mask: u8) {{\n    modify_u8(address, clear_mask, set_mask).expect(\"generated time-driver MMIO write\")\n}}\n\n#[allow(dead_code)]\nfn must_modify_u16(address: u64, clear_mask: u16, set_mask: u16) {{\n    modify_u16(address, clear_mask, set_mask).expect(\"generated time-driver MMIO write\")\n}}\n\n#[allow(dead_code)]\nfn must_modify_u32(address: u64, clear_mask: u32, set_mask: u32) {{\n    modify_u32(address, clear_mask, set_mask).expect(\"generated time-driver MMIO write\")\n}}\n\n#[allow(dead_code)]\nfn must_write_u8(address: u64, value: u8) {{\n    write_u8(address, value).expect(\"generated time-driver MMIO write\")\n}}\n\n#[allow(dead_code)]\nfn must_write_u16(address: u64, value: u16) {{\n    write_u16(address, value).expect(\"generated time-driver MMIO write\")\n}}\n\n#[allow(dead_code)]\nfn must_write_u32(address: u64, value: u32) {{\n    write_u32(address, value).expect(\"generated time-driver MMIO write\")\n}}\n\nembassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedCounterCompareTimeDriver = GeneratedCounterCompareTimeDriver::new());\n\n#[allow(dead_code)]\npub fn generated_{driver_prefix}_time_driver_interrupt() {{\n    GENERATED_TIME_DRIVER.on_interrupt();\n}}\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.init()\n}}\n\nfn generated_{driver_prefix}_time_driver_now() -> u64 {{\n    GENERATED_TIME_DRIVER.now()\n}}\n\nfn generated_{driver_prefix}_time_driver_delay_ticks(ticks: u64) -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.delay_ticks(ticks)\n}}\n",
+        counter_addr = layout.counter.register.absolute_address,
+        counter_mask = layout.counter.mask,
+        counter_shift = layout.counter.lsb,
+        counter_bits = layout.counter.register.width_bits.min(32),
+        compare_addr = layout.compare.register.absolute_address,
+        compare_mask = layout.compare.mask,
+        compare_shift = layout.compare.lsb,
+        enable_addr = layout.interrupt_enable.register.absolute_address,
+        enable_mask = layout.interrupt_enable.mask,
+        pending_addr = layout.interrupt_pending.register.absolute_address,
+        pending_mask = layout.interrupt_pending.mask,
+        clear_statement = clear_must_statement,
+        read_counter_impl = read_counter_impl,
+        alarm_write_impl = alarm_write_impl,
+        alarm_apply_impl = alarm_apply_must_statement,
+        set_alarm_enable_impl = set_alarm_enable_impl,
+        alarm_pending_impl = alarm_pending_impl,
+    ))
 }
 
 fn render_gpio_module_prelude() -> &'static str {
@@ -5208,8 +5434,8 @@ fn render_usart_methods(
             .is_some_and(|signal| signal.eq_ignore_ascii_case("rx"))
     });
 
-    let cr1 = try_resolve_target_register_by_name(model, target_ref, "CR1")?;
-    let cr2 = try_resolve_target_register_by_name(model, target_ref, "CR2")?;
+    let cr1 = try_resolve_target_register_by_names(model, target_ref, &["CR1", "CTLR1"])?;
+    let cr2 = try_resolve_target_register_by_names(model, target_ref, &["CR2", "CTLR2"])?;
     if let (Some(cr1), Some(cr2)) = (cr1, cr2) {
         let brr = try_resolve_target_register_by_name_or_canonical_term(
             model,
@@ -5855,8 +6081,8 @@ fn render_stm32_usart_methods(
     });
 
     if has_tx {
-        let sr = resolve_target_register_by_name(model, target_ref, "SR")?;
-        let dr = resolve_target_register_by_name(model, target_ref, "DR")?;
+        let sr = resolve_target_register_by_names(model, target_ref, &["SR", "STATR"])?;
+        let dr = resolve_target_register_by_names(model, target_ref, &["DR", "DATAR"])?;
         let txe = resolve_register_field(&sr, "TXE")?;
         let tc = resolve_register_field(&sr, "TC")?;
         let txe_mask = field_bit_mask(&txe, &sr)?;
@@ -5885,8 +6111,8 @@ fn render_stm32_usart_methods(
     }
 
     if has_rx {
-        let sr = resolve_target_register_by_name(model, target_ref, "SR")?;
-        let dr = resolve_target_register_by_name(model, target_ref, "DR")?;
+        let sr = resolve_target_register_by_names(model, target_ref, &["SR", "STATR"])?;
+        let dr = resolve_target_register_by_names(model, target_ref, &["DR", "DATAR"])?;
         let rxne = resolve_register_field(&sr, "RXNE")?;
         let rxne_mask = field_bit_mask(&rxne, &sr)?;
 
@@ -5934,7 +6160,7 @@ fn render_stm32_usart_methods(
     }
 
     if has_tx_dma {
-        let cr3 = resolve_target_register_by_name(model, target_ref, "CR3")?;
+        let cr3 = resolve_target_register_by_names(model, target_ref, &["CR3", "CTLR3"])?;
         let dmat = resolve_register_field(&cr3, "DMAT")?;
         methods.push(render_register_write_method(
             "enable_tx_dma".to_string(),
@@ -5953,7 +6179,7 @@ fn render_stm32_usart_methods(
     }
 
     if has_rx_dma {
-        let cr3 = resolve_target_register_by_name(model, target_ref, "CR3")?;
+        let cr3 = resolve_target_register_by_names(model, target_ref, &["CR3", "CTLR3"])?;
         let dmar = resolve_register_field(&cr3, "DMAR")?;
         methods.push(render_register_write_method(
             "enable_rx_dma".to_string(),
@@ -6300,6 +6526,20 @@ fn resolve_target_register_by_name(
     )
 }
 
+fn resolve_target_register_by_names(
+    model: &EmbassyGenerationModel,
+    target_ref: &str,
+    register_names: &[&str],
+) -> Result<ResolvedRegister> {
+    try_resolve_target_register_by_names(model, target_ref, register_names)?.ok_or_else(|| {
+        anyhow!(
+            "peripheral {} does not expose any register in [{}] through its explicit structural template",
+            target_ref,
+            register_names.join(", ")
+        )
+    })
+}
+
 #[derive(Debug, Clone)]
 struct TimeDriverFieldAccess {
     register: ResolvedRegister,
@@ -6325,6 +6565,89 @@ struct HardwareTimerTimeDriverLayout {
     clear_statement: String,
 }
 
+struct CounterCompareTimerTimeDriverLayout {
+    counter: TimeDriverFieldAccess,
+    compare: TimeDriverFieldAccess,
+    alarm_apply_statement: String,
+    interrupt_enable: TimeDriverFieldAccess,
+    interrupt_pending: TimeDriverFieldAccess,
+    clear_statement: String,
+}
+
+fn register_width_mask(register: &ResolvedRegister) -> Result<u32> {
+    match register.width_bits {
+        0 => bail!("register {} has invalid width 0", register.id),
+        1..=31 => Ok((1u32 << register.width_bits) - 1),
+        32 => Ok(u32::MAX),
+        other => bail!(
+            "register {} has unsupported width {} for generated time-driver access",
+            register.id,
+            other
+        ),
+    }
+}
+
+fn resolve_time_driver_access_ref(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+    entity_ref: &str,
+    usage: &str,
+) -> Result<TimeDriverFieldAccess> {
+    if let Some(field_target) = model.fields.get(entity_ref) {
+        if field_target.peripheral_ref != driver.target.target_ref {
+            bail!(
+                "driver {} {} {} targets {} instead of {}",
+                driver.id,
+                usage,
+                entity_ref,
+                field_target.peripheral_ref,
+                driver.target.target_ref
+            );
+        }
+        let register = model
+            .registers
+            .get(field_target.register_id.as_str())
+            .ok_or_else(|| {
+                anyhow!(
+                    "driver {} {} {} references register {} that is unavailable in the generated scope",
+                    driver.id,
+                    usage,
+                    entity_ref,
+                    field_target.register_id
+                )
+            })?
+            .clone();
+        return Ok(TimeDriverFieldAccess {
+            mask: field_bit_mask_or_range_mask(&field_target.field, &register)?,
+            lsb: field_target.field.lsb,
+            register,
+        });
+    }
+    let register = model.registers.get(entity_ref).ok_or_else(|| {
+        anyhow!(
+            "driver {} {} {} must resolve to a register or field",
+            driver.id,
+            usage,
+            entity_ref
+        )
+    })?;
+    if register.peripheral_ref != driver.target.target_ref {
+        bail!(
+            "driver {} {} {} targets {} instead of {}",
+            driver.id,
+            usage,
+            entity_ref,
+            register.peripheral_ref,
+            driver.target.target_ref
+        );
+    }
+    Ok(TimeDriverFieldAccess {
+        mask: register_width_mask(register)?,
+        lsb: 0,
+        register: register.clone(),
+    })
+}
+
 fn resolve_time_driver_field_access(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
@@ -6341,95 +6664,126 @@ fn resolve_time_driver_field_access(
     })
 }
 
-fn render_time_driver_clear_statement(
+fn render_time_driver_operation_statements(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
+    operation_ref: &str,
+    usage: &str,
 ) -> Result<String> {
     let driver_target_ref = driver.target.target_ref.as_str();
-    let [interrupt_source] = driver.interrupt_sources.as_slice() else {
-        bail!(
-            "driver {} must resolve exactly one interrupt source for generated time-driver clearing",
-            driver.id
-        );
-    };
-    let [clear_ref] = interrupt_source.clear_operation_refs.as_slice() else {
-        bail!(
-            "driver {} interrupt source {} must expose exactly one clear operation",
-            driver.id,
-            interrupt_source.id
-        );
-    };
-    let operation = model.operations.get(clear_ref).ok_or_else(|| {
+    let operation = model.operations.get(operation_ref).ok_or_else(|| {
         anyhow!(
-            "driver {} interrupt source {} references unknown clear operation {}",
+            "driver {} {} references unknown operation {}",
             driver.id,
-            interrupt_source.id,
-            clear_ref
+            usage,
+            operation_ref
         )
     })?;
     for operation_target in &operation.target_refs {
         if operation_target != driver_target_ref {
             bail!(
-                "driver {} clear operation {} targets {} instead of {}",
+                "driver {} {} {} targets {} instead of {}",
                 driver.id,
+                usage,
                 operation.id,
                 operation_target,
                 driver_target_ref
             );
         }
     }
-    if operation.steps.len() != 1 {
-        bail!(
-            "driver {} clear operation {} must use exactly one write step for first-cut generated time-driver clearing",
-            driver.id,
-            operation.id
-        );
-    }
-    let step = &operation.steps[0];
-    if step.action != "write" {
-        bail!(
-            "driver {} clear operation {} uses unsupported action {}",
-            driver.id,
-            operation.id,
-            step.action
-        );
-    }
-    let step_target_ref = step.target_ref.as_deref().ok_or_else(|| {
-        anyhow!(
-            "driver {} clear operation {} step {} is missing targetRef",
-            driver.id,
-            operation.id,
-            step.index
-        )
-    })?;
-    let register = model.registers.get(step_target_ref).ok_or_else(|| {
-        anyhow!(
-            "driver {} clear operation {} step {} references unknown register {}",
-            driver.id,
-            operation.id,
+    let mut rendered = String::new();
+    for step in &operation.steps {
+        if step.action != "write" {
+            bail!(
+                "driver {} {} {} uses unsupported action {}",
+                driver.id,
+                usage,
+                operation.id,
+                step.action
+            );
+        }
+        let step_target_ref = step.target_ref.as_deref().ok_or_else(|| {
+            anyhow!(
+                "driver {} {} {} step {} is missing targetRef",
+                driver.id,
+                usage,
+                operation.id,
+                step.index
+            )
+        })?;
+        let register = model.registers.get(step_target_ref).ok_or_else(|| {
+            anyhow!(
+                "driver {} {} {} step {} references unknown register {}",
+                driver.id,
+                usage,
+                operation.id,
+                step.index,
+                step_target_ref
+            )
+        })?;
+        if register.peripheral_ref != driver_target_ref {
+            bail!(
+                "driver {} {} {} step {} references register {} on {} instead of {}",
+                driver.id,
+                usage,
+                operation.id,
+                step.index,
+                step_target_ref,
+                register.peripheral_ref,
+                driver_target_ref
+            );
+        }
+        let parsed = parse_field_write_expression(
+            step.expression.as_ref(),
+            step.value.as_ref(),
+            &operation.id,
             step.index,
-            step_target_ref
-        )
-    })?;
-    if register.peripheral_ref != driver_target_ref {
+        )?;
+        let field = resolve_register_field(register, &parsed.field_name)?;
+        rendered.push_str(&render_register_write_statement(
+            register,
+            &field,
+            parsed.value,
+            "        ",
+        )?);
+    }
+    Ok(rendered)
+}
+
+fn render_time_driver_clear_statement(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    let [interrupt_source] = driver.interrupt_sources.as_slice() else {
         bail!(
-            "driver {} clear operation {} step {} references register {} on {} instead of {}",
+            "driver {} must resolve exactly one interrupt source for generated time-driver clearing",
+            driver.id
+        );
+    };
+    let clear_ref = time_driver_bindings(driver)
+        .map(|bindings| bindings.interrupt_clear_operation_ref.as_str())
+        .or_else(|| interrupt_source.clear_operation_refs.first().map(String::as_str))
+        .ok_or_else(|| {
+            anyhow!(
+                "driver {} interrupt source {} must expose a clear operation for generated time-driver clearing",
+                driver.id,
+                interrupt_source.id
+            )
+        })?;
+    if !interrupt_source.clear_operation_refs.is_empty()
+        && !interrupt_source
+            .clear_operation_refs
+            .iter()
+            .any(|candidate| candidate == clear_ref)
+    {
+        bail!(
+            "driver {} time-driver clear operation {} is not listed on interrupt source {}",
             driver.id,
-            operation.id,
-            step.index,
-            step_target_ref,
-            register.peripheral_ref,
-            driver_target_ref
+            clear_ref,
+            interrupt_source.id
         );
     }
-    let parsed = parse_field_write_expression(
-        step.expression.as_ref(),
-        step.value.as_ref(),
-        &operation.id,
-        step.index,
-    )?;
-    let field = resolve_register_field(register, &parsed.field_name)?;
-    render_register_write_statement(register, &field, parsed.value, "        ")
+    render_time_driver_operation_statements(model, driver, clear_ref, "time-driver clear operation")
 }
 
 fn resolve_hardware_timer_time_driver_layout(
@@ -6520,6 +6874,56 @@ fn resolve_hardware_timer_time_driver_layout(
     })
 }
 
+fn resolve_counter_compare_timer_time_driver_layout(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<CounterCompareTimerTimeDriverLayout> {
+    let bindings = time_driver_bindings(driver).ok_or_else(|| {
+        anyhow!(
+            "driver {} uses loweringPattern {} but omits required timeDriverBindings",
+            driver.id,
+            TIMER_LOWERING_COUNTER_COMPARE
+        )
+    })?;
+    let mut alarm_apply_statement = String::new();
+    for operation_ref in &bindings.alarm_apply_operation_refs {
+        alarm_apply_statement.push_str(&render_time_driver_operation_statements(
+            model,
+            driver,
+            operation_ref,
+            "time-driver alarm apply operation",
+        )?);
+    }
+    Ok(CounterCompareTimerTimeDriverLayout {
+        counter: resolve_time_driver_access_ref(
+            model,
+            driver,
+            &bindings.counter_ref,
+            "time-driver counter binding",
+        )?,
+        compare: resolve_time_driver_access_ref(
+            model,
+            driver,
+            &bindings.alarm_ref,
+            "time-driver alarm binding",
+        )?,
+        alarm_apply_statement,
+        interrupt_enable: resolve_time_driver_access_ref(
+            model,
+            driver,
+            &bindings.interrupt_enable_ref,
+            "time-driver interrupt-enable binding",
+        )?,
+        interrupt_pending: resolve_time_driver_access_ref(
+            model,
+            driver,
+            &bindings.interrupt_pending_ref,
+            "time-driver interrupt-pending binding",
+        )?,
+        clear_statement: render_time_driver_clear_statement(model, driver)?,
+    })
+}
+
 fn try_resolve_target_register_by_name(
     model: &EmbassyGenerationModel,
     target_ref: &str,
@@ -6541,6 +6945,21 @@ fn try_resolve_target_register_by_name(
         return Ok(None);
     };
     try_resolve_target_register_from_template(target, target_base, template, register_name)
+}
+
+fn try_resolve_target_register_by_names(
+    model: &EmbassyGenerationModel,
+    target_ref: &str,
+    register_names: &[&str],
+) -> Result<Option<ResolvedRegister>> {
+    for register_name in register_names {
+        if let Some(register) =
+            try_resolve_target_register_by_name(model, target_ref, register_name)?
+        {
+            return Ok(Some(register));
+        }
+    }
+    Ok(None)
 }
 
 fn try_resolve_target_register_by_name_or_canonical_term(
@@ -7391,6 +7810,41 @@ fn collect_embassy_register_scope(
                 state_machine,
             );
         }
+        if let Some(bindings) = &driver.time_driver_bindings {
+            for binding_ref in [
+                &bindings.counter_ref,
+                &bindings.alarm_ref,
+                &bindings.interrupt_enable_ref,
+                &bindings.interrupt_pending_ref,
+            ] {
+                collect_semantic_target_peripheral(
+                    &mut required,
+                    scope.register_owners,
+                    Some(binding_ref.as_str()),
+                );
+            }
+            for operation_ref in bindings
+                .alarm_apply_operation_refs
+                .iter()
+                .chain(std::iter::once(&bindings.interrupt_clear_operation_ref))
+            {
+                let operation = scope
+                    .operations
+                    .get(operation_ref.as_str())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "operation reference {} on driver {} could not be resolved",
+                            operation_ref,
+                            driver.id
+                        )
+                    })?;
+                collect_operation_target_peripherals(
+                    &mut required,
+                    scope.register_owners,
+                    operation,
+                );
+            }
+        }
     }
     Ok(required)
 }
@@ -7496,6 +7950,30 @@ fn collect_embassy_field_scope(
                         )
                     })?;
             collect_state_machine_field_refs(&mut required, state_machine);
+        }
+        if let Some(bindings) = &driver.time_driver_bindings {
+            for binding_ref in [
+                &bindings.counter_ref,
+                &bindings.alarm_ref,
+                &bindings.interrupt_enable_ref,
+                &bindings.interrupt_pending_ref,
+            ] {
+                collect_semantic_field_ref(&mut required, Some(binding_ref.as_str()));
+            }
+            for operation_ref in bindings
+                .alarm_apply_operation_refs
+                .iter()
+                .chain(std::iter::once(&bindings.interrupt_clear_operation_ref))
+            {
+                let operation = operations.get(operation_ref.as_str()).ok_or_else(|| {
+                    anyhow!(
+                        "operation reference {} on driver {} could not be resolved",
+                        operation_ref,
+                        driver.id
+                    )
+                })?;
+                collect_operation_field_refs(&mut required, operation);
+            }
         }
     }
     Ok(required)
@@ -9504,6 +9982,9 @@ fn render_embassy_host_driver_support_items(
     driver: &ResolvedDriverInstance,
 ) -> Result<String> {
     let mut out = String::new();
+    if driver_uses_pfic_runtime_support(driver) {
+        out.push_str(render_pfic_interrupt_support_items());
+    }
     if driver.driver_kind == "gpio-port" {
         out.push_str(&render_gpio_support_items(model, driver)?);
     }
@@ -13594,6 +14075,8 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             interrupt_rs
                 .contains("//! Generated Embassy-style interrupt module for FIXTURE DEVICE ")
         );
+        assert!(interrupt_rs.contains("pub fn enable_irq(&self, irq: Irq)"));
+        assert!(interrupt_rs.contains("pub fn is_irq_active(&self, irq: Irq)"));
     }
 
     #[test]
@@ -14251,6 +14734,151 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(time_rs.contains("let should_rearm = critical_section::with(|cs| {"));
         assert!(!time_rs.contains("                    fn "));
         assert!(cargo_toml.contains("tick-hz-16_000_000"));
+    }
+
+    #[test]
+    fn generate_embassy_supports_counter_compare_time_driver_when_bindings_are_explicit() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let input = repo_root.join(r"evidence\wch\ch32v203g6u6\hair.json");
+        let mut document = load_json_file(&input).expect("ch32v203g6u6 hair json");
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let tim4 = peripherals
+            .iter_mut()
+            .find(|peripheral| {
+                peripheral
+                    .as_object()
+                    .and_then(|item| item.get("id"))
+                    .and_then(Value::as_str)
+                    == Some("periph.tim4")
+            })
+            .and_then(Value::as_object_mut)
+            .expect("tim4 peripheral");
+        let registers = tim4
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("tim4 registers");
+        for (register_id, field_name, new_field_id) in [
+            ("reg.tim4.dmaintenr", "CC1IE", "field.tim4_dmaintenr.cc1ie"),
+            ("reg.tim4.intfr", "CC1IF", "field.tim4_intfr.cc1if"),
+        ] {
+            let register = registers
+                .iter_mut()
+                .find(|register| {
+                    register
+                        .as_object()
+                        .and_then(|item| item.get("id"))
+                        .and_then(Value::as_str)
+                        == Some(register_id)
+                })
+                .and_then(Value::as_object_mut)
+                .expect("tim4 register");
+            let fields = register
+                .get_mut("fields")
+                .and_then(Value::as_array_mut)
+                .expect("register fields");
+            let field = fields
+                .iter_mut()
+                .find(|field| {
+                    field
+                        .as_object()
+                        .and_then(|item| item.get("name"))
+                        .and_then(Value::as_str)
+                        == Some(field_name)
+                })
+                .and_then(Value::as_object_mut)
+                .expect("target field");
+            field.insert("id".to_string(), Value::String(new_field_id.to_string()));
+        }
+        let drivers = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let tim4 = drivers
+            .iter_mut()
+            .find(|driver| {
+                driver
+                    .as_object()
+                    .and_then(|item| item.get("id"))
+                    .and_then(Value::as_str)
+                    == Some("drv.tim4")
+            })
+            .and_then(Value::as_object_mut)
+            .expect("tim4 driver");
+        tim4.insert("modulePath".to_string(), Value::String("time".to_string()));
+        tim4.insert(
+            "loweringPattern".to_string(),
+            Value::String(TIMER_LOWERING_COUNTER_COMPARE.to_string()),
+        );
+        tim4.insert(
+            "timeDriverSource".to_string(),
+            Value::String(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER.to_string()),
+        );
+        tim4.insert("timeDriverTickHz".to_string(), serde_json::json!(1_000u64));
+        tim4.insert(
+            "interruptRouteRefs".to_string(),
+            serde_json::json!(["iroute.tim4.cc"]),
+        );
+        tim4.insert(
+            "initOperationRefs".to_string(),
+            serde_json::json!([
+                "op.tim4.configure_counter_compare_timebase",
+                "op.tim4.enable"
+            ]),
+        );
+        tim4.insert(
+            "capabilityTags".to_string(),
+            serde_json::json!([EMBASSY_TIME_DRIVER_TAG]),
+        );
+        tim4.insert(
+            "timeDriverBindings".to_string(),
+            serde_json::json!({
+                "counterRef": "reg.tim4.cnt",
+                "alarmRef": "reg.tim4.ch1cvr",
+                "alarmApplyOperationRefs": [],
+                "interruptEnableRef": "field.tim4_dmaintenr.cc1ie",
+                "interruptPendingRef": "field.tim4_intfr.cc1if",
+                "interruptClearOperationRef": "op.tim4.clear_cc1"
+            }),
+        );
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("counter-compare time-driver fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+        generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
+
+        let cargo_toml = std::fs::read_to_string(output_dir.path().join("Cargo.toml"))
+            .expect("generated Cargo.toml");
+        let lib_rs = std::fs::read_to_string(output_dir.path().join("src").join("lib.rs"))
+            .expect("generated lib.rs");
+        let time_rs = std::fs::read_to_string(output_dir.path().join("src").join("time.rs"))
+            .expect("generated time module");
+
+        assert!(cargo_toml.contains("embassy-time-driver"));
+        assert!(cargo_toml.contains("tick-hz-1_000"));
+        assert!(lib_rs.contains("pub mod time;"));
+        assert!(time_rs.contains("generated_drv_tim4_time_driver_interrupt"));
+        assert!(time_rs.contains("GENERATED_TIME_COUNTER_ADDRESS"));
+        assert!(time_rs.contains("GENERATED_TIME_INTERRUPT_PENDING_MASK"));
+        assert!(time_rs.contains("delay_ticks"));
     }
 
     #[test]
@@ -15461,6 +16089,29 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
     }
 
     #[test]
+    fn generate_embassy_supports_ch32_usart_alias_register_names() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        rename_fixture_usart_for_ch32_aliases(&mut document);
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("CH32-aliased uart fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&validated, output_dir.path())
+            .expect("embassy generation should support CH32 USART aliases");
+
+        let uart_rs = std::fs::read_to_string(output_dir.path().join("src").join("uart.rs"))
+            .expect("uart.rs");
+        assert!(uart_rs.contains("pub fn configure_8n1"));
+        assert!(uart_rs.contains("pub fn set_baud_divider"));
+        assert!(uart_rs.contains("pub fn write_byte"));
+        assert!(uart_rs.contains("pub fn enable_tx_dma"));
+        assert!(uart_rs.contains("pub fn enable_rx_dma"));
+    }
+
+    #[test]
     fn generate_embassy_rejects_ambiguous_canonical_uart_register_mappings() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let fixture = write_embassy_fixture(false);
@@ -15855,6 +16506,57 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             .and_then(Value::as_object_mut)
             .expect("ue field")
             .insert("name".to_string(), Value::String("ENABLE_GATE".to_string()));
+    }
+
+    fn rename_fixture_usart_for_ch32_aliases(document: &mut Value) {
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        let usart_template = peripherals
+            .iter_mut()
+            .find(|peripheral| peripheral["id"] == "periph.usart6")
+            .and_then(Value::as_object_mut)
+            .expect("usart6 peripheral");
+        let registers = usart_template
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("usart6 registers");
+        for register in registers {
+            let Some(register_object) = register.as_object_mut() else {
+                continue;
+            };
+            match register_object
+                .get("id")
+                .and_then(Value::as_str)
+                .expect("register id")
+            {
+                "reg.usart6.sr" => {
+                    register_object.insert("name".to_string(), Value::String("STATR".to_string()));
+                }
+                "reg.usart6.dr" => {
+                    register_object.insert("name".to_string(), Value::String("DATAR".to_string()));
+                }
+                "reg.usart6.cr1" => {
+                    register_object.insert("name".to_string(), Value::String("CTLR1".to_string()));
+                }
+                "reg.usart6.cr2" => {
+                    register_object.insert("name".to_string(), Value::String("CTLR2".to_string()));
+                }
+                "reg.usart6.cr3" => {
+                    register_object.insert("name".to_string(), Value::String("CTLR3".to_string()));
+                }
+                _ => {}
+            }
+        }
     }
 
     fn add_fixture_usart_canonical_mappings(document: &mut Value, ambiguous_baud_register: bool) {

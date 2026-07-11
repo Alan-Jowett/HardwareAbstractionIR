@@ -1,6 +1,92 @@
 //! Generated Embassy-style interrupt module for CH32V203G6U6.
 
 use crate::metadata;
+use core::ptr::{read_volatile, write_volatile};
+
+#[allow(dead_code)]
+fn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {
+    let address = usize::try_from(address)
+        .map_err(|_| metadata::Error::Unsupported("MMIO address does not fit usize on this target"))?;
+    if address % align != 0 {
+        return Err(metadata::Error::Unsupported("MMIO address is not naturally aligned for the target register width"));
+    }
+    Ok(address)
+}
+
+#[allow(dead_code)]
+fn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        let current = read_volatile(address as *const u8);
+        write_volatile(address as *mut u8, (current & !clear_mask) | set_mask);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        let current = read_volatile(address as *const u16);
+        write_volatile(address as *mut u16, (current & !clear_mask) | set_mask);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u32>())?;
+    unsafe {
+        let current = read_volatile(address as *const u32);
+        write_volatile(address as *mut u32, (current & !clear_mask) | set_mask);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn read_u8(address: u64) -> Result<u8, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe { Ok(read_volatile(address as *const u8)) }
+}
+
+#[allow(dead_code)]
+fn read_u16(address: u64) -> Result<u16, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe { Ok(read_volatile(address as *const u16)) }
+}
+
+#[allow(dead_code)]
+fn read_u32(address: u64) -> Result<u32, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u32>())?;
+    unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u8(address: u64, value: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        write_volatile(address as *mut u8, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        write_volatile(address as *mut u16, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u32(address: u64, value: u32) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u32>())?;
+    unsafe {
+        write_volatile(address as *mut u32, value);
+    }
+    Ok(())
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Irq {
@@ -57,7 +143,7 @@ pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProven
 // Driver instance: PFIC (interrupt) from canonical block block.pfic -> interrupt-controller
 pub const DRV_PFIC_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[];
 pub const DRV_PFIC_RESET_BINDINGS: &[metadata::ResetBinding] = &[];
-pub const DRV_PFIC_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource { id: "isrc.usart1.global", name: "USART1 GLOBAL interrupt source", source_ref: "periph.usart1", producer_ref: None, kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.usart2.global", name: "USART2 GLOBAL interrupt source", source_ref: "periph.usart2", producer_ref: None, kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.spi1.global", name: "SPI1 GLOBAL interrupt source", source_ref: "periph.spi1", producer_ref: None, kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.i2c1.er", name: "I2C1 ER interrupt source", source_ref: "periph.i2c1", producer_ref: None, kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.i2c1.ev", name: "I2C1 EV interrupt source", source_ref: "periph.i2c1", producer_ref: None, kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim1.brk", name: "TIM1 BRK interrupt source", source_ref: "periph.tim1", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim1.up", name: "TIM1 UP interrupt source", source_ref: "periph.tim1", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim1.trg", name: "TIM1 TRG interrupt source", source_ref: "periph.tim1", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim1.com", name: "TIM1 COM interrupt source", source_ref: "periph.tim1", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim1.cc", name: "TIM1 CC interrupt source", source_ref: "periph.tim1", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim2.up", name: "TIM2 UP interrupt source", source_ref: "periph.tim2", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim2.trg", name: "TIM2 TRG interrupt source", source_ref: "periph.tim2", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim2.cc", name: "TIM2 CC interrupt source", source_ref: "periph.tim2", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim3.up", name: "TIM3 UP interrupt source", source_ref: "periph.tim3", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim3.trg", name: "TIM3 TRG interrupt source", source_ref: "periph.tim3", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim3.cc", name: "TIM3 CC interrupt source", source_ref: "periph.tim3", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim4.up", name: "TIM4 UP interrupt source", source_ref: "periph.tim4", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim4.trg", name: "TIM4 TRG interrupt source", source_ref: "periph.tim4", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim4.cc", name: "TIM4 CC interrupt source", source_ref: "periph.tim4", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.adc1.global", name: "ADC1 GLOBAL interrupt source", source_ref: "periph.adc1", producer_ref: None, kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.adc2.global", name: "ADC2 GLOBAL interrupt source", source_ref: "periph.adc2", producer_ref: None, kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.dma1.channel1", name: "DMA1 channel 1 interrupt source", source_ref: "dmach.dma1.ch1", producer_ref: None, kind: "dma", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.dma1.channel2", name: "DMA1 channel 2 interrupt source", source_ref: "dmach.dma1.ch2", producer_ref: None, kind: "dma", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.dma1.channel3", name: "DMA1 channel 3 interrupt source", source_ref: "dmach.dma1.ch3", producer_ref: None, kind: "dma", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.dma1.channel4", name: "DMA1 channel 4 interrupt source", source_ref: "dmach.dma1.ch4", producer_ref: None, kind: "dma", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.dma1.channel5", name: "DMA1 channel 5 interrupt source", source_ref: "dmach.dma1.ch5", producer_ref: None, kind: "dma", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.dma1.channel6", name: "DMA1 channel 6 interrupt source", source_ref: "dmach.dma1.ch6", producer_ref: None, kind: "dma", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.dma1.channel7", name: "DMA1 channel 7 interrupt source", source_ref: "dmach.dma1.ch7", producer_ref: None, kind: "dma", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.dma1.channel8", name: "DMA1 channel 8 interrupt source", source_ref: "dmach.dma1.ch8", producer_ref: None, kind: "dma", flag_refs: &[], clear_operation_refs: &[] }];
+pub const DRV_PFIC_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource { id: "isrc.usart1.global", name: "USART1 GLOBAL interrupt source", source_ref: "periph.usart1", producer_ref: None, kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.usart2.global", name: "USART2 GLOBAL interrupt source", source_ref: "periph.usart2", producer_ref: None, kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.spi1.global", name: "SPI1 GLOBAL interrupt source", source_ref: "periph.spi1", producer_ref: None, kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.i2c1.er", name: "I2C1 ER interrupt source", source_ref: "periph.i2c1", producer_ref: None, kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.i2c1.ev", name: "I2C1 EV interrupt source", source_ref: "periph.i2c1", producer_ref: None, kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim1.brk", name: "TIM1 BRK interrupt source", source_ref: "periph.tim1", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim1.up", name: "TIM1 UP interrupt source", source_ref: "periph.tim1", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim1.trg", name: "TIM1 TRG interrupt source", source_ref: "periph.tim1", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim1.com", name: "TIM1 COM interrupt source", source_ref: "periph.tim1", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim1.cc", name: "TIM1 CC interrupt source", source_ref: "periph.tim1", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim2.up", name: "TIM2 UP interrupt source", source_ref: "periph.tim2", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim2.trg", name: "TIM2 TRG interrupt source", source_ref: "periph.tim2", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim2.cc", name: "TIM2 CC interrupt source", source_ref: "periph.tim2", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim3.up", name: "TIM3 UP interrupt source", source_ref: "periph.tim3", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim3.trg", name: "TIM3 TRG interrupt source", source_ref: "periph.tim3", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim3.cc", name: "TIM3 CC interrupt source", source_ref: "periph.tim3", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim4.up", name: "TIM4 UP interrupt source", source_ref: "periph.tim4", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim4.trg", name: "TIM4 TRG interrupt source", source_ref: "periph.tim4", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim4.cc", name: "TIM4 CC interrupt source", source_ref: "periph.tim4", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &["op.tim4.clear_cc1"] }, metadata::InterruptSource { id: "isrc.adc1.global", name: "ADC1 GLOBAL interrupt source", source_ref: "periph.adc1", producer_ref: None, kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.adc2.global", name: "ADC2 GLOBAL interrupt source", source_ref: "periph.adc2", producer_ref: None, kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.dma1.channel1", name: "DMA1 channel 1 interrupt source", source_ref: "dmach.dma1.ch1", producer_ref: None, kind: "dma", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.dma1.channel2", name: "DMA1 channel 2 interrupt source", source_ref: "dmach.dma1.ch2", producer_ref: None, kind: "dma", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.dma1.channel3", name: "DMA1 channel 3 interrupt source", source_ref: "dmach.dma1.ch3", producer_ref: None, kind: "dma", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.dma1.channel4", name: "DMA1 channel 4 interrupt source", source_ref: "dmach.dma1.ch4", producer_ref: None, kind: "dma", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.dma1.channel5", name: "DMA1 channel 5 interrupt source", source_ref: "dmach.dma1.ch5", producer_ref: None, kind: "dma", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.dma1.channel6", name: "DMA1 channel 6 interrupt source", source_ref: "dmach.dma1.ch6", producer_ref: None, kind: "dma", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.dma1.channel7", name: "DMA1 channel 7 interrupt source", source_ref: "dmach.dma1.ch7", producer_ref: None, kind: "dma", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.dma1.channel8", name: "DMA1 channel 8 interrupt source", source_ref: "dmach.dma1.ch8", producer_ref: None, kind: "dma", flag_refs: &[], clear_operation_refs: &[] }];
 pub const DRV_PFIC_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute { id: "iroute.usart1.global", name: "USART1 GLOBAL interrupt route", source_ref: "isrc.usart1.global", interrupt_ref: "int.usart1", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.usart2.global", name: "USART2 GLOBAL interrupt route", source_ref: "isrc.usart2.global", interrupt_ref: "int.usart2", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.spi1.global", name: "SPI1 GLOBAL interrupt route", source_ref: "isrc.spi1.global", interrupt_ref: "int.spi1", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.i2c1.er", name: "I2C1 ER interrupt route", source_ref: "isrc.i2c1.er", interrupt_ref: "int.i2c1er", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.i2c1.ev", name: "I2C1 EV interrupt route", source_ref: "isrc.i2c1.ev", interrupt_ref: "int.i2c1ev", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.tim1.brk", name: "TIM1 BRK interrupt route", source_ref: "isrc.tim1.brk", interrupt_ref: "int.tim1brk", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.tim1.up", name: "TIM1 UP interrupt route", source_ref: "isrc.tim1.up", interrupt_ref: "int.tim1up", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.tim1.trg", name: "TIM1 TRG interrupt route", source_ref: "isrc.tim1.trg", interrupt_ref: "int.tim1trgcom", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.tim1.com", name: "TIM1 COM interrupt route", source_ref: "isrc.tim1.com", interrupt_ref: "int.tim1trgcom", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.tim1.cc", name: "TIM1 CC interrupt route", source_ref: "isrc.tim1.cc", interrupt_ref: "int.tim1cc", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.tim2.up", name: "TIM2 UP interrupt route", source_ref: "isrc.tim2.up", interrupt_ref: "int.tim2", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.tim2.trg", name: "TIM2 TRG interrupt route", source_ref: "isrc.tim2.trg", interrupt_ref: "int.tim2", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.tim2.cc", name: "TIM2 CC interrupt route", source_ref: "isrc.tim2.cc", interrupt_ref: "int.tim2", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.tim3.up", name: "TIM3 UP interrupt route", source_ref: "isrc.tim3.up", interrupt_ref: "int.tim3", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.tim3.trg", name: "TIM3 TRG interrupt route", source_ref: "isrc.tim3.trg", interrupt_ref: "int.tim3", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.tim3.cc", name: "TIM3 CC interrupt route", source_ref: "isrc.tim3.cc", interrupt_ref: "int.tim3", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.tim4.up", name: "TIM4 UP interrupt route", source_ref: "isrc.tim4.up", interrupt_ref: "int.tim4", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.tim4.trg", name: "TIM4 TRG interrupt route", source_ref: "isrc.tim4.trg", interrupt_ref: "int.tim4", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.tim4.cc", name: "TIM4 CC interrupt route", source_ref: "isrc.tim4.cc", interrupt_ref: "int.tim4", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.adc1.global", name: "ADC1 GLOBAL interrupt route", source_ref: "isrc.adc1.global", interrupt_ref: "int.adc12", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.adc2.global", name: "ADC2 GLOBAL interrupt route", source_ref: "isrc.adc2.global", interrupt_ref: "int.adc12", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.dma1.channel1", name: "DMA1 channel 1 interrupt route", source_ref: "isrc.dma1.channel1", interrupt_ref: "int.dma1channel1", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.dma1.channel2", name: "DMA1 channel 2 interrupt route", source_ref: "isrc.dma1.channel2", interrupt_ref: "int.dma1channel2", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.dma1.channel3", name: "DMA1 channel 3 interrupt route", source_ref: "isrc.dma1.channel3", interrupt_ref: "int.dma1channel3", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.dma1.channel4", name: "DMA1 channel 4 interrupt route", source_ref: "isrc.dma1.channel4", interrupt_ref: "int.dma1channel4", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.dma1.channel5", name: "DMA1 channel 5 interrupt route", source_ref: "isrc.dma1.channel5", interrupt_ref: "int.dma1channel5", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.dma1.channel6", name: "DMA1 channel 6 interrupt route", source_ref: "isrc.dma1.channel6", interrupt_ref: "int.dma1channel6", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.dma1.channel7", name: "DMA1 channel 7 interrupt route", source_ref: "isrc.dma1.channel7", interrupt_ref: "int.dma1channel7", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.dma1.channel8", name: "DMA1 channel 8 interrupt route", source_ref: "isrc.dma1.channel8", interrupt_ref: "int.dma1channel8", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }];
 pub const DRV_PFIC_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_PFIC_DMA_ROUTES: &[metadata::DmaRoute] = &[];
@@ -78,6 +164,7 @@ pub struct PFICResources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -92,6 +179,7 @@ pub const DRV_PFIC_RESOURCES: PFICResources = PFICResources {
     init_operations: DRV_PFIC_INIT_OPERATIONS,
     state_machines: DRV_PFIC_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_PFIC_CAPABILITY_TAGS,
 };
 
@@ -112,6 +200,43 @@ impl PFIC {
         self.resources.interrupts
     }
 
+    pub fn enable_irq(&self, irq: Irq) -> Result<(), metadata::Error> {
+        let external_index = pfic_external_irq_index(irq)?;
+        let register = pfic_register_address(PFIC_IENR_BASE_ADDRESS, external_index);
+        write_u32(register, pfic_irq_bit(external_index))
+    }
+
+    pub fn disable_irq(&self, irq: Irq) -> Result<(), metadata::Error> {
+        let external_index = pfic_external_irq_index(irq)?;
+        let register = pfic_register_address(PFIC_IRER_BASE_ADDRESS, external_index);
+        write_u32(register, pfic_irq_bit(external_index))
+    }
+
+    pub fn is_irq_active(&self, irq: Irq) -> Result<bool, metadata::Error> {
+        let external_index = pfic_external_irq_index(irq)?;
+        let register = pfic_register_address(PFIC_IACTR_BASE_ADDRESS, external_index);
+        Ok((read_u32(register)? & pfic_irq_bit(external_index)) != 0)
+    }
+
 
 }
 
+
+const PFIC_EXTERNAL_IRQ_OFFSET: u32 = 16;
+const PFIC_IENR_BASE_ADDRESS: u64 = 0xE000_E100;
+const PFIC_IRER_BASE_ADDRESS: u64 = 0xE000_E180;
+const PFIC_IACTR_BASE_ADDRESS: u64 = 0xE000_E300;
+
+fn pfic_external_irq_index(irq: Irq) -> Result<u32, metadata::Error> {
+    (irq as u32)
+        .checked_sub(PFIC_EXTERNAL_IRQ_OFFSET)
+        .ok_or(metadata::Error::Unsupported("PFIC runtime helpers only support external interrupts"))
+}
+
+fn pfic_register_address(base: u64, external_index: u32) -> u64 {
+    base + u64::from((external_index / 32) * 4)
+}
+
+fn pfic_irq_bit(external_index: u32) -> u32 {
+    1u32 << (external_index % 32)
+}

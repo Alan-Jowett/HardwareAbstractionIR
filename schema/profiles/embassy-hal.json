@@ -63,9 +63,10 @@
     },
     "loweringPattern": {
       "type": "string",
-      "description": "Optional generator-facing lowering selector for cases where one supported driver kind has more than one approved evidence-backed lowering family with materially different bring-up behavior. The first reserved value, `serial-jtag-preserve-link`, selects a USB Serial/JTAG-style lowering that preserves an already boot-established link instead of synthesizing a reset-and-reattach sequence. Generators must fail explicitly if a selected lowering pattern lacks the referenced semantic inputs it requires.",
+      "description": "Optional generator-facing lowering selector for cases where one supported driver kind has more than one approved evidence-backed lowering family with materially different bring-up behavior. Reserved values currently include `serial-jtag-preserve-link`, which selects a USB Serial/JTAG-style lowering that preserves an already boot-established link instead of synthesizing a reset-and-reattach sequence, and `counter-compare-timer`, which selects a timer-backed Embassy async timing family built around an explicitly modeled free-running counter plus compare/alarm path. Generators must fail explicitly if a selected lowering pattern lacks the referenced semantic inputs it requires.",
       "enum": [
-        "serial-jtag-preserve-link"
+        "serial-jtag-preserve-link",
+        "counter-compare-timer"
       ]
     },
     "timeDriverSource": {
@@ -80,6 +81,48 @@
       "type": "integer",
       "minimum": 1,
       "description": "Optional generator-facing Embassy tick rate for driver instances that claim capability tag `embassy-time-driver`. This must be present for `timeDriverSource = \"hardware-timer\"` so generated Cargo metadata and runtime behavior agree on the timer tick frequency. It must be omitted for `systick`, whose tick rate is defined by the SysTick lowering contract."
+    },
+    "timeDriverBindings": {
+      "type": "object",
+      "description": "Optional explicit timer-lowering bindings for driver instances that claim capability tag `embassy-time-driver` with `timeDriverSource = \"hardware-timer\"` and a lowering family that exposes one direct counter read plus one direct alarm/interrupt path, such as `counter-compare-timer`. These bindings name the exact structural and semantic handles the generator may use for counter reads, alarm programming, interrupt enable, pending checks, and interrupt acknowledgement. Generators must fail explicitly rather than inferring these roles from vendor register names when this binding map is required for the selected lowering family but is absent or incomplete.",
+      "properties": {
+        "counterRef": {
+          "description": "Entity ref for the free-running counter register or field read by the generated time driver.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "alarmRef": {
+          "description": "Entity ref for the compare/alarm register or field written when scheduling the next wake instant.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "alarmApplyOperationRefs": {
+          "description": "Optional semantic operations that must run after writing the alarm/compare value when the timer family requires an explicit event, reload, or latch step before the new wake instant takes effect.",
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "interruptEnableRef": {
+          "description": "Entity ref for the interrupt-enable field used to arm or disarm the wake interrupt.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "interruptPendingRef": {
+          "description": "Entity ref for the interrupt-pending field read by the generated time driver before acknowledging a wake event.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "interruptClearOperationRef": {
+          "description": "Entity ref for the semantic operation that acknowledges the wake interrupt cause used by the generated time base.",
+          "$ref": "../common.json#/$defs/entityRef"
+        }
+      },
+      "required": [
+        "counterRef",
+        "alarmRef",
+        "interruptEnableRef",
+        "interruptPendingRef",
+        "interruptClearOperationRef"
+      ],
+      "additionalProperties": false
     },
     "resourceRequirement": {
       "type": "string",
@@ -175,6 +218,9 @@
             "timeDriverTickHz": {
               "$ref": "#/$defs/timeDriverTickHz"
             },
+            "timeDriverBindings": {
+              "$ref": "#/$defs/timeDriverBindings"
+            },
             "clockBindingRefs": {
               "description": "Referenced clock bindings that may justify emitted clock-gating or bring-up helpers when those bindings and their linked structural/semantic data are sufficient for real lowering.",
               "type": "array",
@@ -232,7 +278,7 @@
               "uniqueItems": true
             },
             "capabilityTags": {
-              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support. The accompanying `timeDriverSource` selector determines whether that support is the existing SysTick-backed interrupt path or an explicitly modeled hardware-timer-backed path, and `timeDriverTickHz` fixes the Embassy tick rate for modeled hardware-timer sources.",
+              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support. The accompanying `timeDriverSource` selector determines whether that support is the existing SysTick-backed interrupt path or an explicitly modeled hardware-timer-backed path, `timeDriverTickHz` fixes the Embassy tick rate for modeled hardware-timer sources, and `timeDriverBindings` names the exact hardware-timer lowering handles when that hardware-timer path is used.",
               "type": "array",
               "items": {
                 "type": "string"

@@ -213,6 +213,16 @@ driver also exposes blocking delay helpers, those helpers must come from the
 same approved counter/alarm semantics instead of from repository-invented
 timing behavior.
 
+When one supported hardware-timer time-base architecture still has materially
+different lowering families, that family choice must also stay explicit. For
+example, a free-running counter plus compare/alarm timer path that derives async
+timing from prescaler, reload, counter, compare/alarm, event, and
+status/acknowledge registers must be selected through
+`driverInstances[].loweringPattern` rather than by silent generator probing.
+That same path must also narrow any multi-cause timer interrupt inventory to one
+approved interrupt source/route/clear sequence for the generated time base,
+even when the device shares several timer causes on one vector.
+
 The generated core contract for that hardware-timer path must stay
 runtime-agnostic. In practice, that means the generated Embassy module may emit
 timer initialization, blocking delay helpers, the wake-handler entry point, and
@@ -223,6 +233,23 @@ such as ESP32-C3 without making `esp-hal` part of the core generated HAL model.
 That same contract must also preserve the timer tick frequency explicitly so the
 generated crate can select the matching `embassy-time-driver` tick-rate feature
 instead of silently falling back to Embassy's 1 MHz default.
+
+For hardware-timer Embassy time bases whose lowering family depends on one
+directly named counter/alarm/interrupt path, such as `counter-compare-timer`,
+the profile must also name the exact generator-facing binding handles rather
+than relying on generator-side register name probing. The contract uses
+`timeDriverBindings` on the driver instance to name:
+
+- the free-running counter register or field
+- the compare/alarm register or field
+- any semantic apply operations needed after alarm reprogramming
+- the interrupt-enable field
+- the interrupt-pending field
+- the semantic clear/ack operation for that wake cause
+
+This keeps the emitted time-driver lowering auditable and prevents the
+generator from silently re-discovering timing semantics from vendor-native
+register names that the approved HAIR profile did not explicitly bind.
 
 When a document also carries explicit normalization canonical mappings, Embassy
 lowering may use those mappings as secondary resolution hints for supported
@@ -339,6 +366,12 @@ driver kind when they all preserve the same evidence-bounded API contract.
 Explicit canonical normalization mappings may further reduce internal lowering
 variance by helping the generator recognize equivalent supported concepts
 across vendor naming schemes without changing the document's structural names.
+That family-aware path may also accept exact vendor aliases within a supported
+layout family when the approved document still carries the explicit register and
+field closure required for the emitted methods; for example, a CH32 USART that
+uses `STATR` / `DATAR` / `CTLR1-3` names may still lower through the
+STM32-class USART path only when the same supported baud, control, status, and
+data fields are explicitly modeled.
 
 **Supports:** RQ-010, RQ-014, RQ-016
 

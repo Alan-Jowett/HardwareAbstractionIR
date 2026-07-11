@@ -44,9 +44,39 @@ fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metada
 }
 
 #[allow(dead_code)]
+fn read_u8(address: u64) -> Result<u8, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe { Ok(read_volatile(address as *const u8)) }
+}
+
+#[allow(dead_code)]
+fn read_u16(address: u64) -> Result<u16, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe { Ok(read_volatile(address as *const u16)) }
+}
+
+#[allow(dead_code)]
 fn read_u32(address: u64) -> Result<u32, metadata::Error> {
     let address = checked_address(address, core::mem::align_of::<u32>())?;
     unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u8(address: u64, value: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        write_volatile(address as *mut u8, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        write_volatile(address as *mut u16, value);
+    }
+    Ok(())
 }
 
 #[allow(dead_code)]
@@ -93,6 +123,7 @@ pub struct I2C1Resources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -107,6 +138,7 @@ pub const DRV_I2C1_RESOURCES: I2C1Resources = I2C1Resources {
     init_operations: DRV_I2C1_INIT_OPERATIONS,
     state_machines: DRV_I2C1_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_I2C1_CAPABILITY_TAGS,
 };
 

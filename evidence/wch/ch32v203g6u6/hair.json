@@ -12804,6 +12804,54 @@
               "kind": "register",
               "offsetBytes": 8,
               "widthBits": 16,
+              "fields": [
+                {
+                  "id": "field.usart_brr.div_mantissa",
+                  "name": "DIV_Mantissa",
+                  "bitRange": {
+                    "lsb": 4,
+                    "msb": 15
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203g6u6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203g6u6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.91
+                  },
+                  "description": "Mantissa of USARTDIV"
+                },
+                {
+                  "id": "field.usart_brr.div_fraction",
+                  "name": "DIV_Fraction",
+                  "bitRange": {
+                    "lsb": 0,
+                    "msb": 3
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203g6u6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203g6u6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.91
+                  },
+                  "description": "Fraction of USARTDIV"
+                }
+              ],
               "provenance": {
                 "sourceRefs": [
                   "openwch-ch32v20x-header",
@@ -50564,6 +50612,54 @@
               "kind": "register",
               "offsetBytes": 8,
               "widthBits": 16,
+              "fields": [
+                {
+                  "id": "field.usart_brr.div_mantissa",
+                  "name": "DIV_Mantissa",
+                  "bitRange": {
+                    "lsb": 4,
+                    "msb": 15
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203g6u6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203g6u6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.91
+                  },
+                  "description": "Mantissa of USARTDIV"
+                },
+                {
+                  "id": "field.usart_brr.div_fraction",
+                  "name": "DIV_Fraction",
+                  "bitRange": {
+                    "lsb": 0,
+                    "msb": 3
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203g6u6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203g6u6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.91
+                  },
+                  "description": "Fraction of USARTDIV"
+                }
+              ],
               "provenance": {
                 "sourceRefs": [
                   "openwch-ch32v20x-header",
@@ -63770,6 +63866,111 @@
         }
       },
       {
+        "id": "op.tim4.configure_counter_compare_timebase",
+        "name": "Configure TIM4 counter/compare time base",
+        "kind": "initialization",
+        "targetRefs": [
+          "periph.tim4"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.tim4.psc",
+            "expression": {
+              "language": "plain",
+              "text": "Write PSC = 7999"
+            },
+            "description": "Divide the reset-default 8 MHz timer clock down to a 1 kHz timer tick."
+          },
+          {
+            "index": 1,
+            "action": "write",
+            "targetRef": "reg.tim4.atrlr",
+            "expression": {
+              "language": "plain",
+              "text": "Write ARR = 65535"
+            },
+            "description": "Run the free-running counter across the full 16-bit range."
+          },
+          {
+            "index": 2,
+            "action": "write",
+            "targetRef": "reg.tim4.cnt",
+            "expression": {
+              "language": "plain",
+              "text": "Write CNT = 0"
+            },
+            "description": "Start the time base from zero on initialization."
+          },
+          {
+            "index": 3,
+            "action": "write",
+            "targetRef": "reg.tim4.ch1cvr",
+            "expression": {
+              "language": "plain",
+              "text": "Write CCR1 = 0"
+            },
+            "description": "Initialize the compare register before arming alarms."
+          },
+          {
+            "index": 4,
+            "action": "write",
+            "targetRef": "reg.tim4.swevgr",
+            "expression": {
+              "language": "plain",
+              "text": "Set UG = 1"
+            },
+            "description": "Apply the prescaler and reload configuration immediately."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "wch-ch32fv2x-v3x-rm",
+            "wch-ch32v203-datasheet"
+          ],
+          "evidenceRefs": [
+            "e_rm_tim234_register_model",
+            "e_clock_power"
+          ],
+          "status": "inferred",
+          "confidence": 0.72,
+          "notes": "Repository-authored 1 kHz TIM4 time-base configuration for the generated Embassy async timing path. The PSC value assumes the reset-default 8 MHz timer clock used by the current CH32 smoke flow."
+        }
+      },
+      {
+        "id": "op.tim4.clear_cc1",
+        "name": "Clear TIM4 capture/compare 1 interrupt flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.tim4"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.tim4.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Clear CC1IF"
+            },
+            "description": "Acknowledge the TIM4 compare-channel 1 interrupt flag."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_tim234_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.76
+        }
+      },
+      {
         "id": "op.adc1.calibrate",
         "name": "ADC1 enable and calibrate",
         "kind": "initialization",
@@ -67844,8 +68045,9 @@
                 "e_ch32rs_ch32v203g6u6_yaml_clock_reset_topology",
                 "e_header_register_bitdefs"
               ],
-              "status": "verified",
-              "confidence": 0.86
+              "status": "inferred",
+              "confidence": 0.74,
+              "notes": "The TIM4 UP sub-cause partition on the shared TIM4 vector is community-backed from ch32-rs rather than directly enumerated in the official WCH startup file."
             }
           },
           {
@@ -67867,8 +68069,9 @@
                 "e_ch32rs_ch32v203g6u6_yaml_clock_reset_topology",
                 "e_header_register_bitdefs"
               ],
-              "status": "verified",
-              "confidence": 0.86
+              "status": "inferred",
+              "confidence": 0.74,
+              "notes": "The TIM4 TRG sub-cause partition on the shared TIM4 vector is community-backed from ch32-rs rather than directly enumerated in the official WCH startup file."
             }
           },
           {
@@ -67890,8 +68093,9 @@
                 "e_ch32rs_ch32v203g6u6_yaml_clock_reset_topology",
                 "e_header_register_bitdefs"
               ],
-              "status": "verified",
-              "confidence": 0.86
+              "status": "inferred",
+              "confidence": 0.74,
+              "notes": "The TIM4 CC sub-cause partition on the shared TIM4 vector is community-backed from ch32-rs rather than directly enumerated in the official WCH startup file."
             }
           },
           {
@@ -68883,6 +69087,9 @@
             "name": "TIM4 CC interrupt source",
             "sourceRef": "periph.tim4",
             "kind": "timer",
+            "clearOperationRefs": [
+              "op.tim4.clear_cc1"
+            ],
             "provenance": {
               "sourceRefs": [
                 "ch32-rs-ch32v203g6u6-yaml"
@@ -69184,8 +69391,9 @@
                 "e_ch32rs_ch32v203g6u6_yaml_interrupt_topology",
                 "e_startup_vector"
               ],
-              "status": "verified",
-              "confidence": 0.88
+              "status": "inferred",
+              "confidence": 0.76,
+              "notes": "The TIM4 UP route shares one official TIM4 vector and uses the community ch32-rs sub-cause partition to model the update path explicitly."
             }
           },
           {
@@ -69204,8 +69412,9 @@
                 "e_ch32rs_ch32v203g6u6_yaml_interrupt_topology",
                 "e_startup_vector"
               ],
-              "status": "verified",
-              "confidence": 0.88
+              "status": "inferred",
+              "confidence": 0.76,
+              "notes": "The TIM4 TRG route shares one official TIM4 vector and uses the community ch32-rs sub-cause partition to model the trigger path explicitly."
             }
           },
           {
@@ -73601,8 +73810,9 @@
               "e_rm_tim234_register_model",
               "e_ch32rs_ch32v203g6u6_yaml_pin_topology"
             ],
-            "status": "verified",
-            "confidence": 0.88
+            "status": "inferred",
+            "confidence": 0.76,
+            "notes": "The TIM4 CC route shares one official TIM4 vector and uses the community ch32-rs sub-cause partition to model the compare path explicitly."
           }
         },
         {

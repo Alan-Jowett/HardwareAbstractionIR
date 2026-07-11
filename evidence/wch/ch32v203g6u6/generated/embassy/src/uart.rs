@@ -44,9 +44,39 @@ fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metada
 }
 
 #[allow(dead_code)]
+fn read_u8(address: u64) -> Result<u8, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe { Ok(read_volatile(address as *const u8)) }
+}
+
+#[allow(dead_code)]
+fn read_u16(address: u64) -> Result<u16, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe { Ok(read_volatile(address as *const u16)) }
+}
+
+#[allow(dead_code)]
 fn read_u32(address: u64) -> Result<u32, metadata::Error> {
     let address = checked_address(address, core::mem::align_of::<u32>())?;
     unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u8(address: u64, value: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        write_volatile(address as *mut u8, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        write_volatile(address as *mut u16, value);
+    }
+    Ok(())
 }
 
 #[allow(dead_code)]
@@ -95,6 +125,7 @@ pub struct USART1Resources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -109,6 +140,7 @@ pub const DRV_USART1_RESOURCES: USART1Resources = USART1Resources {
     init_operations: DRV_USART1_INIT_OPERATIONS,
     state_machines: DRV_USART1_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_USART1_CAPABILITY_TAGS,
 };
 
@@ -149,6 +181,136 @@ impl USART1 {
         Ok(())
     }
 
+    /// Enable USART1.
+    pub fn enable(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4001380Cu64, 0x2000u16, 0x2000u16)?;
+        Ok(())
+    }
+
+    /// Disable USART1.
+    pub fn disable(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4001380Cu64, 0x2000u16, 0x0000u16)?;
+        Ok(())
+    }
+
+    /// Enable the USART1 transmitter.
+    pub fn enable_transmitter(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4001380Cu64, 0x0008u16, 0x0008u16)?;
+        Ok(())
+    }
+
+    /// Disable the USART1 transmitter.
+    pub fn disable_transmitter(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4001380Cu64, 0x0008u16, 0x0000u16)?;
+        Ok(())
+    }
+
+    /// Enable the USART1 receiver.
+    pub fn enable_receiver(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4001380Cu64, 0x0004u16, 0x0004u16)?;
+        Ok(())
+    }
+
+    /// Disable the USART1 receiver.
+    pub fn disable_receiver(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4001380Cu64, 0x0004u16, 0x0000u16)?;
+        Ok(())
+    }
+
+    pub fn configure_8n1(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4001380Cu64, 0x2000u16, 0x0000u16)?;
+        modify_u16(0x4001380Cu64, 0x0008u16, 0x0000u16)?;
+        modify_u16(0x4001380Cu64, 0x0004u16, 0x0000u16)?;
+        modify_u16(0x4001380Cu64, 0x8000u16, 0x0000u16)?;
+        modify_u16(0x4001380Cu64, 0x1000u16, 0x0000u16)?;
+        modify_u16(0x4001380Cu64, 0x0400u16, 0x0000u16)?;
+        modify_u16(0x4001380Cu64, 0x0200u16, 0x0000u16)?;
+        modify_u16(0x40013810u64, 0x3000u16, 0x0000u16)?;
+        Ok(())
+    }
+
+    pub fn set_baud_divider(&self, mantissa: u16, fraction: u8) -> Result<(), metadata::Error> {
+        if u32::from(mantissa) > 0xFFFu32 {
+            return Err(metadata::Error::Unsupported("USART baud mantissa exceeds modeled field width"));
+        }
+        if u32::from(fraction) > 0xFu32 {
+            return Err(metadata::Error::Unsupported("USART baud fraction exceeds modeled field width"));
+        }
+        modify_u32(0x40013808u64, 0x0000FFFFu32, ((u32::from(mantissa) & 0xFFFu32) << 4) | ((u32::from(fraction) & 0xFu32) << 0))?;
+        Ok(())
+    }
+
+    pub fn write_byte(&self, byte: u8) -> Result<(), metadata::Error> {
+        while (read_u32(0x40013800u64)? & 0x00000080u32) == 0 {}
+        write_u32(0x40013804u64, u32::from(byte))?;
+        Ok(())
+    }
+
+    pub fn write_bytes(&self, bytes: &[u8]) -> Result<(), metadata::Error> {
+        for &byte in bytes {
+            self.write_byte(byte)?;
+        }
+        Ok(())
+    }
+
+    pub fn flush(&self) -> Result<(), metadata::Error> {
+        while (read_u32(0x40013800u64)? & 0x00000040u32) == 0 {}
+        Ok(())
+    }
+
+    pub fn read_byte(&self) -> Result<u8, metadata::Error> {
+        while (read_u32(0x40013800u64)? & 0x00000020u32) == 0 {}
+        Ok((read_u32(0x40013804u64)? & 0xFFu32) as u8)
+    }
+
+    /// Enable the USART1 TXE interrupt.
+    pub fn enable_txe_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4001380Cu64, 0x0080u16, 0x0080u16)?;
+        Ok(())
+    }
+
+    /// Disable the USART1 TXE interrupt.
+    pub fn disable_txe_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4001380Cu64, 0x0080u16, 0x0000u16)?;
+        Ok(())
+    }
+
+    /// Enable the USART1 RXNE interrupt.
+    pub fn enable_rxne_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4001380Cu64, 0x0020u16, 0x0020u16)?;
+        Ok(())
+    }
+
+    /// Disable the USART1 RXNE interrupt.
+    pub fn disable_rxne_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4001380Cu64, 0x0020u16, 0x0000u16)?;
+        Ok(())
+    }
+
+    /// Enable the USART1 TX DMA path.
+    pub fn enable_tx_dma(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40013814u64, 0x0080u16, 0x0080u16)?;
+        Ok(())
+    }
+
+    /// Disable the USART1 TX DMA path.
+    pub fn disable_tx_dma(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40013814u64, 0x0080u16, 0x0000u16)?;
+        Ok(())
+    }
+
+    /// Enable the USART1 RX DMA path.
+    pub fn enable_rx_dma(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40013814u64, 0x0040u16, 0x0040u16)?;
+        Ok(())
+    }
+
+    /// Disable the USART1 RX DMA path.
+    pub fn disable_rx_dma(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40013814u64, 0x0040u16, 0x0000u16)?;
+        Ok(())
+    }
+
 
 }
 
@@ -181,6 +343,7 @@ pub struct USART2Resources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -195,6 +358,7 @@ pub const DRV_USART2_RESOURCES: USART2Resources = USART2Resources {
     init_operations: DRV_USART2_INIT_OPERATIONS,
     state_machines: DRV_USART2_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_USART2_CAPABILITY_TAGS,
 };
 
@@ -232,6 +396,136 @@ impl USART2 {
     /// Release reset for USART2.
     pub fn release_reset(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40021010u64, 0x00020000u32, 0x00000000u32)?;
+        Ok(())
+    }
+
+    /// Enable USART2.
+    pub fn enable(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4000440Cu64, 0x2000u16, 0x2000u16)?;
+        Ok(())
+    }
+
+    /// Disable USART2.
+    pub fn disable(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4000440Cu64, 0x2000u16, 0x0000u16)?;
+        Ok(())
+    }
+
+    /// Enable the USART2 transmitter.
+    pub fn enable_transmitter(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4000440Cu64, 0x0008u16, 0x0008u16)?;
+        Ok(())
+    }
+
+    /// Disable the USART2 transmitter.
+    pub fn disable_transmitter(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4000440Cu64, 0x0008u16, 0x0000u16)?;
+        Ok(())
+    }
+
+    /// Enable the USART2 receiver.
+    pub fn enable_receiver(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4000440Cu64, 0x0004u16, 0x0004u16)?;
+        Ok(())
+    }
+
+    /// Disable the USART2 receiver.
+    pub fn disable_receiver(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4000440Cu64, 0x0004u16, 0x0000u16)?;
+        Ok(())
+    }
+
+    pub fn configure_8n1(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4000440Cu64, 0x2000u16, 0x0000u16)?;
+        modify_u16(0x4000440Cu64, 0x0008u16, 0x0000u16)?;
+        modify_u16(0x4000440Cu64, 0x0004u16, 0x0000u16)?;
+        modify_u16(0x4000440Cu64, 0x8000u16, 0x0000u16)?;
+        modify_u16(0x4000440Cu64, 0x1000u16, 0x0000u16)?;
+        modify_u16(0x4000440Cu64, 0x0400u16, 0x0000u16)?;
+        modify_u16(0x4000440Cu64, 0x0200u16, 0x0000u16)?;
+        modify_u16(0x40004410u64, 0x3000u16, 0x0000u16)?;
+        Ok(())
+    }
+
+    pub fn set_baud_divider(&self, mantissa: u16, fraction: u8) -> Result<(), metadata::Error> {
+        if u32::from(mantissa) > 0xFFFu32 {
+            return Err(metadata::Error::Unsupported("USART baud mantissa exceeds modeled field width"));
+        }
+        if u32::from(fraction) > 0xFu32 {
+            return Err(metadata::Error::Unsupported("USART baud fraction exceeds modeled field width"));
+        }
+        modify_u32(0x40004408u64, 0x0000FFFFu32, ((u32::from(mantissa) & 0xFFFu32) << 4) | ((u32::from(fraction) & 0xFu32) << 0))?;
+        Ok(())
+    }
+
+    pub fn write_byte(&self, byte: u8) -> Result<(), metadata::Error> {
+        while (read_u32(0x40004400u64)? & 0x00000080u32) == 0 {}
+        write_u32(0x40004404u64, u32::from(byte))?;
+        Ok(())
+    }
+
+    pub fn write_bytes(&self, bytes: &[u8]) -> Result<(), metadata::Error> {
+        for &byte in bytes {
+            self.write_byte(byte)?;
+        }
+        Ok(())
+    }
+
+    pub fn flush(&self) -> Result<(), metadata::Error> {
+        while (read_u32(0x40004400u64)? & 0x00000040u32) == 0 {}
+        Ok(())
+    }
+
+    pub fn read_byte(&self) -> Result<u8, metadata::Error> {
+        while (read_u32(0x40004400u64)? & 0x00000020u32) == 0 {}
+        Ok((read_u32(0x40004404u64)? & 0xFFu32) as u8)
+    }
+
+    /// Enable the USART2 TXE interrupt.
+    pub fn enable_txe_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4000440Cu64, 0x0080u16, 0x0080u16)?;
+        Ok(())
+    }
+
+    /// Disable the USART2 TXE interrupt.
+    pub fn disable_txe_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4000440Cu64, 0x0080u16, 0x0000u16)?;
+        Ok(())
+    }
+
+    /// Enable the USART2 RXNE interrupt.
+    pub fn enable_rxne_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4000440Cu64, 0x0020u16, 0x0020u16)?;
+        Ok(())
+    }
+
+    /// Disable the USART2 RXNE interrupt.
+    pub fn disable_rxne_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4000440Cu64, 0x0020u16, 0x0000u16)?;
+        Ok(())
+    }
+
+    /// Enable the USART2 TX DMA path.
+    pub fn enable_tx_dma(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40004414u64, 0x0080u16, 0x0080u16)?;
+        Ok(())
+    }
+
+    /// Disable the USART2 TX DMA path.
+    pub fn disable_tx_dma(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40004414u64, 0x0080u16, 0x0000u16)?;
+        Ok(())
+    }
+
+    /// Enable the USART2 RX DMA path.
+    pub fn enable_rx_dma(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40004414u64, 0x0040u16, 0x0040u16)?;
+        Ok(())
+    }
+
+    /// Disable the USART2 RX DMA path.
+    pub fn disable_rx_dma(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40004414u64, 0x0040u16, 0x0000u16)?;
         Ok(())
     }
 

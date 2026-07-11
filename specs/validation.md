@@ -132,9 +132,31 @@ cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-
   async wake behavior and any claimed blocking delay helpers from approved HAIR
   data. For approved hardware-timer paths, the emitted core contract must also
   preserve the unique interrupt-route metadata and wake-handler hook needed for
-  a downstream runtime layer to bind and enable the interrupt explicitly, plus
-  the explicit Embassy tick rate needed to keep generated async durations
-  aligned with the modeled hardware timer.
+  a downstream runtime layer to bind the concrete trap symbol explicitly, plus
+  any generated interrupt-controller helper methods justified by the approved
+  interrupt identities and the explicit Embassy tick rate needed to keep
+  generated async durations aligned with the modeled hardware timer.
+- If a hardware-timer time-driver path uses a lowering family whose generated
+  code depends on directly named counter/alarm/interrupt roles, such as
+  `counter-compare-timer`, generation also succeeds only when the driver
+  instance carries explicit `timeDriverBindings` for the
+  counter read, alarm/compare write, interrupt-enable, interrupt-pending, and
+  interrupt-clear roles used by the generated time-driver lowering; the
+  generator must fail explicitly rather than recovering those roles from vendor
+  register names alone. If the selected timer family requires a separate
+  event/reload/latch step after alarm writes, that same binding map must also
+  name the required semantic apply operation(s).
+- If a hardware-timer time-driver path uses a timer family whose supported
+  lowering shape is materially distinct from other supported timer families,
+  generation succeeds only when the driver instance also carries the explicit
+  `loweringPattern` for that family. The first such family selector is
+  `counter-compare-timer` for free-running counter plus compare/alarm timer
+  paths.
+- If a hardware-timer time-driver path is sourced from a timer with multiple
+  interrupt causes or shared vectors, generation succeeds only when the profile
+  and interrupt topology narrow the generated time base to one explicit
+  interrupt route/source pair and one explicit clear operation; a timer that
+  merely exposes update/trigger/compare inventory is not yet async-ready.
 
 ## 3. Artifact-level validation
 
@@ -185,6 +207,10 @@ repository contracts.
 - `evidence\st\stm32f405rgt6\generated\stm32f405rgt6.svd`
 - `evidence\st\stm32f405rgt6\generated\embassy\`
 - `evidence\st\stm32f405rgt6\generated\embassy-smoke\`
+- `evidence\wch\ch32v203g6u6\generated\ch32v203g6u6.svd`
+- `evidence\wch\ch32v203g6u6\generated\pac\`
+- `evidence\wch\ch32v203g6u6\generated\embassy\`
+- `evidence\wch\ch32v203g6u6\generated\embassy-smoke\`
 - `evidence\espressif\esp32-c3fn4\`
 - `evidence\texas-instruments\lm3s6965\embassy-out\`
 - `evidence\texas-instruments\lm3s6965\embassy-smoke\`
@@ -193,6 +219,8 @@ repository contracts.
 - Checked-in SVD output is present for the STM32F405RGT6 reference bundle, and
   V-004 separately exercises the current passing SVD command path on
   `evidence\wch\ch32v203c8t6\hair.json`.
+- The CH32V203G6U6 reference bundle keeps its checked-in SVD, PAC, Embassy HAL,
+  and smoke-project artifacts aligned with the same HAIR document.
 - Embassy output directories contain a complete generated crate layout.
 - Smoke-project directories consume generated crates using normal Rust package
   boundaries rather than ad hoc post-processing.
@@ -317,6 +345,33 @@ powershell -ExecutionPolicy Bypass -File evidence\espressif\esp32-c3fn4\generate
 - The current ESP32-C3 QEMU path validates boot, UART, and interrupt behavior.
   GPIO output state is not asserted there because the emulator does not expose
   enough observable GPIO state for a reliable runtime check.
+
+### V-015 Hardware smoke packaging for the CH32V203G6U6 Embassy example
+
+**Purpose:** provide a hardware-flashable Embassy smoke image for the
+CH32V203G6U6 reference bundle that exercises the generated HAL Embassy
+time-driver path on the physical device with an externally observable signal.
+
+**Command**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\embassy-smoke\build-smoke-bin.ps1 -Release
+```
+
+**Expected result**
+- The smoke firmware builds for `riscv32imc-unknown-none-elf`.
+- The packaging step writes a flashable `.bin` beside the release ELF.
+- When flashed to the physical QT Py CH32V203 hardware, the firmware toggles
+  PA7 high and low with one-second `embassy_time::Timer::after(...)` delays so
+  basic `.await` timing can be observed directly on the pin.
+
+**Note**
+- This is a hardware-dependent smoke check, not a universal repository
+  precondition.
+- The smoke application shall consume the generated Embassy HAL crate through
+  normal Rust package boundaries for RCC and Embassy time-driver setup. Until a
+  CH32 GPIO lowering exists, minimal board pin setup may still use direct MMIO
+  writes in the smoke application.
 
 ## 6. Requirement-specific validation coverage
 
