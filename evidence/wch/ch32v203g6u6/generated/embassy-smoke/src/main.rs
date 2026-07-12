@@ -3,7 +3,6 @@
 
 use core::arch::{asm, global_asm};
 use core::panic::PanicInfo;
-use core::ptr::{read_volatile, write_volatile};
 
 use ch32v203g6u6_embassy_hal::{
     gpio::{DRV_GPIOA_RESOURCES, GPIOA, Level},
@@ -13,222 +12,55 @@ use ch32v203g6u6_embassy_hal::{
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 
-const GPIOA_CFGLR_ADDR: usize = 0x4001_0800;
-const GPIOA_OUTDR_ADDR: usize = 0x4001_080C;
-const RCC_APB2PCENR_ADDR: usize = 0x4002_1018;
-const GPIOA_CLOCK_EN_BIT: u32 = 0x0000_0004;
-const GPIO_CFG_MASK: u32 = 0xF;
-const GPIO_MODE_OUTPUT_50MHZ_PUSH_PULL: u32 = 0x3;
-const PA7_CFG_SHIFT: u32 = 28;
-const PA7_BIT: u32 = 1 << 7;
-const FAULT_PULSE_ON_CYCLES: u32 = 200_000;
-const FAULT_PULSE_OFF_CYCLES: u32 = 200_000;
-const FAULT_GROUP_GAP_CYCLES: u32 = 8_000_000;
-
 unsafe extern "C" {
-    fn __wch_fault_vector();
+    fn __wch_hang_vector();
     fn __wch_tim4_vector();
-    fn __wch_unexpected_irq_vector();
 }
 
+#[derive(Clone, Copy)]
 #[repr(C)]
 union WchVector {
     handler: unsafe extern "C" fn(),
     reserved: usize,
 }
 
+const WCH_VECTOR_COUNT: usize = 63;
+const WCH_TIM4_VECTOR_SLOT: usize = 46;
+const WCH_RESERVED_VECTOR: WchVector = WchVector { reserved: 0 };
+const WCH_HANG_VECTOR: WchVector = WchVector {
+    handler: __wch_hang_vector,
+};
+const WCH_TIM4_HANDLER_VECTOR: WchVector = WchVector {
+    handler: __wch_tim4_vector,
+};
+
 #[repr(C, align(64))]
-struct WchVectorTable([WchVector; 63]);
+struct WchVectorTable([WchVector; WCH_VECTOR_COUNT]);
+
+const fn build_wch_vector_table() -> WchVectorTable {
+    let mut table = [WCH_HANG_VECTOR; WCH_VECTOR_COUNT];
+    table[1] = WCH_RESERVED_VECTOR;
+    table[4] = WCH_RESERVED_VECTOR;
+    table[6] = WCH_RESERVED_VECTOR;
+    table[7] = WCH_RESERVED_VECTOR;
+    table[10] = WCH_RESERVED_VECTOR;
+    table[11] = WCH_RESERVED_VECTOR;
+    table[13] = WCH_RESERVED_VECTOR;
+    table[15] = WCH_RESERVED_VECTOR;
+    table[WCH_TIM4_VECTOR_SLOT] = WCH_TIM4_HANDLER_VECTOR;
+    WchVectorTable(table)
+}
 
 #[unsafe(link_section = ".vector")]
 #[used]
-static WCH_VECTOR_TABLE: WchVectorTable = WchVectorTable([
-    WchVector {
-        handler: __wch_fault_vector,
-    },
-    WchVector { reserved: 0 },
-    WchVector {
-        handler: __wch_fault_vector,
-    },
-    WchVector {
-        handler: __wch_fault_vector,
-    },
-    WchVector { reserved: 0 },
-    WchVector {
-        handler: __wch_fault_vector,
-    },
-    WchVector { reserved: 0 },
-    WchVector { reserved: 0 },
-    WchVector {
-        handler: __wch_fault_vector,
-    },
-    WchVector {
-        handler: __wch_fault_vector,
-    },
-    WchVector { reserved: 0 },
-    WchVector { reserved: 0 },
-    WchVector {
-        handler: __wch_fault_vector,
-    },
-    WchVector { reserved: 0 },
-    WchVector {
-        handler: __wch_fault_vector,
-    },
-    WchVector { reserved: 0 },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_tim4_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-    WchVector {
-        handler: __wch_unexpected_irq_vector,
-    },
-]);
+static WCH_VECTOR_TABLE: WchVectorTable = build_wch_vector_table();
 
 global_asm!(
     r#"
-    .global __wch_fault_vector
-__wch_fault_vector:
-    li a0, 13
-    tail __wch_signal_fault_rust
-
-    .global __wch_unexpected_irq_vector
-__wch_unexpected_irq_vector:
-    li a0, 14
-    tail __wch_signal_fault_rust
+    .global __wch_hang_vector
+__wch_hang_vector:
+1:
+    j 1b
 
     .global __wch_tim4_vector
 __wch_tim4_vector:
@@ -271,55 +103,6 @@ __wch_tim4_vector:
 "#
 );
 
-fn modify_u32(address: usize, clear_mask: u32, set_mask: u32) {
-    unsafe {
-        let current = read_volatile(address as *const u32);
-        write_volatile(address as *mut u32, (current & !clear_mask) | set_mask);
-    }
-}
-
-fn set_status_pin_raw(high: bool) {
-    unsafe {
-        let current = read_volatile(GPIOA_OUTDR_ADDR as *const u32);
-        let next = if high {
-            current | PA7_BIT
-        } else {
-            current & !PA7_BIT
-        };
-        write_volatile(GPIOA_OUTDR_ADDR as *mut u32, next);
-    }
-}
-
-fn init_status_pin_raw() {
-    modify_u32(RCC_APB2PCENR_ADDR, GPIOA_CLOCK_EN_BIT, GPIOA_CLOCK_EN_BIT);
-    modify_u32(
-        GPIOA_CFGLR_ADDR,
-        GPIO_CFG_MASK << PA7_CFG_SHIFT,
-        GPIO_MODE_OUTPUT_50MHZ_PUSH_PULL << PA7_CFG_SHIFT,
-    );
-    set_status_pin_raw(false);
-}
-
-fn busy_wait(cycles: u32) {
-    for _ in 0..cycles {
-        core::hint::spin_loop();
-    }
-}
-
-fn signal_fault(code: u8) -> ! {
-    init_status_pin_raw();
-    let pulses = code.max(1);
-    loop {
-        for _ in 0..pulses {
-            set_status_pin_raw(true);
-            busy_wait(FAULT_PULSE_ON_CYCLES);
-            set_status_pin_raw(false);
-            busy_wait(FAULT_PULSE_OFF_CYCLES);
-        }
-        busy_wait(FAULT_GROUP_GAP_CYCLES);
-    }
-}
-
 fn pfic() -> PFIC {
     PFIC::new(DRV_PFIC_RESOURCES).unwrap()
 }
@@ -328,7 +111,8 @@ fn tim4_time() -> TIM4EmbassyTimeDriver {
     TIM4EmbassyTimeDriver::new(DRV_TIME_TIM4_RESOURCES).unwrap()
 }
 
-fn install_wch_vectors() {
+fn init_generated_time_driver() {
+    tim4_time().init_time_driver().unwrap();
     unsafe {
         asm!("csrw 0x804, {}", in(reg) 0x3usize);
         asm!(
@@ -336,16 +120,7 @@ fn install_wch_vectors() {
             in(reg) ((&WCH_VECTOR_TABLE as *const WchVectorTable as usize) | 0x3)
         );
     }
-}
-
-fn enable_tim4_irq() {
     pfic().enable_irq(Irq::TIM4).unwrap();
-}
-
-fn init_generated_time_driver() {
-    tim4_time().init_time_driver().unwrap();
-    install_wch_vectors();
-    enable_tim4_irq();
     unsafe {
         riscv::register::mie::set_mext();
         riscv::interrupt::enable();
@@ -354,12 +129,9 @@ fn init_generated_time_driver() {
 
 #[panic_handler]
 fn panic(_info: &PanicInfo<'_>) -> ! {
-    signal_fault(15)
-}
-
-#[unsafe(no_mangle)]
-extern "C" fn __wch_signal_fault_rust(code: usize) -> ! {
-    signal_fault(code as u8)
+    loop {
+        core::hint::spin_loop();
+    }
 }
 
 #[unsafe(no_mangle)]

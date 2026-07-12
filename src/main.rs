@@ -3786,6 +3786,8 @@ fn driver_uses_pfic_runtime_support(driver: &ResolvedDriverInstance) -> bool {
 }
 
 fn render_pfic_interrupt_support_items() -> &'static str {
+    // WCH's PFIC helper macros index IENR/IRER/IPSR/IACTR by the raw external IRQn
+    // value (for example TIM4_IRQn = 46 -> IENR[1] bit 14), not by IRQn - 16.
     "\nconst PFIC_EXTERNAL_IRQ_OFFSET: u32 = 16;\nconst PFIC_IENR_BASE_ADDRESS: u64 = 0xE000_E100;\nconst PFIC_IRER_BASE_ADDRESS: u64 = 0xE000_E180;\nconst PFIC_IACTR_BASE_ADDRESS: u64 = 0xE000_E300;\n\nfn pfic_irq_index(irq: Irq) -> Result<u32, metadata::Error> {\n    let irq_index = irq as u32;\n    if irq_index < PFIC_EXTERNAL_IRQ_OFFSET {\n        return Err(metadata::Error::Unsupported(\n            \"PFIC runtime helpers only support external interrupts\",\n        ));\n    }\n    Ok(irq_index)\n}\n\nfn pfic_register_address(base: u64, irq_index: u32) -> u64 {\n    base + u64::from((irq_index / 32) * 4)\n}\n\nfn pfic_irq_bit(irq_index: u32) -> u32 {\n    1u32 << (irq_index % 32)\n}\n"
 }
 
@@ -14415,6 +14417,26 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
     }
 
     #[test]
+    fn generate_embassy_uses_raw_wch_pfic_irq_indices() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let document = load_validated_hair_document(fixture.path(), &repo_root)
+            .expect("fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&document, output_dir.path()).expect("embassy generation");
+
+        let interrupt_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("interrupt.rs"))
+                .expect("interrupt.rs");
+        assert!(interrupt_rs.contains("let irq_index = irq as u32;"));
+        assert!(interrupt_rs.contains("if irq_index < PFIC_EXTERNAL_IRQ_OFFSET"));
+        assert!(interrupt_rs.contains("base + u64::from((irq_index / 32) * 4)"));
+        assert!(interrupt_rs.contains("1u32 << (irq_index % 32)"));
+        assert!(!interrupt_rs.contains(".checked_sub(PFIC_EXTERNAL_IRQ_OFFSET)"));
+    }
+
+    #[test]
     fn generate_embassy_requires_embassy_profile() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let fixture = write_embassy_fixture(false);
@@ -15130,17 +15152,29 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             .get_mut("driverInstances")
             .and_then(Value::as_array_mut)
             .expect("driverInstances");
-        let tim4 = drivers
-            .iter_mut()
-            .find(|driver| {
+        let tim4_index = drivers
+            .iter()
+            .position(|driver| {
                 driver
                     .as_object()
                     .and_then(|item| item.get("id"))
                     .and_then(Value::as_str)
-                    == Some("drv.tim4")
+                    == Some("drv.time-tim4")
             })
+            .or_else(|| {
+                drivers.iter().position(|driver| {
+                    driver
+                        .as_object()
+                        .and_then(|item| item.get("id"))
+                        .and_then(Value::as_str)
+                        == Some("drv.tim4")
+                })
+            })
+            .expect("tim4 time driver index");
+        let tim4 = drivers
+            .get_mut(tim4_index)
             .and_then(Value::as_object_mut)
-            .expect("tim4 driver");
+            .expect("tim4 time driver");
         tim4.insert("modulePath".to_string(), Value::String("time".to_string()));
         tim4.insert(
             "loweringPattern".to_string(),
@@ -15193,7 +15227,7 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(cargo_toml.contains("embassy-time-driver"));
         assert!(cargo_toml.contains("tick-hz-1_000"));
         assert!(lib_rs.contains("pub mod time;"));
-        assert!(time_rs.contains("generated_drv_tim4_time_driver_interrupt"));
+        assert!(time_rs.contains("generated_drv_time_tim4_time_driver_interrupt"));
         assert!(time_rs.contains("GENERATED_TIME_COUNTER_ADDRESS"));
         assert!(time_rs.contains("GENERATED_TIME_INTERRUPT_PENDING_MASK"));
         assert!(time_rs.contains("delay_ticks"));
