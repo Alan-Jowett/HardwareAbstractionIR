@@ -25,6 +25,10 @@ on:
       rust_target:
         required: true
         type: string
+      pac_svd2rust_target:
+        required: false
+        type: string
+        default: "cortex-m"
       smoke_mode:
         required: true
         type: string
@@ -184,7 +188,7 @@ jobs:
             -i "$RUNNER_TEMP/generated.svd" \
             -o "$RUNNER_TEMP/generated-pac" \
             --edition 2024 \
-            --target cortex-m
+            --target "${{ inputs.pac_svd2rust_target }}"
 
       - name: Verify checked-in PAC sources
         shell: bash
