@@ -204,6 +204,10 @@ fn run_generate_embassy_host(input: &Path, output_dir: &Path) -> Result<CommandO
 
 fn generate_embassy_crate(document: &HairDocument, output_dir: &Path) -> Result<()> {
     let model = EmbassyGenerationModel::from_document(document)?;
+    validate_reserved_generated_module_names(
+        &model,
+        &[("wch", "reserved generated module name wch")],
+    )?;
     let src_dir = output_dir.join("src");
     fs::create_dir_all(&src_dir)
         .with_context(|| format!("creating output directory {}", src_dir.display()))?;
@@ -217,6 +221,12 @@ fn generate_embassy_crate(document: &HairDocument, output_dir: &Path) -> Result<
         &src_dir.join("metadata.rs"),
         &render_embassy_metadata_rs(&model),
     )?;
+    if uses_generated_wch_runtime_module(&model) {
+        write_generated_text(
+            &src_dir.join("wch.rs"),
+            &render_embassy_wch_runtime_rs(&model)?,
+        )?;
+    }
 
     for (module_name, driver_group) in model.driver_groups() {
         let rendered = if module_name == "interrupt" {
@@ -3543,6 +3553,9 @@ fn render_embassy_lib_rs(model: &EmbassyGenerationModel) -> String {
     for module_name in model.module_names() {
         out.push_str(&format!("pub mod {module_name};\n"));
     }
+    if uses_generated_wch_runtime_module(model) {
+        out.push_str("pub mod wch;\n");
+    }
     out
 }
 
@@ -3783,6 +3796,101 @@ fn driver_uses_pfic_runtime_support(driver: &ResolvedDriverInstance) -> bool {
         && driver.module_name == "interrupt"
         && driver.target.block_class == "interrupt-controller"
         && (driver.target.id == "block.pfic" || driver.target.name.eq_ignore_ascii_case("PFIC"))
+}
+
+fn uses_generated_wch_runtime_module(model: &EmbassyGenerationModel) -> bool {
+    generated_wch_runtime_inputs(model).is_ok_and(|inputs| inputs.is_some())
+}
+
+struct GeneratedWchRuntimeInputs<'a> {
+    interrupt_driver: &'a ResolvedDriverInstance,
+    time_driver: &'a ResolvedDriverInstance,
+    time_interrupt: &'a Interrupt,
+}
+
+fn generated_wch_runtime_inputs(
+    model: &EmbassyGenerationModel,
+) -> Result<Option<GeneratedWchRuntimeInputs<'_>>> {
+    let interrupt_driver = model
+        .drivers
+        .iter()
+        .find(|driver| driver_uses_pfic_runtime_support(driver));
+    let time_driver = model.drivers.iter().find(|driver| {
+        has_time_driver_tag(&driver.capability_tags)
+            && matches!(
+                time_driver_source(driver),
+                Some(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER)
+            )
+    });
+    let (Some(interrupt_driver), Some(time_driver)) = (interrupt_driver, time_driver) else {
+        return Ok(None);
+    };
+    let interrupt_route = time_driver.interrupt_routes.first().ok_or_else(|| {
+        anyhow!(
+            "time driver {} is missing its interrupt route",
+            time_driver.id
+        )
+    })?;
+    if interrupt_route.controller_ref != interrupt_driver.target.id {
+        return Ok(None);
+    }
+    let time_interrupt = model
+        .interrupts
+        .iter()
+        .find(|interrupt| interrupt.id == interrupt_route.interrupt_ref)
+        .ok_or_else(|| {
+            anyhow!(
+                "time driver {} references unknown interrupt {}",
+                time_driver.id,
+                interrupt_route.interrupt_ref
+            )
+        })?;
+    if time_interrupt.number < 16 {
+        bail!(
+            "WCH runtime support requires an external interrupt, but {} has IRQ number {}",
+            time_interrupt.id,
+            time_interrupt.number
+        );
+    }
+    Ok(Some(GeneratedWchRuntimeInputs {
+        interrupt_driver,
+        time_driver,
+        time_interrupt,
+    }))
+}
+
+fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<String> {
+    let Some(inputs) = generated_wch_runtime_inputs(model)? else {
+        bail!("WCH runtime support requested without PFIC + hardware-timer time-driver inputs");
+    };
+    let time_driver_type = &inputs.time_driver.type_name;
+    let time_driver_resources = format!("{}_RESOURCES", to_rust_const_name(&inputs.time_driver.id));
+    let interrupt_driver_type = &inputs.interrupt_driver.type_name;
+    let interrupt_driver_resources = format!(
+        "{}_RESOURCES",
+        to_rust_const_name(&inputs.interrupt_driver.id)
+    );
+    let irq_variant = to_rust_type_name(&inputs.time_interrupt.name);
+    let vector_slot = usize::try_from(inputs.time_interrupt.number).map_err(|_| {
+        anyhow!(
+            "interrupt {} has negative IRQ number",
+            inputs.time_interrupt.id
+        )
+    })?;
+    let vector_count = model
+        .interrupts
+        .iter()
+        .filter_map(|interrupt| usize::try_from(interrupt.number).ok())
+        .max()
+        .unwrap_or(vector_slot)
+        .max(15)
+        + 1;
+
+    Ok(format!(
+        "//! Generated WCH/QingKe runtime support for {}.\n\nuse crate::interrupt::{{{interrupt_driver_resources}, Irq, {interrupt_driver_type}}};\nuse crate::metadata;\nuse crate::time::{{{time_driver_resources}, {time_driver_type}}};\nuse core::arch::{{asm, global_asm}};\n\n{}\nunsafe extern \"C\" {{\n    fn __hair_wch_hang_vector();\n    fn __hair_wch_embassy_time_driver_vector();\n}}\n\n#[derive(Clone, Copy)]\n#[repr(C)]\nunion WchVector {{\n    handler: unsafe extern \"C\" fn(),\n    reserved: usize,\n}}\n\nconst WCH_VECTOR_COUNT: usize = {vector_count};\nconst WCH_TIME_DRIVER_VECTOR_SLOT: usize = {vector_slot};\nconst WCH_RESERVED_VECTOR: WchVector = WchVector {{ reserved: 0 }};\nconst WCH_HANG_VECTOR: WchVector = WchVector {{\n    handler: __hair_wch_hang_vector,\n}};\nconst WCH_TIME_DRIVER_HANDLER_VECTOR: WchVector = WchVector {{\n    handler: __hair_wch_embassy_time_driver_vector,\n}};\n\n#[repr(C, align(64))]\nstruct WchVectorTable([WchVector; WCH_VECTOR_COUNT]);\n\nconst fn build_wch_vector_table() -> WchVectorTable {{\n    let mut table = [WCH_HANG_VECTOR; WCH_VECTOR_COUNT];\n    table[1] = WCH_RESERVED_VECTOR;\n    table[4] = WCH_RESERVED_VECTOR;\n    table[6] = WCH_RESERVED_VECTOR;\n    table[7] = WCH_RESERVED_VECTOR;\n    table[10] = WCH_RESERVED_VECTOR;\n    table[11] = WCH_RESERVED_VECTOR;\n    table[13] = WCH_RESERVED_VECTOR;\n    table[15] = WCH_RESERVED_VECTOR;\n    table[WCH_TIME_DRIVER_VECTOR_SLOT] = WCH_TIME_DRIVER_HANDLER_VECTOR;\n    WchVectorTable(table)\n}}\n\n#[unsafe(link_section = \".vector\")]\n#[used]\nstatic WCH_VECTOR_TABLE: WchVectorTable = build_wch_vector_table();\n\nglobal_asm!(\n    r#\"\n    .global __hair_wch_hang_vector\n__hair_wch_hang_vector:\n1:\n    j 1b\n\n    .global __hair_wch_embassy_time_driver_vector\n__hair_wch_embassy_time_driver_vector:\n    addi sp, sp, -64\n    sw ra, 0(sp)\n    sw t0, 4(sp)\n    sw t1, 8(sp)\n    sw t2, 12(sp)\n    sw t3, 16(sp)\n    sw t4, 20(sp)\n    sw t5, 24(sp)\n    sw t6, 28(sp)\n    sw a0, 32(sp)\n    sw a1, 36(sp)\n    sw a2, 40(sp)\n    sw a3, 44(sp)\n    sw a4, 48(sp)\n    sw a5, 52(sp)\n    sw a6, 56(sp)\n    sw a7, 60(sp)\n    call __hair_wch_embassy_time_driver_irq_rust\n    lw ra, 0(sp)\n    lw t0, 4(sp)\n    lw t1, 8(sp)\n    lw t2, 12(sp)\n    lw t3, 16(sp)\n    lw t4, 20(sp)\n    lw t5, 24(sp)\n    lw t6, 28(sp)\n    lw a0, 32(sp)\n    lw a1, 36(sp)\n    lw a2, 40(sp)\n    lw a3, 44(sp)\n    lw a4, 48(sp)\n    lw a5, 52(sp)\n    lw a6, 56(sp)\n    lw a7, 60(sp)\n    addi sp, sp, 64\n    mret\n\"#\n);\n\nfn pfic() -> {interrupt_driver_type} {{\n    {interrupt_driver_type}::new({interrupt_driver_resources}).expect(\"generated WCH PFIC resources\")\n}}\n\nfn time_driver() -> {time_driver_type} {{\n    {time_driver_type}::new({time_driver_resources}).expect(\"generated WCH time-driver resources\")\n}}\n\npub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {{\n    time_driver().init_time_driver()?;\n    unsafe {{\n        asm!(\"csrw 0x804, {{value}}\", value = in(reg) 0x3usize);\n        asm!(\n            \"csrw mtvec, {{value}}\",\n            value = in(reg) ((&WCH_VECTOR_TABLE as *const WchVectorTable as usize) | 0x3)\n        );\n    }}\n    pfic().enable_irq(Irq::{irq_variant})?;\n    unsafe {{\n        asm!(\"csrs mie, {{value}}\", value = in(reg) 0x800usize);\n        asm!(\"csrs mstatus, {{value}}\", value = in(reg) 0x8usize);\n    }}\n    Ok(())\n}}\n\n#[unsafe(no_mangle)]\nextern \"C\" fn __hair_wch_embassy_time_driver_irq_rust() {{\n    time_driver().on_time_driver_interrupt();\n}}\n",
+        render_comment_text(&model.device_name),
+        render_module_provenance_const("wch"),
+    ))
 }
 
 fn render_pfic_interrupt_support_items() -> &'static str {
@@ -15223,14 +15331,22 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             .expect("generated lib.rs");
         let time_rs = std::fs::read_to_string(output_dir.path().join("src").join("time.rs"))
             .expect("generated time module");
+        let wch_rs = std::fs::read_to_string(output_dir.path().join("src").join("wch.rs"))
+            .expect("generated wch module");
 
         assert!(cargo_toml.contains("embassy-time-driver"));
         assert!(cargo_toml.contains("tick-hz-1_000"));
         assert!(lib_rs.contains("pub mod time;"));
+        assert!(lib_rs.contains("pub mod wch;"));
         assert!(time_rs.contains("generated_drv_time_tim4_time_driver_interrupt"));
         assert!(time_rs.contains("GENERATED_TIME_COUNTER_ADDRESS"));
         assert!(time_rs.contains("GENERATED_TIME_INTERRUPT_PENDING_MASK"));
         assert!(time_rs.contains("delay_ticks"));
+        assert!(
+            wch_rs.contains("pub fn init_embassy_time_runtime() -> Result<(), metadata::Error>")
+        );
+        assert!(wch_rs.contains("pfic().enable_irq(Irq::TIM4)?;"));
+        assert!(wch_rs.contains("call __hair_wch_embassy_time_driver_irq_rust"));
     }
 
     #[test]

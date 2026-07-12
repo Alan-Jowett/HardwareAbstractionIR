@@ -12,3 +12,4 @@ pub mod spi;
 pub mod time;
 pub mod timer;
 pub mod uart;
+pub mod wch;
