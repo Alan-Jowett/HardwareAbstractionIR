@@ -44,9 +44,39 @@ fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metada
 }
 
 #[allow(dead_code)]
+fn read_u8(address: u64) -> Result<u8, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe { Ok(read_volatile(address as *const u8)) }
+}
+
+#[allow(dead_code)]
+fn read_u16(address: u64) -> Result<u16, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe { Ok(read_volatile(address as *const u16)) }
+}
+
+#[allow(dead_code)]
 fn read_u32(address: u64) -> Result<u32, metadata::Error> {
     let address = checked_address(address, core::mem::align_of::<u32>())?;
     unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u8(address: u64, value: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        write_volatile(address as *mut u8, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        write_volatile(address as *mut u16, value);
+    }
+    Ok(())
 }
 
 #[allow(dead_code)]
@@ -161,10 +191,7 @@ impl TIMER0 {
         modify_u32(0x4003000Cu64, 0x00000001u32, 0x00000000u32)?;
         Ok(())
     }
-
-
 }
-
 // Driver instance: TIMER1 (timer) from canonical block block.timer1 -> timer-general
 pub const DRV_TIMER1_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.timer1", name: "TIMER1", consumer_ref: "periph.timer1", clock_ref: "clock.sysclk", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.sysctl.rcgc1"], enable_operation_refs: &[], disable_operation_refs: &[] }];
 pub const DRV_TIMER1_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.timer1", name: "TIMER1", target_ref: "periph.timer1", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rd.software"), binding_kind: "software", control_refs: &["reg.sysctl.srcr1"], assert_operation_refs: &[], release_operation_refs: &[] }];
@@ -260,10 +287,7 @@ impl TIMER1 {
         modify_u32(0x4003100Cu64, 0x00000001u32, 0x00000000u32)?;
         Ok(())
     }
-
-
 }
-
 // Driver instance: TIMER2 (timer) from canonical block block.timer2 -> timer-general
 pub const DRV_TIMER2_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.timer2", name: "TIMER2", consumer_ref: "periph.timer2", clock_ref: "clock.sysclk", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.sysctl.rcgc1"], enable_operation_refs: &[], disable_operation_refs: &[] }];
 pub const DRV_TIMER2_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.timer2", name: "TIMER2", target_ref: "periph.timer2", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rd.software"), binding_kind: "software", control_refs: &["reg.sysctl.srcr1"], assert_operation_refs: &[], release_operation_refs: &[] }];
@@ -359,10 +383,7 @@ impl TIMER2 {
         modify_u32(0x4003200Cu64, 0x00000001u32, 0x00000000u32)?;
         Ok(())
     }
-
-
 }
-
 // Driver instance: TIMER3 (timer) from canonical block block.timer3 -> timer-general
 pub const DRV_TIMER3_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.timer3", name: "TIMER3", consumer_ref: "periph.timer3", clock_ref: "clock.sysclk", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.sysctl.rcgc1"], enable_operation_refs: &[], disable_operation_refs: &[] }];
 pub const DRV_TIMER3_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.timer3", name: "TIMER3", target_ref: "periph.timer3", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rd.software"), binding_kind: "software", control_refs: &["reg.sysctl.srcr1"], assert_operation_refs: &[], release_operation_refs: &[] }];
@@ -458,7 +479,4 @@ impl TIMER3 {
         modify_u32(0x4003300Cu64, 0x00000001u32, 0x00000000u32)?;
         Ok(())
     }
-
-
 }
-

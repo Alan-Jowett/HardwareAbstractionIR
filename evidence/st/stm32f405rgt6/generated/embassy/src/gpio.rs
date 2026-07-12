@@ -44,9 +44,39 @@ fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metada
 }
 
 #[allow(dead_code)]
+fn read_u8(address: u64) -> Result<u8, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe { Ok(read_volatile(address as *const u8)) }
+}
+
+#[allow(dead_code)]
+fn read_u16(address: u64) -> Result<u16, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe { Ok(read_volatile(address as *const u16)) }
+}
+
+#[allow(dead_code)]
 fn read_u32(address: u64) -> Result<u32, metadata::Error> {
     let address = checked_address(address, core::mem::align_of::<u32>())?;
     unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u8(address: u64, value: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        write_volatile(address as *mut u8, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        write_volatile(address as *mut u16, value);
+    }
+    Ok(())
 }
 
 #[allow(dead_code)]
@@ -542,8 +572,6 @@ impl GpioA {
             bsrr_reset_mask: 0x02000000u32,
         }
     }
-
-
 }
 
 #[derive(Debug, Clone)]
@@ -735,7 +763,6 @@ impl GpioAOutput {
         self.pin.get_output_level()
     }
 }
-
 // Driver instance: GpioB (gpio-port) from canonical block block.gpiob -> gpio-port
 pub const DRV_GPIOB_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.gpiob", name: "GPIOB clock", consumer_ref: "periph.gpiob", clock_ref: "clk.hclk1", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.ahb1enr"], enable_operation_refs: &[], disable_operation_refs: &[] }];
 pub const DRV_GPIOB_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.gpiob", name: "GPIOB reset", target_ref: "periph.gpiob", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rdom.ahb1"), binding_kind: "software", control_refs: &["reg.rcc.ahb1rstr"], assert_operation_refs: &[], release_operation_refs: &[] }];
@@ -1199,8 +1226,6 @@ impl GpioB {
             bsrr_reset_mask: 0x02000000u32,
         }
     }
-
-
 }
 
 #[derive(Debug, Clone)]
@@ -1392,7 +1417,6 @@ impl GpioBOutput {
         self.pin.get_output_level()
     }
 }
-
 // Driver instance: GpioC (gpio-port) from canonical block block.gpioc -> gpio-port
 pub const DRV_GPIOC_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.gpioc", name: "GPIOC clock", consumer_ref: "periph.gpioc", clock_ref: "clk.hclk1", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.ahb1enr"], enable_operation_refs: &[], disable_operation_refs: &[] }];
 pub const DRV_GPIOC_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.gpioc", name: "GPIOC reset", target_ref: "periph.gpioc", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rdom.ahb1"), binding_kind: "software", control_refs: &["reg.rcc.ahb1rstr"], assert_operation_refs: &[], release_operation_refs: &[] }];
@@ -1856,8 +1880,6 @@ impl GpioC {
             bsrr_reset_mask: 0x02000000u32,
         }
     }
-
-
 }
 
 #[derive(Debug, Clone)]
@@ -2049,7 +2071,6 @@ impl GpioCOutput {
         self.pin.get_output_level()
     }
 }
-
 // Driver instance: GpioD (gpio-port) from canonical block block.gpiod -> gpio-port
 pub const DRV_GPIOD_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.gpiod", name: "GPIOD clock", consumer_ref: "periph.gpiod", clock_ref: "clk.hclk1", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.ahb1enr"], enable_operation_refs: &[], disable_operation_refs: &[] }];
 pub const DRV_GPIOD_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.gpiod", name: "GPIOD reset", target_ref: "periph.gpiod", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rdom.ahb1"), binding_kind: "software", control_refs: &["reg.rcc.ahb1rstr"], assert_operation_refs: &[], release_operation_refs: &[] }];
@@ -2153,8 +2174,6 @@ impl GpioD {
             bsrr_reset_mask: 0x00040000u32,
         }
     }
-
-
 }
 
 #[derive(Debug, Clone)]
@@ -2346,7 +2365,6 @@ impl GpioDOutput {
         self.pin.get_output_level()
     }
 }
-
 // Driver instance: GpioH (gpio-port) from canonical block block.gpioh -> gpio-port
 pub const DRV_GPIOH_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.gpioh", name: "GPIOH clock", consumer_ref: "periph.gpioh", clock_ref: "clk.hclk1", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.ahb1enr"], enable_operation_refs: &[], disable_operation_refs: &[] }];
 pub const DRV_GPIOH_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.gpioh", name: "GPIOH reset", target_ref: "periph.gpioh", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rdom.ahb1"), binding_kind: "software", control_refs: &["reg.rcc.ahb1rstr"], assert_operation_refs: &[], release_operation_refs: &[] }];
@@ -2474,8 +2492,6 @@ impl GpioH {
             bsrr_reset_mask: 0x00020000u32,
         }
     }
-
-
 }
 
 #[derive(Debug, Clone)]
@@ -2667,4 +2683,3 @@ impl GpioHOutput {
         self.pin.get_output_level()
     }
 }
-

@@ -13,6 +13,7 @@ pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProven
     evidence_ids: metadata::GENERATED_PROVENANCE_EVIDENCE_IDS,
 };
 
+
 unsafe extern "C" {
     fn __hair_wch_hang_vector();
     fn __hair_wch_embassy_time_driver_vector();
@@ -109,8 +110,7 @@ fn pfic() -> PFIC {
 }
 
 fn time_driver() -> TIM4EmbassyTimeDriver {
-    TIM4EmbassyTimeDriver::new(DRV_TIME_TIM4_RESOURCES)
-        .expect("generated WCH time-driver resources")
+    TIM4EmbassyTimeDriver::new(DRV_TIME_TIM4_RESOURCES).expect("generated WCH time-driver resources")
 }
 
 pub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {

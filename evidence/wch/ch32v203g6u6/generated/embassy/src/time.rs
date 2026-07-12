@@ -5,13 +5,10 @@ use core::ptr::{read_volatile, write_volatile};
 
 #[allow(dead_code)]
 fn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {
-    let address = usize::try_from(address).map_err(|_| {
-        metadata::Error::Unsupported("MMIO address does not fit usize on this target")
-    })?;
+    let address = usize::try_from(address)
+        .map_err(|_| metadata::Error::Unsupported("MMIO address does not fit usize on this target"))?;
     if address % align != 0 {
-        return Err(metadata::Error::Unsupported(
-            "MMIO address is not naturally aligned for the target register width",
-        ));
+        return Err(metadata::Error::Unsupported("MMIO address is not naturally aligned for the target register width"));
     }
     Ok(address)
 }
@@ -100,189 +97,15 @@ pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProven
 };
 
 // Driver instance: TIM4 Embassy time driver (timer) from canonical block block.tim4 -> timer-general
-pub const DRV_TIME_TIM4_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding {
-    id: "clk.tim4",
-    name: "TIM4 clock binding",
-    consumer_ref: "periph.tim4",
-    clock_ref: "clk.pclk1-tim",
-    controller_ref: Some("block.rcc"),
-    binding_kind: "gated",
-    control_refs: &["reg.rcc.apb1pcenr"],
-    enable_operation_refs: &[],
-    disable_operation_refs: &[],
-}];
-pub const DRV_TIME_TIM4_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding {
-    id: "rst.tim4",
-    name: "TIM4 reset binding",
-    target_ref: "periph.tim4",
-    controller_ref: Some("block.rcc"),
-    reset_domain_ref: Some("rst.apb1"),
-    binding_kind: "local",
-    control_refs: &["reg.rcc.apb1prstr"],
-    assert_operation_refs: &[],
-    release_operation_refs: &[],
-}];
-pub const DRV_TIME_TIM4_INTERRUPT_SOURCES: &[metadata::InterruptSource] =
-    &[metadata::InterruptSource {
-        id: "isrc.tim4.cc",
-        name: "TIM4 CC interrupt source",
-        source_ref: "periph.tim4",
-        producer_ref: None,
-        kind: "timer",
-        flag_refs: &[],
-        clear_operation_refs: &["op.tim4.clear_cc1"],
-    }];
-pub const DRV_TIME_TIM4_INTERRUPT_ROUTES: &[metadata::InterruptRoute] =
-    &[metadata::InterruptRoute {
-        id: "iroute.tim4.cc",
-        name: "TIM4 CC interrupt route",
-        source_ref: "isrc.tim4.cc",
-        interrupt_ref: "int.tim4",
-        controller_ref: "block.pfic",
-        cpu_target_ref: None,
-        line_index: None,
-        route_type: "hardwired",
-        control_refs: &[],
-        acknowledge_operation_refs: &[],
-        shared_group: None,
-    }];
+pub const DRV_TIME_TIM4_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.tim4", name: "TIM4 clock binding", consumer_ref: "periph.tim4", clock_ref: "clk.pclk1-tim", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb1pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }];
+pub const DRV_TIME_TIM4_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.tim4", name: "TIM4 reset binding", target_ref: "periph.tim4", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb1"), binding_kind: "local", control_refs: &["reg.rcc.apb1prstr"], assert_operation_refs: &[], release_operation_refs: &[] }];
+pub const DRV_TIME_TIM4_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource { id: "isrc.tim4.cc", name: "TIM4 CC interrupt source", source_ref: "periph.tim4", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &["op.tim4.clear_cc1"] }];
+pub const DRV_TIME_TIM4_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute { id: "iroute.tim4.cc", name: "TIM4 CC interrupt route", source_ref: "isrc.tim4.cc", interrupt_ref: "int.tim4", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }];
 pub const DRV_TIME_TIM4_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_TIME_TIM4_DMA_ROUTES: &[metadata::DmaRoute] = &[];
 pub const DRV_TIME_TIM4_PIN_ROLES: &[metadata::PinRole] = &[];
-pub const DRV_TIME_TIM4_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[
-    metadata::SemanticOperation {
-        id: "op.tim4.configure_counter_compare_timebase",
-        name: "Configure TIM4 counter/compare time base",
-        description: None,
-        kind: Some("initialization"),
-        target_refs: &["periph.tim4"],
-        steps: &[
-            metadata::SemanticOperationStep {
-                index: 0,
-                action: "write",
-                target_ref: Some("reg.tim4.psc"),
-                expression: Some(metadata::SemanticExpression {
-                    language: Some("plain"),
-                    text: "Write PSC = 7999",
-                }),
-                value: None,
-                description: Some(
-                    "Divide the reset-default 8 MHz timer clock down to a 1 kHz timer tick.",
-                ),
-            },
-            metadata::SemanticOperationStep {
-                index: 1,
-                action: "write",
-                target_ref: Some("reg.tim4.atrlr"),
-                expression: Some(metadata::SemanticExpression {
-                    language: Some("plain"),
-                    text: "Write ARR = 65535",
-                }),
-                value: None,
-                description: Some("Run the free-running counter across the full 16-bit range."),
-            },
-            metadata::SemanticOperationStep {
-                index: 2,
-                action: "write",
-                target_ref: Some("reg.tim4.cnt"),
-                expression: Some(metadata::SemanticExpression {
-                    language: Some("plain"),
-                    text: "Write CNT = 0",
-                }),
-                value: None,
-                description: Some("Start the time base from zero on initialization."),
-            },
-            metadata::SemanticOperationStep {
-                index: 3,
-                action: "write",
-                target_ref: Some("reg.tim4.ch1cvr"),
-                expression: Some(metadata::SemanticExpression {
-                    language: Some("plain"),
-                    text: "Write CCR1 = 0",
-                }),
-                value: None,
-                description: Some("Initialize the compare register before arming alarms."),
-            },
-            metadata::SemanticOperationStep {
-                index: 4,
-                action: "write",
-                target_ref: Some("reg.tim4.swevgr"),
-                expression: Some(metadata::SemanticExpression {
-                    language: Some("plain"),
-                    text: "Set UG = 1",
-                }),
-                value: None,
-                description: Some("Apply the prescaler and reload configuration immediately."),
-            },
-        ],
-        preconditions: &[],
-        postconditions: &[],
-    },
-    metadata::SemanticOperation {
-        id: "op.tim4.enable",
-        name: "TIM4 counter enable",
-        description: None,
-        kind: Some("mode-transition"),
-        target_refs: &["periph.tim4"],
-        steps: &[metadata::SemanticOperationStep {
-            index: 0,
-            action: "write",
-            target_ref: Some("reg.tim4.ctlr1"),
-            expression: Some(metadata::SemanticExpression {
-                language: Some("plain"),
-                text: "Set CEN = 1",
-            }),
-            value: None,
-            description: Some("Set CTLR1.CEN to enable the counter."),
-        }],
-        preconditions: &[],
-        postconditions: &[],
-    },
-];
-pub const DRV_TIME_TIM4_STATE_MACHINES: &[metadata::SemanticStateMachine] =
-    &[metadata::SemanticStateMachine {
-        id: "sm.tim4",
-        name: "TIM4 counter state",
-        description: None,
-        target_refs: &["periph.tim4"],
-        initial_state: Some("disabled"),
-        states: &[
-            metadata::SemanticState {
-                name: "disabled",
-                description: Some("CTLR1.CEN is cleared and the counter is stopped."),
-                invariants: &[],
-            },
-            metadata::SemanticState {
-                name: "enabled",
-                description: Some("CTLR1.CEN is set and the counter runs."),
-                invariants: &[],
-            },
-        ],
-        transitions: &[
-            metadata::SemanticTransition {
-                from: "disabled",
-                to: "enabled",
-                trigger: Some("Set CTLR1.CEN"),
-                conditions: &[],
-                effects: &[metadata::SemanticSideEffect {
-                    kind: "starts-hardware",
-                    target_ref: Some("field.tim4.ctlr1.cen"),
-                    description: Some("Counter starts when CEN is asserted."),
-                }],
-            },
-            metadata::SemanticTransition {
-                from: "enabled",
-                to: "disabled",
-                trigger: Some("Clear CTLR1.CEN"),
-                conditions: &[],
-                effects: &[metadata::SemanticSideEffect {
-                    kind: "stops-hardware",
-                    target_ref: Some("field.tim4.ctlr1.cen"),
-                    description: Some("Counter stops when CEN is cleared."),
-                }],
-            },
-        ],
-    }];
+pub const DRV_TIME_TIM4_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[metadata::SemanticOperation { id: "op.tim4.configure_counter_compare_timebase", name: "Configure TIM4 counter/compare time base", description: None, kind: Some("initialization"), target_refs: &["periph.tim4"], steps: &[metadata::SemanticOperationStep { index: 0, action: "write", target_ref: Some("reg.tim4.psc"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Write PSC = 7999" }), value: None, description: Some("Divide the reset-default 8 MHz timer clock down to a 1 kHz timer tick.") }, metadata::SemanticOperationStep { index: 1, action: "write", target_ref: Some("reg.tim4.atrlr"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Write ARR = 65535" }), value: None, description: Some("Run the free-running counter across the full 16-bit range.") }, metadata::SemanticOperationStep { index: 2, action: "write", target_ref: Some("reg.tim4.cnt"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Write CNT = 0" }), value: None, description: Some("Start the time base from zero on initialization.") }, metadata::SemanticOperationStep { index: 3, action: "write", target_ref: Some("reg.tim4.ch1cvr"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Write CCR1 = 0" }), value: None, description: Some("Initialize the compare register before arming alarms.") }, metadata::SemanticOperationStep { index: 4, action: "write", target_ref: Some("reg.tim4.swevgr"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Set UG = 1" }), value: None, description: Some("Apply the prescaler and reload configuration immediately.") }], preconditions: &[], postconditions: &[] }, metadata::SemanticOperation { id: "op.tim4.enable", name: "TIM4 counter enable", description: None, kind: Some("mode-transition"), target_refs: &["periph.tim4"], steps: &[metadata::SemanticOperationStep { index: 0, action: "write", target_ref: Some("reg.tim4.ctlr1"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Set CEN = 1" }), value: None, description: Some("Set CTLR1.CEN to enable the counter.") }], preconditions: &[], postconditions: &[] }];
+pub const DRV_TIME_TIM4_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[metadata::SemanticStateMachine { id: "sm.tim4", name: "TIM4 counter state", description: None, target_refs: &["periph.tim4"], initial_state: Some("disabled"), states: &[metadata::SemanticState { name: "disabled", description: Some("CTLR1.CEN is cleared and the counter is stopped."), invariants: &[] }, metadata::SemanticState { name: "enabled", description: Some("CTLR1.CEN is set and the counter runs."), invariants: &[] }], transitions: &[metadata::SemanticTransition { from: "disabled", to: "enabled", trigger: Some("Set CTLR1.CEN"), conditions: &[], effects: &[metadata::SemanticSideEffect { kind: "starts-hardware", target_ref: Some("field.tim4.ctlr1.cen"), description: Some("Counter starts when CEN is asserted.") }] }, metadata::SemanticTransition { from: "enabled", to: "disabled", trigger: Some("Clear CTLR1.CEN"), conditions: &[], effects: &[metadata::SemanticSideEffect { kind: "stops-hardware", target_ref: Some("field.tim4.ctlr1.cen"), description: Some("Counter stops when CEN is cleared.") }] }] }];
 pub const DRV_TIME_TIM4_CAPABILITY_TAGS: &[&str] = &["embassy-time-driver"];
 
 #[derive(Debug, Clone, Copy)]
@@ -301,21 +124,20 @@ pub struct TIM4EmbassyTimeDriverResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_TIME_TIM4_RESOURCES: TIM4EmbassyTimeDriverResources =
-    TIM4EmbassyTimeDriverResources {
-        clocks: DRV_TIME_TIM4_CLOCK_BINDINGS,
-        resets: DRV_TIME_TIM4_RESET_BINDINGS,
-        interrupt_sources: DRV_TIME_TIM4_INTERRUPT_SOURCES,
-        interrupts: DRV_TIME_TIM4_INTERRUPT_ROUTES,
-        dma_channels: DRV_TIME_TIM4_DMA_CHANNELS,
-        dma: DRV_TIME_TIM4_DMA_ROUTES,
-        pins: DRV_TIME_TIM4_PIN_ROLES,
-        init_operations: DRV_TIME_TIM4_INIT_OPERATIONS,
-        state_machines: DRV_TIME_TIM4_STATE_MACHINES,
-        lowering_pattern: Some("counter-compare-timer"),
-        time_driver_source: Some("hardware-timer"),
-        capability_tags: DRV_TIME_TIM4_CAPABILITY_TAGS,
-    };
+pub const DRV_TIME_TIM4_RESOURCES: TIM4EmbassyTimeDriverResources = TIM4EmbassyTimeDriverResources {
+    clocks: DRV_TIME_TIM4_CLOCK_BINDINGS,
+    resets: DRV_TIME_TIM4_RESET_BINDINGS,
+    interrupt_sources: DRV_TIME_TIM4_INTERRUPT_SOURCES,
+    interrupts: DRV_TIME_TIM4_INTERRUPT_ROUTES,
+    dma_channels: DRV_TIME_TIM4_DMA_CHANNELS,
+    dma: DRV_TIME_TIM4_DMA_ROUTES,
+    pins: DRV_TIME_TIM4_PIN_ROLES,
+    init_operations: DRV_TIME_TIM4_INIT_OPERATIONS,
+    state_machines: DRV_TIME_TIM4_STATE_MACHINES,
+    lowering_pattern: Some("counter-compare-timer"),
+    time_driver_source: Some("hardware-timer"),
+    capability_tags: DRV_TIME_TIM4_CAPABILITY_TAGS,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub struct TIM4EmbassyTimeDriver {
@@ -399,6 +221,7 @@ impl TIM4EmbassyTimeDriver {
     }
 }
 
+
 use core::cell::{Cell, RefCell};
 use critical_section::Mutex as CriticalSectionMutex;
 use embassy_time_driver::Driver as EmbassyTimeDriver;
@@ -439,7 +262,7 @@ impl GeneratedCounterCompareTimeDriver {
                 return Ok(());
             }
             self.set_alarm_enabled(false);
-            must_modify_u16(0x40000810u64, 0x0002u16, 0x0000u16);
+        must_modify_u16(0x40000810u64, 0x0002u16, 0x0000u16);
             self.wraps.borrow(cs).set(0);
             self.last_raw.borrow(cs).set(self.read_raw_counter());
             self.initialized.borrow(cs).set(true);
@@ -467,25 +290,14 @@ impl GeneratedCounterCompareTimeDriver {
     }
 
     fn arm_alarm(&self, at: u64) {
-        let raw =
-            (((at as u32) << GENERATED_TIME_COMPARE_SHIFT) & GENERATED_TIME_COMPARE_MASK) as u16;
-        must_modify_u16(
-            GENERATED_TIME_COMPARE_ADDRESS,
-            GENERATED_TIME_COMPARE_MASK as u16,
-            raw,
-        );
+        let raw = (((at as u32) << GENERATED_TIME_COMPARE_SHIFT) & GENERATED_TIME_COMPARE_MASK) as u16;
+        must_modify_u16(GENERATED_TIME_COMPARE_ADDRESS, GENERATED_TIME_COMPARE_MASK as u16, raw);
         self.set_alarm_enabled(true);
     }
 
     fn set_alarm_enabled(&self, enabled: bool) {
-        let set_mask = enabled
-            .then_some(GENERATED_TIME_INTERRUPT_ENABLE_MASK as u16)
-            .unwrap_or(0u16);
-        must_modify_u16(
-            GENERATED_TIME_INTERRUPT_ENABLE_ADDRESS,
-            GENERATED_TIME_INTERRUPT_ENABLE_MASK as u16,
-            set_mask,
-        );
+        let set_mask = enabled.then_some(GENERATED_TIME_INTERRUPT_ENABLE_MASK as u16).unwrap_or(0u16);
+        must_modify_u16(GENERATED_TIME_INTERRUPT_ENABLE_ADDRESS, GENERATED_TIME_INTERRUPT_ENABLE_MASK as u16, set_mask);
     }
 
     fn acknowledge_interrupt(&self) {
@@ -493,15 +305,11 @@ impl GeneratedCounterCompareTimeDriver {
     }
 
     fn is_alarm_pending(&self) -> bool {
-        (must_read_u16(GENERATED_TIME_INTERRUPT_PENDING_ADDRESS)
-            & (GENERATED_TIME_INTERRUPT_PENDING_MASK as u16))
-            != 0
+        (must_read_u16(GENERATED_TIME_INTERRUPT_PENDING_ADDRESS) & (GENERATED_TIME_INTERRUPT_PENDING_MASK as u16)) != 0
     }
 
     fn on_interrupt(&self) {
-        if !critical_section::with(|cs| self.initialized.borrow(cs).get())
-            || !self.is_alarm_pending()
-        {
+        if !critical_section::with(|cs| self.initialized.borrow(cs).get()) || !self.is_alarm_pending() {
             return;
         }
         self.acknowledge_interrupt();

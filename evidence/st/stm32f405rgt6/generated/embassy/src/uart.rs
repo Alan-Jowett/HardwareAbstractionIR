@@ -44,9 +44,39 @@ fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metada
 }
 
 #[allow(dead_code)]
+fn read_u8(address: u64) -> Result<u8, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe { Ok(read_volatile(address as *const u8)) }
+}
+
+#[allow(dead_code)]
+fn read_u16(address: u64) -> Result<u16, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe { Ok(read_volatile(address as *const u16)) }
+}
+
+#[allow(dead_code)]
 fn read_u32(address: u64) -> Result<u32, metadata::Error> {
     let address = checked_address(address, core::mem::align_of::<u32>())?;
     unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u8(address: u64, value: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        write_volatile(address as *mut u8, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        write_volatile(address as *mut u16, value);
+    }
+    Ok(())
 }
 
 #[allow(dead_code)]
@@ -253,10 +283,7 @@ impl Uart4 {
         modify_u32(0x40004C0Cu64, 0x00000020u32, 0x00000000u32)?;
         Ok(())
     }
-
-
 }
-
 // Driver instance: Uart5 (uart) from canonical block block.uart5 -> uart
 pub const DRV_UART5_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.uart5", name: "UART5 clock", consumer_ref: "periph.uart5", clock_ref: "clk.pclk1", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb1enr"], enable_operation_refs: &[], disable_operation_refs: &[] }];
 pub const DRV_UART5_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.uart5", name: "UART5 reset", target_ref: "periph.uart5", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rdom.apb1"), binding_kind: "software", control_refs: &["reg.rcc.apb1rstr"], assert_operation_refs: &[], release_operation_refs: &[] }];
@@ -444,7 +471,4 @@ impl Uart5 {
         modify_u32(0x4000500Cu64, 0x00000020u32, 0x00000000u32)?;
         Ok(())
     }
-
-
 }
-
