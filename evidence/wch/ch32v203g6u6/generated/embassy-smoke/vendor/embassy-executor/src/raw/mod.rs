@@ -28,7 +28,7 @@ use core::marker::PhantomData;
 use core::mem;
 use core::pin::Pin;
 use core::ptr::NonNull;
-use core::sync::atomic::{AtomicPtr, AtomicU8, Ordering};
+use core::sync::atomic::{AtomicPtr, Ordering};
 use core::task::{Context, Poll};
 
 use self::run_queue::{RunQueue, RunQueueItem};
@@ -37,92 +37,6 @@ use self::util::{SyncUnsafeCell, UninitCell};
 pub use self::waker::task_from_waker;
 use super::SpawnToken;
 
-#[cfg(target_arch = "riscv32")]
-static DEBUG_MAX_MARKER: AtomicU8 = AtomicU8::new(0);
-
-#[cfg(target_arch = "riscv32")]
-const DEBUG_RCC_APB2PCENR_ADDR: usize = 0x4002_1018;
-#[cfg(target_arch = "riscv32")]
-const DEBUG_GPIOA_CFGLR_ADDR: usize = 0x4001_0800;
-#[cfg(target_arch = "riscv32")]
-const DEBUG_GPIOA_BSHR_ADDR: usize = 0x4001_0810;
-#[cfg(target_arch = "riscv32")]
-const DEBUG_GPIOA_BCR_ADDR: usize = 0x4001_0814;
-#[cfg(target_arch = "riscv32")]
-const DEBUG_GPIOA_CLOCK_EN_BIT: u32 = 0x0000_0004;
-#[cfg(target_arch = "riscv32")]
-const DEBUG_GPIO_CFG_MASK: u32 = 0xF;
-#[cfg(target_arch = "riscv32")]
-const DEBUG_GPIO_MODE_OUTPUT_50MHZ_PUSH_PULL: u32 = 0x3;
-#[cfg(target_arch = "riscv32")]
-const DEBUG_PA7_CFG_SHIFT: u32 = 28;
-#[cfg(target_arch = "riscv32")]
-const DEBUG_PA7_BIT: u32 = 1 << 7;
-
-#[cfg(target_arch = "riscv32")]
-fn debug_modify_u32(address: usize, clear_mask: u32, set_mask: u32) {
-    unsafe {
-        let current = core::ptr::read_volatile(address as *const u32);
-        core::ptr::write_volatile(address as *mut u32, (current & !clear_mask) | set_mask);
-    }
-}
-
-#[cfg(target_arch = "riscv32")]
-fn debug_write_u32(address: usize, value: u32) {
-    unsafe {
-        core::ptr::write_volatile(address as *mut u32, value);
-    }
-}
-
-#[cfg(target_arch = "riscv32")]
-fn debug_busy_wait(cycles: u32) {
-    for _ in 0..cycles {
-        core::hint::spin_loop();
-    }
-}
-
-#[cfg(target_arch = "riscv32")]
-fn debug_prepare_pa7() {
-    debug_modify_u32(
-        DEBUG_RCC_APB2PCENR_ADDR,
-        DEBUG_GPIOA_CLOCK_EN_BIT,
-        DEBUG_GPIOA_CLOCK_EN_BIT,
-    );
-    debug_modify_u32(
-        DEBUG_GPIOA_CFGLR_ADDR,
-        DEBUG_GPIO_CFG_MASK << DEBUG_PA7_CFG_SHIFT,
-        DEBUG_GPIO_MODE_OUTPUT_50MHZ_PUSH_PULL << DEBUG_PA7_CFG_SHIFT,
-    );
-}
-
-#[cfg(target_arch = "riscv32")]
-fn debug_set_pa7(high: bool) {
-    let address = if high {
-        DEBUG_GPIOA_BSHR_ADDR
-    } else {
-        DEBUG_GPIOA_BCR_ADDR
-    };
-    debug_write_u32(address, DEBUG_PA7_BIT);
-}
-
-#[cfg(target_arch = "riscv32")]
-pub(crate) fn debug_mark(marker: u8) {
-    let seen = DEBUG_MAX_MARKER.load(Ordering::Relaxed);
-    if marker <= seen {
-        return;
-    }
-    DEBUG_MAX_MARKER.store(marker, Ordering::Relaxed);
-    debug_prepare_pa7();
-    for _ in 0..marker {
-        debug_set_pa7(true);
-        debug_busy_wait(200_000);
-        debug_set_pa7(false);
-        debug_busy_wait(200_000);
-    }
-    debug_busy_wait(800_000);
-}
-
-#[cfg(not(target_arch = "riscv32"))]
 pub(crate) fn debug_mark(_marker: u8) {}
 
 /// Raw task header for use in task pointers.
@@ -459,13 +373,9 @@ impl<F: Future + 'static, const N: usize> TaskPool<F, N> {
     }
 }
 
-pub unsafe fn debug_probe_first_task<F: Future + 'static, const N: usize>(pool: &TaskPool<F, N>) {
-    let task = &pool.pool[0];
-    debug_mark(10);
-    let _ = task.raw.timer_queue_item.next.get();
-    debug_mark(11);
-    let _ = task.raw.timer_queue_item.expires_at.get();
-    debug_mark(12);
+pub unsafe fn debug_probe_first_task<F: Future + 'static, const N: usize>(
+    _pool: &TaskPool<F, N>,
+) {
 }
 
 #[derive(Clone, Copy)]
