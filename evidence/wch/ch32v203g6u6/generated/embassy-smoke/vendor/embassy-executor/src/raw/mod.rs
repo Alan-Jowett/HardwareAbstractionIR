@@ -37,8 +37,6 @@ use self::util::{SyncUnsafeCell, UninitCell};
 pub use self::waker::task_from_waker;
 use super::SpawnToken;
 
-pub(crate) fn debug_mark(_marker: u8) {}
-
 /// Raw task header for use in task pointers.
 ///
 /// A task can be in one of the following states:
@@ -208,7 +206,6 @@ impl<F: Future + 'static> TaskStorage<F> {
     }
 
     unsafe fn poll(p: TaskRef) {
-        debug_mark(14);
         let this = &*p.as_ptr().cast::<TaskStorage<F>>();
 
         let future = Pin::new_unchecked(this.future.as_mut());
@@ -255,23 +252,17 @@ impl<F: Future + 'static> AvailableTask<F> {
     ///
     /// This function returns `None` if a task has already been spawned and has not finished running.
     pub fn claim(task: &'static TaskStorage<F>) -> Option<Self> {
-        debug_mark(9);
         let claimed = task.raw.state.spawn().then(|| Self { task });
-        if claimed.is_some() {
-            debug_mark(10);
-        }
         claimed
     }
 
     fn initialize_impl<S>(self, future: impl FnOnce() -> F) -> SpawnToken<S> {
-        debug_mark(11);
         unsafe {
             self.task.raw.poll_fn.set(Some(TaskStorage::<F>::poll));
             self.task.future.write_in_place(future);
 
             let task = TaskRef::new(self.task);
 
-            debug_mark(12);
             SpawnToken::new(task)
         }
     }
@@ -334,7 +325,6 @@ impl<F: Future + 'static, const N: usize> TaskPool<F, N> {
     }
 
     fn spawn_impl<T>(&'static self, future: impl FnOnce() -> F) -> SpawnToken<T> {
-        debug_mark(12);
         match self.pool.iter().find_map(AvailableTask::claim) {
             Some(task) => task.initialize_impl::<T>(future),
             None => SpawnToken::new_failed(),
@@ -349,10 +339,7 @@ impl<F: Future + 'static, const N: usize> TaskPool<F, N> {
     /// is currently free. If none is free, a "poisoned" SpawnToken is returned,
     /// which will cause [`Spawner::spawn()`](super::Spawner::spawn) to return the error.
     pub fn spawn(&'static self, future: impl FnOnce() -> F) -> SpawnToken<impl Sized> {
-        debug_mark(10);
-        let token = self.spawn_impl::<F>(future);
-        debug_mark(11);
-        token
+        self.spawn_impl::<F>(future)
     }
 
     /// Like spawn(), but allows the task to be send-spawned if the args are Send even if
@@ -371,11 +358,6 @@ impl<F: Future + 'static, const N: usize> TaskPool<F, N> {
         // See the comment in AvailableTask::__initialize_async_fn for explanation.
         self.spawn_impl::<FutFn>(future)
     }
-}
-
-pub unsafe fn debug_probe_first_task<F: Future + 'static, const N: usize>(
-    _pool: &TaskPool<F, N>,
-) {
 }
 
 #[derive(Clone, Copy)]
@@ -433,14 +415,12 @@ impl SyncExecutor {
         state::locked(|l| {
             self.enqueue(task, l);
         });
-        debug_mark(15);
     }
 
     /// # Safety
     ///
     /// Same as [`Executor::poll`], plus you must only call this on the thread this executor was created.
     pub(crate) unsafe fn poll(&'static self) {
-        debug_mark(16);
         self.run_queue.dequeue_all(|p| {
             let task = p.header();
 
@@ -448,7 +428,6 @@ impl SyncExecutor {
             trace::task_exec_begin(self, &p);
 
             // Run the task
-            debug_mark(17);
             task.poll_fn.get().unwrap_unchecked()(p);
 
             #[cfg(feature = "trace")]

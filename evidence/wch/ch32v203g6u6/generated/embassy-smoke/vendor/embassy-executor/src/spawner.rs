@@ -119,7 +119,6 @@ impl Spawner {
     ///
     /// You obtain the `token` by calling a task function (i.e. one marked with `#[embassy_executor::task]`).
     pub fn spawn<S>(&self, token: SpawnToken<S>) -> Result<(), SpawnError> {
-        crate::raw::debug_mark(14);
         let task = token.raw_task;
         mem::forget(token);
 
