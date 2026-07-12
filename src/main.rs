@@ -1558,6 +1558,20 @@ struct ResolvedIndexedFieldGpioPinLowering {
 }
 
 #[derive(Debug, Clone)]
+struct ResolvedWchCfgGpioPinLowering {
+    role_index: usize,
+    pin_name: String,
+    accessor_name: String,
+    cfg_addr: u64,
+    cfg_clear_mask: u32,
+    cfg_input_float_mask: u32,
+    cfg_input_pull_mask: u32,
+    cfg_output_mask: u32,
+    idr_mask: u32,
+    odr_mask: u32,
+}
+
+#[derive(Debug, Clone)]
 struct ResolvedBitmaskGpioPinLowering {
     role_index: usize,
     pin_name: String,
@@ -1595,6 +1609,11 @@ enum ResolvedGpioPortLowering {
         odr: ResolvedRegister,
         bsrr: ResolvedRegister,
         pins: Vec<ResolvedIndexedFieldGpioPinLowering>,
+    },
+    WchCfgRegisters {
+        idr: ResolvedRegister,
+        odr: ResolvedRegister,
+        pins: Vec<ResolvedWchCfgGpioPinLowering>,
     },
     BitmaskRegisters {
         dir: ResolvedRegister,
@@ -1815,7 +1834,7 @@ struct EmbassyGenerationModel {
     peripheral_names: HashMap<String, String>,
     register_owners: HashMap<String, Vec<String>>,
     registers: HashMap<String, ResolvedRegister>,
-    fields: HashMap<String, ResolvedFieldTarget>,
+    fields: HashMap<String, Vec<ResolvedFieldTarget>>,
     canonical_terms_by_target: HashMap<String, BTreeSet<String>>,
     provenance: HairProvenance,
 }
@@ -2864,7 +2883,7 @@ fn validate_driver_semantic_scope(
     init_operations: &[SemanticOperation],
     state_machines: &[SemanticStateMachine],
     registers: &HashMap<String, ResolvedRegister>,
-    fields: &HashMap<String, ResolvedFieldTarget>,
+    fields: &HashMap<String, Vec<ResolvedFieldTarget>>,
 ) -> Result<()> {
     let target_ref = target.target_ref.as_str();
 
@@ -2883,7 +2902,7 @@ fn validate_operation_scope(
     target_ref: &str,
     operation: &SemanticOperation,
     registers: &HashMap<String, ResolvedRegister>,
-    fields: &HashMap<String, ResolvedFieldTarget>,
+    fields: &HashMap<String, Vec<ResolvedFieldTarget>>,
 ) -> Result<()> {
     for operation_target in &operation.target_refs {
         if operation_target != target_ref {
@@ -2945,7 +2964,7 @@ fn validate_state_machine_scope(
     target_ref: &str,
     state_machine: &SemanticStateMachine,
     registers: &HashMap<String, ResolvedRegister>,
-    fields: &HashMap<String, ResolvedFieldTarget>,
+    fields: &HashMap<String, Vec<ResolvedFieldTarget>>,
 ) -> Result<()> {
     for state_machine_target in &state_machine.target_refs {
         if state_machine_target != target_ref {
@@ -2990,7 +3009,9 @@ fn validate_state_machine_scope(
             let Some(effect_target_ref) = effect.target_ref.as_deref() else {
                 continue;
             };
-            if let Some(field_target) = fields.get(effect_target_ref) {
+            if let Some(field_target) =
+                try_resolve_field_target(fields, effect_target_ref, Some(target_ref))?
+            {
                 if field_target.peripheral_ref != target_ref {
                     bail!(
                         "driver {} state machine {} transition {} -> {} references field {} on {} instead of {}",
@@ -3038,7 +3059,7 @@ fn validate_predicate_scope(
     target_ref: &str,
     predicate: &SemanticPredicate,
     registers: &HashMap<String, ResolvedRegister>,
-    fields: &HashMap<String, ResolvedFieldTarget>,
+    fields: &HashMap<String, Vec<ResolvedFieldTarget>>,
 ) -> Result<()> {
     let Some(predicate_target_ref) = predicate.target_ref.as_deref() else {
         return Ok(());
@@ -3046,7 +3067,9 @@ fn validate_predicate_scope(
     if !predicate_target_ref.starts_with("reg.") && !predicate_target_ref.starts_with("field.") {
         return Ok(());
     }
-    if let Some(field_target) = fields.get(predicate_target_ref) {
+    if let Some(field_target) =
+        try_resolve_field_target(fields, predicate_target_ref, Some(target_ref))?
+    {
         if field_target.peripheral_ref != target_ref {
             bail!(
                 "driver {} {} predicate {} references field {} on {} instead of {}",
@@ -3704,17 +3727,17 @@ fn render_driver_methods(
         if driver_uses_pfic_runtime_support(driver) {
             methods.push(GeneratedMethod {
                 name: "enable_irq".to_string(),
-                code: "    pub fn enable_irq(&self, irq: Irq) -> Result<(), metadata::Error> {\n        let external_index = pfic_external_irq_index(irq)?;\n        let register = pfic_register_address(PFIC_IENR_BASE_ADDRESS, external_index);\n        write_u32(register, pfic_irq_bit(external_index))\n    }\n"
+                code: "    pub fn enable_irq(&self, irq: Irq) -> Result<(), metadata::Error> {\n        let irq_index = pfic_irq_index(irq)?;\n        let register = pfic_register_address(PFIC_IENR_BASE_ADDRESS, irq_index);\n        write_u32(register, pfic_irq_bit(irq_index))\n    }\n"
                     .to_string(),
             });
             methods.push(GeneratedMethod {
                 name: "disable_irq".to_string(),
-                code: "    pub fn disable_irq(&self, irq: Irq) -> Result<(), metadata::Error> {\n        let external_index = pfic_external_irq_index(irq)?;\n        let register = pfic_register_address(PFIC_IRER_BASE_ADDRESS, external_index);\n        write_u32(register, pfic_irq_bit(external_index))\n    }\n"
+                code: "    pub fn disable_irq(&self, irq: Irq) -> Result<(), metadata::Error> {\n        let irq_index = pfic_irq_index(irq)?;\n        let register = pfic_register_address(PFIC_IRER_BASE_ADDRESS, irq_index);\n        write_u32(register, pfic_irq_bit(irq_index))\n    }\n"
                     .to_string(),
             });
             methods.push(GeneratedMethod {
                 name: "is_irq_active".to_string(),
-                code: "    pub fn is_irq_active(&self, irq: Irq) -> Result<bool, metadata::Error> {\n        let external_index = pfic_external_irq_index(irq)?;\n        let register = pfic_register_address(PFIC_IACTR_BASE_ADDRESS, external_index);\n        Ok((read_u32(register)? & pfic_irq_bit(external_index)) != 0)\n    }\n"
+                code: "    pub fn is_irq_active(&self, irq: Irq) -> Result<bool, metadata::Error> {\n        let irq_index = pfic_irq_index(irq)?;\n        let register = pfic_register_address(PFIC_IACTR_BASE_ADDRESS, irq_index);\n        Ok((read_u32(register)? & pfic_irq_bit(irq_index)) != 0)\n    }\n"
                     .to_string(),
             });
         }
@@ -3763,7 +3786,7 @@ fn driver_uses_pfic_runtime_support(driver: &ResolvedDriverInstance) -> bool {
 }
 
 fn render_pfic_interrupt_support_items() -> &'static str {
-    "\nconst PFIC_EXTERNAL_IRQ_OFFSET: u32 = 16;\nconst PFIC_IENR_BASE_ADDRESS: u64 = 0xE000_E100;\nconst PFIC_IRER_BASE_ADDRESS: u64 = 0xE000_E180;\nconst PFIC_IACTR_BASE_ADDRESS: u64 = 0xE000_E300;\n\nfn pfic_external_irq_index(irq: Irq) -> Result<u32, metadata::Error> {\n    (irq as u32)\n        .checked_sub(PFIC_EXTERNAL_IRQ_OFFSET)\n        .ok_or(metadata::Error::Unsupported(\"PFIC runtime helpers only support external interrupts\"))\n}\n\nfn pfic_register_address(base: u64, external_index: u32) -> u64 {\n    base + u64::from((external_index / 32) * 4)\n}\n\nfn pfic_irq_bit(external_index: u32) -> u32 {\n    1u32 << (external_index % 32)\n}\n"
+    "\nconst PFIC_EXTERNAL_IRQ_OFFSET: u32 = 16;\nconst PFIC_IENR_BASE_ADDRESS: u64 = 0xE000_E100;\nconst PFIC_IRER_BASE_ADDRESS: u64 = 0xE000_E180;\nconst PFIC_IACTR_BASE_ADDRESS: u64 = 0xE000_E300;\n\nfn pfic_irq_index(irq: Irq) -> Result<u32, metadata::Error> {\n    let irq_index = irq as u32;\n    if irq_index < PFIC_EXTERNAL_IRQ_OFFSET {\n        return Err(metadata::Error::Unsupported(\n            \"PFIC runtime helpers only support external interrupts\",\n        ));\n    }\n    Ok(irq_index)\n}\n\nfn pfic_register_address(base: u64, irq_index: u32) -> u64 {\n    base + u64::from((irq_index / 32) * 4)\n}\n\nfn pfic_irq_bit(irq_index: u32) -> u32 {\n    1u32 << (irq_index % 32)\n}\n"
 }
 
 fn render_time_driver_methods(driver: &ResolvedDriverInstance) -> Result<Vec<GeneratedMethod>> {
@@ -4352,6 +4375,39 @@ fn render_gpio_methods(
                 });
             }
         }
+        ResolvedGpioPortLowering::WchCfgRegisters { idr, odr, pins } => {
+            for pin in pins {
+                let mut code = format!(
+                    "    /// Access the {} pin on {}.\n",
+                    render_comment_text(&pin.pin_name),
+                    render_comment_text(&driver.name)
+                );
+                code.push_str(&format!(
+                    "    pub fn {}(&self) -> {} {{\n",
+                    pin.accessor_name, flex_type
+                ));
+                code.push_str(&format!(
+                    "        {} {{\n            resources: self.resources,\n            role: &self.resources.pins[{}],\n            pin_name: {},\n            cfg_addr: 0x{:X}u64,\n            cfg_clear_mask: 0x{:08X}u32,\n            cfg_input_float_mask: 0x{:08X}u32,\n            cfg_input_pull_mask: 0x{:08X}u32,\n            cfg_output_mask: 0x{:08X}u32,\n            idr_addr: 0x{:X}u64,\n            idr_mask: 0x{:08X}u32,\n            odr_addr: 0x{:X}u64,\n            odr_mask: 0x{:08X}u32,\n        }}\n",
+                    flex_type,
+                    pin.role_index,
+                    render_rust_string(&pin.pin_name),
+                    pin.cfg_addr,
+                    pin.cfg_clear_mask,
+                    pin.cfg_input_float_mask,
+                    pin.cfg_input_pull_mask,
+                    pin.cfg_output_mask,
+                    idr.absolute_address,
+                    pin.idr_mask,
+                    odr.absolute_address,
+                    pin.odr_mask,
+                ));
+                code.push_str("    }\n");
+                methods.push(GeneratedMethod {
+                    name: pin.accessor_name.clone(),
+                    code,
+                });
+            }
+        }
         ResolvedGpioPortLowering::BitmaskRegisters {
             dir,
             afsel,
@@ -4482,6 +4538,17 @@ fn render_gpio_support_items(
             out.push_str("    bsrr_set_mask: u32,\n");
             out.push_str("    bsrr_reset_mask: u32,\n");
         }
+        ResolvedGpioPortLowering::WchCfgRegisters { .. } => {
+            out.push_str("    cfg_addr: u64,\n");
+            out.push_str("    cfg_clear_mask: u32,\n");
+            out.push_str("    cfg_input_float_mask: u32,\n");
+            out.push_str("    cfg_input_pull_mask: u32,\n");
+            out.push_str("    cfg_output_mask: u32,\n");
+            out.push_str("    idr_addr: u64,\n");
+            out.push_str("    idr_mask: u32,\n");
+            out.push_str("    odr_addr: u64,\n");
+            out.push_str("    odr_mask: u32,\n");
+        }
         ResolvedGpioPortLowering::BitmaskRegisters { .. } => {
             out.push_str("    dir_addr: u64,\n");
             out.push_str("    afsel_addr: u64,\n");
@@ -4606,6 +4673,80 @@ fn render_gpio_support_items(
             out.push_str("    }\n\n");
             out.push_str("    pub fn set_low(&self) -> Result<(), metadata::Error> {\n");
             out.push_str("        write_u32(self.bsrr_addr, self.bsrr_reset_mask)?;\n");
+            out.push_str("        Ok(())\n");
+            out.push_str("    }\n\n");
+        }
+        ResolvedGpioPortLowering::WchCfgRegisters { .. } => {
+            out.push_str(
+                "    pub fn set_as_input(&self, pull: Pull) -> Result<(), metadata::Error> {\n",
+            );
+            out.push_str("        self.set_pull(pull)\n");
+            out.push_str("    }\n\n");
+            out.push_str(
+                "    pub fn set_as_output(&self, initial_level: Level) -> Result<(), metadata::Error> {\n",
+            );
+            out.push_str("        self.set_level(initial_level)?;\n");
+            out.push_str(
+                "        modify_u32(self.cfg_addr, self.cfg_clear_mask, self.cfg_output_mask)?;\n",
+            );
+            out.push_str("        Ok(())\n");
+            out.push_str("    }\n\n");
+            out.push_str(
+                "    pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {\n",
+            );
+            out.push_str("        match pull {\n");
+            out.push_str("            Pull::None => {\n");
+            out.push_str(
+                "                modify_u32(self.cfg_addr, self.cfg_clear_mask, self.cfg_input_float_mask)?;\n",
+            );
+            out.push_str("            }\n");
+            out.push_str("            Pull::Up => {\n");
+            out.push_str(
+                "                modify_u32(self.odr_addr, self.odr_mask, self.odr_mask)?;\n",
+            );
+            out.push_str(
+                "                modify_u32(self.cfg_addr, self.cfg_clear_mask, self.cfg_input_pull_mask)?;\n",
+            );
+            out.push_str("            }\n");
+            out.push_str("            Pull::Down => {\n");
+            out.push_str(
+                "                modify_u32(self.odr_addr, self.odr_mask, 0x00000000u32)?;\n",
+            );
+            out.push_str(
+                "                modify_u32(self.cfg_addr, self.cfg_clear_mask, self.cfg_input_pull_mask)?;\n",
+            );
+            out.push_str("            }\n");
+            out.push_str("        }\n");
+            out.push_str("        Ok(())\n");
+            out.push_str("    }\n\n");
+            out.push_str("    pub fn is_high(&self) -> Result<bool, metadata::Error> {\n");
+            out.push_str("        Ok((read_u32(self.idr_addr)? & self.idr_mask) != 0)\n");
+            out.push_str("    }\n\n");
+            out.push_str("    pub fn is_low(&self) -> Result<bool, metadata::Error> {\n");
+            out.push_str("        Ok(!self.is_high()?)\n");
+            out.push_str("    }\n\n");
+            out.push_str("    pub fn get_level(&self) -> Result<Level, metadata::Error> {\n");
+            out.push_str("        Ok(if self.is_high()? { Level::High } else { Level::Low })\n");
+            out.push_str("    }\n\n");
+            out.push_str("    pub fn is_set_high(&self) -> Result<bool, metadata::Error> {\n");
+            out.push_str("        Ok((read_u32(self.odr_addr)? & self.odr_mask) != 0)\n");
+            out.push_str("    }\n\n");
+            out.push_str("    pub fn is_set_low(&self) -> Result<bool, metadata::Error> {\n");
+            out.push_str("        Ok(!self.is_set_high()?)\n");
+            out.push_str("    }\n\n");
+            out.push_str(
+                "    pub fn get_output_level(&self) -> Result<Level, metadata::Error> {\n",
+            );
+            out.push_str(
+                "        Ok(if self.is_set_high()? { Level::High } else { Level::Low })\n",
+            );
+            out.push_str("    }\n\n");
+            out.push_str("    pub fn set_high(&self) -> Result<(), metadata::Error> {\n");
+            out.push_str("        modify_u32(self.odr_addr, self.odr_mask, self.odr_mask)?;\n");
+            out.push_str("        Ok(())\n");
+            out.push_str("    }\n\n");
+            out.push_str("    pub fn set_low(&self) -> Result<(), metadata::Error> {\n");
+            out.push_str("        modify_u32(self.odr_addr, self.odr_mask, 0x00000000u32)?;\n");
             out.push_str("        Ok(())\n");
             out.push_str("    }\n\n");
         }
@@ -4817,6 +4958,9 @@ fn resolve_gpio_port_lowering(
     {
         return resolve_indexed_field_gpio_port_lowering(model, driver);
     }
+    if supports_gpio_register_layout(model, target_ref, &["CFGLR", "CFGHR", "INDR", "OUTDR"])? {
+        return resolve_wch_cfg_gpio_port_lowering(model, driver);
+    }
     if supports_gpio_register_layout(
         model,
         target_ref,
@@ -4840,7 +4984,7 @@ fn resolve_gpio_port_lowering(
         return resolve_esp_gpio_port_lowering(model, driver);
     }
     bail!(
-        "gpio-port driver {} target {} does not expose a supported GPIO register layout; expected either indexed-field registers [MODER, PUPDR, IDR, ODR, BSRR], bitmask registers [DIR, AFSEL, DEN, PUR, PDR, DATA], or ESP-style registers [OUT, OUT_W1TS, OUT_W1TC, ENABLE, ENABLE_W1TS, ENABLE_W1TC, IN]",
+        "gpio-port driver {} target {} does not expose a supported GPIO register layout; expected either indexed-field registers [MODER, PUPDR, IDR, ODR, BSRR], CH32 CFG registers [CFGLR, CFGHR, INDR, OUTDR], bitmask registers [DIR, AFSEL, DEN, PUR, PDR, DATA], or ESP-style registers [OUT, OUT_W1TS, OUT_W1TC, ENABLE, ENABLE_W1TS, ENABLE_W1TC, IN]",
         driver.id,
         target_ref
     );
@@ -5069,6 +5213,89 @@ fn resolve_bitmask_gpio_port_lowering(
         pdr,
         pins,
     })
+}
+
+fn resolve_wch_cfg_gpio_port_lowering(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<ResolvedGpioPortLowering> {
+    let target_ref = driver.target.target_ref.as_str();
+    let cfglr = resolve_gpio_register32(model, target_ref, "CFGLR", driver)?;
+    let cfghr = resolve_gpio_register32(model, target_ref, "CFGHR", driver)?;
+    let idr = resolve_gpio_register32(model, target_ref, "INDR", driver)?;
+    let odr = resolve_gpio_register32(model, target_ref, "OUTDR", driver)?;
+    let mut pins = Vec::with_capacity(driver.pin_roles.len());
+    let mut seen_accessors = BTreeSet::new();
+
+    for (role_index, pin_role) in driver.pin_roles.iter().enumerate() {
+        let [route] = pin_role.routes.as_slice() else {
+            bail!(
+                "gpio-port driver {} pin role {} requires exactly one route for first-cut per-pin lowering, found {}",
+                driver.id,
+                pin_role.role,
+                pin_role.routes.len()
+            );
+        };
+        if route.peripheral_ref != target_ref {
+            bail!(
+                "gpio-port driver {} pin role {} references pin route {} for {} instead of {}",
+                driver.id,
+                pin_role.role,
+                route.id,
+                route.peripheral_ref,
+                target_ref
+            );
+        }
+        let pin = model
+            .pins
+            .iter()
+            .find(|candidate| candidate.id == route.pin_ref)
+            .ok_or_else(|| {
+                anyhow!(
+                    "gpio-port driver {} route {} references unknown physical pin {}",
+                    driver.id,
+                    route.id,
+                    route.pin_ref
+                )
+            })?;
+        let pin_index = pin.index.ok_or_else(|| {
+            anyhow!(
+                "gpio-port driver {} route {} references pin {} without an index required for lowering",
+                driver.id,
+                route.id,
+                pin.id
+            )
+        })?;
+        let accessor_name = to_rust_method_name(&pin.name);
+        if !seen_accessors.insert(accessor_name.clone()) {
+            bail!(
+                "gpio-port driver {} would generate duplicate pin accessor {}",
+                driver.id,
+                accessor_name
+            );
+        }
+
+        let cfg_register = if pin_index < 8 { &cfglr } else { &cfghr };
+        let cfg_shift = (pin_index % 8) * 4;
+        let cfg_clear_mask = 0xFu32 << cfg_shift;
+        let idr_field = resolve_register_field(&idr, &format!("IDR{pin_index}"))?;
+        let odr_field = resolve_register_field(&odr, &format!("ODR{pin_index}"))?;
+
+        pins.push(ResolvedWchCfgGpioPinLowering {
+            role_index,
+            pin_name: pin.name.clone(),
+            accessor_name,
+            cfg_addr: cfg_register.absolute_address,
+            cfg_clear_mask,
+            cfg_input_float_mask: 0x4u32 << cfg_shift,
+            cfg_input_pull_mask: 0x8u32 << cfg_shift,
+            cfg_output_mask: 0x3u32 << cfg_shift,
+            idr_mask: field_bit_mask(&idr_field, &idr)?,
+            odr_mask: field_bit_mask(&odr_field, &odr)?,
+        });
+    }
+
+    Ok(ResolvedGpioPortLowering::WchCfgRegisters { idr, odr, pins })
 }
 
 fn resolve_esp_gpio_port_lowering(
@@ -6593,7 +6820,11 @@ fn resolve_time_driver_access_ref(
     entity_ref: &str,
     usage: &str,
 ) -> Result<TimeDriverFieldAccess> {
-    if let Some(field_target) = model.fields.get(entity_ref) {
+    if let Some(field_target) = try_resolve_field_target(
+        &model.fields,
+        entity_ref,
+        Some(driver.target.target_ref.as_str()),
+    )? {
         if field_target.peripheral_ref != driver.target.target_ref {
             bail!(
                 "driver {} {} {} targets {} instead of {}",
@@ -7289,16 +7520,21 @@ fn resolve_transition_effect_write<'a>(
             driver.id
         )
     })?;
-    let field_target = model.fields.get(effect_target_ref).ok_or_else(|| {
-        anyhow!(
-            "state machine {} transition {} -> {} on driver {} requires effect targetRef {} to resolve to a field for first-cut lowering",
-            state_machine.id,
-            transition.from,
-            transition.to,
-            driver.id,
-            effect_target_ref
-        )
-    })?;
+    let field_target = resolve_field_target(
+        &model.fields,
+        effect_target_ref,
+        Some(driver.target.target_ref.as_str()),
+        || {
+            anyhow!(
+                "state machine {} transition {} -> {} on driver {} requires effect targetRef {} to resolve to a field for first-cut lowering",
+                state_machine.id,
+                transition.from,
+                transition.to,
+                driver.id,
+                effect_target_ref
+            )
+        },
+    )?;
     let register = model
         .registers
         .get(field_target.register_id.as_str())
@@ -7332,7 +7568,7 @@ fn resolve_control_target<'a>(
     if let Some(register) = model.registers.get(control_ref) {
         return Ok((register, resolve_control_field(register, subjects)?));
     }
-    if let Some(field_target) = model.fields.get(control_ref) {
+    if let Some(field_target) = try_resolve_field_target(&model.fields, control_ref, None)? {
         let register = model
             .registers
             .get(field_target.register_id.as_str())
@@ -8100,7 +8336,7 @@ fn collect_register_map(
 fn collect_field_map(
     registers: &HashMap<String, ResolvedRegister>,
     required_field_refs: &HashSet<String>,
-) -> Result<HashMap<String, ResolvedFieldTarget>> {
+) -> Result<HashMap<String, Vec<ResolvedFieldTarget>>> {
     let mut fields = HashMap::new();
     for register in registers.values() {
         for field in &register.fields {
@@ -8112,12 +8348,66 @@ fn collect_field_map(
                 register_id: register.id.clone(),
                 field: field.clone(),
             };
-            if fields.insert(field.id.clone(), resolved).is_some() {
-                bail!("duplicate field {} is not supported", field.id);
-            }
+            fields
+                .entry(field.id.clone())
+                .or_insert_with(Vec::new)
+                .push(resolved);
         }
     }
     Ok(fields)
+}
+
+fn resolve_field_target<'a, F>(
+    fields: &'a HashMap<String, Vec<ResolvedFieldTarget>>,
+    field_ref: &str,
+    expected_peripheral_ref: Option<&str>,
+    missing_error: F,
+) -> Result<&'a ResolvedFieldTarget>
+where
+    F: FnOnce() -> anyhow::Error,
+{
+    let candidates = fields.get(field_ref).ok_or_else(missing_error)?;
+    if let Some(expected_peripheral_ref) = expected_peripheral_ref {
+        let mut matches = candidates
+            .iter()
+            .filter(|candidate| candidate.peripheral_ref == expected_peripheral_ref);
+        let first = matches.next().ok_or_else(|| {
+            anyhow!(
+                "field {} does not resolve within peripheral {}",
+                field_ref,
+                expected_peripheral_ref
+            )
+        })?;
+        if matches.next().is_some() {
+            bail!(
+                "field {} resolves multiple times within peripheral {}",
+                field_ref,
+                expected_peripheral_ref
+            );
+        }
+        return Ok(first);
+    }
+    if candidates.len() != 1 {
+        bail!(
+            "field {} is ambiguous across multiple peripherals and must be resolved in a target-scoped context",
+            field_ref
+        );
+    }
+    Ok(&candidates[0])
+}
+
+fn try_resolve_field_target<'a>(
+    fields: &'a HashMap<String, Vec<ResolvedFieldTarget>>,
+    field_ref: &str,
+    expected_peripheral_ref: Option<&str>,
+) -> Result<Option<&'a ResolvedFieldTarget>> {
+    match fields.get(field_ref) {
+        Some(_) => resolve_field_target(fields, field_ref, expected_peripheral_ref, || {
+            anyhow!("field {} is unavailable", field_ref)
+        })
+        .map(Some),
+        None => Ok(None),
+    }
 }
 
 fn collect_register_members(
@@ -10083,6 +10373,34 @@ fn render_host_gpio_emulator_methods(
     let mut out = String::new();
     match lowering {
         ResolvedGpioPortLowering::IndexedFields { idr, odr, pins, .. } => {
+            out.push_str(
+                "    pub fn set_input_level(&self, pin_name: &str, high: bool) -> Result<(), metadata::Error> {\n        match pin_name {\n",
+            );
+            for pin in &pins {
+                out.push_str(&format!(
+                    "            {} => metadata::modify_u32_for(&self.state, 0x{:X}u64, 0x{:08X}u32, if high {{ 0x{:08X}u32 }} else {{ 0x00000000u32 }})?,\n",
+                    render_rust_string(&pin.pin_name),
+                    idr.absolute_address,
+                    pin.idr_mask,
+                    pin.idr_mask,
+                ));
+            }
+            out.push_str(
+                "            _ => return Err(metadata::Error::InvalidReference(\"unknown GPIO pin\")),\n        }\n        Ok(())\n    }\n\n    pub fn output_level(&self, pin_name: &str) -> Result<bool, metadata::Error> {\n        match pin_name {\n",
+            );
+            for pin in &pins {
+                out.push_str(&format!(
+                    "            {} => Ok((metadata::read_u32_for(&self.state, 0x{:X}u64)? & 0x{:08X}u32) != 0),\n",
+                    render_rust_string(&pin.pin_name),
+                    odr.absolute_address,
+                    pin.odr_mask,
+                ));
+            }
+            out.push_str(
+                "            _ => Err(metadata::Error::InvalidReference(\"unknown GPIO pin\")),\n        }\n    }\n\n",
+            );
+        }
+        ResolvedGpioPortLowering::WchCfgRegisters { idr, odr, pins } => {
             out.push_str(
                 "    pub fn set_input_level(&self, pin_name: &str, high: bool) -> Result<(), metadata::Error> {\n        match pin_name {\n",
             );

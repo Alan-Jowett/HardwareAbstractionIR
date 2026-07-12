@@ -73019,6 +73019,273 @@
           }
         },
         {
+          "id": "drv.gpioa",
+          "name": "GPIOA",
+          "targetRef": "block.gpioa",
+          "driverKind": "gpio-port",
+          "modulePath": "gpio",
+          "clockBindingRefs": [
+            "clk.gpioa"
+          ],
+          "resetBindingRefs": [
+            "rst.gpioa"
+          ],
+          "pinRoles": [
+            {
+              "role": "gpio0",
+              "signal": "GPIO0",
+              "routeRefs": [
+                "pinroute.gpioa.pa0"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio1",
+              "signal": "GPIO1",
+              "routeRefs": [
+                "pinroute.gpioa.pa1"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio10",
+              "signal": "GPIO10",
+              "routeRefs": [
+                "pinroute.gpioa.pa10"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio11",
+              "signal": "GPIO11",
+              "routeRefs": [
+                "pinroute.gpioa.pa11"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio12",
+              "signal": "GPIO12",
+              "routeRefs": [
+                "pinroute.gpioa.pa12"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio13",
+              "signal": "GPIO13",
+              "routeRefs": [
+                "pinroute.gpioa.pa13"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio14",
+              "signal": "GPIO14",
+              "routeRefs": [
+                "pinroute.gpioa.pa14"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio15",
+              "signal": "GPIO15",
+              "routeRefs": [
+                "pinroute.gpioa.pa15"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio2",
+              "signal": "GPIO2",
+              "routeRefs": [
+                "pinroute.gpioa.pa2"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio3",
+              "signal": "GPIO3",
+              "routeRefs": [
+                "pinroute.gpioa.pa3"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio4",
+              "signal": "GPIO4",
+              "routeRefs": [
+                "pinroute.gpioa.pa4"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio5",
+              "signal": "GPIO5",
+              "routeRefs": [
+                "pinroute.gpioa.pa5"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio6",
+              "signal": "GPIO6",
+              "routeRefs": [
+                "pinroute.gpioa.pa6"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio7",
+              "signal": "GPIO7",
+              "routeRefs": [
+                "pinroute.gpioa.pa7"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio9",
+              "signal": "GPIO9",
+              "routeRefs": [
+                "pinroute.gpioa.pa9"
+              ],
+              "requirement": "required"
+            }
+          ],
+          "provenance": {
+            "sourceRefs": [
+              "wch-ch32v203-datasheet"
+            ],
+            "evidenceRefs": [
+              "e_pin_table_qfn28"
+            ],
+            "status": "verified",
+            "confidence": 0.9
+          }
+        },
+        {
+          "id": "drv.gpiob",
+          "name": "GPIOB",
+          "targetRef": "block.gpiob",
+          "driverKind": "gpio-port",
+          "modulePath": "gpio",
+          "clockBindingRefs": [
+            "clk.gpiob"
+          ],
+          "resetBindingRefs": [
+            "rst.gpiob"
+          ],
+          "pinRoles": [
+            {
+              "role": "gpio0",
+              "signal": "GPIO0",
+              "routeRefs": [
+                "pinroute.gpiob.pb0"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio1",
+              "signal": "GPIO1",
+              "routeRefs": [
+                "pinroute.gpiob.pb1"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio3",
+              "signal": "GPIO3",
+              "routeRefs": [
+                "pinroute.gpiob.pb3"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio4",
+              "signal": "GPIO4",
+              "routeRefs": [
+                "pinroute.gpiob.pb4"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio5",
+              "signal": "GPIO5",
+              "routeRefs": [
+                "pinroute.gpiob.pb5"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio6",
+              "signal": "GPIO6",
+              "routeRefs": [
+                "pinroute.gpiob.pb6"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio7",
+              "signal": "GPIO7",
+              "routeRefs": [
+                "pinroute.gpiob.pb7"
+              ],
+              "requirement": "required"
+            }
+          ],
+          "provenance": {
+            "sourceRefs": [
+              "wch-ch32v203-datasheet"
+            ],
+            "evidenceRefs": [
+              "e_pin_table_qfn28"
+            ],
+            "status": "verified",
+            "confidence": 0.9
+          }
+        },
+        {
+          "id": "drv.gpiod",
+          "name": "GPIOD",
+          "targetRef": "block.gpiod",
+          "driverKind": "gpio-port",
+          "modulePath": "gpio",
+          "clockBindingRefs": [
+            "clk.gpiod"
+          ],
+          "resetBindingRefs": [
+            "rst.gpiod"
+          ],
+          "pinRoles": [
+            {
+              "role": "gpio0",
+              "signal": "GPIO0",
+              "routeRefs": [
+                "pinroute.gpiod.pd0"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "gpio1",
+              "signal": "GPIO1",
+              "routeRefs": [
+                "pinroute.gpiod.pd1"
+              ],
+              "requirement": "required"
+            }
+          ],
+          "provenance": {
+            "sourceRefs": [
+              "wch-ch32v203-datasheet"
+            ],
+            "evidenceRefs": [
+              "e_pin_table_qfn28"
+            ],
+            "status": "verified",
+            "confidence": 0.9
+          }
+        },
+        {
           "id": "drv.usart1",
           "name": "USART1",
           "targetRef": "block.usart1",
@@ -73867,6 +74134,60 @@
             ],
             "status": "verified",
             "confidence": 0.88
+          }
+        },
+        {
+          "id": "drv.time-tim4",
+          "name": "TIM4 Embassy time driver",
+          "targetRef": "block.tim4",
+          "driverKind": "timer",
+          "modulePath": "time",
+          "loweringPattern": "counter-compare-timer",
+          "timeDriverSource": "hardware-timer",
+          "timeDriverTickHz": 1000,
+          "clockBindingRefs": [
+            "clk.tim4"
+          ],
+          "resetBindingRefs": [
+            "rst.tim4"
+          ],
+          "interruptRouteRefs": [
+            "iroute.tim4.cc"
+          ],
+          "initOperationRefs": [
+            "op.tim4.configure_counter_compare_timebase",
+            "op.tim4.enable"
+          ],
+          "stateMachineRefs": [
+            "sm.tim4"
+          ],
+          "capabilityTags": [
+            "embassy-time-driver"
+          ],
+          "timeDriverBindings": {
+            "counterRef": "reg.tim4.cnt",
+            "alarmRef": "reg.tim4.ch1cvr",
+            "alarmApplyOperationRefs": [],
+            "interruptEnableRef": "field.tim_dmaintenr.cc1ie",
+            "interruptPendingRef": "field.tim_intfr.cc1if",
+            "interruptClearOperationRef": "op.tim4.clear_cc1"
+          },
+          "provenance": {
+            "sourceRefs": [
+              "wch-ch32fv2x-v3x-rm",
+              "openwch-ch32v20x-header",
+              "openwch-ch32v20x-tim-c",
+              "openwch-ch32v20x-startup-d6"
+            ],
+            "evidenceRefs": [
+              "e_rm_tim234_register_model",
+              "e_header_register_bitdefs",
+              "e_header_register_typedefs",
+              "e_startup_vector"
+            ],
+            "status": "inferred",
+            "confidence": 0.78,
+            "notes": "Embassy async timing binds TIM4 counter and CC1 compare/alarm state to the shared TIM4 interrupt vector via the compare-channel path only."
           }
         },
         {

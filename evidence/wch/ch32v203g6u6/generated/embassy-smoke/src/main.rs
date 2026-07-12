@@ -1,123 +1,383 @@
 #![no_std]
 #![no_main]
 
-use core::hint::spin_loop;
+use core::arch::{asm, global_asm};
+use core::panic::PanicInfo;
 use core::ptr::{read_volatile, write_volatile};
 
-use ch32v203g6u6_embassy_hal::adc::{ADC1, DRV_ADC1_RESOURCES};
-use ch32v203g6u6_embassy_hal::dma::{DMA1, DRV_DMA1_RESOURCES};
-use ch32v203g6u6_embassy_hal::i2c::{DRV_I2C1_RESOURCES, I2C1};
-use ch32v203g6u6_embassy_hal::interrupt::{DRV_PFIC_RESOURCES, PFIC};
-use ch32v203g6u6_embassy_hal::spi::{DRV_SPI1_RESOURCES, SPI1};
-use ch32v203g6u6_embassy_hal::timer::{DRV_TIM1_RESOURCES, TIM1};
-use ch32v203g6u6_embassy_hal::uart::{DRV_USART1_RESOURCES, USART1};
-use panic_halt as _;
-use riscv_rt::entry;
+use ch32v203g6u6_embassy_hal::{
+    gpio::{DRV_GPIOA_RESOURCES, GPIOA, Level},
+    interrupt::{DRV_PFIC_RESOURCES, Irq, PFIC},
+    time::{DRV_TIME_TIM4_RESOURCES, TIM4EmbassyTimeDriver},
+};
+use embassy_executor::Spawner;
+use embassy_time::{Duration, Timer};
 
-const RCC_AHBPCENR: *const u32 = 0x4002_1014 as *const u32;
-const RCC_APB2PRSTR: *const u32 = 0x4002_100C as *const u32;
-const RCC_APB2PCENR: *const u32 = 0x4002_1018 as *const u32;
-const RCC_APB1PRSTR: *const u32 = 0x4002_1010 as *const u32;
-const RCC_APB1PCENR: *const u32 = 0x4002_101C as *const u32;
-const TIM1_CTLR1: *const u16 = 0x4001_2C00 as *const u16;
+const GPIOA_CFGLR_ADDR: usize = 0x4001_0800;
+const GPIOA_OUTDR_ADDR: usize = 0x4001_080C;
+const RCC_APB2PCENR_ADDR: usize = 0x4002_1018;
+const GPIOA_CLOCK_EN_BIT: u32 = 0x0000_0004;
+const GPIO_CFG_MASK: u32 = 0xF;
+const GPIO_MODE_OUTPUT_50MHZ_PUSH_PULL: u32 = 0x3;
+const PA7_CFG_SHIFT: u32 = 28;
+const PA7_BIT: u32 = 1 << 7;
+const FAULT_PULSE_ON_CYCLES: u32 = 200_000;
+const FAULT_PULSE_OFF_CYCLES: u32 = 200_000;
+const FAULT_GROUP_GAP_CYCLES: u32 = 8_000_000;
 
-const DMA1_ENABLE_BIT: u32 = 1 << 0;
-const ADC1_ENABLE_BIT: u32 = 1 << 9;
-const TIM1_ENABLE_BIT: u32 = 1 << 11;
-const SPI1_ENABLE_BIT: u32 = 1 << 12;
-const USART1_ENABLE_BIT: u32 = 1 << 14;
-const I2C1_ENABLE_BIT: u32 = 1 << 21;
-
-const ADC1_RESET_BIT: u32 = 1 << 9;
-const TIM1_RESET_BIT: u32 = 1 << 11;
-const SPI1_RESET_BIT: u32 = 1 << 12;
-const USART1_RESET_BIT: u32 = 1 << 14;
-const I2C1_RESET_BIT: u32 = 1 << 21;
-
-fn read_reg32(address: *const u32) -> u32 {
-    unsafe { read_volatile(address) }
+unsafe extern "C" {
+    fn __wch_fault_vector();
+    fn __wch_tim4_vector();
+    fn __wch_unexpected_irq_vector();
 }
 
-fn read_reg16(address: *const u16) -> u16 {
-    unsafe { read_volatile(address) }
+#[repr(C)]
+union WchVector {
+    handler: unsafe extern "C" fn(),
+    reserved: usize,
 }
 
-fn fail() -> ! {
+#[repr(C, align(64))]
+struct WchVectorTable([WchVector; 63]);
+
+#[unsafe(link_section = ".vector")]
+#[used]
+static WCH_VECTOR_TABLE: WchVectorTable = WchVectorTable([
+    WchVector {
+        handler: __wch_fault_vector,
+    },
+    WchVector { reserved: 0 },
+    WchVector {
+        handler: __wch_fault_vector,
+    },
+    WchVector {
+        handler: __wch_fault_vector,
+    },
+    WchVector { reserved: 0 },
+    WchVector {
+        handler: __wch_fault_vector,
+    },
+    WchVector { reserved: 0 },
+    WchVector { reserved: 0 },
+    WchVector {
+        handler: __wch_fault_vector,
+    },
+    WchVector {
+        handler: __wch_fault_vector,
+    },
+    WchVector { reserved: 0 },
+    WchVector { reserved: 0 },
+    WchVector {
+        handler: __wch_fault_vector,
+    },
+    WchVector { reserved: 0 },
+    WchVector {
+        handler: __wch_fault_vector,
+    },
+    WchVector { reserved: 0 },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_tim4_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+    WchVector {
+        handler: __wch_unexpected_irq_vector,
+    },
+]);
+
+global_asm!(
+    r#"
+    .global __wch_fault_vector
+__wch_fault_vector:
+    li a0, 13
+    tail __wch_signal_fault_rust
+
+    .global __wch_unexpected_irq_vector
+__wch_unexpected_irq_vector:
+    li a0, 14
+    tail __wch_signal_fault_rust
+
+    .global __wch_tim4_vector
+__wch_tim4_vector:
+    addi sp, sp, -64
+    sw ra, 0(sp)
+    sw t0, 4(sp)
+    sw t1, 8(sp)
+    sw t2, 12(sp)
+    sw t3, 16(sp)
+    sw t4, 20(sp)
+    sw t5, 24(sp)
+    sw t6, 28(sp)
+    sw a0, 32(sp)
+    sw a1, 36(sp)
+    sw a2, 40(sp)
+    sw a3, 44(sp)
+    sw a4, 48(sp)
+    sw a5, 52(sp)
+    sw a6, 56(sp)
+    sw a7, 60(sp)
+    call __wch_tim4_irq_rust
+    lw ra, 0(sp)
+    lw t0, 4(sp)
+    lw t1, 8(sp)
+    lw t2, 12(sp)
+    lw t3, 16(sp)
+    lw t4, 20(sp)
+    lw t5, 24(sp)
+    lw t6, 28(sp)
+    lw a0, 32(sp)
+    lw a1, 36(sp)
+    lw a2, 40(sp)
+    lw a3, 44(sp)
+    lw a4, 48(sp)
+    lw a5, 52(sp)
+    lw a6, 56(sp)
+    lw a7, 60(sp)
+    addi sp, sp, 64
+    mret
+"#
+);
+
+fn modify_u32(address: usize, clear_mask: u32, set_mask: u32) {
     unsafe {
-        write_volatile(0x2000_0000 as *mut u32, 0xFA11_FA11);
-    }
-    loop {
-        spin_loop();
+        let current = read_volatile(address as *const u32);
+        write_volatile(address as *mut u32, (current & !clear_mask) | set_mask);
     }
 }
 
-fn expect(condition: bool) {
-    if !condition {
-        fail();
-    }
-}
-
-#[entry]
-fn main() -> ! {
-    let pfic = PFIC::new(DRV_PFIC_RESOURCES).unwrap();
-    expect(!pfic.bind().is_empty());
-
-    let dma1 = DMA1::new(DRV_DMA1_RESOURCES).unwrap();
-    dma1.enable_clock().unwrap();
-    expect((read_reg32(RCC_AHBPCENR) & DMA1_ENABLE_BIT) != 0);
-    expect(dma1.resources().dma_channels.len() == 7);
-    expect(!dma1.resources().dma.is_empty());
-
-    let usart1 = USART1::new(DRV_USART1_RESOURCES).unwrap();
-    usart1.enable_clock().unwrap();
-    expect((read_reg32(RCC_APB2PCENR) & USART1_ENABLE_BIT) != 0);
-    usart1.assert_reset().unwrap();
-    expect((read_reg32(RCC_APB2PRSTR) & USART1_RESET_BIT) != 0);
-    usart1.release_reset().unwrap();
-    expect((read_reg32(RCC_APB2PRSTR) & USART1_RESET_BIT) == 0);
-
-    let spi1 = SPI1::new(DRV_SPI1_RESOURCES).unwrap();
-    spi1.enable_clock().unwrap();
-    expect((read_reg32(RCC_APB2PCENR) & SPI1_ENABLE_BIT) != 0);
-    spi1.assert_reset().unwrap();
-    expect((read_reg32(RCC_APB2PRSTR) & SPI1_RESET_BIT) != 0);
-    spi1.release_reset().unwrap();
-    expect((read_reg32(RCC_APB2PRSTR) & SPI1_RESET_BIT) == 0);
-
-    let i2c1 = I2C1::new(DRV_I2C1_RESOURCES).unwrap();
-    i2c1.enable_clock().unwrap();
-    expect((read_reg32(RCC_APB1PCENR) & I2C1_ENABLE_BIT) != 0);
-    i2c1.assert_reset().unwrap();
-    expect((read_reg32(RCC_APB1PRSTR) & I2C1_RESET_BIT) != 0);
-    i2c1.release_reset().unwrap();
-    expect((read_reg32(RCC_APB1PRSTR) & I2C1_RESET_BIT) == 0);
-
-    let tim1 = TIM1::new(DRV_TIM1_RESOURCES).unwrap();
-    tim1.enable_clock().unwrap();
-    expect((read_reg32(RCC_APB2PCENR) & TIM1_ENABLE_BIT) != 0);
-    tim1.assert_reset().unwrap();
-    expect((read_reg32(RCC_APB2PRSTR) & TIM1_RESET_BIT) != 0);
-    tim1.release_reset().unwrap();
-    expect((read_reg32(RCC_APB2PRSTR) & TIM1_RESET_BIT) == 0);
-    tim1.transition_disabled_to_enabled().unwrap();
-    expect((read_reg16(TIM1_CTLR1) & 1) != 0);
-    tim1.transition_enabled_to_disabled().unwrap();
-    expect((read_reg16(TIM1_CTLR1) & 1) == 0);
-
-    let adc1 = ADC1::new(DRV_ADC1_RESOURCES).unwrap();
-    adc1.enable_clock().unwrap();
-    expect((read_reg32(RCC_APB2PCENR) & ADC1_ENABLE_BIT) != 0);
-    adc1.assert_reset().unwrap();
-    expect((read_reg32(RCC_APB2PRSTR) & ADC1_RESET_BIT) != 0);
-    adc1.release_reset().unwrap();
-    expect((read_reg32(RCC_APB2PRSTR) & ADC1_RESET_BIT) == 0);
-    adc1.apply_calibrate().unwrap();
-
+fn set_status_pin_raw(high: bool) {
     unsafe {
-        write_volatile(0x2000_0000 as *mut u32, 0x600D_600D);
+        let current = read_volatile(GPIOA_OUTDR_ADDR as *const u32);
+        let next = if high {
+            current | PA7_BIT
+        } else {
+            current & !PA7_BIT
+        };
+        write_volatile(GPIOA_OUTDR_ADDR as *mut u32, next);
     }
+}
 
+fn init_status_pin_raw() {
+    modify_u32(RCC_APB2PCENR_ADDR, GPIOA_CLOCK_EN_BIT, GPIOA_CLOCK_EN_BIT);
+    modify_u32(
+        GPIOA_CFGLR_ADDR,
+        GPIO_CFG_MASK << PA7_CFG_SHIFT,
+        GPIO_MODE_OUTPUT_50MHZ_PUSH_PULL << PA7_CFG_SHIFT,
+    );
+    set_status_pin_raw(false);
+}
+
+fn busy_wait(cycles: u32) {
+    for _ in 0..cycles {
+        core::hint::spin_loop();
+    }
+}
+
+fn signal_fault(code: u8) -> ! {
+    init_status_pin_raw();
+    let pulses = code.max(1);
     loop {
-        spin_loop();
+        for _ in 0..pulses {
+            set_status_pin_raw(true);
+            busy_wait(FAULT_PULSE_ON_CYCLES);
+            set_status_pin_raw(false);
+            busy_wait(FAULT_PULSE_OFF_CYCLES);
+        }
+        busy_wait(FAULT_GROUP_GAP_CYCLES);
+    }
+}
+
+fn pfic() -> PFIC {
+    PFIC::new(DRV_PFIC_RESOURCES).unwrap()
+}
+
+fn tim4_time() -> TIM4EmbassyTimeDriver {
+    TIM4EmbassyTimeDriver::new(DRV_TIME_TIM4_RESOURCES).unwrap()
+}
+
+fn install_wch_vectors() {
+    unsafe {
+        asm!("csrw 0x804, {}", in(reg) 0x3usize);
+        asm!(
+            "csrw mtvec, {}",
+            in(reg) ((&WCH_VECTOR_TABLE as *const WchVectorTable as usize) | 0x3)
+        );
+    }
+}
+
+fn enable_tim4_irq() {
+    pfic().enable_irq(Irq::TIM4).unwrap();
+}
+
+fn init_generated_time_driver() {
+    tim4_time().init_time_driver().unwrap();
+    install_wch_vectors();
+    enable_tim4_irq();
+    unsafe {
+        riscv::register::mie::set_mext();
+        riscv::interrupt::enable();
+    }
+}
+
+#[panic_handler]
+fn panic(_info: &PanicInfo<'_>) -> ! {
+    signal_fault(15)
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn __wch_signal_fault_rust(code: usize) -> ! {
+    signal_fault(code as u8)
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn __wch_tim4_irq_rust() {
+    tim4_time().on_time_driver_interrupt();
+}
+
+#[embassy_executor::main]
+async fn main(_spawner: Spawner) -> ! {
+    let gpioa = GPIOA::new(DRV_GPIOA_RESOURCES).unwrap();
+    gpioa.enable_clock().unwrap();
+    gpioa.release_reset().unwrap();
+    let led = gpioa.pa7().into_output(Level::Low).unwrap();
+    init_generated_time_driver();
+    loop {
+        led.set_high().unwrap();
+        Timer::after(Duration::from_secs(1)).await;
+        led.set_low().unwrap();
+        Timer::after(Duration::from_secs(1)).await;
     }
 }

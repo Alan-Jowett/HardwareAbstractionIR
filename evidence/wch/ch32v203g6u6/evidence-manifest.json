@@ -36,14 +36,28 @@
       "kind": "vendor-header",
       "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h",
       "version": "V1.0.1",
-      "notes": "Official WCH peripheral access header. The CH32V20x_D6 grouping explicitly includes CH32V203G6 and provides IRQ names, peripheral types, and register definitions."
+      "notes": "Official WCH peripheral access header. The CH32V20x_D6 grouping explicitly includes CH32V203G6 and provides IRQ names, TIM4 register layout, base addresses, and peripheral type definitions."
     },
     {
       "id": "openwch-ch32v20x-startup-d6",
       "kind": "source-code",
       "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Startup/startup_ch32v20x_D6.S",
       "version": "V1.0.2",
-      "notes": "Official WCH startup file for the D6 subset that includes CH32V203G6. Useful to cross-check interrupt vector ordering and D6 subgroup membership."
+      "notes": "Official WCH startup file for the D6 subset that includes CH32V203G6. Useful to cross-check interrupt vector ordering, D6 subgroup membership, and the single shared TIM4_IRQHandler vector."
+    },
+    {
+      "id": "openwch-ch32v20x-tim-h",
+      "kind": "vendor-header",
+      "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Peripheral/inc/ch32v20x_tim.h",
+      "version": "V1.0.1",
+      "notes": "Official WCH timer library header. Names the TIM update, compare, and trigger interrupt bits plus preload, update-source, and software-event constants needed to bind a timer-backed Embassy time driver."
+    },
+    {
+      "id": "openwch-ch32v20x-tim-c",
+      "kind": "source-code",
+      "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Peripheral/src/ch32v20x_tim.c",
+      "version": "V1.0.1",
+      "notes": "Official WCH timer library implementation. Proves the concrete interrupt-enable, pending, clear, compare-register, and software-event semantics used by TIM2-TIM4."
     },
     {
       "id": "openwch-ch32v20x-adc-dma-example",
@@ -58,6 +72,20 @@
       "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/TIM/TIM_DMA/User/main.c",
       "version": "V1.0.1",
       "notes": "Official WCH timer DMA example for the CH32V20x family. Useful to ground at least one concrete timer DMA route and direction."
+    },
+    {
+      "id": "openwch-ch32v20x-tim-int-example",
+      "kind": "source-code",
+      "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/TIM/TIM_INT/User/main.c",
+      "version": "V1.0.0",
+      "notes": "Official WCH timer interrupt example. Although it uses TIM1, it shows the vendor-supported sequence for time-base init, pending clear, NVIC enable, interrupt enable, and optional software-generated update events."
+    },
+    {
+      "id": "openwch-ch32v20x-output-compare-example",
+      "kind": "source-code",
+      "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/TIM/Output_Compare_Mode/User/main.c",
+      "version": "V1.0.1",
+      "notes": "Official WCH output-compare example. Although it uses TIM1, it shows vendor-supported compare-register programming and ARR/OC preload configuration relevant to compare-based alarms."
     },
     {
       "id": "qingke-v4-processor-manual",
@@ -78,6 +106,12 @@
       "uri": "https://raw.githubusercontent.com/ch32-rs/ch32-data/a515903589cfbc342dc6ad0d13c02b4382da5628/data/chips/CH32V203G6U6.yaml",
       "version": "a515903589cfbc342dc6ad0d13c02b4382da5628",
       "notes": "Community-curated exact-variant machine-readable chip description for CH32V203G6U6. Useful as an exact-variant cross-check for package, memory sizing, device id, and included peripheral fragments."
+    },
+    {
+      "id": "wch-cnblogs-bldc-tim4-article",
+      "kind": "human-annotation",
+      "uri": "https://www.cnblogs.com/wchmcu/p/17678923.html",
+      "notes": "Blog园 post by WCH_CH32 with directly TIM4-specific code snippets, including a shared TIM4_IRQHandler and TIM_IT_Trigger|TIM_IT_CC1 usage. Lower authority than the official SDK and included only as a gap-filler for TIM4-specific interrupt usage."
     }
   ]
 }
