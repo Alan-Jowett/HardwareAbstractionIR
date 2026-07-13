@@ -44,9 +44,39 @@ fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metada
 }
 
 #[allow(dead_code)]
+fn read_u8(address: u64) -> Result<u8, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe { Ok(read_volatile(address as *const u8)) }
+}
+
+#[allow(dead_code)]
+fn read_u16(address: u64) -> Result<u16, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe { Ok(read_volatile(address as *const u16)) }
+}
+
+#[allow(dead_code)]
 fn read_u32(address: u64) -> Result<u32, metadata::Error> {
     let address = checked_address(address, core::mem::align_of::<u32>())?;
     unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u8(address: u64, value: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        write_volatile(address as *mut u8, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        write_volatile(address as *mut u16, value);
+    }
+    Ok(())
 }
 
 #[allow(dead_code)]
@@ -96,6 +126,7 @@ pub struct TIM1PWMResources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -110,6 +141,7 @@ pub const DRV_PWM_TIM1_RESOURCES: TIM1PWMResources = TIM1PWMResources {
     init_operations: DRV_PWM_TIM1_INIT_OPERATIONS,
     state_machines: DRV_PWM_TIM1_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_PWM_TIM1_CAPABILITY_TAGS,
 };
 
@@ -164,10 +196,7 @@ impl TIM1PWM {
         modify_u16(0x40012C00u64, 0x0001u16, 0x0000u16)?;
         Ok(())
     }
-
-
 }
-
 // Driver instance: TIM2 PWM (pwm) from canonical block block.pwm-tim2 -> pwm
 pub const DRV_PWM_TIM2_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.tim2", name: "TIM2 clock binding", consumer_ref: "periph.tim2", clock_ref: "clk.pclk1-tim", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb1pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }];
 pub const DRV_PWM_TIM2_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.tim2", name: "TIM2 reset binding", target_ref: "periph.tim2", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb1"), binding_kind: "local", control_refs: &["reg.rcc.apb1prstr"], assert_operation_refs: &[], release_operation_refs: &[] }];
@@ -196,6 +225,7 @@ pub struct TIM2PWMResources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -210,6 +240,7 @@ pub const DRV_PWM_TIM2_RESOURCES: TIM2PWMResources = TIM2PWMResources {
     init_operations: DRV_PWM_TIM2_INIT_OPERATIONS,
     state_machines: DRV_PWM_TIM2_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_PWM_TIM2_CAPABILITY_TAGS,
 };
 
@@ -264,10 +295,7 @@ impl TIM2PWM {
         modify_u16(0x40000000u64, 0x0001u16, 0x0000u16)?;
         Ok(())
     }
-
-
 }
-
 // Driver instance: TIM3 PWM (pwm) from canonical block block.pwm-tim3 -> pwm
 pub const DRV_PWM_TIM3_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.tim3", name: "TIM3 clock binding", consumer_ref: "periph.tim3", clock_ref: "clk.pclk1-tim", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb1pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }];
 pub const DRV_PWM_TIM3_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.tim3", name: "TIM3 reset binding", target_ref: "periph.tim3", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb1"), binding_kind: "local", control_refs: &["reg.rcc.apb1prstr"], assert_operation_refs: &[], release_operation_refs: &[] }];
@@ -296,6 +324,7 @@ pub struct TIM3PWMResources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -310,6 +339,7 @@ pub const DRV_PWM_TIM3_RESOURCES: TIM3PWMResources = TIM3PWMResources {
     init_operations: DRV_PWM_TIM3_INIT_OPERATIONS,
     state_machines: DRV_PWM_TIM3_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_PWM_TIM3_CAPABILITY_TAGS,
 };
 
@@ -364,14 +394,11 @@ impl TIM3PWM {
         modify_u16(0x40000400u64, 0x0001u16, 0x0000u16)?;
         Ok(())
     }
-
-
 }
-
 // Driver instance: TIM4 PWM (pwm) from canonical block block.pwm-tim4 -> pwm
 pub const DRV_PWM_TIM4_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.tim4", name: "TIM4 clock binding", consumer_ref: "periph.tim4", clock_ref: "clk.pclk1-tim", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb1pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }];
 pub const DRV_PWM_TIM4_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.tim4", name: "TIM4 reset binding", target_ref: "periph.tim4", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb1"), binding_kind: "local", control_refs: &["reg.rcc.apb1prstr"], assert_operation_refs: &[], release_operation_refs: &[] }];
-pub const DRV_PWM_TIM4_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource { id: "isrc.tim4.up", name: "TIM4 UP interrupt source", source_ref: "periph.tim4", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim4.trg", name: "TIM4 TRG interrupt source", source_ref: "periph.tim4", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim4.cc", name: "TIM4 CC interrupt source", source_ref: "periph.tim4", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }];
+pub const DRV_PWM_TIM4_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource { id: "isrc.tim4.up", name: "TIM4 UP interrupt source", source_ref: "periph.tim4", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim4.trg", name: "TIM4 TRG interrupt source", source_ref: "periph.tim4", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.tim4.cc", name: "TIM4 CC interrupt source", source_ref: "periph.tim4", producer_ref: None, kind: "timer", flag_refs: &[], clear_operation_refs: &["op.tim4.clear_cc1"] }];
 pub const DRV_PWM_TIM4_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute { id: "iroute.tim4.up", name: "TIM4 UP interrupt route", source_ref: "isrc.tim4.up", interrupt_ref: "int.tim4", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.tim4.trg", name: "TIM4 TRG interrupt route", source_ref: "isrc.tim4.trg", interrupt_ref: "int.tim4", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.tim4.cc", name: "TIM4 CC interrupt route", source_ref: "isrc.tim4.cc", interrupt_ref: "int.tim4", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }];
 pub const DRV_PWM_TIM4_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_PWM_TIM4_DMA_ROUTES: &[metadata::DmaRoute] = &[];
@@ -394,6 +421,7 @@ pub struct TIM4PWMResources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -408,6 +436,7 @@ pub const DRV_PWM_TIM4_RESOURCES: TIM4PWMResources = TIM4PWMResources {
     init_operations: DRV_PWM_TIM4_INIT_OPERATIONS,
     state_machines: DRV_PWM_TIM4_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_PWM_TIM4_CAPABILITY_TAGS,
 };
 
@@ -462,7 +491,4 @@ impl TIM4PWM {
         modify_u16(0x40000800u64, 0x0001u16, 0x0000u16)?;
         Ok(())
     }
-
-
 }
-

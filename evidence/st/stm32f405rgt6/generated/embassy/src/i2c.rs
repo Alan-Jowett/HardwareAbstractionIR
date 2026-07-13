@@ -44,9 +44,39 @@ fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metada
 }
 
 #[allow(dead_code)]
+fn read_u8(address: u64) -> Result<u8, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe { Ok(read_volatile(address as *const u8)) }
+}
+
+#[allow(dead_code)]
+fn read_u16(address: u64) -> Result<u16, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe { Ok(read_volatile(address as *const u16)) }
+}
+
+#[allow(dead_code)]
 fn read_u32(address: u64) -> Result<u32, metadata::Error> {
     let address = checked_address(address, core::mem::align_of::<u32>())?;
     unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u8(address: u64, value: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        write_volatile(address as *mut u8, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        write_volatile(address as *mut u16, value);
+    }
+    Ok(())
 }
 
 #[allow(dead_code)]
@@ -148,10 +178,7 @@ impl I2C1 {
         modify_u32(0x40023820u64, 0x00200000u32, 0x00000000u32)?;
         Ok(())
     }
-
-
 }
-
 // Driver instance: I2C2 (i2c) from canonical block block.i2c2 -> i2c
 pub const DRV_I2C2_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.i2c2", name: "I2C2 clock", consumer_ref: "periph.i2c2", clock_ref: "clk.pclk1", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb1enr"], enable_operation_refs: &[], disable_operation_refs: &[] }];
 pub const DRV_I2C2_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.i2c2", name: "I2C2 reset", target_ref: "periph.i2c2", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rdom.apb1"), binding_kind: "software", control_refs: &["reg.rcc.apb1rstr"], assert_operation_refs: &[], release_operation_refs: &[] }];
@@ -234,10 +261,7 @@ impl I2C2 {
         modify_u32(0x40023820u64, 0x00400000u32, 0x00000000u32)?;
         Ok(())
     }
-
-
 }
-
 // Driver instance: I2C3 (i2c) from canonical block block.i2c3 -> i2c
 pub const DRV_I2C3_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.i2c3", name: "I2C3 clock", consumer_ref: "periph.i2c3", clock_ref: "clk.pclk1", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb1enr"], enable_operation_refs: &[], disable_operation_refs: &[] }];
 pub const DRV_I2C3_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.i2c3", name: "I2C3 reset", target_ref: "periph.i2c3", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rdom.apb1"), binding_kind: "software", control_refs: &["reg.rcc.apb1rstr"], assert_operation_refs: &[], release_operation_refs: &[] }];
@@ -320,7 +344,4 @@ impl I2C3 {
         modify_u32(0x40023820u64, 0x00800000u32, 0x00000000u32)?;
         Ok(())
     }
-
-
 }
-

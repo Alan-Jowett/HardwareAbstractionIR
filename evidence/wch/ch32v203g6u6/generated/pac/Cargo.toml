@@ -1,0 +1,18 @@
+[package]
+name = "ch32v203g6u6-pac"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "lib.rs"
+
+[features]
+default = ["critical-section"]
+critical-section = []
+rt = ["dep:riscv-rt"]
+
+[dependencies]
+critical-section = "1.2"
+riscv = "0.12"
+riscv-rt = { version = "0.13", optional = true }
+vcell = "0.1"

@@ -44,9 +44,39 @@ fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metada
 }
 
 #[allow(dead_code)]
+fn read_u8(address: u64) -> Result<u8, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe { Ok(read_volatile(address as *const u8)) }
+}
+
+#[allow(dead_code)]
+fn read_u16(address: u64) -> Result<u16, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe { Ok(read_volatile(address as *const u16)) }
+}
+
+#[allow(dead_code)]
 fn read_u32(address: u64) -> Result<u32, metadata::Error> {
     let address = checked_address(address, core::mem::align_of::<u32>())?;
     unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u8(address: u64, value: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        write_volatile(address as *mut u8, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        write_volatile(address as *mut u16, value);
+    }
+    Ok(())
 }
 
 #[allow(dead_code)]
@@ -147,10 +177,7 @@ impl UART0 {
         modify_u32(0x400FE040u64, 0x00000001u32, 0x00000000u32)?;
         Ok(())
     }
-
-
 }
-
 // Driver instance: UART1 (uart) from canonical block block.uart1 -> uart
 pub const DRV_UART1_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.uart1", name: "UART1", consumer_ref: "periph.uart1", clock_ref: "clock.sysclk", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.sysctl.rcgc1"], enable_operation_refs: &[], disable_operation_refs: &[] }];
 pub const DRV_UART1_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.uart1", name: "UART1", target_ref: "periph.uart1", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rd.software"), binding_kind: "software", control_refs: &["reg.sysctl.srcr1"], assert_operation_refs: &[], release_operation_refs: &[] }];
@@ -232,7 +259,4 @@ impl UART1 {
         modify_u32(0x400FE040u64, 0x00000002u32, 0x00000000u32)?;
         Ok(())
     }
-
-
 }
-

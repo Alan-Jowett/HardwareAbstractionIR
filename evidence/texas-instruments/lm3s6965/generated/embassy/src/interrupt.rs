@@ -1,6 +1,92 @@
 //! Generated Embassy-style interrupt module for LM3S6965.
 
 use crate::metadata;
+use core::ptr::{read_volatile, write_volatile};
+
+#[allow(dead_code)]
+fn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {
+    let address = usize::try_from(address)
+        .map_err(|_| metadata::Error::Unsupported("MMIO address does not fit usize on this target"))?;
+    if address % align != 0 {
+        return Err(metadata::Error::Unsupported("MMIO address is not naturally aligned for the target register width"));
+    }
+    Ok(address)
+}
+
+#[allow(dead_code)]
+fn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        let current = read_volatile(address as *const u8);
+        write_volatile(address as *mut u8, (current & !clear_mask) | set_mask);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        let current = read_volatile(address as *const u16);
+        write_volatile(address as *mut u16, (current & !clear_mask) | set_mask);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u32>())?;
+    unsafe {
+        let current = read_volatile(address as *const u32);
+        write_volatile(address as *mut u32, (current & !clear_mask) | set_mask);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn read_u8(address: u64) -> Result<u8, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe { Ok(read_volatile(address as *const u8)) }
+}
+
+#[allow(dead_code)]
+fn read_u16(address: u64) -> Result<u16, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe { Ok(read_volatile(address as *const u16)) }
+}
+
+#[allow(dead_code)]
+fn read_u32(address: u64) -> Result<u32, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u32>())?;
+    unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u8(address: u64, value: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        write_volatile(address as *mut u8, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        write_volatile(address as *mut u16, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u32(address: u64, value: u32) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u32>())?;
+    unsafe {
+        write_volatile(address as *mut u32, value);
+    }
+    Ok(())
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Irq {
@@ -95,7 +181,4 @@ impl NVIC {
     pub fn bind(&self) -> &'static [metadata::InterruptRoute] {
         self.resources.interrupts
     }
-
-
 }
-

@@ -140,3 +140,16 @@ jobs:
       smoke_dir: evidence/texas-instruments/lm3s6965/generated/embassy-smoke
       smoke_command: qemu-system-arm -M lm3s6965evb -display none -monitor none -serial stdio -semihosting-config enable=on,target=native -kernel "$SMOKE_BINARY"
       qemu_artifact_name: ${{ needs.qemu.outputs.artifact_name }}
+
+  ch32v203g6u6:
+    name: ch32v203g6u6
+    uses: ./.github/workflows/verify-generated-mcu.yml
+    with:
+      mcu_name: ch32v203g6u6
+      hair_path: evidence/wch/ch32v203g6u6/hair.json
+      svd_path: evidence/wch/ch32v203g6u6/generated/ch32v203g6u6.svd
+      pac_dir: evidence/wch/ch32v203g6u6/generated/pac
+      embassy_dir: evidence/wch/ch32v203g6u6/generated/embassy
+      rust_target: riscv32imc-unknown-none-elf
+      pac_svd2rust_target: riscv
+      smoke_mode: unsupported

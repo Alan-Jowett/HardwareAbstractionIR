@@ -44,9 +44,39 @@ fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metada
 }
 
 #[allow(dead_code)]
+fn read_u8(address: u64) -> Result<u8, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe { Ok(read_volatile(address as *const u8)) }
+}
+
+#[allow(dead_code)]
+fn read_u16(address: u64) -> Result<u16, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe { Ok(read_volatile(address as *const u16)) }
+}
+
+#[allow(dead_code)]
 fn read_u32(address: u64) -> Result<u32, metadata::Error> {
     let address = checked_address(address, core::mem::align_of::<u32>())?;
     unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u8(address: u64, value: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        write_volatile(address as *mut u8, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        write_volatile(address as *mut u16, value);
+    }
+    Ok(())
 }
 
 #[allow(dead_code)]
@@ -100,6 +130,7 @@ pub struct ADC1Resources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -114,6 +145,7 @@ pub const DRV_ADC1_RESOURCES: ADC1Resources = ADC1Resources {
     init_operations: DRV_ADC1_INIT_OPERATIONS,
     state_machines: DRV_ADC1_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_ADC1_CAPABILITY_TAGS,
 };
 
@@ -160,10 +192,7 @@ impl ADC1 {
         modify_u32(0x40012408u64, 0x00000004u32, 0x00000004u32)?;
         Ok(())
     }
-
-
 }
-
 // Driver instance: ADC2 (adc) from canonical block block.adc2 -> adc
 pub const DRV_ADC2_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.adc2", name: "ADC2 clock binding", consumer_ref: "periph.adc2", clock_ref: "clk.adc", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb2pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }];
 pub const DRV_ADC2_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.adc2", name: "ADC2 reset binding", target_ref: "periph.adc2", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb2"), binding_kind: "local", control_refs: &["reg.rcc.apb2prstr"], assert_operation_refs: &[], release_operation_refs: &[] }];
@@ -198,6 +227,7 @@ pub struct ADC2Resources {
     pub init_operations: &'static [metadata::SemanticOperation],
     pub state_machines: &'static [metadata::SemanticStateMachine],
     pub lowering_pattern: Option<&'static str>,
+    pub time_driver_source: Option<&'static str>,
     pub capability_tags: &'static [&'static str],
 }
 
@@ -212,6 +242,7 @@ pub const DRV_ADC2_RESOURCES: ADC2Resources = ADC2Resources {
     init_operations: DRV_ADC2_INIT_OPERATIONS,
     state_machines: DRV_ADC2_STATE_MACHINES,
     lowering_pattern: None,
+    time_driver_source: None,
     capability_tags: DRV_ADC2_CAPABILITY_TAGS,
 };
 
@@ -258,7 +289,4 @@ impl ADC2 {
         modify_u32(0x40012808u64, 0x00000004u32, 0x00000004u32)?;
         Ok(())
     }
-
-
 }
-

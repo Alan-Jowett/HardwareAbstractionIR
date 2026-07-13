@@ -79,8 +79,10 @@ First-cut behavior:
   `embassy-time-driver` instance plus an explicit time-driver source contract,
   preserving the existing SysTick-backed path and allowing reusable
   hardware-timer-backed lowering when the document models that timer path
-  explicitly, while preserving a runtime-agnostic interrupt hook and explicit
-  tick-rate contract for hardware-timer wake delivery
+  explicitly, including explicit hardware-timer binding refs for counter,
+  alarm, interrupt-enable, interrupt-pending, and clear/ack roles, while
+  preserving a runtime-agnostic interrupt hook and explicit tick-rate
+  contract for hardware-timer wake delivery
 - preserve the generator-relevant structured subset of referenced topology and semantic inputs in the emitted Rust metadata so downstream code does not lose control refs, remap data, or executable semantic structure that the approved HAIR document already provides
 - emit register-level code only for methods that can be justified by explicit HAIR lowering inputs, and fail explicitly when the requested or implied behavior is underspecified
 - fail explicitly when the input document falls outside the documented supported subset or omits generator-required topology, semantics, or bindings documented in `docs/embassy-hal-profile.md`

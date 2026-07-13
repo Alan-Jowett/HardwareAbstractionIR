@@ -223,13 +223,28 @@ Embassy profile contract.
   explicitly. A hardware-timer-backed time base is allowed only when the
   approved timer, interrupt, semantic, and structural inputs justify both the
   async wake behavior and any claimed blocking delay helpers deterministically.
+  For lowering families whose generated code depends on directly named
+  counter/alarm/interrupt roles, such as `counter-compare-timer`, the same
+  hardware-timer profile entry shall also carry explicit
+  `timeDriverBindings` naming the exact counter-read, alarm-programming,
+  interrupt-enable, interrupt-pending, and interrupt-clear handles used by the
+  generated lowering; the generator shall not infer those roles from vendor
+  register names alone. When the timer family requires a distinct
+  event/reload/latch step after alarm reprogramming, that binding map shall
+  also carry the corresponding explicit semantic operation reference(s).
+  If multiple hardware-timer lowering families have materially different timer
+  semantics, the same profile entry shall also carry an explicit lowering-family
+  selector rather than leaving that choice to generator heuristics.
   For a hardware-timer-backed path, the generated core contract shall remain
   runtime-agnostic: it must expose the generated wake handler plus the unique
   approved interrupt-route metadata needed by a downstream runtime layer to bind
   and enable that interrupt without repository guesswork. The same profile entry
   shall also carry the explicit Embassy tick rate used by that hardware timer so
   generated async timing behavior and generated Cargo metadata agree on the
-  duration unit.
+  duration unit. When the source timer exposes multiple interrupt sources or
+  shares one device vector across update/trigger/compare causes, the profile and
+  interrupt topology shall still identify one explicit route/source/clear path
+  for the generated time base rather than assuming an implicit default.
 - Unsupported driver kinds, unresolved references, missing lowering inputs,
   and out-of-subset requests fail explicitly.
 
