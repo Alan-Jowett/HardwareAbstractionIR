@@ -1,0 +1,20 @@
+[package]
+name = "embassy-neopixel-smoke"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ch32v203g6u6_embassy_hal = { package = "ch32v203g6u6-embassy-hal", path = "../embassy" }
+embassy-executor = { version = "0.7.0", features = ["arch-spin", "executor-thread"] }
+embassy-time = { version = "0.5.1", features = ["tick-hz-1_000"] }
+riscv = { version = "0.12", features = ["critical-section-single-hart"] }
+riscv-rt = "0.13"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+opt-level = "z"
+lto = true
+codegen-units = 1
