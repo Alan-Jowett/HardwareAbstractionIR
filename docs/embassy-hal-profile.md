@@ -209,6 +209,14 @@ Normative consequences:
    explicit interrupt inventory plus startup, clear/ack, and counter
    facts needed to initialize and drive the generated tick source
    without guesswork
+13. when a checked-in or derived Embassy runtime harness for the same
+   profile must choose between materially different thread-executor idle
+   strategies, `profiles.embassyHal.crate.executorIdleStrategy` must
+   declare that choice explicitly rather than relying on target-name
+   heuristics. `wfi` selects the default wait-for-interrupt idle path;
+   `spin` selects a non-sleeping idle loop for targets whose approved
+   runtime/interrupt behavior cannot safely rely on WFI under the active
+   critical-section strategy
 
 In host-emulated mode, that same timing contract must remain deterministic under
 explicit test-controlled progression rather than background wall-clock advance.

@@ -72955,6 +72955,7 @@
         "packageName": "ch32v203g6u6-embassy-hal",
         "crateName": "ch32v203g6u6_embassy_hal",
         "targetArchitecture": "rv32imacxw",
+        "executorIdleStrategy": "spin",
         "featureFlags": [
           "adc",
           "dma",

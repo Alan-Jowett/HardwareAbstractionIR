@@ -124,6 +124,14 @@
       ],
       "additionalProperties": false
     },
+    "executorIdleStrategy": {
+      "type": "string",
+      "description": "Optional generator-facing selector for thread-executor idle behavior in checked-in or derived Embassy runtime harnesses that pair with this profile. `wfi` selects the default wait-for-interrupt idle path, while `spin` selects a non-sleeping idle loop for targets whose approved runtime/interrupt behavior cannot safely use WFI under the active critical-section strategy.",
+      "enum": [
+        "wfi",
+        "spin"
+      ]
+    },
     "resourceRequirement": {
       "type": "string",
       "enum": [
@@ -145,6 +153,9 @@
         },
         "targetArchitecture": {
           "type": "string"
+        },
+        "executorIdleStrategy": {
+          "$ref": "#/$defs/executorIdleStrategy"
         },
         "featureFlags": {
           "type": "array",
