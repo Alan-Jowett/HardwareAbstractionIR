@@ -2287,7 +2287,9 @@ fn validate_embassy_crate_metadata(crate_info: &EmbassyCrateMetadata) -> Result<
 fn validate_executor_idle_strategy(strategy: &str) -> Result<()> {
     match strategy {
         EMBASSY_EXECUTOR_IDLE_STRATEGY_WFI | EMBASSY_EXECUTOR_IDLE_STRATEGY_SPIN => Ok(()),
-        other => bail!("executorIdleStrategy {} is not supported", other),
+        other => bail!(
+            "executorIdleStrategy {other:?} is not supported; expected one of: {EMBASSY_EXECUTOR_IDLE_STRATEGY_WFI}, {EMBASSY_EXECUTOR_IDLE_STRATEGY_SPIN}"
+        ),
     }
 }
 
@@ -15861,6 +15863,15 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         let error =
             generate_embassy_crate(&validated, temp.path()).expect_err("generation should fail");
         assert!(error.to_string().contains("packageName"));
+    }
+
+    #[test]
+    fn validate_executor_idle_strategy_reports_supported_values() {
+        let error = validate_executor_idle_strategy(" spin ")
+            .expect_err("invalid executor idle strategy should fail");
+        let message = error.to_string();
+        assert!(message.contains("executorIdleStrategy \" spin \""));
+        assert!(message.contains("expected one of: wfi, spin"));
     }
 
     #[test]
