@@ -73157,7 +73157,8 @@
           "rcc",
           "spi",
           "timer",
-          "uart"
+          "uart",
+          "usb"
         ]
       },
       "driverInstances": [
@@ -73759,6 +73760,59 @@
             "dmaroute.i2c1.tx",
             "dmaroute.i2c1.rx"
           ]
+        },
+        {
+          "id": "drv.usbd",
+          "name": "USBD",
+          "targetRef": "block.usbd",
+          "driverKind": "usb-device",
+          "modulePath": "usb",
+          "loweringPattern": "fsdev-pma-btable",
+          "clockBindingRefs": [
+            "clk.usbd"
+          ],
+          "resetBindingRefs": [
+            "rst.usbd"
+          ],
+          "interruptRouteRefs": [
+            "iroute.usbd.hp",
+            "iroute.usbd.lp",
+            "iroute.usbd.wkup"
+          ],
+          "pinRoles": [
+            {
+              "role": "dm",
+              "signal": "DM",
+              "routeRefs": [
+                "pinroute.usbd.dm.pa11"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "dp",
+              "signal": "DP",
+              "routeRefs": [
+                "pinroute.usbd.dp.pa12"
+              ],
+              "requirement": "required"
+            }
+          ],
+          "provenance": {
+            "sourceRefs": [
+              "ch32-rs-ch32v203g6u6-yaml",
+              "wch-ch32v203-datasheet"
+            ],
+            "evidenceRefs": [
+              "e_ch32rs_ch32v203g6u6_yaml_variant",
+              "e_ch32rs_ch32v203g6u6_yaml_clock_reset_topology",
+              "e_ch32rs_ch32v203g6u6_yaml_interrupt_topology",
+              "e_ch32rs_ch32v203g6u6_yaml_pin_topology",
+              "e_pin_table_qfn28"
+            ],
+            "status": "verified",
+            "confidence": 0.84,
+            "notes": "Controller-level Embassy USB device driver. Higher-level USB classes such as CDC ACM are expected to come from layered Embassy USB libraries rather than from the HAIR driver contract itself."
+          }
         },
         {
           "id": "drv.tim1",

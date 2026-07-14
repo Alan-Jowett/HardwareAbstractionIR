@@ -1787,6 +1787,7 @@ const EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER: &str = "hardware-timer";
 const EMBASSY_EXECUTOR_IDLE_STRATEGY_WFI: &str = "wfi";
 const EMBASSY_EXECUTOR_IDLE_STRATEGY_SPIN: &str = "spin";
 const TIMER_LOWERING_COUNTER_COMPARE: &str = "counter-compare-timer";
+const USB_LOWERING_FSDEV_PMA_BTABLE: &str = "fsdev-pma-btable";
 const USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK: &str = "serial-jtag-preserve-link";
 const USB_PRESERVE_LINK_OPERATION_ID: &str = "op.usb_device.preserve_serial_jtag_link";
 
@@ -1810,12 +1811,20 @@ fn has_usb_preserve_link_lowering(pattern: Option<&str>) -> bool {
     matches!(pattern, Some(USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK))
 }
 
+fn has_usb_fsdev_pma_btable_lowering(pattern: Option<&str>) -> bool {
+    matches!(pattern, Some(USB_LOWERING_FSDEV_PMA_BTABLE))
+}
+
 fn has_counter_compare_timer_lowering(pattern: Option<&str>) -> bool {
     matches!(pattern, Some(TIMER_LOWERING_COUNTER_COMPARE))
 }
 
 fn driver_uses_usb_preserve_link_lowering(driver: &ResolvedDriverInstance) -> bool {
     has_usb_preserve_link_lowering(driver.lowering_pattern.as_deref())
+}
+
+fn driver_uses_usb_fsdev_pma_btable_lowering(driver: &ResolvedDriverInstance) -> bool {
+    has_usb_fsdev_pma_btable_lowering(driver.lowering_pattern.as_deref())
 }
 
 fn driver_uses_counter_compare_timer_lowering(driver: &ResolvedDriverInstance) -> bool {
@@ -3350,12 +3359,24 @@ fn validate_driver_lowering_pattern(
             }
             validate_usb_preserve_link_lowering(driver, init_operations)?
         }
+        USB_LOWERING_FSDEV_PMA_BTABLE => validate_usb_fsdev_pma_btable_lowering(driver)?,
         TIMER_LOWERING_COUNTER_COMPARE => validate_counter_compare_timer_lowering(driver)?,
         other => bail!(
             "driver {} uses unsupported loweringPattern {}",
             driver.id,
             other
         ),
+    }
+    Ok(())
+}
+
+fn validate_usb_fsdev_pma_btable_lowering(driver: &EmbassyDriverInstance) -> Result<()> {
+    if driver.driver_kind != "usb-device" {
+        bail!(
+            "driver {} uses loweringPattern {} but that lowering is only supported on usb-device drivers",
+            driver.id,
+            USB_LOWERING_FSDEV_PMA_BTABLE
+        );
     }
     Ok(())
 }
@@ -3524,17 +3545,27 @@ fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
         render_rust_string(&model.crate_info.package_name),
         render_rust_string(&model.crate_info.crate_name)
     );
-    if model
+    let has_time_driver = model
         .drivers
         .iter()
-        .any(|driver| has_time_driver_tag(&driver.capability_tags))
-    {
-        out.push_str("\n[dependencies]\ncritical-section = \"1.2\"\n");
+        .any(|driver| has_time_driver_tag(&driver.capability_tags));
+    let has_fsdev_usb = model
+        .drivers
+        .iter()
+        .any(driver_uses_usb_fsdev_pma_btable_lowering);
+    if has_time_driver || has_fsdev_usb {
+        out.push_str("\n[dependencies]\n");
+        out.push_str("critical-section = \"1.2\"\n");
+    }
+    if has_time_driver {
         out.push_str(&format!(
             "{}\n",
             render_embassy_time_driver_dependency(&model.drivers)
         ));
         out.push_str("embassy-time-queue-utils = { version = \"0.3.2\", features = [\"generic-queue-8\"] }\n");
+    }
+    if has_fsdev_usb {
+        out.push_str("embassy-usb-driver = \"0.2.2\"\n");
     }
     out
 }
@@ -3742,10 +3773,956 @@ fn render_driver_support_items(
     if driver.driver_kind == "gpio-port" {
         out.push_str(&render_gpio_support_items(model, driver)?);
     }
+    if driver_uses_usb_fsdev_pma_btable_lowering(driver) {
+        out.push_str(&render_usb_fsdev_support_items(driver));
+    }
     if has_time_driver_tag(&driver.capability_tags) {
         out.push_str(&render_time_driver_support_items(model, driver)?);
     }
     Ok(out)
+}
+
+fn render_usb_fsdev_support_items(driver: &ResolvedDriverInstance) -> String {
+    format!(
+        r#"
+use core::{{cell::RefCell, future::poll_fn, task::Poll}};
+use embassy_usb_driver::{{Bus, ControlPipe, Direction, Driver, Endpoint, EndpointAddress, EndpointAllocError, EndpointError, EndpointInfo, EndpointIn, EndpointOut, EndpointType, Event, Unsupported}};
+
+const USB_BASE: usize = 0x4000_5C00;
+const USBRAM_BASE: usize = 0x4000_6000;
+const RCC_APB1PCENR: u64 = 0x4002_101C;
+const RCC_APB1PRSTR: u64 = 0x4002_100C;
+const EXTEN_CTR: u64 = 0x4002_3800;
+const RCC_APB1_USB_EN: u32 = 1 << 23;
+const RCC_APB1_USB_RST: u32 = 1 << 23;
+const EXTEN_USBD_PU_EN: u32 = 1 << 1;
+const USB_DYNAMIC_PMA_START: u16 = 0x00C0;
+const USB_DETACH_DELAY_MS: u16 = 250;
+
+const USB_CNTR_OFFSET: usize = 0x40;
+const USB_ISTR_OFFSET: usize = 0x44;
+const USB_DADDR_OFFSET: usize = 0x4C;
+const USB_BTABLE_OFFSET: usize = 0x50;
+
+const USB_CNTR_FRES: u16 = 1 << 0;
+const USB_CNTR_PDWN: u16 = 1 << 1;
+const USB_CNTR_LPMODE: u16 = 1 << 2;
+const USB_CNTR_FSUSP: u16 = 1 << 3;
+const USB_CNTR_ESOFM: u16 = 1 << 8;
+const USB_CNTR_RESETM: u16 = 1 << 10;
+const USB_CNTR_SUSPM: u16 = 1 << 11;
+const USB_CNTR_WKUPM: u16 = 1 << 12;
+const USB_CNTR_PMAOVRM: u16 = 1 << 14;
+const USB_CNTR_CTRM: u16 = 1 << 15;
+const USB_CNTR_INIT_MASK: u16 = USB_CNTR_RESETM
+    | USB_CNTR_ESOFM
+    | USB_CNTR_CTRM
+    | USB_CNTR_SUSPM
+    | USB_CNTR_WKUPM
+    | USB_CNTR_PMAOVRM;
+
+const USB_ISTR_PMAOVR: u16 = 1 << 14;
+const USB_ISTR_ERR: u16 = 1 << 13;
+const USB_ISTR_WKUP: u16 = 1 << 12;
+const USB_ISTR_SUSP: u16 = 1 << 11;
+const USB_ISTR_RESET: u16 = 1 << 10;
+const USB_ISTR_SOF: u16 = 1 << 9;
+const USB_ISTR_ESOF: u16 = 1 << 8;
+
+const USB_DADDR_EF: u16 = 1 << 7;
+
+const EP_CTR_RX: u16 = 1 << 15;
+const EP_DTOG_RX: u16 = 1 << 14;
+const EP_STAT_RX_MASK: u16 = 0b11 << 12;
+const EP_SETUP: u16 = 1 << 11;
+const EP_TYPE_MASK: u16 = 0b11 << 9;
+const EP_KIND: u16 = 1 << 8;
+const EP_CTR_TX: u16 = 1 << 7;
+const EP_DTOG_TX: u16 = 1 << 6;
+const EP_STAT_TX_MASK: u16 = 0b11 << 4;
+const EP_ADDR_MASK: u16 = 0x000F;
+
+const EP_TYPE_BULK: u16 = 0b00 << 9;
+const EP_TYPE_CONTROL: u16 = 0b01 << 9;
+const EP_TYPE_INTERRUPT: u16 = 0b11 << 9;
+
+const EP_STAT_STALL: u8 = 1;
+const EP_STAT_NAK: u8 = 2;
+const EP_STAT_VALID: u8 = 3;
+
+const BTABLE_FIELD_ADDR_TX: u16 = 0;
+const BTABLE_FIELD_COUNT_TX: u16 = 2;
+const BTABLE_FIELD_ADDR_RX: u16 = 4;
+const BTABLE_FIELD_COUNT_RX: u16 = 6;
+
+const EP0_PACKET_SIZE: u16 = 64;
+const EP0_SETUP_SIZE: u16 = 8;
+const PMA_EP0_RX_ADDR: u16 = 0x0040;
+const PMA_EP0_TX_ADDR: u16 = 0x0080;
+
+#[derive(Debug, Clone, Copy)]
+struct FsdevDirConfig {{
+    allocated: bool,
+    enabled: bool,
+    stalled: bool,
+    busy: bool,
+    pma_addr: u16,
+    max_packet_size: u16,
+    interval_ms: u8,
+}}
+
+impl FsdevDirConfig {{
+    const fn new() -> Self {{
+        Self {{
+            allocated: false,
+            enabled: false,
+            stalled: false,
+            busy: false,
+            pma_addr: 0,
+            max_packet_size: 0,
+            interval_ms: 0,
+        }}
+    }}
+}}
+
+#[derive(Debug, Clone, Copy)]
+struct FsdevEndpointPair {{
+    ep_type: u16,
+    in_dir: FsdevDirConfig,
+    out_dir: FsdevDirConfig,
+}}
+
+impl FsdevEndpointPair {{
+    const fn new() -> Self {{
+        Self {{
+            ep_type: 0,
+            in_dir: FsdevDirConfig::new(),
+            out_dir: FsdevDirConfig::new(),
+        }}
+    }}
+}}
+
+#[derive(Debug, Clone, Copy)]
+struct FsdevRuntimeState {{
+    pairs: [FsdevEndpointPair; 8],
+    control_max_packet_size: u16,
+}}
+
+impl FsdevRuntimeState {{
+    const fn new() -> Self {{
+        Self {{
+            pairs: [FsdevEndpointPair::new(); 8],
+            control_max_packet_size: EP0_PACKET_SIZE,
+        }}
+    }}
+}}
+
+static FSDEV_RUNTIME: critical_section::Mutex<RefCell<FsdevRuntimeState>> =
+    critical_section::Mutex::new(RefCell::new(FsdevRuntimeState::new()));
+
+fn with_fsdev_runtime<R>(f: impl FnOnce(&mut FsdevRuntimeState) -> R) -> R {{
+    critical_section::with(|cs| {{
+        let mut runtime = FSDEV_RUNTIME.borrow(cs).borrow_mut();
+        f(&mut runtime)
+    }})
+}}
+
+fn dir_config_mut(pair: &mut FsdevEndpointPair, direction: Direction) -> &mut FsdevDirConfig {{
+    match direction {{
+        Direction::In => &mut pair.in_dir,
+        Direction::Out => &mut pair.out_dir,
+    }}
+}}
+
+fn dir_config(pair: &FsdevEndpointPair, direction: Direction) -> &FsdevDirConfig {{
+    match direction {{
+        Direction::In => &pair.in_dir,
+        Direction::Out => &pair.out_dir,
+    }}
+}}
+
+#[derive(Debug, Clone, Copy)]
+pub struct {type_name}UsbDriver {{
+    pairs: [FsdevEndpointPair; 8],
+    next_pma_addr: u16,
+}}
+
+impl {type_name}UsbDriver {{
+    fn new(resources: {type_name}Resources) -> Self {{
+        let _ = resources;
+        Self {{
+            pairs: [FsdevEndpointPair::new(); 8],
+            next_pma_addr: USB_DYNAMIC_PMA_START,
+        }}
+    }}
+
+    fn allocate_endpoint(
+        &mut self,
+        direction: Direction,
+        ep_type: EndpointType,
+        ep_addr: Option<EndpointAddress>,
+        max_packet_size: u16,
+        interval_ms: u8,
+    ) -> Result<EndpointInfo, EndpointAllocError> {{
+        let type_bits = endpoint_type_bits(ep_type)?;
+        let index = if let Some(addr) = ep_addr {{
+            if addr.direction() != direction || addr.index() == 0 || addr.index() >= self.pairs.len() {{
+                return Err(EndpointAllocError);
+            }}
+            let pair = &self.pairs[addr.index()];
+            if pair.ep_type != 0 && pair.ep_type != type_bits {{
+                return Err(EndpointAllocError);
+            }}
+            if dir_config(pair, direction).allocated {{
+                return Err(EndpointAllocError);
+            }}
+            addr.index()
+        }} else if let Some(index) = (1..self.pairs.len()).find(|&index| {{
+            let pair = &self.pairs[index];
+            pair.ep_type == type_bits
+                && !dir_config(pair, direction).allocated
+                && dir_config(pair, opposite_direction(direction)).allocated
+        }}) {{
+            index
+        }} else if let Some(index) =
+            (1..self.pairs.len()).find(|&index| self.pairs[index].ep_type == 0)
+        {{
+            index
+        }} else {{
+            return Err(EndpointAllocError);
+        }};
+
+        let pair = &mut self.pairs[index];
+        if pair.ep_type == 0 {{
+            pair.ep_type = type_bits;
+        }}
+        let dir = dir_config_mut(pair, direction);
+        dir.allocated = true;
+        dir.enabled = false;
+        dir.stalled = false;
+        dir.busy = false;
+        dir.pma_addr = self.next_pma_addr;
+        dir.max_packet_size = max_packet_size;
+        dir.interval_ms = interval_ms;
+        self.next_pma_addr = self
+            .next_pma_addr
+            .saturating_add(pma_allocation_size(max_packet_size));
+
+        Ok(EndpointInfo {{
+            addr: EndpointAddress::from_parts(index, direction),
+            ep_type,
+            max_packet_size,
+            interval_ms,
+        }})
+    }}
+}}
+
+impl<'d> Driver<'d> for {type_name}UsbDriver {{
+    type EndpointOut = {type_name}EndpointOut;
+    type EndpointIn = {type_name}EndpointIn;
+    type ControlPipe = {type_name}ControlPipe;
+    type Bus = {type_name}UsbBus;
+
+    fn alloc_endpoint_out(
+        &mut self,
+        ep_type: EndpointType,
+        ep_addr: Option<EndpointAddress>,
+        max_packet_size: u16,
+        interval_ms: u8,
+    ) -> Result<Self::EndpointOut, EndpointAllocError> {{
+        let info = self.allocate_endpoint(Direction::Out, ep_type, ep_addr, max_packet_size, interval_ms)?;
+        Ok({type_name}EndpointOut {{ info }})
+    }}
+
+    fn alloc_endpoint_in(
+        &mut self,
+        ep_type: EndpointType,
+        ep_addr: Option<EndpointAddress>,
+        max_packet_size: u16,
+        interval_ms: u8,
+    ) -> Result<Self::EndpointIn, EndpointAllocError> {{
+        let info = self.allocate_endpoint(Direction::In, ep_type, ep_addr, max_packet_size, interval_ms)?;
+        Ok({type_name}EndpointIn {{ info }})
+    }}
+
+    fn start(self, control_max_packet_size: u16) -> (Self::Bus, Self::ControlPipe) {{
+        with_fsdev_runtime(|runtime| {{
+            runtime.pairs = self.pairs;
+            runtime.control_max_packet_size = control_max_packet_size;
+        }});
+        (
+            {type_name}UsbBus {{ power_reported: false }},
+            {type_name}ControlPipe {{
+                max_packet_size: control_max_packet_size as usize,
+            }},
+        )
+    }}
+}}
+
+#[derive(Debug, Clone, Copy)]
+pub struct {type_name}UsbBus {{
+    power_reported: bool,
+}}
+
+impl Bus for {type_name}UsbBus {{
+    async fn enable(&mut self) {{
+        let _ = modify_u32(RCC_APB1PCENR, 0, RCC_APB1_USB_EN);
+        usb_disconnect();
+        delay_ms(USB_DETACH_DELAY_MS);
+        let _ = modify_u32(RCC_APB1PRSTR, 0, RCC_APB1_USB_RST);
+        spin_delay(1_000);
+        let _ = modify_u32(RCC_APB1PRSTR, RCC_APB1_USB_RST, 0);
+        fsdev_core_reset();
+        usb_write16(USB_CNTR_OFFSET, 0);
+        usb_write16(USB_BTABLE_OFFSET, 0);
+        usb_write16(USB_CNTR_OFFSET, USB_CNTR_INIT_MASK);
+        handle_bus_reset_runtime();
+        usb_connect();
+    }}
+
+    async fn disable(&mut self) {{
+        usb_disconnect();
+        usb_write16(USB_CNTR_OFFSET, USB_CNTR_FRES | USB_CNTR_PDWN);
+        let _ = modify_u32(RCC_APB1PCENR, RCC_APB1_USB_EN, 0);
+    }}
+
+    async fn poll(&mut self) -> Event {{
+        if !self.power_reported {{
+            self.power_reported = true;
+            return Event::PowerDetected;
+        }}
+
+        poll_fn(|cx| {{
+            cx.waker().wake_by_ref();
+            let status = usb_read16(USB_ISTR_OFFSET);
+            if (status & USB_ISTR_RESET) != 0 {{
+                clear_istr_exact(USB_ISTR_RESET);
+                handle_bus_reset_runtime();
+                return Poll::Ready(Event::Reset);
+            }}
+            if (status & USB_ISTR_WKUP) != 0 {{
+                usb_write16(
+                    USB_CNTR_OFFSET,
+                    usb_read16(USB_CNTR_OFFSET) & !(USB_CNTR_LPMODE | USB_CNTR_FSUSP),
+                );
+                clear_istr_exact(USB_ISTR_WKUP);
+                return Poll::Ready(Event::Resume);
+            }}
+            if (status & USB_ISTR_SUSP) != 0 {{
+                let mut cntr = usb_read16(USB_CNTR_OFFSET);
+                cntr |= USB_CNTR_FSUSP | USB_CNTR_LPMODE;
+                usb_write16(USB_CNTR_OFFSET, cntr);
+                clear_istr_exact(USB_ISTR_SUSP);
+                return Poll::Ready(Event::Suspend);
+            }}
+            if (status & USB_ISTR_ESOF) != 0 {{
+                clear_istr_exact(USB_ISTR_ESOF);
+            }}
+            if (status & USB_ISTR_SOF) != 0 {{
+                clear_istr_exact(USB_ISTR_SOF);
+            }}
+            if (status & USB_ISTR_ERR) != 0 {{
+                clear_istr_exact(USB_ISTR_ERR);
+            }}
+            if (status & USB_ISTR_PMAOVR) != 0 {{
+                clear_istr_exact(USB_ISTR_PMAOVR);
+            }}
+            Poll::Pending
+        }})
+        .await
+    }}
+
+    fn endpoint_set_enabled(&mut self, ep_addr: EndpointAddress, enabled: bool) {{
+        let index = ep_addr.index() as u8;
+        let direction = ep_addr.direction();
+        with_fsdev_runtime(|runtime| {{
+            let pair = &mut runtime.pairs[index as usize];
+            dir_config_mut(pair, direction).enabled = enabled;
+            dir_config_mut(pair, direction).busy = false;
+            dir_config_mut(pair, direction).stalled = false;
+            if enabled {{
+                if direction == Direction::In {{
+                    open_in_endpoint(index, pair.ep_type, dir_config(pair, Direction::In).pma_addr, dir_config(pair, Direction::In).max_packet_size);
+                }} else {{
+                    open_out_endpoint(index, pair.ep_type, dir_config(pair, Direction::Out).pma_addr, dir_config(pair, Direction::Out).max_packet_size);
+                }}
+            }} else if dir_config(pair, opposite_direction(direction)).enabled {{
+                if direction == Direction::In {{
+                    open_out_endpoint(index, pair.ep_type, dir_config(pair, Direction::Out).pma_addr, dir_config(pair, Direction::Out).max_packet_size);
+                }} else {{
+                    open_in_endpoint(index, pair.ep_type, dir_config(pair, Direction::In).pma_addr, dir_config(pair, Direction::In).max_packet_size);
+                }}
+            }} else {{
+                epr_write(index, 0);
+            }}
+        }});
+    }}
+
+    fn endpoint_set_stalled(&mut self, ep_addr: EndpointAddress, stalled: bool) {{
+        with_fsdev_runtime(|runtime| {{
+            let pair = &mut runtime.pairs[ep_addr.index()];
+            dir_config_mut(pair, ep_addr.direction()).stalled = stalled;
+        }});
+        if stalled {{
+            dcd_edpt_stall(u8::from(ep_addr));
+        }} else {{
+            dcd_edpt_clear_stall(u8::from(ep_addr));
+        }}
+    }}
+
+    fn endpoint_is_stalled(&mut self, ep_addr: EndpointAddress) -> bool {{
+        with_fsdev_runtime(|runtime| dir_config(&runtime.pairs[ep_addr.index()], ep_addr.direction()).stalled)
+    }}
+
+    async fn remote_wakeup(&mut self) -> Result<(), Unsupported> {{
+        Err(Unsupported)
+    }}
+}}
+
+#[derive(Debug, Clone, Copy)]
+pub struct {type_name}EndpointOut {{
+    info: EndpointInfo,
+}}
+
+#[derive(Debug, Clone, Copy)]
+pub struct {type_name}EndpointIn {{
+    info: EndpointInfo,
+}}
+
+impl Endpoint for {type_name}EndpointOut {{
+    fn info(&self) -> &EndpointInfo {{
+        &self.info
+    }}
+
+    async fn wait_enabled(&mut self) {{
+        wait_endpoint_enabled(self.info.addr).await
+    }}
+}}
+
+impl Endpoint for {type_name}EndpointIn {{
+    fn info(&self) -> &EndpointInfo {{
+        &self.info
+    }}
+
+    async fn wait_enabled(&mut self) {{
+        wait_endpoint_enabled(self.info.addr).await
+    }}
+}}
+
+impl EndpointOut for {type_name}EndpointOut {{
+    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, EndpointError> {{
+        let index = self.info.addr.index() as u8;
+        arm_out_transfer(index, self.info.max_packet_size);
+        poll_fn(|cx| {{
+            cx.waker().wake_by_ref();
+            if !endpoint_enabled(self.info.addr) {{
+                return Poll::Ready(Err(EndpointError::Disabled));
+            }}
+            let ep_reg = epr_read(index);
+            if (ep_reg & EP_CTR_RX) == 0 {{
+                return Poll::Pending;
+            }}
+            ep_write_clear_ctr(index, false);
+            let count = ep_rx_count(index);
+            if count > buf.len() {{
+                arm_out_transfer(index, self.info.max_packet_size);
+                return Poll::Ready(Err(EndpointError::BufferOverflow));
+            }}
+            pma_read_bytes(ep_rx_addr(index), &mut buf[..count]);
+            arm_out_transfer(index, self.info.max_packet_size);
+            Poll::Ready(Ok(count))
+        }})
+        .await
+    }}
+}}
+
+impl EndpointIn for {type_name}EndpointIn {{
+    async fn write(&mut self, buf: &[u8]) -> Result<(), EndpointError> {{
+        if buf.len() > self.info.max_packet_size as usize {{
+            return Err(EndpointError::BufferOverflow);
+        }}
+        let index = self.info.addr.index() as u8;
+        let pma_addr = with_fsdev_runtime(|runtime| runtime.pairs[index as usize].in_dir.pma_addr);
+        poll_fn(|cx| {{
+            cx.waker().wake_by_ref();
+            if !endpoint_enabled(self.info.addr) {{
+                return Poll::Ready(Err(EndpointError::Disabled));
+            }}
+            if endpoint_busy(self.info.addr) {{
+                if (epr_read(index) & EP_CTR_TX) != 0 {{
+                    ep_write_clear_ctr(index, true);
+                    set_endpoint_busy(self.info.addr, false);
+                    return Poll::Ready(Ok(()));
+                }}
+                return Poll::Pending;
+            }}
+            if !buf.is_empty() {{
+                unsafe {{ pma_write_bytes(pma_addr, buf) }};
+            }}
+            ep_tx_count(index, buf.len() as u16);
+            let mut ep_reg = epr_read(index) | EP_CTR_TX | EP_CTR_RX;
+            ep_change_status(&mut ep_reg, true, EP_STAT_VALID);
+            ep_reg &= u_epreg_mask() | EP_STAT_TX_MASK;
+            epr_write(index, ep_reg);
+            set_endpoint_busy(self.info.addr, true);
+            Poll::Pending
+        }})
+        .await
+    }}
+}}
+
+#[derive(Debug, Clone, Copy)]
+pub struct {type_name}ControlPipe {{
+    max_packet_size: usize,
+}}
+
+impl ControlPipe for {type_name}ControlPipe {{
+    fn max_packet_size(&self) -> usize {{
+        self.max_packet_size
+    }}
+
+    async fn setup(&mut self) -> [u8; 8] {{
+        poll_fn(|cx| {{
+            cx.waker().wake_by_ref();
+            let ep_reg = epr_read(0);
+            if (ep_reg & EP_CTR_RX) == 0 || (ep_reg & EP_SETUP) == 0 {{
+                return Poll::Pending;
+            }}
+            let mut setup = [0u8; 8];
+            pma_read_bytes(ep_rx_addr(0), &mut setup);
+            ep_write_clear_ctr(0, false);
+            let direction_in = (setup[0] & 0x80) != 0;
+            let has_data = u16::from_le_bytes([setup[6], setup[7]]) != 0;
+            if !direction_in && has_data {{
+                ep0_set_type(EP_TYPE_BULK);
+            }} else {{
+                ep0_set_type(EP_TYPE_CONTROL);
+            }}
+            Poll::Ready(setup)
+        }})
+        .await
+    }}
+
+    async fn data_out(&mut self, buf: &mut [u8], _first: bool, _last: bool) -> Result<usize, EndpointError> {{
+        arm_ep0_out_data(buf.len() as u16);
+        poll_fn(|cx| {{
+            cx.waker().wake_by_ref();
+            let ep_reg = epr_read(0);
+            if (ep_reg & EP_CTR_RX) == 0 {{
+                return Poll::Pending;
+            }}
+            if (ep_reg & EP_SETUP) != 0 {{
+                return Poll::Ready(Err(EndpointError::Disabled));
+            }}
+            let count = ep_rx_count(0);
+            ep_write_clear_ctr(0, false);
+            if count > buf.len() {{
+                return Poll::Ready(Err(EndpointError::BufferOverflow));
+            }}
+            pma_read_bytes(ep_rx_addr(0), &mut buf[..count]);
+            Poll::Ready(Ok(count))
+        }})
+        .await
+    }}
+
+    async fn data_in(&mut self, data: &[u8], _first: bool, last: bool) -> Result<(), EndpointError> {{
+        if data.len() > self.max_packet_size {{
+            return Err(EndpointError::BufferOverflow);
+        }}
+        if !data.is_empty() {{
+            unsafe {{ pma_write_bytes(ep_tx_addr(0), data) }};
+        }}
+        ep_tx_count(0, data.len() as u16);
+        let mut ep_reg = epr_read(0) | EP_CTR_TX | EP_CTR_RX;
+        ep_change_status(&mut ep_reg, true, EP_STAT_VALID);
+        ep_reg &= u_epreg_mask() | EP_STAT_TX_MASK;
+        epr_write(0, ep_reg);
+        poll_fn(|cx| {{
+            cx.waker().wake_by_ref();
+            let ep_reg = epr_read(0);
+            if (ep_reg & EP_CTR_TX) == 0 {{
+                return Poll::Pending;
+            }}
+            ep_write_clear_ctr(0, true);
+            if !last {{
+                return Poll::Ready(Ok(()));
+            }}
+            ep0_set_type(EP_TYPE_BULK);
+            arm_ep0_status_out();
+            Poll::Ready(Ok(()))
+        }})
+        .await?;
+
+        if !last {{
+            return Ok(());
+        }}
+
+        poll_fn(|cx| {{
+            cx.waker().wake_by_ref();
+            let ep_reg = epr_read(0);
+            if (ep_reg & EP_CTR_RX) == 0 {{
+                return Poll::Pending;
+            }}
+            if (ep_reg & EP_SETUP) != 0 {{
+                return Poll::Ready(Err(EndpointError::Disabled));
+            }}
+            ep_write_clear_ctr(0, false);
+            ep0_set_type(EP_TYPE_CONTROL);
+            edpt0_prepare_setup();
+            Poll::Ready(Ok(()))
+        }})
+        .await
+    }}
+
+    async fn accept(&mut self) {{
+        ep0_set_type(EP_TYPE_CONTROL);
+        ep_tx_count(0, 0);
+        let mut ep_reg = epr_read(0) | EP_CTR_TX | EP_CTR_RX;
+        ep_change_status(&mut ep_reg, true, EP_STAT_VALID);
+        ep_reg &= u_epreg_mask() | EP_STAT_TX_MASK;
+        epr_write(0, ep_reg);
+        poll_fn(|cx| {{
+            cx.waker().wake_by_ref();
+            if (epr_read(0) & EP_CTR_TX) == 0 {{
+                return Poll::Pending;
+            }}
+            ep_write_clear_ctr(0, true);
+            edpt0_prepare_setup();
+            Poll::Ready(())
+        }})
+        .await
+    }}
+
+    async fn reject(&mut self) {{
+        dcd_edpt_stall(0x00);
+        dcd_edpt_stall(0x80);
+    }}
+
+    async fn accept_set_address(&mut self, addr: u8) {{
+        self.accept().await;
+        usb_write16(USB_DADDR_OFFSET, USB_DADDR_EF | u16::from(addr & 0x7F));
+    }}
+}}
+
+async fn wait_endpoint_enabled(ep_addr: EndpointAddress) {{
+    poll_fn(|cx| {{
+        cx.waker().wake_by_ref();
+        if endpoint_enabled(ep_addr) {{
+            Poll::Ready(())
+        }} else {{
+            Poll::Pending
+        }}
+    }})
+    .await
+}}
+
+fn endpoint_enabled(ep_addr: EndpointAddress) -> bool {{
+    with_fsdev_runtime(|runtime| dir_config(&runtime.pairs[ep_addr.index()], ep_addr.direction()).enabled)
+}}
+
+fn endpoint_busy(ep_addr: EndpointAddress) -> bool {{
+    with_fsdev_runtime(|runtime| dir_config(&runtime.pairs[ep_addr.index()], ep_addr.direction()).busy)
+}}
+
+fn set_endpoint_busy(ep_addr: EndpointAddress, busy: bool) {{
+    with_fsdev_runtime(|runtime| {{
+        dir_config_mut(&mut runtime.pairs[ep_addr.index()], ep_addr.direction()).busy = busy;
+    }});
+}}
+
+fn opposite_direction(direction: Direction) -> Direction {{
+    match direction {{
+        Direction::In => Direction::Out,
+        Direction::Out => Direction::In,
+    }}
+}}
+
+fn endpoint_type_bits(ep_type: EndpointType) -> Result<u16, EndpointAllocError> {{
+    match ep_type {{
+        EndpointType::Bulk => Ok(EP_TYPE_BULK),
+        EndpointType::Interrupt => Ok(EP_TYPE_INTERRUPT),
+        EndpointType::Control => Ok(EP_TYPE_CONTROL),
+        EndpointType::Isochronous => Err(EndpointAllocError),
+    }}
+}}
+
+fn pma_allocation_size(max_packet_size: u16) -> u16 {{
+    (max_packet_size + 1) & !1
+}}
+
+fn spin_delay(iterations: u32) {{
+    for _ in 0..iterations {{
+        core::hint::spin_loop();
+    }}
+}}
+
+fn delay_ms(ms: u16) {{
+    for _ in 0..ms {{
+        spin_delay(48_000);
+    }}
+}}
+
+fn usb_connect() {{
+    let _ = modify_u32(EXTEN_CTR, 0, EXTEN_USBD_PU_EN);
+}}
+
+fn usb_disconnect() {{
+    let _ = modify_u32(EXTEN_CTR, EXTEN_USBD_PU_EN, 0);
+}}
+
+fn fsdev_core_reset() {{
+    usb_write16(USB_CNTR_OFFSET, USB_CNTR_FRES | USB_CNTR_PDWN);
+    spin_delay(200);
+    usb_write16(USB_CNTR_OFFSET, USB_CNTR_FRES);
+    spin_delay(200);
+    usb_write16(USB_ISTR_OFFSET, 0);
+}}
+
+fn handle_bus_reset_runtime() {{
+    with_fsdev_runtime(|runtime| {{
+        for pair in &mut runtime.pairs {{
+            pair.in_dir.enabled = false;
+            pair.in_dir.busy = false;
+            pair.out_dir.enabled = false;
+            pair.out_dir.busy = false;
+            pair.in_dir.stalled = false;
+            pair.out_dir.stalled = false;
+        }}
+    }});
+    for index in 1..8 {{
+        epr_write(index, 0);
+    }}
+    usb_write16(USB_DADDR_OFFSET, 0);
+    edpt0_open();
+    usb_write16(USB_DADDR_OFFSET, USB_DADDR_EF);
+}}
+
+fn edpt0_open() {{
+    btable_write(0, BTABLE_FIELD_ADDR_RX, PMA_EP0_RX_ADDR);
+    btable_write(0, BTABLE_FIELD_ADDR_TX, PMA_EP0_TX_ADDR);
+    let mut ep_reg = epr_read(0) & !u_epreg_mask();
+    ep_reg |= EP_TYPE_CONTROL;
+    ep_change_status(&mut ep_reg, true, EP_STAT_NAK);
+    ep_change_status(&mut ep_reg, false, EP_STAT_NAK);
+    edpt0_prepare_setup();
+    epr_write(0, ep_reg);
+}}
+
+fn edpt0_prepare_setup() {{
+    btable_set_rx_bufsize(0, EP0_SETUP_SIZE);
+}}
+
+fn arm_ep0_out_data(size: u16) {{
+    btable_set_rx_bufsize(0, size.min(EP0_PACKET_SIZE));
+    let mut ep_reg = epr_read(0) | EP_CTR_TX | EP_CTR_RX;
+    ep_reg &= u_epreg_mask() | EP_STAT_RX_MASK;
+    ep_change_status(&mut ep_reg, false, EP_STAT_VALID);
+    epr_write(0, ep_reg);
+}}
+
+fn arm_ep0_status_out() {{
+    edpt0_prepare_setup();
+    let mut ep_reg = epr_read(0) | EP_CTR_TX | EP_CTR_RX;
+    ep_reg &= u_epreg_mask() | EP_STAT_RX_MASK;
+    ep_change_status(&mut ep_reg, false, EP_STAT_VALID);
+    epr_write(0, ep_reg);
+}}
+
+fn arm_out_transfer(index: u8, max_packet_size: u16) {{
+    btable_set_rx_bufsize(index, max_packet_size);
+    let mut ep_reg = epr_read(index) | EP_CTR_TX | EP_CTR_RX;
+    ep_reg &= u_epreg_mask() | EP_STAT_RX_MASK;
+    ep_change_status(&mut ep_reg, false, EP_STAT_VALID);
+    epr_write(index, ep_reg);
+}}
+
+fn open_in_endpoint(ep_num: u8, ep_type: u16, pma_addr: u16, packet_size: u16) {{
+    btable_write(ep_num, BTABLE_FIELD_ADDR_TX, pma_addr);
+    let mut ep_reg = epr_read(ep_num) & !u_epreg_mask();
+    ep_reg |= u16::from(ep_num) | ep_type;
+    ep_change_status(&mut ep_reg, true, EP_STAT_NAK);
+    ep_reg &= !(EP_STAT_RX_MASK | EP_DTOG_RX);
+    ep_tx_count(ep_num, 0);
+    let _ = packet_size;
+    epr_write(ep_num, ep_reg);
+}}
+
+fn open_out_endpoint(ep_num: u8, ep_type: u16, pma_addr: u16, packet_size: u16) {{
+    btable_write(ep_num, BTABLE_FIELD_ADDR_RX, pma_addr);
+    let mut ep_reg = epr_read(ep_num) & !u_epreg_mask();
+    ep_reg |= u16::from(ep_num) | ep_type;
+    ep_change_status(&mut ep_reg, false, EP_STAT_NAK);
+    ep_reg &= !(EP_STAT_TX_MASK | EP_DTOG_TX);
+    btable_set_rx_bufsize(ep_num, packet_size);
+    epr_write(ep_num, ep_reg);
+}}
+
+fn dcd_edpt_stall(ep_addr: u8) {{
+    let ep_num = ep_addr & 0x7F;
+    let dir_in = (ep_addr & 0x80) != 0;
+    let mut ep_reg = epr_read(ep_num) | EP_CTR_TX | EP_CTR_RX;
+    ep_reg &= u_epreg_mask() | if dir_in {{ EP_STAT_TX_MASK }} else {{ EP_STAT_RX_MASK }};
+    if dir_in {{
+        ep_change_status(&mut ep_reg, true, EP_STAT_STALL);
+    }} else {{
+        ep_change_status(&mut ep_reg, false, EP_STAT_STALL);
+    }}
+    if ep_num == 0 {{
+        ep_reg = (ep_reg & !EP_TYPE_MASK) | EP_TYPE_CONTROL;
+    }}
+    epr_write(ep_num, ep_reg);
+}}
+
+fn dcd_edpt_clear_stall(ep_addr: u8) {{
+    let ep_num = ep_addr & 0x7F;
+    let dir_in = (ep_addr & 0x80) != 0;
+    let mut ep_reg = epr_read(ep_num) | EP_CTR_TX | EP_CTR_RX;
+    ep_reg &= u_epreg_mask()
+        | if dir_in {{
+            EP_STAT_TX_MASK | EP_DTOG_TX
+        }} else {{
+            EP_STAT_RX_MASK | EP_DTOG_RX
+        }};
+    if dir_in {{
+        ep_change_status(&mut ep_reg, true, EP_STAT_NAK);
+    }} else {{
+        ep_change_status(&mut ep_reg, false, EP_STAT_VALID);
+    }}
+    if ep_num == 0 {{
+        ep_reg = (ep_reg & !EP_TYPE_MASK) | EP_TYPE_CONTROL;
+    }}
+    epr_write(ep_num, ep_reg);
+}}
+
+fn ep0_set_type(ep_type: u16) {{
+    let mut ep_reg = epr_read(0) | EP_CTR_TX | EP_CTR_RX;
+    ep_reg &= u_epreg_mask();
+    ep_reg = (ep_reg & !EP_TYPE_MASK) | ep_type;
+    epr_write(0, ep_reg);
+}}
+
+#[inline(always)]
+const fn u_epreg_mask() -> u16 {{
+    EP_CTR_RX | EP_SETUP | EP_TYPE_MASK | EP_KIND | EP_CTR_TX | EP_ADDR_MASK
+}}
+
+fn ep_change_status(reg: &mut u16, dir_in: bool, state: u8) {{
+    *reg ^= u16::from(state) << if dir_in {{ 4 }} else {{ 12 }};
+}}
+
+fn ep_write_clear_ctr(ep: u8, dir_in: bool) {{
+    let mut reg = epr_read(ep);
+    reg |= EP_CTR_TX | EP_CTR_RX;
+    reg &= u_epreg_mask();
+    reg &= !(if dir_in {{ EP_CTR_TX }} else {{ EP_CTR_RX }});
+    epr_write(ep, reg);
+}}
+
+fn clear_istr_exact(mask: u16) {{
+    usb_write16(USB_ISTR_OFFSET, !mask);
+}}
+
+fn btable_write(ep: u8, field_offset: u16, value: u16) {{
+    pma_write16(u16::from(ep) * 8 + field_offset, value);
+}}
+
+fn btable_read(ep: u8, field_offset: u16) -> u16 {{
+    pma_read16(u16::from(ep) * 8 + field_offset)
+}}
+
+fn btable_set_rx_bufsize(ep: u8, size: u16) {{
+    let (blsize, num_block) = if size > 62 {{
+        (1u16, size.div_ceil(32))
+    }} else {{
+        (0u16, size.div_ceil(2))
+    }};
+    let mut bl_nb = (blsize << 15) | ((num_block - blsize) << 10);
+    if bl_nb == 0 {{
+        bl_nb = 1 << 15;
+    }}
+    btable_write(ep, BTABLE_FIELD_COUNT_RX, bl_nb);
+}}
+
+fn ep_tx_count(ep: u8, value: u16) {{
+    btable_write(ep, BTABLE_FIELD_COUNT_TX, value);
+}}
+
+fn ep_tx_addr(ep: u8) -> u16 {{
+    btable_read(ep, BTABLE_FIELD_ADDR_TX)
+}}
+
+fn ep_rx_addr(ep: u8) -> u16 {{
+    btable_read(ep, BTABLE_FIELD_ADDR_RX)
+}}
+
+fn ep_rx_count(ep: u8) -> usize {{
+    usize::from(btable_read(ep, BTABLE_FIELD_COUNT_RX) & 0x03FF)
+}}
+
+#[inline(always)]
+fn usb_reg_ptr(offset: usize) -> *mut u16 {{
+    (USB_BASE + offset) as *mut u16
+}}
+
+fn usb_read16(offset: usize) -> u16 {{
+    unsafe {{ usb_reg_ptr(offset).read_volatile() }}
+}}
+
+fn usb_write16(offset: usize, value: u16) {{
+    unsafe {{ usb_reg_ptr(offset).write_volatile(value) }}
+}}
+
+#[inline(always)]
+fn epr_read(ep: u8) -> u16 {{
+    usb_read16(usize::from(ep) * 4)
+}}
+
+#[inline(always)]
+fn epr_write(ep: u8, value: u16) {{
+    usb_write16(usize::from(ep) * 4, value)
+}}
+
+#[inline(always)]
+fn pma_word_ptr(offset: u16) -> *mut u16 {{
+    (USBRAM_BASE + usize::from(offset) * 2) as *mut u16
+}}
+
+fn pma_read16(offset: u16) -> u16 {{
+    unsafe {{ pma_word_ptr(offset).read_volatile() }}
+}}
+
+fn pma_write16(offset: u16, value: u16) {{
+    unsafe {{ pma_word_ptr(offset).write_volatile(value) }}
+}}
+
+unsafe fn pma_write_bytes(offset: u16, bytes: &[u8]) {{
+    let mut pma_offset = offset;
+    let mut index = 0;
+    while index < bytes.len() {{
+        let lo = bytes[index];
+        let hi = if index + 1 < bytes.len() {{ bytes[index + 1] }} else {{ 0 }};
+        pma_write16(pma_offset, u16::from(lo) | (u16::from(hi) << 8));
+        pma_offset += 2;
+        index += 2;
+    }}
+}}
+
+fn pma_read_bytes(offset: u16, dest: &mut [u8]) {{
+    let mut pma_offset = offset;
+    let mut index = 0;
+    while index < dest.len() {{
+        let word = pma_read16(pma_offset).to_le_bytes();
+        dest[index] = word[0];
+        if index + 1 < dest.len() {{
+            dest[index + 1] = word[1];
+        }}
+        pma_offset += 2;
+        index += 2;
+    }}
+}}
+"#,
+        type_name = driver.type_name
+    )
 }
 
 fn render_driver_methods(
@@ -3785,6 +4762,7 @@ fn render_driver_methods(
     methods.extend(render_spi_methods(model, driver)?);
     methods.extend(render_adc_methods(model, driver)?);
     methods.extend(render_usb_device_methods(model, driver)?);
+    methods.extend(render_rcc_methods(model, driver)?);
     methods.extend(render_operation_methods(model, driver)?);
     methods.extend(render_state_machine_methods(model, driver)?);
     methods.extend(render_time_driver_methods(driver)?);
@@ -6005,6 +6983,20 @@ fn render_usb_device_methods(
         return Ok(Vec::new());
     }
 
+    if driver_uses_usb_fsdev_pma_btable_lowering(driver) {
+        return Ok(vec![GeneratedMethod {
+            name: "embassy_usb_driver".to_string(),
+            code: format!(
+                "    pub fn embassy_usb_driver(&self) -> {type_name}UsbDriver {{\n        {type_name}UsbDriver::new(self.resources)\n    }}\n",
+                type_name = driver.type_name
+            ),
+        }]);
+    }
+
+    if !driver_uses_usb_preserve_link_lowering(driver) {
+        return Ok(Vec::new());
+    }
+
     let target_ref = driver.target.target_ref.as_str();
     let Some(ep1) = try_resolve_target_register_by_name(model, target_ref, "EP1")? else {
         return Ok(Vec::new());
@@ -6314,6 +7306,28 @@ fn render_usb_device_methods(
     let _ = (serial_in_free_mask, serial_out_avail_mask);
 
     Ok(methods)
+}
+
+fn render_rcc_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    if driver.driver_kind != "rcc" {
+        return Ok(Vec::new());
+    }
+    if !model
+        .drivers
+        .iter()
+        .any(driver_uses_usb_fsdev_pma_btable_lowering)
+    {
+        return Ok(Vec::new());
+    }
+
+    Ok(vec![GeneratedMethod {
+        name: "configure_usb_fsdev_clock_48mhz".to_string(),
+        code: "    pub fn configure_usb_fsdev_clock_48mhz(&self) -> Result<(), metadata::Error> {\n        const RCC_CTLR: u64 = 0x4002_1000;\n        const RCC_CFGR0: u64 = 0x4002_1004;\n        const RCC_APB1PCENR: u64 = 0x4002_101C;\n        const EXTEN_CTR: u64 = 0x4002_3800;\n        const RCC_PLLON: u32 = 1 << 24;\n        const RCC_PLLRDY: u32 = 1 << 25;\n        const RCC_HSEON: u32 = 1 << 16;\n        const RCC_HSERDY: u32 = 1 << 17;\n        const RCC_SW_MASK: u32 = 0b11;\n        const RCC_SW_PLL: u32 = 0b10;\n        const RCC_SWS_MASK: u32 = 0b11 << 2;\n        const RCC_SWS_PLL: u32 = 0b10 << 2;\n        const RCC_HPRE_MASK: u32 = 0b1111 << 4;\n        const RCC_PPRE1_MASK: u32 = 0b111 << 8;\n        const RCC_PPRE2_MASK: u32 = 0b111 << 11;\n        const RCC_PLLSRC: u32 = 1 << 16;\n        const RCC_PLLXTPRE: u32 = 1 << 17;\n        const RCC_PLLMULL_MASK: u32 = 0b1111 << 18;\n        const RCC_USBPRE_MASK: u32 = 0b11 << 22;\n        const RCC_PLLMULL6: u32 = 4 << 18;\n        const RCC_PPRE1_DIV2: u32 = 0b100 << 8;\n        const RCC_APB1_USB_EN: u32 = 1 << 23;\n        const EXTEN_PLL_HSI_PRE: u32 = 1 << 4;\n        const HSE_TIMEOUT: u32 = 200_000;\n        const PLL_TIMEOUT: u32 = 200_000;\n        const SWITCH_TIMEOUT: u32 = 200_000;\n\n        modify_u32(EXTEN_CTR, EXTEN_PLL_HSI_PRE, 0)?;\n        let mut cfgr0 = read_u32(RCC_CFGR0)?;\n        cfgr0 &= !(RCC_SW_MASK | RCC_HPRE_MASK | RCC_PPRE1_MASK | RCC_PPRE2_MASK | RCC_PLLSRC | RCC_PLLXTPRE | RCC_PLLMULL_MASK | RCC_USBPRE_MASK);\n        cfgr0 |= RCC_PPRE1_DIV2 | RCC_PLLMULL6;\n        write_u32(RCC_CFGR0, cfgr0)?;\n\n        write_u32(RCC_CTLR, read_u32(RCC_CTLR)? | RCC_HSEON)?;\n        for _ in 0..HSE_TIMEOUT {\n            if (read_u32(RCC_CTLR)? & RCC_HSERDY) != 0 {\n                let mut pll_cfg = read_u32(RCC_CFGR0)?;\n                pll_cfg &= !(RCC_PLLSRC | RCC_PLLXTPRE | RCC_PLLMULL_MASK | RCC_USBPRE_MASK);\n                pll_cfg |= RCC_PLLSRC | RCC_PLLMULL6;\n                write_u32(RCC_CFGR0, pll_cfg)?;\n                write_u32(RCC_CTLR, read_u32(RCC_CTLR)? | RCC_PLLON)?;\n                for _ in 0..PLL_TIMEOUT {\n                    if (read_u32(RCC_CTLR)? & RCC_PLLRDY) != 0 {\n                        let mut switched = read_u32(RCC_CFGR0)?;\n                        switched &= !RCC_SW_MASK;\n                        switched |= RCC_SW_PLL;\n                        write_u32(RCC_CFGR0, switched)?;\n                        for _ in 0..SWITCH_TIMEOUT {\n                            if (read_u32(RCC_CFGR0)? & RCC_SWS_MASK) == RCC_SWS_PLL {\n                                write_u32(RCC_APB1PCENR, read_u32(RCC_APB1PCENR)? | RCC_APB1_USB_EN)?;\n                                return Ok(());\n                            }\n                        }\n                        break;\n                    }\n                }\n                break;\n            }\n        }\n\n        modify_u32(EXTEN_CTR, 0, EXTEN_PLL_HSI_PRE)?;\n        let mut cfgr0 = read_u32(RCC_CFGR0)?;\n        cfgr0 &= !(RCC_SW_MASK | RCC_HPRE_MASK | RCC_PPRE1_MASK | RCC_PPRE2_MASK | RCC_PLLSRC | RCC_PLLXTPRE | RCC_PLLMULL_MASK | RCC_USBPRE_MASK);\n        cfgr0 |= RCC_PPRE1_DIV2 | RCC_PLLMULL6;\n        write_u32(RCC_CFGR0, cfgr0)?;\n        write_u32(RCC_CTLR, read_u32(RCC_CTLR)? | RCC_PLLON)?;\n        for _ in 0..PLL_TIMEOUT {\n            if (read_u32(RCC_CTLR)? & RCC_PLLRDY) != 0 {\n                let mut switched = read_u32(RCC_CFGR0)?;\n                switched &= !RCC_SW_MASK;\n                switched |= RCC_SW_PLL;\n                write_u32(RCC_CFGR0, switched)?;\n                for _ in 0..SWITCH_TIMEOUT {\n                    if (read_u32(RCC_CFGR0)? & RCC_SWS_MASK) == RCC_SWS_PLL {\n                        write_u32(RCC_APB1PCENR, read_u32(RCC_APB1PCENR)? | RCC_APB1_USB_EN)?;\n                        return Ok(());\n                    }\n                }\n                break;\n            }\n        }\n\n        Err(metadata::Error::Unsupported(\"failed to configure CH32 FSDEV USB clock to 48 MHz\"))\n    }\n"
+            .to_string(),
+    }])
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -8675,6 +9689,10 @@ fn subject_aliases(value: &str) -> Vec<String> {
     {
         aliases.push(format!("UART{index}"));
     }
+    if matches!(upper.as_str(), "USB" | "USBD" | "USBFSD" | "USBFS") {
+        aliases.push("USB".to_string());
+        aliases.push("USBD".to_string());
+    }
 
     aliases.sort();
     aliases.dedup();
@@ -10065,7 +11083,7 @@ fn collect_host_usb_stream_models(
 ) -> Result<Vec<HostUsbStreamModel>> {
     let mut usb_models = Vec::new();
     for driver in &model.drivers {
-        if driver.driver_kind != "usb-device" {
+        if driver.driver_kind != "usb-device" || !driver_uses_usb_preserve_link_lowering(driver) {
             continue;
         }
         let target_ref = driver.target.target_ref.as_str();
@@ -12284,6 +13302,34 @@ fn host_emulator_tracks_esp_gpio_output_level() {
         assert!(!usb_rs.contains("pub fn assert_reset(&self)"));
         assert!(usb_rs.contains("pub fn write_serial_packet(&self, bytes: &[u8])"));
         assert!(usb_rs.contains("pub fn is_usb_bus_reset_pending(&self)"));
+    }
+
+    #[test]
+    fn generate_embassy_emits_ch32_usb_controller_module() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let document = load_validated_hair_document(
+            &repo_root
+                .join("evidence")
+                .join("wch")
+                .join("ch32v203g6u6")
+                .join("hair.json"),
+            &repo_root,
+        )
+        .expect("ch32v203g6u6 hair should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&document, output_dir.path()).expect("embassy generation");
+
+        let lib_rs = std::fs::read_to_string(output_dir.path().join("src").join("lib.rs"))
+            .expect("generated lib.rs");
+        let usb_rs = std::fs::read_to_string(output_dir.path().join("src").join("usb.rs"))
+            .expect("generated usb.rs");
+        assert!(lib_rs.contains("pub mod usb;"));
+        assert!(usb_rs.contains("lowering_pattern: Some(\"fsdev-pma-btable\")"));
+        assert!(usb_rs.contains("pub fn enable_clock(&self)"));
+        assert!(usb_rs.contains("pub fn assert_reset(&self)"));
+        assert!(!usb_rs.contains("write_serial_packet"));
+        assert!(!usb_rs.contains("serial_in_ready"));
     }
 
     #[test]

@@ -499,4 +499,90 @@ impl RCC {
         modify_u32(0x4002100Cu64, 0x00000400u32, 0x00000000u32)?;
         Ok(())
     }
+
+    pub fn configure_usb_fsdev_clock_48mhz(&self) -> Result<(), metadata::Error> {
+        const RCC_CTLR: u64 = 0x4002_1000;
+        const RCC_CFGR0: u64 = 0x4002_1004;
+        const RCC_APB1PCENR: u64 = 0x4002_101C;
+        const EXTEN_CTR: u64 = 0x4002_3800;
+        const RCC_PLLON: u32 = 1 << 24;
+        const RCC_PLLRDY: u32 = 1 << 25;
+        const RCC_HSEON: u32 = 1 << 16;
+        const RCC_HSERDY: u32 = 1 << 17;
+        const RCC_SW_MASK: u32 = 0b11;
+        const RCC_SW_PLL: u32 = 0b10;
+        const RCC_SWS_MASK: u32 = 0b11 << 2;
+        const RCC_SWS_PLL: u32 = 0b10 << 2;
+        const RCC_HPRE_MASK: u32 = 0b1111 << 4;
+        const RCC_PPRE1_MASK: u32 = 0b111 << 8;
+        const RCC_PPRE2_MASK: u32 = 0b111 << 11;
+        const RCC_PLLSRC: u32 = 1 << 16;
+        const RCC_PLLXTPRE: u32 = 1 << 17;
+        const RCC_PLLMULL_MASK: u32 = 0b1111 << 18;
+        const RCC_USBPRE_MASK: u32 = 0b11 << 22;
+        const RCC_PLLMULL6: u32 = 4 << 18;
+        const RCC_PPRE1_DIV2: u32 = 0b100 << 8;
+        const RCC_APB1_USB_EN: u32 = 1 << 23;
+        const EXTEN_PLL_HSI_PRE: u32 = 1 << 4;
+        const HSE_TIMEOUT: u32 = 200_000;
+        const PLL_TIMEOUT: u32 = 200_000;
+        const SWITCH_TIMEOUT: u32 = 200_000;
+
+        modify_u32(EXTEN_CTR, EXTEN_PLL_HSI_PRE, 0)?;
+        let mut cfgr0 = read_u32(RCC_CFGR0)?;
+        cfgr0 &= !(RCC_SW_MASK | RCC_HPRE_MASK | RCC_PPRE1_MASK | RCC_PPRE2_MASK | RCC_PLLSRC | RCC_PLLXTPRE | RCC_PLLMULL_MASK | RCC_USBPRE_MASK);
+        cfgr0 |= RCC_PPRE1_DIV2 | RCC_PLLMULL6;
+        write_u32(RCC_CFGR0, cfgr0)?;
+
+        write_u32(RCC_CTLR, read_u32(RCC_CTLR)? | RCC_HSEON)?;
+        for _ in 0..HSE_TIMEOUT {
+            if (read_u32(RCC_CTLR)? & RCC_HSERDY) != 0 {
+                let mut pll_cfg = read_u32(RCC_CFGR0)?;
+                pll_cfg &= !(RCC_PLLSRC | RCC_PLLXTPRE | RCC_PLLMULL_MASK | RCC_USBPRE_MASK);
+                pll_cfg |= RCC_PLLSRC | RCC_PLLMULL6;
+                write_u32(RCC_CFGR0, pll_cfg)?;
+                write_u32(RCC_CTLR, read_u32(RCC_CTLR)? | RCC_PLLON)?;
+                for _ in 0..PLL_TIMEOUT {
+                    if (read_u32(RCC_CTLR)? & RCC_PLLRDY) != 0 {
+                        let mut switched = read_u32(RCC_CFGR0)?;
+                        switched &= !RCC_SW_MASK;
+                        switched |= RCC_SW_PLL;
+                        write_u32(RCC_CFGR0, switched)?;
+                        for _ in 0..SWITCH_TIMEOUT {
+                            if (read_u32(RCC_CFGR0)? & RCC_SWS_MASK) == RCC_SWS_PLL {
+                                write_u32(RCC_APB1PCENR, read_u32(RCC_APB1PCENR)? | RCC_APB1_USB_EN)?;
+                                return Ok(());
+                            }
+                        }
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+
+        modify_u32(EXTEN_CTR, 0, EXTEN_PLL_HSI_PRE)?;
+        let mut cfgr0 = read_u32(RCC_CFGR0)?;
+        cfgr0 &= !(RCC_SW_MASK | RCC_HPRE_MASK | RCC_PPRE1_MASK | RCC_PPRE2_MASK | RCC_PLLSRC | RCC_PLLXTPRE | RCC_PLLMULL_MASK | RCC_USBPRE_MASK);
+        cfgr0 |= RCC_PPRE1_DIV2 | RCC_PLLMULL6;
+        write_u32(RCC_CFGR0, cfgr0)?;
+        write_u32(RCC_CTLR, read_u32(RCC_CTLR)? | RCC_PLLON)?;
+        for _ in 0..PLL_TIMEOUT {
+            if (read_u32(RCC_CTLR)? & RCC_PLLRDY) != 0 {
+                let mut switched = read_u32(RCC_CFGR0)?;
+                switched &= !RCC_SW_MASK;
+                switched |= RCC_SW_PLL;
+                write_u32(RCC_CFGR0, switched)?;
+                for _ in 0..SWITCH_TIMEOUT {
+                    if (read_u32(RCC_CFGR0)? & RCC_SWS_MASK) == RCC_SWS_PLL {
+                        write_u32(RCC_APB1PCENR, read_u32(RCC_APB1PCENR)? | RCC_APB1_USB_EN)?;
+                        return Ok(());
+                    }
+                }
+                break;
+            }
+        }
+
+        Err(metadata::Error::Unsupported("failed to configure CH32 FSDEV USB clock to 48 MHz"))
+    }
 }
