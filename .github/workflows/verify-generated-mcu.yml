@@ -220,15 +220,42 @@ jobs:
       - name: Report intentionally unsupported smoke target
         if: ${{ inputs.smoke_mode == 'unsupported' }}
         shell: bash
-        run: echo "Smoke test intentionally unsupported for ${{ inputs.mcu_name }}."
+        run: echo "Smoke run intentionally unsupported for ${{ inputs.mcu_name }}; build-only smoke validation will still run."
 
-      - name: Build smoke harness
-        if: ${{ inputs.smoke_mode == 'required' }}
-        working-directory: ${{ inputs.smoke_dir }}
+      - name: Discover smoke harnesses
+        id: discover-smoke
         shell: bash
         run: |
           set -euo pipefail
-          cargo build --locked --target "${{ inputs.rust_target }}"
+          generated_dir="$(dirname "${{ inputs.embassy_dir }}")"
+          if [[ ! -d "$generated_dir" ]]; then
+            echo "generated directory does not exist: $generated_dir" >&2
+            exit 1
+          fi
+
+          mapfile -t smoke_manifests < <(find "$generated_dir" -mindepth 2 -maxdepth 2 -path '*/generated/*smoke*/Cargo.toml' | sort)
+          if [[ ${#smoke_manifests[@]} -eq 0 ]]; then
+            echo "count=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          {
+            echo "count=${#smoke_manifests[@]}"
+            echo "manifests<<EOF"
+            printf '%s\n' "${smoke_manifests[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build smoke harnesses
+        if: ${{ steps.discover-smoke.outputs.count != '0' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r manifest_path; do
+            [[ -n "$manifest_path" ]] || continue
+            echo "Building smoke harness from $manifest_path"
+            cargo build --locked --target "${{ inputs.rust_target }}" --manifest-path "$manifest_path"
+          done <<< "${{ steps.discover-smoke.outputs.manifests }}"
 
       - name: Run smoke harness
         if: ${{ inputs.smoke_mode == 'required' }}
