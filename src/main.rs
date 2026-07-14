@@ -4978,6 +4978,7 @@ fn driver_uses_pfic_runtime_support(driver: &ResolvedDriverInstance) -> bool {
         && (driver.target.id == "block.pfic" || driver.target.name.eq_ignore_ascii_case("PFIC"))
 }
 
+const PFIC_INTERRUPT_CONTROLLER_ID: &str = "ic.pfic";
 const INTERRUPT_NUMBERING_INTERRUPT_NUMBER: &str = "interrupt-number";
 const INTERRUPT_NUMBERING_EXTERNAL_INTERRUPT_INDEX: &str = "external-interrupt-index";
 const CORE_EXCEPTION_VECTOR_PREFIX: usize = 16;
@@ -4999,7 +5000,10 @@ fn pfic_interrupt_controller_numbering(
     model
         .interrupt_controllers
         .values()
-        .find(|controller| controller.name.eq_ignore_ascii_case("PFIC"))
+        .find(|controller| {
+            controller.id == PFIC_INTERRUPT_CONTROLLER_ID
+                || controller.name.eq_ignore_ascii_case("PFIC")
+        })
         .and_then(|controller| controller.interrupt_numbering.as_ref())
         .ok_or_else(|| {
             anyhow!(
@@ -5150,8 +5154,14 @@ fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<Strin
 
 fn render_pfic_interrupt_support_items(register_indexing: &str) -> Result<String> {
     let irq_index_body = render_pfic_irq_index_expression(register_indexing)?;
+    let offset_const = if register_indexing == INTERRUPT_NUMBERING_INTERRUPT_NUMBER {
+        "const PFIC_EXTERNAL_IRQ_OFFSET: u32 = 16;\n"
+    } else {
+        ""
+    };
     Ok(format!(
-        "\nconst PFIC_EXTERNAL_IRQ_OFFSET: u32 = 16;\nconst PFIC_IENR_BASE_ADDRESS: u64 = 0xE000_E100;\nconst PFIC_IRER_BASE_ADDRESS: u64 = 0xE000_E180;\nconst PFIC_IACTR_BASE_ADDRESS: u64 = 0xE000_E300;\n\nfn pfic_irq_index(irq: Irq) -> Result<u32, metadata::Error> {{\n    let irq_index = irq as u32;\n{irq_index_body}}}\n\nfn pfic_register_address(base: u64, irq_index: u32) -> u64 {{\n    base + u64::from((irq_index / 32) * 4)\n}}\n\nfn pfic_irq_bit(irq_index: u32) -> u32 {{\n    1u32 << (irq_index % 32)\n}}\n",
+        "\n{offset_const}const PFIC_IENR_BASE_ADDRESS: u64 = 0xE000_E100;\nconst PFIC_IRER_BASE_ADDRESS: u64 = 0xE000_E180;\nconst PFIC_IACTR_BASE_ADDRESS: u64 = 0xE000_E300;\n\nfn pfic_irq_index(irq: Irq) -> Result<u32, metadata::Error> {{\n    let irq_index = irq as u32;\n{irq_index_body}}}\n\nfn pfic_register_address(base: u64, irq_index: u32) -> u64 {{\n    base + u64::from((irq_index / 32) * 4)\n}}\n\nfn pfic_irq_bit(irq_index: u32) -> u32 {{\n    1u32 << (irq_index % 32)\n}}\n",
+        offset_const = offset_const,
         irq_index_body = irq_index_body
     ))
 }
@@ -17130,8 +17140,30 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             std::fs::read_to_string(output_dir.path().join("src").join("interrupt.rs"))
                 .expect("interrupt.rs");
         assert!(interrupt_rs.contains("let irq_index = irq as u32;"));
+        assert!(!interrupt_rs.contains("const PFIC_EXTERNAL_IRQ_OFFSET"));
         assert!(!interrupt_rs.contains("if irq_index < PFIC_EXTERNAL_IRQ_OFFSET"));
         assert!(!interrupt_rs.contains(".checked_sub(PFIC_EXTERNAL_IRQ_OFFSET)"));
+        assert!(interrupt_rs.contains("Ok(irq_index)"));
+    }
+
+    #[test]
+    fn generate_embassy_finds_pfic_numbering_by_stable_controller_id() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        document["physical"]["interruptControllers"][0]["name"] =
+            Value::String("Platform Interrupt Controller".to_string());
+        let file = write_temp_json(&document);
+        let document =
+            load_validated_hair_document(file.path(), &repo_root).expect("fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&document, output_dir.path()).expect("embassy generation");
+
+        let interrupt_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("interrupt.rs"))
+                .expect("interrupt.rs");
+        assert!(interrupt_rs.contains("const PFIC_EXTERNAL_IRQ_OFFSET: u32 = 16;"));
         assert!(interrupt_rs.contains("Ok(irq_index)"));
     }
 
