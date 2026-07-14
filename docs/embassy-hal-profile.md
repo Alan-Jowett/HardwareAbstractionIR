@@ -282,7 +282,7 @@ The first Embassy generator cut is expected to support this driver subset:
 | `adc` | supported | Requires calibration/init operations and any claimed DMA bindings. |
 | `dma` | supported | Generates DMA infrastructure from `dmaTopology`. |
 | `interrupt` | supported | Generates IRQ enums/bindings from the device interrupt inventory plus `interruptTopology`. |
-| `usb-device` | supported | Requires explicit D+/D- pin-routing data, clock/reset support, interrupt routes, and semantic/state-machine plus structural register/field closure for any claimed endpoint-oriented or serial-style USB behavior. Some USB lowering families may additionally require an explicit `loweringPattern` selector when bring-up behavior is materially family-specific. The first such lowering family may be device-specific, such as ESP32-C3 USB Serial/JTAG, but the generator must still stay evidence-bounded and expose only the justified subset. |
+| `usb-device` | supported | Requires explicit D+/D- pin-routing data, clock/reset support, interrupt routes, and semantic/state-machine plus structural register/field closure for any claimed controller-level USB behavior. Some USB lowering families may additionally require an explicit `loweringPattern` selector when bring-up behavior is materially family-specific. Standard USB functions such as CDC ACM should be layered from Embassy USB libraries on top of the generated controller module rather than encoded as separate HAIR driver kinds. |
 | `custom` | unsupported in the first cut | Must fail explicitly rather than generating placeholders. |
 
 Any other generation request is out of subset for the first cut and must fail explicitly.
@@ -315,7 +315,7 @@ hoc name matching.
 | `adc` | `semantics.operations` for calibration/init/enable; structural register/field data for any emitted conversion or sample path; pin/electrical data for exposed analog inputs; `dmaTopology.routes` only when the emitted API claims DMA-backed sampling |
 | `dma` | `profiles.mcuSoc.dmaTopology.routes` and the referenced `dmaTopology.channels`; any referenced route `controlRefs`; and structural register/field data for emitted channel enable/launch/status helpers |
 | `interrupt` | `structure.device.interrupts`, `profiles.mcuSoc.interruptTopology.routes`, and the referenced `interruptTopology.sources`; plus any clear/ack operations or control refs required by emitted helper methods |
-| `usb-device` | `pinTopology.routes` for D+ and D-; clock/reset support for emitted bring-up helpers; `interruptTopology.routes` for any emitted interrupt-driven behavior; explicit `semantics.operations` and/or `semantics.stateMachines` for claimed bus-reset, attach, endpoint/FIFO, or byte-stream data movement helpers; structural register/field data for the reachable USB control/data path being lowered; and `driverInstances[].loweringPattern` whenever the chosen USB lowering family has materially distinct bring-up behavior that the generator must not infer |
+| `usb-device` | `pinTopology.routes` for D+ and D-; clock/reset support for emitted bring-up helpers; `interruptTopology.routes` for any emitted interrupt-driven behavior; explicit `semantics.operations` and/or `semantics.stateMachines` for claimed bus-reset, attach, endpoint/FIFO, or other controller-level helpers; structural register/field data for the reachable USB control/data path being lowered; and `driverInstances[].loweringPattern` whenever the chosen USB lowering family has materially distinct bring-up behavior that the generator must not infer |
 
 ## Generated API contract by driver kind
 
@@ -334,7 +334,7 @@ exact naming contract:
 | `adc` | Calibration/enable helpers plus only those conversion/sample methods whose trigger/start/complete/data path is explicitly modeled |
 | `dma` | Channel-oriented enable/configure/launch/status helpers derived from DMA topology and any referenced controls |
 | `interrupt` | IRQ enums plus bind/clear/ack helpers justified by the interrupt inventory, routes, and source-level operations; and, when tagged `embassy-time-driver` with `timeDriverSource = "systick"`, the generated SysTick-backed async time-base support module |
-| `usb-device` | Bring-up helpers plus only those endpoint-oriented and/or serial-style USB methods whose attach, reset, interrupt, and data paths are explicitly modeled; device-specific helpers are allowed when they remain traceable to the approved USB lowering path rather than to inferred generic USB behavior. When `loweringPattern = "serial-jtag-preserve-link"`, the emitted bring-up sequence must preserve the boot-established USB Serial/JTAG link instead of synthesizing an unconditional reset-and-reattach sequence |
+| `usb-device` | Bring-up helpers plus only those controller-level USB methods whose attach, reset, interrupt, and data paths are explicitly modeled; device-specific helpers are allowed when they remain traceable to the approved USB lowering path rather than to inferred generic USB behavior. Standard USB classes such as CDC ACM are expected to come from Embassy USB libraries layered on top of the generated controller module. When `loweringPattern = "serial-jtag-preserve-link"`, the emitted bring-up sequence must preserve the boot-established USB Serial/JTAG link instead of synthesizing an unconditional reset-and-reattach sequence |
 
 The generator may choose exact Rust names and signatures, but those names
 and signatures must be traceable to the approved HAIR lowering inputs.
@@ -368,17 +368,20 @@ companion emulator/state handles and their observation/control methods.
     lowering inputs needed for that behavior; otherwise the generator must emit
     only the supported polling subset or fail explicitly if the requested
     surface depends on the missing inputs.
-12. A `usb-device` driver instance may claim endpoint-oriented behavior,
-    serial-style behavior, or both, but each claimed helper must map to an
-    explicit approved USB control/data path. Generic USB endpoint inventory
-    alone does not justify CDC- or UART-like byte-stream helpers, and a
-    device-specific byte-stream path does not justify unrelated generic USB APIs.
+12. A `usb-device` driver instance may claim only the controller-level helper
+    subset justified by its approved USB control/data path. Generic USB
+    endpoint inventory alone does not justify CDC- or UART-like byte-stream
+    helpers; standard USB functions such as CDC ACM should come from layered
+    Embassy USB libraries. A device-specific byte-stream path still does not
+    justify unrelated generic USB APIs.
 13. If a `usb-device` driver instance names a `loweringPattern`, that selector
     becomes part of the executable lowering contract. In particular,
     `serial-jtag-preserve-link` requires the referenced semantic operations to
     justify a bring-up path that preserves an already boot-established USB
     Serial/JTAG link; the generator must not silently substitute a reset or
-    attach pattern that is not explicitly modeled.
+    attach pattern that is not explicitly modeled. `fsdev-pma-btable` selects
+    a controller-level PMA/BTABLE-style full-speed device family and does not
+    by itself authorize CDC- or other class-specific helpers.
 14. If a driver instance claims `embassy-time-driver`, `timeDriverSource`
     becomes part of the executable lowering contract. `systick` preserves the
     existing SysTick-backed interrupt path. `hardware-timer` selects an
