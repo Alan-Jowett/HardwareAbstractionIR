@@ -1646,6 +1646,87 @@ struct ResolvedPwmDriverLowering {
     channels: Vec<ResolvedPwmChannelLowering>,
 }
 
+#[derive(Debug, Clone)]
+struct ResolvedCanPinConfig {
+    method_name: String,
+    pin_name: String,
+    cfg_addr: u64,
+    cfg_clear_mask: u32,
+    cfg_mode_mask: u32,
+    route_statement: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedCanDriverLowering {
+    ctlr: ResolvedRegister,
+    statr: ResolvedRegister,
+    tstatr: ResolvedRegister,
+    rfifo0: ResolvedRegister,
+    rfifo1: ResolvedRegister,
+    intenr: ResolvedRegister,
+    errsr: ResolvedRegister,
+    btimr: ResolvedRegister,
+    txmir: ResolvedRegister,
+    txmdtr: ResolvedRegister,
+    txmdlr: ResolvedRegister,
+    txmdhr: ResolvedRegister,
+    rxmir: ResolvedRegister,
+    rxmdtr: ResolvedRegister,
+    rxmdlr: ResolvedRegister,
+    rxmdhr: ResolvedRegister,
+    fctlr: ResolvedRegister,
+    fmcfgr: ResolvedRegister,
+    fscfgr: ResolvedRegister,
+    fafifor: ResolvedRegister,
+    fwr: ResolvedRegister,
+    fr1: ResolvedRegister,
+    fr2: ResolvedRegister,
+    filter_bank_count: u8,
+    inrq: ResolvedField,
+    sleep: ResolvedField,
+    txfp: ResolvedField,
+    nart: ResolvedField,
+    abom: ResolvedField,
+    inak: ResolvedField,
+    erri: ResolvedField,
+    rqcp0: ResolvedField,
+    txok0: ResolvedField,
+    alst0: ResolvedField,
+    terr0: ResolvedField,
+    tme0: ResolvedField,
+    fmp0: ResolvedField,
+    fovr0: ResolvedField,
+    rfom0: ResolvedField,
+    fmp1: ResolvedField,
+    fovr1: ResolvedField,
+    rfom1: ResolvedField,
+    tmeie: ResolvedField,
+    fmpie0: ResolvedField,
+    fmpie1: ResolvedField,
+    errie: ResolvedField,
+    lec: ResolvedField,
+    boff: ResolvedField,
+    brp: ResolvedField,
+    ts1: ResolvedField,
+    ts2: ResolvedField,
+    sjw: ResolvedField,
+    lbkm: ResolvedField,
+    silm: ResolvedField,
+    stid_tx: ResolvedField,
+    exid_tx: ResolvedField,
+    ide_tx: ResolvedField,
+    rtr_tx: ResolvedField,
+    txrq: ResolvedField,
+    dlc_tx: ResolvedField,
+    stid_rx: ResolvedField,
+    exid_rx: ResolvedField,
+    ide_rx: ResolvedField,
+    rtr_rx: ResolvedField,
+    dlc_rx: ResolvedField,
+    finit: ResolvedField,
+    pin_configs: Vec<ResolvedCanPinConfig>,
+}
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 enum ResolvedGpioPortLowering {
@@ -2256,7 +2337,7 @@ impl EmbassyGenerationModel {
 fn validate_supported_driver_kind(driver_kind: &str) -> Result<()> {
     match driver_kind {
         "rcc" | "gpio-port" | "uart" | "usart" | "spi" | "i2c" | "timer" | "pwm" | "adc"
-        | "dma" | "interrupt" | "usb-device" => Ok(()),
+        | "dma" | "interrupt" | "usb-device" | "can" => Ok(()),
         "custom" => bail!("driver kind custom is outside the supported first-cut Embassy subset"),
         other => bail!("driver kind {other} is not supported by the first-cut Embassy generator"),
     }
@@ -2833,7 +2914,8 @@ fn validate_driver_resource_scope(
     resources: &DriverResourceScopeInputs<'_>,
 ) -> Result<()> {
     match driver.driver_kind.as_str() {
-        "uart" | "usart" | "spi" | "i2c" | "timer" | "pwm" | "adc" | "gpio-port" | "usb-device" => {
+        "uart" | "usart" | "spi" | "i2c" | "timer" | "pwm" | "adc" | "gpio-port" | "usb-device"
+        | "can" => {
             let target_ref = target.target_ref.as_str();
             for binding in resources.clock_bindings {
                 if binding.consumer_ref != target_ref {
@@ -3594,7 +3676,11 @@ fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
         .drivers
         .iter()
         .any(|driver| driver.driver_kind == "pwm");
-    if has_time_driver || has_fsdev_usb || has_pwm {
+    let has_can = model
+        .drivers
+        .iter()
+        .any(|driver| driver.driver_kind == "can");
+    if has_time_driver || has_fsdev_usb || has_pwm || has_can {
         out.push_str("\n[dependencies]\n");
         if has_time_driver || has_fsdev_usb {
             out.push_str("critical-section = \"1.2\"\n");
@@ -3612,6 +3698,9 @@ fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
     }
     if has_pwm {
         out.push_str("embedded-hal = \"1.0\"\n");
+    }
+    if has_can {
+        out.push_str("embedded-can = \"0.4\"\n");
     }
     out
 }
@@ -3729,6 +3818,9 @@ fn render_driver_module(
     if drivers.iter().any(|driver| driver.driver_kind == "pwm") {
         out.push_str(render_pwm_module_prelude());
     }
+    if drivers.iter().any(|driver| driver.driver_kind == "can") {
+        out.push_str(render_can_module_prelude());
+    }
     out.push_str(&render_module_provenance_const(module_name));
     for driver in drivers {
         out.push_str(&render_driver_instance(model, driver)?);
@@ -3824,6 +3916,9 @@ fn render_driver_support_items(
     }
     if driver.driver_kind == "pwm" {
         out.push_str(&render_pwm_support_items(model, driver)?);
+    }
+    if driver.driver_kind == "can" {
+        out.push_str(&render_can_support_items(model, driver)?);
     }
     if driver_uses_usb_fsdev_pma_btable_lowering(driver) {
         out.push_str(&render_usb_fsdev_support_items(driver));
@@ -4811,6 +4906,7 @@ fn render_driver_methods(
     methods.extend(render_gpio_methods(model, driver)?);
     methods.extend(render_pin_route_methods(model, driver)?);
     methods.extend(render_pwm_methods(model, driver)?);
+    methods.extend(render_can_methods(model, driver)?);
     methods.extend(render_usart_methods(model, driver)?);
     methods.extend(render_spi_methods(model, driver)?);
     methods.extend(render_adc_methods(model, driver)?);
@@ -5869,7 +5965,7 @@ fn resolve_pwm_pin_config(
             .find_map(|(peripheral_ref, peripheral)| {
                 normalize_search_text(&peripheral.name)
                     .eq(&normalize_search_text(&gpio_name))
-                    .then(|| peripheral_ref.as_str())
+                    .then_some(peripheral_ref.as_str())
             })
     else {
         return Ok(None);
@@ -6026,6 +6122,1004 @@ fn render_pwm_register_write_statement(
         }
     };
     Ok(statement)
+}
+
+fn render_can_module_prelude() -> &'static str {
+    r#"
+use core::hint::spin_loop;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CanError {
+    Metadata(metadata::Error),
+    Peripheral {
+        kind: embedded_can::ErrorKind,
+        detail: &'static str,
+    },
+    InvalidFrame(&'static str),
+}
+
+impl From<metadata::Error> for CanError {
+    fn from(error: metadata::Error) -> Self {
+        Self::Metadata(error)
+    }
+}
+
+impl embedded_can::Error for CanError {
+    fn kind(&self) -> embedded_can::ErrorKind {
+        match *self {
+            Self::Metadata(_) | Self::InvalidFrame(_) => embedded_can::ErrorKind::Other,
+            Self::Peripheral { kind, .. } => kind,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CanFrame {
+    id: embedded_can::Id,
+    data: [u8; 8],
+    dlc: u8,
+    is_remote: bool,
+}
+
+impl CanFrame {
+    fn from_parts(
+        id: embedded_can::Id,
+        is_remote: bool,
+        dlc: usize,
+        data: [u8; 8],
+    ) -> Result<Self, CanError> {
+        if dlc > 8 {
+            return Err(CanError::InvalidFrame("CAN DLC must be in the range 0..=8"));
+        }
+        Ok(Self {
+            id,
+            data: if is_remote { [0; 8] } else { data },
+            dlc: dlc as u8,
+            is_remote,
+        })
+    }
+
+    fn data_words(&self) -> (u32, u32) {
+        let bytes = self.data;
+        (
+            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
+        )
+    }
+}
+
+impl embedded_can::Frame for CanFrame {
+    fn new(
+        id: impl Into<embedded_can::Id>,
+        data: &[u8],
+    ) -> Option<Self> {
+        if data.len() > 8 {
+            return None;
+        }
+        let mut frame_data = [0u8; 8];
+        frame_data[..data.len()].copy_from_slice(data);
+        Some(Self {
+            id: id.into(),
+            data: frame_data,
+            dlc: data.len() as u8,
+            is_remote: false,
+        })
+    }
+
+    fn new_remote(
+        id: impl Into<embedded_can::Id>,
+        dlc: usize,
+    ) -> Option<Self> {
+        (dlc <= 8).then_some(Self {
+            id: id.into(),
+            data: [0; 8],
+            dlc: dlc as u8,
+            is_remote: true,
+        })
+    }
+
+    fn is_extended(&self) -> bool {
+        matches!(self.id, embedded_can::Id::Extended(_))
+    }
+
+    fn is_remote_frame(&self) -> bool {
+        self.is_remote
+    }
+
+    fn id(&self) -> embedded_can::Id {
+        self.id
+    }
+
+    fn dlc(&self) -> usize {
+        usize::from(self.dlc)
+    }
+
+    fn data(&self) -> &[u8] {
+        let len = if self.is_remote {
+            0
+        } else {
+            usize::from(self.dlc)
+        };
+        &self.data[..len]
+    }
+}
+
+fn decode_can_error_kind(lec: u32, bus_off: bool, fifo_overrun: bool) -> embedded_can::ErrorKind {
+    if fifo_overrun {
+        return embedded_can::ErrorKind::Overrun;
+    }
+    if bus_off {
+        return embedded_can::ErrorKind::Other;
+    }
+    match lec {
+        1 => embedded_can::ErrorKind::Stuff,
+        2 => embedded_can::ErrorKind::Form,
+        3 => embedded_can::ErrorKind::Acknowledge,
+        4 | 5 => embedded_can::ErrorKind::Bit,
+        6 => embedded_can::ErrorKind::Crc,
+        _ => embedded_can::ErrorKind::Other,
+    }
+}
+
+"#
+}
+
+fn render_can_support_items(
+    _model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    Ok(format!(
+        r#"
+impl embedded_can::blocking::Can for {type_name} {{
+    type Frame = CanFrame;
+    type Error = CanError;
+
+    fn transmit(&mut self, frame: &Self::Frame) -> Result<(), Self::Error> {{
+        self.transmit_frame(frame)
+    }}
+
+    fn receive(&mut self) -> Result<Self::Frame, Self::Error> {{
+        self.receive_fifo0_frame()
+    }}
+}}
+"#,
+        type_name = driver.type_name
+    ))
+}
+
+fn render_can_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    if driver.driver_kind != "can" {
+        return Ok(Vec::new());
+    }
+
+    let lowering = resolve_can_driver_lowering(model, driver)?;
+    let inrq_mask = field_bit_mask(&lowering.inrq, &lowering.ctlr)?;
+    let sleep_mask = field_bit_mask(&lowering.sleep, &lowering.ctlr)?;
+    let txfp_mask = field_bit_mask(&lowering.txfp, &lowering.ctlr)?;
+    let nart_mask = field_bit_mask(&lowering.nart, &lowering.ctlr)?;
+    let abom_mask = field_bit_mask(&lowering.abom, &lowering.ctlr)?;
+    let inak_mask = field_bit_mask(&lowering.inak, &lowering.statr)?;
+    let erri_mask = field_bit_mask(&lowering.erri, &lowering.statr)?;
+    let rqcp0_mask = field_bit_mask(&lowering.rqcp0, &lowering.tstatr)?;
+    let txok0_mask = field_bit_mask(&lowering.txok0, &lowering.tstatr)?;
+    let alst0_mask = field_bit_mask(&lowering.alst0, &lowering.tstatr)?;
+    let terr0_mask = field_bit_mask(&lowering.terr0, &lowering.tstatr)?;
+    let tme0_mask = field_bit_mask(&lowering.tme0, &lowering.tstatr)?;
+    let fmp0_mask = shifted_field_mask(&lowering.fmp0, &lowering.rfifo0)?;
+    let fovr0_mask = field_bit_mask(&lowering.fovr0, &lowering.rfifo0)?;
+    let rfom0_mask = field_bit_mask(&lowering.rfom0, &lowering.rfifo0)?;
+    let fmp1_mask = shifted_field_mask(&lowering.fmp1, &lowering.rfifo1)?;
+    let fovr1_mask = field_bit_mask(&lowering.fovr1, &lowering.rfifo1)?;
+    let rfom1_mask = field_bit_mask(&lowering.rfom1, &lowering.rfifo1)?;
+    let tmeie_mask = field_bit_mask(&lowering.tmeie, &lowering.intenr)?;
+    let fmpie0_mask = field_bit_mask(&lowering.fmpie0, &lowering.intenr)?;
+    let fmpie1_mask = field_bit_mask(&lowering.fmpie1, &lowering.intenr)?;
+    let errie_mask = field_bit_mask(&lowering.errie, &lowering.intenr)?;
+    let lec_mask = shifted_field_mask(&lowering.lec, &lowering.errsr)?;
+    let boff_mask = field_bit_mask(&lowering.boff, &lowering.errsr)?;
+    let brp_mask = shifted_field_mask(&lowering.brp, &lowering.btimr)?;
+    let ts1_mask = shifted_field_mask(&lowering.ts1, &lowering.btimr)?;
+    let ts2_mask = shifted_field_mask(&lowering.ts2, &lowering.btimr)?;
+    let sjw_mask = shifted_field_mask(&lowering.sjw, &lowering.btimr)?;
+    let lbkm_mask = field_bit_mask(&lowering.lbkm, &lowering.btimr)?;
+    let silm_mask = field_bit_mask(&lowering.silm, &lowering.btimr)?;
+    let stid_tx_mask = shifted_field_mask(&lowering.stid_tx, &lowering.txmir)?;
+    let stid_tx_value_mask = field_value_mask(&lowering.stid_tx)?;
+    let exid_tx_mask = shifted_field_mask(&lowering.exid_tx, &lowering.txmir)?;
+    let exid_tx_value_mask = field_value_mask(&lowering.exid_tx)?;
+    let exid_tx_width = exid_tx_value_mask.count_ones();
+    let ide_tx_mask = field_bit_mask(&lowering.ide_tx, &lowering.txmir)?;
+    let rtr_tx_mask = field_bit_mask(&lowering.rtr_tx, &lowering.txmir)?;
+    let txrq_mask = field_bit_mask(&lowering.txrq, &lowering.txmir)?;
+    let dlc_tx_mask = shifted_field_mask(&lowering.dlc_tx, &lowering.txmdtr)?;
+    let dlc_tx_value_mask = field_value_mask(&lowering.dlc_tx)?;
+    let stid_rx_mask = shifted_field_mask(&lowering.stid_rx, &lowering.rxmir)?;
+    let exid_rx_mask = shifted_field_mask(&lowering.exid_rx, &lowering.rxmir)?;
+    let exid_rx_width = field_value_mask(&lowering.exid_rx)?.count_ones();
+    let ide_rx_mask = field_bit_mask(&lowering.ide_rx, &lowering.rxmir)?;
+    let rtr_rx_mask = field_bit_mask(&lowering.rtr_rx, &lowering.rxmir)?;
+    let dlc_rx_mask = shifted_field_mask(&lowering.dlc_rx, &lowering.rxmdtr)?;
+    let finit_mask = field_bit_mask(&lowering.finit, &lowering.fctlr)?;
+    let filter_mode_mask = shifted_field_mask(
+        &try_resolve_register_field(&lowering.fmcfgr, "FBM")
+            .ok_or_else(|| anyhow!("CAN driver {} requires FMCFGR.FBM", driver.id))?,
+        &lowering.fmcfgr,
+    )?;
+    let filter_scale_mask = shifted_field_mask(
+        &try_resolve_register_field(&lowering.fscfgr, "FSC")
+            .ok_or_else(|| anyhow!("CAN driver {} requires FSCFGR.FSC", driver.id))?,
+        &lowering.fscfgr,
+    )?;
+    let filter_fifo_mask = shifted_field_mask(
+        &try_resolve_register_field(&lowering.fafifor, "FFA")
+            .ok_or_else(|| anyhow!("CAN driver {} requires FAFIFOR.FFA", driver.id))?,
+        &lowering.fafifor,
+    )?;
+    let filter_active_mask = shifted_field_mask(
+        &try_resolve_register_field(&lowering.fwr, "FACT")
+            .ok_or_else(|| anyhow!("CAN driver {} requires FWR.FACT", driver.id))?,
+        &lowering.fwr,
+    )?;
+
+    let mut methods = Vec::new();
+    for pin_config in &lowering.pin_configs {
+        let mut code = format!(
+            "    /// Configure the CAN {} route on {}.\n",
+            if pin_config.method_name.contains("tx_") {
+                "TX"
+            } else {
+                "RX"
+            },
+            render_comment_text(&pin_config.pin_name),
+        );
+        code.push_str(&format!(
+            "    pub fn {}(&self) -> Result<(), CanError> {{\n",
+            pin_config.method_name
+        ));
+        if let Some(route_statement) = &pin_config.route_statement {
+            code.push_str(route_statement);
+        }
+        code.push_str(&format!(
+            "        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x{:08X}u32)?;\n",
+            pin_config.cfg_addr, pin_config.cfg_clear_mask, pin_config.cfg_mode_mask
+        ));
+        code.push_str("        Ok(())\n    }\n");
+        methods.push(GeneratedMethod {
+            name: pin_config.method_name.clone(),
+            code,
+        });
+    }
+
+    methods.push(GeneratedMethod {
+        name: "enter_initialization_mode".to_string(),
+        code: format!(
+            "    pub fn enter_initialization_mode(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32 | 0x{:08X}u32, 0x{:08X}u32)?;\n        self.wait_for_initialization_state(true)\n    }}\n",
+            lowering.ctlr.absolute_address, inrq_mask, sleep_mask, inrq_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "leave_initialization_mode".to_string(),
+        code: format!(
+            "    pub fn leave_initialization_mode(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32 | 0x{:08X}u32, 0x00000000u32)?;\n        self.wait_for_initialization_state(false)\n    }}\n",
+            lowering.ctlr.absolute_address, inrq_mask, sleep_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "configure_tx_priority_by_identifier".to_string(),
+        code: format!(
+            "    pub fn configure_tx_priority_by_identifier(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x00000000u32)?;\n        Ok(())\n    }}\n",
+            lowering.ctlr.absolute_address, txfp_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "configure_tx_priority_by_request_order".to_string(),
+        code: format!(
+            "    pub fn configure_tx_priority_by_request_order(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x{:08X}u32)?;\n        Ok(())\n    }}\n",
+            lowering.ctlr.absolute_address, txfp_mask, txfp_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "enable_automatic_retransmission".to_string(),
+        code: format!(
+            "    pub fn enable_automatic_retransmission(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x00000000u32)?;\n        Ok(())\n    }}\n",
+            lowering.ctlr.absolute_address, nart_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "disable_automatic_retransmission".to_string(),
+        code: format!(
+            "    pub fn disable_automatic_retransmission(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x{:08X}u32)?;\n        Ok(())\n    }}\n",
+            lowering.ctlr.absolute_address, nart_mask, nart_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "enable_automatic_bus_off_management".to_string(),
+        code: format!(
+            "    pub fn enable_automatic_bus_off_management(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x{:08X}u32)?;\n        Ok(())\n    }}\n",
+            lowering.ctlr.absolute_address, abom_mask, abom_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "disable_automatic_bus_off_management".to_string(),
+        code: format!(
+            "    pub fn disable_automatic_bus_off_management(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x00000000u32)?;\n        Ok(())\n    }}\n",
+            lowering.ctlr.absolute_address, abom_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "configure_bit_timing".to_string(),
+        code: format!(
+            "    pub fn configure_bit_timing(&self, brp: u16, ts1: u8, ts2: u8, sjw: u8) -> Result<(), CanError> {{\n        if u64::from(brp) > 0x{:X}u64 {{\n            return Err(CanError::InvalidFrame(\"CAN BRP exceeds modeled field width\"));\n        }}\n        if u64::from(ts1) > 0x{:X}u64 {{\n            return Err(CanError::InvalidFrame(\"CAN TS1 exceeds modeled field width\"));\n        }}\n        if u64::from(ts2) > 0x{:X}u64 {{\n            return Err(CanError::InvalidFrame(\"CAN TS2 exceeds modeled field width\"));\n        }}\n        if u64::from(sjw) > 0x{:X}u64 {{\n            return Err(CanError::InvalidFrame(\"CAN SJW exceeds modeled field width\"));\n        }}\n        let set_mask = ((u32::from(brp) << {}) & 0x{:08X}u32)\n            | ((u32::from(ts1) << {}) & 0x{:08X}u32)\n            | ((u32::from(ts2) << {}) & 0x{:08X}u32)\n            | ((u32::from(sjw) << {}) & 0x{:08X}u32);\n        modify_u32(0x{:X}u64, 0x{:08X}u32 | 0x{:08X}u32 | 0x{:08X}u32 | 0x{:08X}u32, set_mask)?;\n        Ok(())\n    }}\n",
+            field_value_mask(&lowering.brp)?,
+            field_value_mask(&lowering.ts1)?,
+            field_value_mask(&lowering.ts2)?,
+            field_value_mask(&lowering.sjw)?,
+            lowering.brp.lsb, brp_mask,
+            lowering.ts1.lsb, ts1_mask,
+            lowering.ts2.lsb, ts2_mask,
+            lowering.sjw.lsb, sjw_mask,
+            lowering.btimr.absolute_address, brp_mask, ts1_mask, ts2_mask, sjw_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "enable_loopback".to_string(),
+        code: format!(
+            "    pub fn enable_loopback(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x{:08X}u32)?;\n        Ok(())\n    }}\n",
+            lowering.btimr.absolute_address, lbkm_mask, lbkm_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "disable_loopback".to_string(),
+        code: format!(
+            "    pub fn disable_loopback(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x00000000u32)?;\n        Ok(())\n    }}\n",
+            lowering.btimr.absolute_address, lbkm_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "enable_silent".to_string(),
+        code: format!(
+            "    pub fn enable_silent(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x{:08X}u32)?;\n        Ok(())\n    }}\n",
+            lowering.btimr.absolute_address, silm_mask, silm_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "disable_silent".to_string(),
+        code: format!(
+            "    pub fn disable_silent(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x00000000u32)?;\n        Ok(())\n    }}\n",
+            lowering.btimr.absolute_address, silm_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "enable_tx_interrupt".to_string(),
+        code: format!(
+            "    pub fn enable_tx_interrupt(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x{:08X}u32)?;\n        Ok(())\n    }}\n",
+            lowering.intenr.absolute_address, tmeie_mask, tmeie_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "disable_tx_interrupt".to_string(),
+        code: format!(
+            "    pub fn disable_tx_interrupt(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x00000000u32)?;\n        Ok(())\n    }}\n",
+            lowering.intenr.absolute_address, tmeie_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "enable_rx0_interrupt".to_string(),
+        code: format!(
+            "    pub fn enable_rx0_interrupt(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x{:08X}u32)?;\n        Ok(())\n    }}\n",
+            lowering.intenr.absolute_address, fmpie0_mask, fmpie0_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "disable_rx0_interrupt".to_string(),
+        code: format!(
+            "    pub fn disable_rx0_interrupt(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x00000000u32)?;\n        Ok(())\n    }}\n",
+            lowering.intenr.absolute_address, fmpie0_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "enable_rx1_interrupt".to_string(),
+        code: format!(
+            "    pub fn enable_rx1_interrupt(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x{:08X}u32)?;\n        Ok(())\n    }}\n",
+            lowering.intenr.absolute_address, fmpie1_mask, fmpie1_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "disable_rx1_interrupt".to_string(),
+        code: format!(
+            "    pub fn disable_rx1_interrupt(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x00000000u32)?;\n        Ok(())\n    }}\n",
+            lowering.intenr.absolute_address, fmpie1_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "enable_status_change_interrupt".to_string(),
+        code: format!(
+            "    pub fn enable_status_change_interrupt(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x{:08X}u32)?;\n        Ok(())\n    }}\n",
+            lowering.intenr.absolute_address, errie_mask, errie_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "disable_status_change_interrupt".to_string(),
+        code: format!(
+            "    pub fn disable_status_change_interrupt(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x00000000u32)?;\n        Ok(())\n    }}\n",
+            lowering.intenr.absolute_address, errie_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "pending_fifo0_frames".to_string(),
+        code: format!(
+            "    pub fn pending_fifo0_frames(&self) -> Result<u8, CanError> {{\n        let value = (read_u32(0x{:X}u64)? & 0x{:08X}u32) >> {};\n        Ok(value as u8)\n    }}\n",
+            lowering.rfifo0.absolute_address, fmp0_mask, lowering.fmp0.lsb
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "pending_fifo1_frames".to_string(),
+        code: format!(
+            "    pub fn pending_fifo1_frames(&self) -> Result<u8, CanError> {{\n        let value = (read_u32(0x{:X}u64)? & 0x{:08X}u32) >> {};\n        Ok(value as u8)\n    }}\n",
+            lowering.rfifo1.absolute_address, fmp1_mask, lowering.fmp1.lsb
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "last_error_kind".to_string(),
+        code: format!(
+            "    pub fn last_error_kind(&self) -> Result<embedded_can::ErrorKind, CanError> {{\n        let errsr = read_u32(0x{:X}u64)?;\n        let fifo0 = read_u32(0x{:X}u64)?;\n        let fifo1 = read_u32(0x{:X}u64)?;\n        let lec = (errsr & 0x{:08X}u32) >> {};\n        let bus_off = (errsr & 0x{:08X}u32) != 0;\n        let overrun = (fifo0 & 0x{:08X}u32) != 0 || (fifo1 & 0x{:08X}u32) != 0;\n        Ok(decode_can_error_kind(lec, bus_off, overrun))\n    }}\n",
+            lowering.errsr.absolute_address,
+            lowering.rfifo0.absolute_address,
+            lowering.rfifo1.absolute_address,
+            lec_mask,
+            lowering.lec.lsb,
+            boff_mask,
+            fovr0_mask,
+            fovr1_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "transmit_frame".to_string(),
+        code: format!(
+            "    pub fn transmit_frame(&self, frame: &CanFrame) -> Result<(), CanError> {{\n        while (read_u32(0x{:X}u64)? & 0x{:08X}u32) == 0 {{\n            if self.protocol_error_pending()? {{\n                let kind = self.last_error_kind()?;\n                return Err(CanError::Peripheral {{ kind, detail: \"CAN controller reported an error while waiting for mailbox 0\" }});\n            }}\n            spin_loop();\n        }}\n        let (identifier_register, data_length_register, data_low_register, data_high_register) = self.encode_frame_words(frame)?;\n        write_u32(0x{:X}u64, data_low_register)?;\n        write_u32(0x{:X}u64, data_high_register)?;\n        write_u32(0x{:X}u64, data_length_register)?;\n        write_u32(0x{:X}u64, identifier_register | 0x{:08X}u32)?;\n        while (read_u32(0x{:X}u64)? & 0x{:08X}u32) == 0 {{\n            if self.protocol_error_pending()? {{\n                let kind = self.last_error_kind()?;\n                return Err(CanError::Peripheral {{ kind, detail: \"CAN controller reported an error while transmitting on mailbox 0\" }});\n            }}\n            spin_loop();\n        }}\n        let status = read_u32(0x{:X}u64)?;\n        write_u32(0x{:X}u64, 0x{:08X}u32)?;\n        if (status & 0x{:08X}u32) != 0 {{\n            return Ok(());\n        }}\n        if (status & 0x{:08X}u32) != 0 {{\n            return Err(CanError::Peripheral {{ kind: embedded_can::ErrorKind::Other, detail: \"CAN arbitration was lost on mailbox 0\" }});\n        }}\n        if (status & 0x{:08X}u32) != 0 {{\n            let kind = self.last_error_kind()?;\n            return Err(CanError::Peripheral {{ kind, detail: \"CAN transmission failed on mailbox 0\" }});\n        }}\n        Err(CanError::Peripheral {{ kind: embedded_can::ErrorKind::Other, detail: \"CAN mailbox 0 completed without TXOK0\" }})\n    }}\n",
+            lowering.tstatr.absolute_address, tme0_mask,
+            lowering.txmdlr.absolute_address,
+            lowering.txmdhr.absolute_address,
+            lowering.txmdtr.absolute_address,
+            lowering.txmir.absolute_address, txrq_mask,
+            lowering.tstatr.absolute_address, rqcp0_mask,
+            lowering.tstatr.absolute_address,
+            lowering.tstatr.absolute_address, rqcp0_mask,
+            txok0_mask,
+            alst0_mask,
+            terr0_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "receive_fifo0_frame".to_string(),
+        code: format!(
+            "    pub fn receive_fifo0_frame(&self) -> Result<CanFrame, CanError> {{\n        loop {{\n            let fifo_status = read_u32(0x{:X}u64)?;\n            let pending = (fifo_status & 0x{:08X}u32) >> {};\n            if pending != 0 {{\n                let identifier_register = read_u32(0x{:X}u64)?;\n                let data_length_register = read_u32(0x{:X}u64)?;\n                let data_low_register = read_u32(0x{:X}u64)?;\n                let data_high_register = read_u32(0x{:X}u64)?;\n                let is_extended = (identifier_register & 0x{:08X}u32) != 0;\n                let id = if is_extended {{\n                    let raw = (((identifier_register & 0x{:08X}u32) >> {}) << {}) | ((identifier_register & 0x{:08X}u32) >> {});\n                    let id = embedded_can::ExtendedId::new(raw)\n                        .ok_or(CanError::InvalidFrame(\"received CAN extended identifier exceeds 29 bits\"))?;\n                    embedded_can::Id::Extended(id)\n                }} else {{\n                    let raw = ((identifier_register & 0x{:08X}u32) >> {}) as u16;\n                    let id = embedded_can::StandardId::new(raw)\n                        .ok_or(CanError::InvalidFrame(\"received CAN standard identifier exceeds 11 bits\"))?;\n                    embedded_can::Id::Standard(id)\n                }};\n                let is_remote = (identifier_register & 0x{:08X}u32) != 0;\n                let dlc = ((data_length_register & 0x{:08X}u32) >> {}) as usize;\n                let low_bytes = data_low_register.to_le_bytes();\n                let high_bytes = data_high_register.to_le_bytes();\n                let mut data = [0u8; 8];\n                data[..4].copy_from_slice(&low_bytes);\n                data[4..].copy_from_slice(&high_bytes);\n                let frame = CanFrame::from_parts(id, is_remote, dlc, data);\n                write_u32(0x{:X}u64, 0x{:08X}u32)?;\n                return frame;\n            }}\n            if (fifo_status & 0x{:08X}u32) != 0 {{\n                let kind = self.last_error_kind()?;\n                return Err(CanError::Peripheral {{ kind, detail: \"CAN FIFO0 overrun\" }});\n            }}\n            if self.protocol_error_pending()? {{\n                let kind = self.last_error_kind()?;\n                return Err(CanError::Peripheral {{ kind, detail: \"CAN controller reported an error while waiting on FIFO0\" }});\n            }}\n            spin_loop();\n        }}\n    }}\n",
+            lowering.rfifo0.absolute_address,
+            fmp0_mask, lowering.fmp0.lsb,
+            lowering.rxmir.absolute_address,
+            lowering.rxmdtr.absolute_address,
+            lowering.rxmdlr.absolute_address,
+            lowering.rxmdhr.absolute_address,
+            ide_rx_mask,
+            stid_rx_mask, lowering.stid_rx.lsb, exid_rx_width,
+            exid_rx_mask, lowering.exid_rx.lsb,
+            stid_rx_mask, lowering.stid_rx.lsb,
+            rtr_rx_mask,
+            dlc_rx_mask, lowering.dlc_rx.lsb,
+            lowering.rfifo0.absolute_address, rfom0_mask,
+            fovr0_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "receive_fifo1_frame".to_string(),
+        code: format!(
+            "    pub fn receive_fifo1_frame(&self) -> Result<CanFrame, CanError> {{\n        loop {{\n            let fifo_status = read_u32(0x{:X}u64)?;\n            let pending = (fifo_status & 0x{:08X}u32) >> {};\n            if pending != 0 {{\n                let identifier_register = read_u32(0x{:X}u64)?;\n                let data_length_register = read_u32(0x{:X}u64)?;\n                let data_low_register = read_u32(0x{:X}u64)?;\n                let data_high_register = read_u32(0x{:X}u64)?;\n                let is_extended = (identifier_register & 0x{:08X}u32) != 0;\n                let id = if is_extended {{\n                    let raw = (((identifier_register & 0x{:08X}u32) >> {}) << {}) | ((identifier_register & 0x{:08X}u32) >> {});\n                    let id = embedded_can::ExtendedId::new(raw)\n                        .ok_or(CanError::InvalidFrame(\"received CAN extended identifier exceeds 29 bits\"))?;\n                    embedded_can::Id::Extended(id)\n                }} else {{\n                    let raw = ((identifier_register & 0x{:08X}u32) >> {}) as u16;\n                    let id = embedded_can::StandardId::new(raw)\n                        .ok_or(CanError::InvalidFrame(\"received CAN standard identifier exceeds 11 bits\"))?;\n                    embedded_can::Id::Standard(id)\n                }};\n                let is_remote = (identifier_register & 0x{:08X}u32) != 0;\n                let dlc = ((data_length_register & 0x{:08X}u32) >> {}) as usize;\n                let low_bytes = data_low_register.to_le_bytes();\n                let high_bytes = data_high_register.to_le_bytes();\n                let mut data = [0u8; 8];\n                data[..4].copy_from_slice(&low_bytes);\n                data[4..].copy_from_slice(&high_bytes);\n                let frame = CanFrame::from_parts(id, is_remote, dlc, data);\n                write_u32(0x{:X}u64, 0x{:08X}u32)?;\n                return frame;\n            }}\n            if (fifo_status & 0x{:08X}u32) != 0 {{\n                let kind = self.last_error_kind()?;\n                return Err(CanError::Peripheral {{ kind, detail: \"CAN FIFO1 overrun\" }});\n            }}\n            if self.protocol_error_pending()? {{\n                let kind = self.last_error_kind()?;\n                return Err(CanError::Peripheral {{ kind, detail: \"CAN controller reported an error while waiting on FIFO1\" }});\n            }}\n            spin_loop();\n        }}\n    }}\n",
+            lowering.rfifo1.absolute_address,
+            fmp1_mask, lowering.fmp1.lsb,
+            lowering.rxmir.absolute_address + 16,
+            lowering.rxmdtr.absolute_address + 16,
+            lowering.rxmdlr.absolute_address + 16,
+            lowering.rxmdhr.absolute_address + 16,
+            ide_rx_mask,
+            stid_rx_mask, lowering.stid_rx.lsb, exid_rx_width,
+            exid_rx_mask, lowering.exid_rx.lsb,
+            stid_rx_mask, lowering.stid_rx.lsb,
+            rtr_rx_mask,
+            dlc_rx_mask, lowering.dlc_rx.lsb,
+            lowering.rfifo1.absolute_address, rfom1_mask,
+            fovr1_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "enter_filter_init_mode".to_string(),
+        code: format!(
+            "    pub fn enter_filter_init_mode(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x{:08X}u32)?;\n        Ok(())\n    }}\n",
+            lowering.fctlr.absolute_address, finit_mask, finit_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "leave_filter_init_mode".to_string(),
+        code: format!(
+            "    pub fn leave_filter_init_mode(&self) -> Result<(), CanError> {{\n        modify_u32(0x{:X}u64, 0x{:08X}u32, 0x00000000u32)?;\n        Ok(())\n    }}\n",
+            lowering.fctlr.absolute_address, finit_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "configure_filter_bank_mask_mode".to_string(),
+        code: format!(
+            "    pub fn configure_filter_bank_mask_mode(&self, filter_bank: u8) -> Result<(), CanError> {{\n        let mask = self.filter_bank_mask(filter_bank)?;\n        modify_u32(0x{:X}u64, mask & 0x{:08X}u32, 0x00000000u32)?;\n        Ok(())\n    }}\n",
+            lowering.fmcfgr.absolute_address, filter_mode_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "configure_filter_bank_list_mode".to_string(),
+        code: format!(
+            "    pub fn configure_filter_bank_list_mode(&self, filter_bank: u8) -> Result<(), CanError> {{\n        let mask = self.filter_bank_mask(filter_bank)?;\n        modify_u32(0x{:X}u64, mask & 0x{:08X}u32, mask & 0x{:08X}u32)?;\n        Ok(())\n    }}\n",
+            lowering.fmcfgr.absolute_address, filter_mode_mask, filter_mode_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "configure_filter_bank_scale_16bit".to_string(),
+        code: format!(
+            "    pub fn configure_filter_bank_scale_16bit(&self, filter_bank: u8) -> Result<(), CanError> {{\n        let mask = self.filter_bank_mask(filter_bank)?;\n        modify_u32(0x{:X}u64, mask & 0x{:08X}u32, 0x00000000u32)?;\n        Ok(())\n    }}\n",
+            lowering.fscfgr.absolute_address, filter_scale_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "configure_filter_bank_scale_32bit".to_string(),
+        code: format!(
+            "    pub fn configure_filter_bank_scale_32bit(&self, filter_bank: u8) -> Result<(), CanError> {{\n        let mask = self.filter_bank_mask(filter_bank)?;\n        modify_u32(0x{:X}u64, mask & 0x{:08X}u32, mask & 0x{:08X}u32)?;\n        Ok(())\n    }}\n",
+            lowering.fscfgr.absolute_address, filter_scale_mask, filter_scale_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "assign_filter_bank_to_fifo0".to_string(),
+        code: format!(
+            "    pub fn assign_filter_bank_to_fifo0(&self, filter_bank: u8) -> Result<(), CanError> {{\n        let mask = self.filter_bank_mask(filter_bank)?;\n        modify_u32(0x{:X}u64, mask & 0x{:08X}u32, 0x00000000u32)?;\n        Ok(())\n    }}\n",
+            lowering.fafifor.absolute_address, filter_fifo_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "assign_filter_bank_to_fifo1".to_string(),
+        code: format!(
+            "    pub fn assign_filter_bank_to_fifo1(&self, filter_bank: u8) -> Result<(), CanError> {{\n        let mask = self.filter_bank_mask(filter_bank)?;\n        modify_u32(0x{:X}u64, mask & 0x{:08X}u32, mask & 0x{:08X}u32)?;\n        Ok(())\n    }}\n",
+            lowering.fafifor.absolute_address, filter_fifo_mask, filter_fifo_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "enable_filter_bank".to_string(),
+        code: format!(
+            "    pub fn enable_filter_bank(&self, filter_bank: u8) -> Result<(), CanError> {{\n        let mask = self.filter_bank_mask(filter_bank)?;\n        modify_u32(0x{:X}u64, mask & 0x{:08X}u32, mask & 0x{:08X}u32)?;\n        Ok(())\n    }}\n",
+            lowering.fwr.absolute_address, filter_active_mask, filter_active_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "disable_filter_bank".to_string(),
+        code: format!(
+            "    pub fn disable_filter_bank(&self, filter_bank: u8) -> Result<(), CanError> {{\n        let mask = self.filter_bank_mask(filter_bank)?;\n        modify_u32(0x{:X}u64, mask & 0x{:08X}u32, 0x00000000u32)?;\n        Ok(())\n    }}\n",
+            lowering.fwr.absolute_address, filter_active_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "write_filter_bank_words".to_string(),
+        code: format!(
+            "    pub fn write_filter_bank_words(&self, filter_bank: u8, fr1: u32, fr2: u32) -> Result<(), CanError> {{\n        let offset = self.filter_bank_offset(filter_bank)?;\n        write_u32(0x{:X}u64 + offset, fr1)?;\n        write_u32(0x{:X}u64 + offset, fr2)?;\n        Ok(())\n    }}\n",
+            lowering.fr1.absolute_address,
+            lowering.fr2.absolute_address
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "wait_for_initialization_state".to_string(),
+        code: format!(
+            "    fn wait_for_initialization_state(&self, expected: bool) -> Result<(), CanError> {{\n        loop {{\n            let status = read_u32(0x{:X}u64)?;\n            let active = (status & 0x{:08X}u32) != 0;\n            if active == expected {{\n                return Ok(());\n            }}\n            spin_loop();\n        }}\n    }}\n",
+            lowering.statr.absolute_address, inak_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "protocol_error_pending".to_string(),
+        code: format!(
+            "    fn protocol_error_pending(&self) -> Result<bool, CanError> {{\n        Ok((read_u32(0x{:X}u64)? & 0x{:08X}u32) != 0)\n    }}\n",
+            lowering.statr.absolute_address, erri_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "filter_bank_mask".to_string(),
+        code: format!(
+            "    fn filter_bank_mask(&self, filter_bank: u8) -> Result<u32, CanError> {{\n        if usize::from(filter_bank) >= {} {{\n            return Err(CanError::InvalidFrame(\"CAN filter bank index exceeds modeled extent\"));\n        }}\n        Ok(1u32 << u32::from(filter_bank))\n    }}\n",
+            lowering.filter_bank_count
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "filter_bank_offset".to_string(),
+        code: "    fn filter_bank_offset(&self, filter_bank: u8) -> Result<u64, CanError> {\n        Ok(u64::from(filter_bank) * 8)\n    }\n".to_string(),
+    });
+    methods.push(GeneratedMethod {
+        name: "encode_frame_words".to_string(),
+        code: format!(
+            "    fn encode_frame_words(&self, frame: &CanFrame) -> Result<(u32, u32, u32, u32), CanError> {{\n        let mut identifier_register = 0u32;\n        match embedded_can::Frame::id(frame) {{\n            embedded_can::Id::Standard(id) => {{\n                let raw = u32::from(id.as_raw());\n                if u64::from(raw) > 0x{:X}u64 {{\n                    return Err(CanError::InvalidFrame(\"CAN standard identifier exceeds modeled field width\"));\n                }}\n                identifier_register |= (raw << {}) & 0x{:08X}u32;\n            }}\n            embedded_can::Id::Extended(id) => {{\n                let raw = id.as_raw();\n                let standard_component = raw >> {};\n                let extended_component = raw & 0x{:X}u32;\n                if u64::from(standard_component) > 0x{:X}u64 {{\n                    return Err(CanError::InvalidFrame(\"CAN extended identifier standard component exceeds modeled field width\"));\n                }}\n                identifier_register |= (standard_component << {}) & 0x{:08X}u32;\n                identifier_register |= (extended_component << {}) & 0x{:08X}u32;\n                identifier_register |= 0x{:08X}u32;\n            }}\n        }}\n        if embedded_can::Frame::is_remote_frame(frame) {{\n            identifier_register |= 0x{:08X}u32;\n        }}\n        let dlc = embedded_can::Frame::dlc(frame);\n        if dlc > 8 || dlc > 0x{:X}usize {{\n            return Err(CanError::InvalidFrame(\"CAN DLC exceeds modeled field width\"));\n        }}\n        let data_length_register = ((dlc as u32) << {}) & 0x{:08X}u32;\n        let (data_low_register, data_high_register) = frame.data_words();\n        Ok((identifier_register, data_length_register, data_low_register, data_high_register))\n    }}\n",
+            stid_tx_value_mask,
+            lowering.stid_tx.lsb,
+            stid_tx_mask,
+            exid_tx_width,
+            exid_tx_value_mask,
+            stid_tx_value_mask,
+            lowering.stid_tx.lsb,
+            stid_tx_mask,
+            lowering.exid_tx.lsb,
+            exid_tx_mask,
+            ide_tx_mask,
+            rtr_tx_mask,
+            dlc_tx_value_mask,
+            lowering.dlc_tx.lsb,
+            dlc_tx_mask
+        ),
+    });
+
+    Ok(methods)
+}
+
+fn resolve_can_driver_lowering(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<ResolvedCanDriverLowering> {
+    let target_ref = driver.target.target_ref.as_str();
+    let ctlr = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "CTLR")?,
+        driver,
+        "CTLR",
+    )?;
+    let statr = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "STATR")?,
+        driver,
+        "STATR",
+    )?;
+    let tstatr = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "TSTATR")?,
+        driver,
+        "TSTATR",
+    )?;
+    let rfifo0 = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "RFIFO0")?,
+        driver,
+        "RFIFO0",
+    )?;
+    let rfifo1 = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "RFIFO1")?,
+        driver,
+        "RFIFO1",
+    )?;
+    let intenr = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "INTENR")?,
+        driver,
+        "INTENR",
+    )?;
+    let errsr = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "ERRSR")?,
+        driver,
+        "ERRSR",
+    )?;
+    let btimr = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "BTIMR")?,
+        driver,
+        "BTIMR",
+    )?;
+    let txmir = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "TXMIR")?,
+        driver,
+        "TXMIR",
+    )?;
+    let txmdtr = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "TXMDTR")?,
+        driver,
+        "TXMDTR",
+    )?;
+    let txmdlr = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "TXMDLR")?,
+        driver,
+        "TXMDLR",
+    )?;
+    let txmdhr = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "TXMDHR")?,
+        driver,
+        "TXMDHR",
+    )?;
+    let rxmir = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "RXMIR")?,
+        driver,
+        "RXMIR",
+    )?;
+    let rxmdtr = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "RXMDTR")?,
+        driver,
+        "RXMDTR",
+    )?;
+    let rxmdlr = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "RXMDLR")?,
+        driver,
+        "RXMDLR",
+    )?;
+    let rxmdhr = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "RXMDHR")?,
+        driver,
+        "RXMDHR",
+    )?;
+    let fctlr = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "FCTLR")?,
+        driver,
+        "FCTLR",
+    )?;
+    let fmcfgr = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "FMCFGR")?,
+        driver,
+        "FMCFGR",
+    )?;
+    let fscfgr = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "FSCFGR")?,
+        driver,
+        "FSCFGR",
+    )?;
+    let fafifor = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "FAFIFOR")?,
+        driver,
+        "FAFIFOR",
+    )?;
+    let fwr = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "FWR")?,
+        driver,
+        "FWR",
+    )?;
+    let fr1 = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "FR1")?,
+        driver,
+        "FR1",
+    )?;
+    let fr2 = require_register(
+        try_resolve_target_register_by_name(model, target_ref, "FR2")?,
+        driver,
+        "FR2",
+    )?;
+
+    let mut pin_configs = Vec::new();
+    for pin_role in &driver.pin_roles {
+        for route in &pin_role.routes {
+            if let Some(pin_config) = resolve_can_pin_config(model, pin_role, route)? {
+                pin_configs.push(pin_config);
+            }
+        }
+    }
+
+    let filter_bank_count = u8::try_from(
+        try_resolve_register_field(&fscfgr, "FSC")
+            .ok_or_else(|| anyhow!("CAN driver {} requires FSCFGR.FSC", driver.id))?
+            .msb
+            + 1,
+    )?;
+
+    Ok(ResolvedCanDriverLowering {
+        inrq: require_field(&ctlr, driver, "INRQ")?,
+        sleep: require_field(&ctlr, driver, "SLEEP")?,
+        txfp: require_field(&ctlr, driver, "TXFP")?,
+        nart: require_field(&ctlr, driver, "NART")?,
+        abom: require_field(&ctlr, driver, "ABOM")?,
+        inak: require_field(&statr, driver, "INAK")?,
+        erri: require_field(&statr, driver, "ERRI")?,
+        rqcp0: require_field(&tstatr, driver, "RQCP0")?,
+        txok0: require_field(&tstatr, driver, "TXOK0")?,
+        alst0: require_field(&tstatr, driver, "ALST0")?,
+        terr0: require_field(&tstatr, driver, "TERR0")?,
+        tme0: require_field(&tstatr, driver, "TME0")?,
+        fmp0: require_field(&rfifo0, driver, "FMP0")?,
+        fovr0: require_field(&rfifo0, driver, "FOVR0")?,
+        rfom0: require_field(&rfifo0, driver, "RFOM0")?,
+        fmp1: require_field(&rfifo1, driver, "FMP1")?,
+        fovr1: require_field(&rfifo1, driver, "FOVR1")?,
+        rfom1: require_field(&rfifo1, driver, "RFOM1")?,
+        tmeie: require_field(&intenr, driver, "TMEIE")?,
+        fmpie0: require_field(&intenr, driver, "FMPIE0")?,
+        fmpie1: require_field(&intenr, driver, "FMPIE1")?,
+        errie: require_field(&intenr, driver, "ERRIE")?,
+        lec: require_field(&errsr, driver, "LEC")?,
+        boff: require_field(&errsr, driver, "BOFF")?,
+        brp: require_field(&btimr, driver, "BRP")?,
+        ts1: require_field(&btimr, driver, "TS1")?,
+        ts2: require_field(&btimr, driver, "TS2")?,
+        sjw: require_field(&btimr, driver, "SJW")?,
+        lbkm: require_field(&btimr, driver, "LBKM")?,
+        silm: require_field(&btimr, driver, "SILM")?,
+        stid_tx: require_field(&txmir, driver, "STID")?,
+        exid_tx: require_field(&txmir, driver, "EXID")?,
+        ide_tx: require_field(&txmir, driver, "IDE")?,
+        rtr_tx: require_field(&txmir, driver, "RTR")?,
+        txrq: require_field(&txmir, driver, "TXRQ")?,
+        dlc_tx: require_field(&txmdtr, driver, "DLC")?,
+        stid_rx: require_field(&rxmir, driver, "STID")?,
+        exid_rx: require_field(&rxmir, driver, "EXID")?,
+        ide_rx: require_field(&rxmir, driver, "IDE")?,
+        rtr_rx: require_field(&rxmir, driver, "RTR")?,
+        dlc_rx: require_field(&rxmdtr, driver, "DLC")?,
+        finit: require_field(&fctlr, driver, "FINIT")?,
+        ctlr,
+        statr,
+        tstatr,
+        rfifo0,
+        rfifo1,
+        intenr,
+        errsr,
+        btimr,
+        txmir,
+        txmdtr,
+        txmdlr,
+        txmdhr,
+        rxmir,
+        rxmdtr,
+        rxmdlr,
+        rxmdhr,
+        fctlr,
+        fmcfgr,
+        fscfgr,
+        fafifor,
+        fwr,
+        fr1,
+        fr2,
+        filter_bank_count,
+        pin_configs,
+    })
+}
+
+fn resolve_can_pin_config(
+    model: &EmbassyGenerationModel,
+    pin_role: &ResolvedEmbassyPinRole,
+    route: &McuPinRoute,
+) -> Result<Option<ResolvedCanPinConfig>> {
+    let cfg_mode = if pin_role.role.eq_ignore_ascii_case("tx")
+        || pin_role.signal.eq_ignore_ascii_case("tx")
+    {
+        0xB
+    } else if pin_role.role.eq_ignore_ascii_case("rx") || pin_role.signal.eq_ignore_ascii_case("rx")
+    {
+        0x4
+    } else {
+        return Ok(None);
+    };
+
+    let pin = model
+        .pins
+        .iter()
+        .find(|candidate| candidate.id == route.pin_ref)
+        .ok_or_else(|| {
+            anyhow!(
+                "CAN route {} references unknown physical pin {}",
+                route.id,
+                route.pin_ref
+            )
+        })?;
+    let Some(port) = pin.port.as_deref() else {
+        return Ok(None);
+    };
+    let Some(pin_index) = pin.index else {
+        return Ok(None);
+    };
+
+    let gpio_name = format!("GPIO{}", port.to_ascii_uppercase());
+    let Some(gpio_target_ref) =
+        model
+            .peripherals
+            .iter()
+            .find_map(|(peripheral_ref, peripheral)| {
+                normalize_search_text(&peripheral.name)
+                    .eq(&normalize_search_text(&gpio_name))
+                    .then_some(peripheral_ref.as_str())
+            })
+    else {
+        return Ok(None);
+    };
+
+    if !supports_gpio_register_layout(model, gpio_target_ref, &["CFGLR", "CFGHR", "OUTDR", "INDR"])?
+    {
+        return Ok(None);
+    }
+    let cfglr =
+        try_resolve_target_register_by_name(model, gpio_target_ref, "CFGLR")?.ok_or_else(|| {
+            anyhow!(
+                "CAN route {} requires GPIO register CFGLR on {}",
+                route.id,
+                gpio_target_ref
+            )
+        })?;
+    let cfghr =
+        try_resolve_target_register_by_name(model, gpio_target_ref, "CFGHR")?.ok_or_else(|| {
+            anyhow!(
+                "CAN route {} requires GPIO register CFGHR on {}",
+                route.id,
+                gpio_target_ref
+            )
+        })?;
+    if cfglr.width_bits != 32 || cfghr.width_bits != 32 {
+        return Ok(None);
+    }
+    let cfg_register = if pin_index < 8 { &cfglr } else { &cfghr };
+    let cfg_shift = (pin_index % 8) * 4;
+    let cfg_clear_mask = 0xFu32 << cfg_shift;
+    let cfg_mode_mask = cfg_mode << cfg_shift;
+    let route_statement = render_can_route_statement(model, route)?;
+    if route_statement.is_none()
+        && route.route_type.eq_ignore_ascii_case("selectable")
+        && !route.default_after_reset.unwrap_or(false)
+    {
+        return Ok(None);
+    }
+
+    Ok(Some(ResolvedCanPinConfig {
+        method_name: format!(
+            "configure_{}_{}_route",
+            to_rust_method_name(&pin_role.role),
+            to_rust_method_name(&pin.name)
+        ),
+        pin_name: pin.name.clone(),
+        cfg_addr: cfg_register.absolute_address,
+        cfg_clear_mask,
+        cfg_mode_mask,
+        route_statement,
+    }))
+}
+
+fn render_can_route_statement(
+    model: &EmbassyGenerationModel,
+    route: &McuPinRoute,
+) -> Result<Option<String>> {
+    if route.route_type.eq_ignore_ascii_case("hardwired") {
+        return Ok(None);
+    }
+    let route_index = parse_route_variant_index(route).unwrap_or(0);
+    let [control_ref] = route.control_refs.as_slice() else {
+        return Ok(None);
+    };
+    let Some(register) = try_resolve_register_by_ref(model, control_ref)? else {
+        return Ok(None);
+    };
+    let peripheral_name = last_ref_segment(&route.peripheral_ref).to_ascii_uppercase();
+    let remap_suffixes = [
+        format!("{}_REMAP", peripheral_name),
+        format!("{}RM", peripheral_name),
+    ];
+    let Some(field) = remap_suffixes
+        .iter()
+        .find_map(|suffix| try_resolve_register_field_by_suffix(&register, suffix))
+    else {
+        return Ok(None);
+    };
+    Ok(Some(render_register_write_statement(
+        &register,
+        &field,
+        u64::from(route_index),
+        "        ",
+    )?))
+}
+
+fn require_register(
+    register: Option<ResolvedRegister>,
+    driver: &ResolvedDriverInstance,
+    name: &str,
+) -> Result<ResolvedRegister> {
+    register.ok_or_else(|| anyhow!("CAN driver {} requires register {}", driver.id, name))
+}
+
+fn require_field(
+    register: &ResolvedRegister,
+    driver: &ResolvedDriverInstance,
+    name: &str,
+) -> Result<ResolvedField> {
+    try_resolve_register_field(register, name).ok_or_else(|| {
+        anyhow!(
+            "CAN driver {} requires field {} on register {}",
+            driver.id,
+            name,
+            register.id
+        )
+    })
 }
 
 fn render_gpio_methods(
@@ -10201,10 +11295,16 @@ fn collect_register_members(
             }
             RegisterBlockMember::Cluster(cluster) => {
                 if cluster.array.is_some() {
-                    bail!(
-                        "cluster {} uses arrayed instances, which are not yet supported for Embassy lowering",
-                        cluster.name
+                    let allowed_can_array_cluster = matches!(
+                        cluster.name.as_str(),
+                        "TxMailBox" | "FIFOMailBox" | "FilterRegister"
                     );
+                    if !allowed_can_array_cluster {
+                        bail!(
+                            "cluster {} uses arrayed instances, which are not yet supported for Embassy lowering",
+                            cluster.name
+                        );
+                    }
                 }
                 collect_register_members(
                     registers,
@@ -10292,6 +11392,12 @@ fn subject_aliases(value: &str) -> Vec<String> {
     if matches!(upper.as_str(), "USB" | "USBD" | "USBFSD" | "USBFS") {
         aliases.push("USB".to_string());
         aliases.push("USBD".to_string());
+    }
+    if let Some(index) = upper.strip_prefix("CAN")
+        && !index.is_empty()
+    {
+        aliases.push("CAN".to_string());
+        aliases.push("USB".to_string());
     }
 
     aliases.sort();
@@ -14768,6 +15874,47 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(pwm_rs.contains("modify_u32(0x40010004u64, 0x00000C00u32, 0x00000000u32)?;"));
         assert!(pwm_rs.contains("pub fn channel_ch2(&self) -> TIM3PWMCh2"));
         assert!(pwm_rs.contains("impl embedded_hal::pwm::SetDutyCycle for TIM3PWMCh2"));
+
+        let cargo_output = Command::new("cargo")
+            .arg("check")
+            .current_dir(output_dir.path())
+            .output()
+            .expect("cargo check");
+        assert!(
+            cargo_output.status.success(),
+            "generated crate should compile:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&cargo_output.stdout),
+            String::from_utf8_lossy(&cargo_output.stderr)
+        );
+    }
+
+    #[test]
+    fn generate_embassy_emits_can_helpers_for_ch32v203g6u6() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let input = repo_root
+            .join("evidence")
+            .join("wch")
+            .join("ch32v203g6u6")
+            .join("hair.json");
+        let document = load_validated_hair_document(&input, &repo_root)
+            .expect("reference hair document should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&document, output_dir.path()).expect("embassy generation");
+
+        let cargo_toml =
+            std::fs::read_to_string(output_dir.path().join("Cargo.toml")).expect("Cargo.toml");
+        let can_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("can.rs")).expect("can.rs");
+
+        assert!(cargo_toml.contains("embedded-can = \"0.4\""));
+        assert!(can_rs.contains("pub struct CAN1"));
+        assert!(can_rs.contains("pub fn enter_initialization_mode"));
+        assert!(can_rs.contains("pub fn configure_bit_timing"));
+        assert!(can_rs.contains("pub fn configure_tx_pa12_route"));
+        assert!(can_rs.contains("pub fn receive_fifo0_frame"));
+        assert!(can_rs.contains("pub fn write_filter_bank_words"));
+        assert!(can_rs.contains("impl embedded_can::blocking::Can for CAN1"));
 
         let cargo_output = Command::new("cargo")
             .arg("check")

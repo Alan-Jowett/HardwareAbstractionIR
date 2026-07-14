@@ -184,6 +184,17 @@ interrupt-driven and DMA-backed UART/I2C/SPI/ADC behavior is part of the
 supported subset only when the driver instance names the full interrupt, DMA,
 pin, and semantic closure required for real lowering.
 
+Classic CAN controller lowering follows the same evidence-bounded rule. A
+`can` driver instance may expose an `embedded-can`-aligned blocking transmit /
+receive surface plus HAL-specific controller, mailbox/FIFO, interrupt, and
+filter-bank helpers, but only for the subset whose initialization, mode
+transition, data movement, acknowledgement, and filter configuration paths are
+explicitly modeled by approved clock/reset bindings, interrupt routes, semantic
+operations/state machines, and structurally reachable registers/fields. The
+first cut does not imply CAN FD, time-triggered CAN, or advanced sleep/wakeup
+support; those remain out of contract until the repository names them
+explicitly.
+
 USB device lowering follows the same evidence-bounded rule. A `usb-device`
 driver instance may expose endpoint-oriented helpers, serial-style byte-stream
 helpers, or both, but only for the subset whose control and data paths are
