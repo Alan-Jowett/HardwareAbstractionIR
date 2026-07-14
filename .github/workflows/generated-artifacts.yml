@@ -202,6 +202,6 @@ jobs:
             smoke_dir="$(dirname "$manifest_path")"
             (
               cd "$smoke_dir"
-              cargo build --release --target riscv32imc-unknown-none-elf --manifest-path Cargo.toml
+              cargo build --release --locked --target riscv32imc-unknown-none-elf --manifest-path Cargo.toml
             )
           done <<< "${{ steps.discover-smoke.outputs.manifests }}"
