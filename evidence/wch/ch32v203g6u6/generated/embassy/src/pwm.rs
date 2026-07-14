@@ -243,7 +243,7 @@ impl TIM1PWM {
         }
     }
 
-    /// Configure PA9 for the TIM1 PWM CH2 PWM output.
+    /// Configure PA9 for the TIM1 PWM CH2 output.
     pub fn configure_ch2_pa9_as_pwm_output(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40010804u64, 0x000000F0u32, 0x000000B0u32)?;
         Ok(())
@@ -266,7 +266,7 @@ impl TIM1PWM {
         }
     }
 
-    /// Configure PA10 for the TIM1 PWM CH3 PWM output.
+    /// Configure PA10 for the TIM1 PWM CH3 output.
     pub fn configure_ch3_pa10_as_pwm_output(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40010804u64, 0x00000F00u32, 0x00000B00u32)?;
         Ok(())
@@ -289,7 +289,7 @@ impl TIM1PWM {
         }
     }
 
-    /// Configure PA11 for the TIM1 PWM CH4 PWM output.
+    /// Configure PA11 for the TIM1 PWM CH4 output.
     pub fn configure_ch4_pa11_as_pwm_output(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40010804u64, 0x0000F000u32, 0x0000B000u32)?;
         Ok(())
@@ -563,7 +563,7 @@ impl TIM2PWM {
         }
     }
 
-    /// Configure PA0 for the TIM2 PWM CH1 PWM output.
+    /// Configure PA0 for the TIM2 PWM CH1 output.
     pub fn configure_ch1_pa0_as_pwm_output(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40010800u64, 0x0000000Fu32, 0x0000000Bu32)?;
         Ok(())
@@ -586,7 +586,7 @@ impl TIM2PWM {
         }
     }
 
-    /// Configure PA1 for the TIM2 PWM CH2 PWM output.
+    /// Configure PA1 for the TIM2 PWM CH2 output.
     pub fn configure_ch2_pa1_as_pwm_output(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40010800u64, 0x000000F0u32, 0x000000B0u32)?;
         Ok(())
@@ -609,7 +609,7 @@ impl TIM2PWM {
         }
     }
 
-    /// Configure PA2 for the TIM2 PWM CH3 PWM output.
+    /// Configure PA2 for the TIM2 PWM CH3 output.
     pub fn configure_ch3_pa2_as_pwm_output(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40010800u64, 0x00000F00u32, 0x00000B00u32)?;
         Ok(())
@@ -632,7 +632,7 @@ impl TIM2PWM {
         }
     }
 
-    /// Configure PA3 for the TIM2 PWM CH4 PWM output.
+    /// Configure PA3 for the TIM2 PWM CH4 output.
     pub fn configure_ch4_pa3_as_pwm_output(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40010800u64, 0x0000F000u32, 0x0000B000u32)?;
         Ok(())
@@ -948,7 +948,7 @@ impl TIM3PWM {
         }
     }
 
-    /// Configure PA6 for the TIM3 PWM CH1 PWM output.
+    /// Configure PA6 for the TIM3 PWM CH1 output.
     pub fn configure_ch1_pa6_as_pwm_output(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40010800u64, 0x0F000000u32, 0x0B000000u32)?;
         Ok(())
@@ -971,7 +971,7 @@ impl TIM3PWM {
         }
     }
 
-    /// Configure PA7 for the TIM3 PWM CH2 PWM output.
+    /// Configure PA7 for the TIM3 PWM CH2 output.
     pub fn configure_ch2_pa7_as_pwm_output(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40010800u64, 0xF0000000u32, 0xB0000000u32)?;
         Ok(())
@@ -994,7 +994,7 @@ impl TIM3PWM {
         }
     }
 
-    /// Configure PB0 for the TIM3 PWM CH3 PWM output.
+    /// Configure PB0 for the TIM3 PWM CH3 output.
     pub fn configure_ch3_pb0_as_pwm_output(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40010C00u64, 0x0000000Fu32, 0x0000000Bu32)?;
         Ok(())
@@ -1017,7 +1017,7 @@ impl TIM3PWM {
         }
     }
 
-    /// Configure PB1 for the TIM3 PWM CH4 PWM output.
+    /// Configure PB1 for the TIM3 PWM CH4 output.
     pub fn configure_ch4_pb1_as_pwm_output(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40010C00u64, 0x000000F0u32, 0x000000B0u32)?;
         Ok(())
@@ -1331,7 +1331,7 @@ impl TIM4PWM {
         }
     }
 
-    /// Configure PB6 for the TIM4 PWM CH1 PWM output.
+    /// Configure PB6 for the TIM4 PWM CH1 output.
     pub fn configure_ch1_pb6_as_pwm_output(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40010C00u64, 0x0F000000u32, 0x0B000000u32)?;
         Ok(())
@@ -1354,7 +1354,7 @@ impl TIM4PWM {
         }
     }
 
-    /// Configure PB7 for the TIM4 PWM CH2 PWM output.
+    /// Configure PB7 for the TIM4 PWM CH2 output.
     pub fn configure_ch2_pb7_as_pwm_output(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40010C00u64, 0xF0000000u32, 0xB0000000u32)?;
         Ok(())

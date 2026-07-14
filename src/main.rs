@@ -5604,7 +5604,7 @@ fn render_pwm_methods(
             methods.push(GeneratedMethod {
                 name: pin_config.method_name.clone(),
                 code: format!(
-                    "    /// Configure {pin_name} for the {driver_name} {channel_name} PWM output.\n    pub fn {method_name}(&self) -> Result<(), metadata::Error> {{\n{route_statement}        modify_u32(0x{cfg_addr:X}u64, 0x{cfg_clear_mask:08X}u32, 0x{cfg_alt_output_mask:08X}u32)?;\n        Ok(())\n    }}\n",
+                    "    /// Configure {pin_name} for the {driver_name} {channel_name} output.\n    pub fn {method_name}(&self) -> Result<(), metadata::Error> {{\n{route_statement}        modify_u32(0x{cfg_addr:X}u64, 0x{cfg_clear_mask:08X}u32, 0x{cfg_alt_output_mask:08X}u32)?;\n        Ok(())\n    }}\n",
                     pin_name = render_comment_text(&pin_config.pin_name),
                     driver_name = render_comment_text(&driver.name),
                     channel_name = render_comment_text(&format!("CH{}", channel.channel_index)),
