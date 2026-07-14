@@ -172,7 +172,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo check --locked --target riscv32imc-unknown-none-elf --manifest-path evidence/espressif/esp32-c3fn4/generated/embassy/Cargo.toml
+          cargo check --target riscv32imc-unknown-none-elf --manifest-path evidence/espressif/esp32-c3fn4/generated/embassy/Cargo.toml
 
       - name: Discover smoke harnesses
         id: discover-smoke
