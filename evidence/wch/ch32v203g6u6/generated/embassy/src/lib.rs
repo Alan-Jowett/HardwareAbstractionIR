@@ -2,6 +2,7 @@
 
 pub mod metadata;
 pub mod adc;
+pub mod can;
 pub mod dma;
 pub mod gpio;
 pub mod i2c;

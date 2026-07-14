@@ -201,6 +201,13 @@ Embassy profile contract.
 - Supported lowering may bind through either direct per-block register layouts
   or composite MCU-specific routing/control fabrics when the approved HAIR
   document makes that path explicit and structurally reachable.
+- `can` lowering is allowed only when the document carries the classic-CAN
+  controller, mailbox/FIFO, interrupt, and filter-bank facts needed to lower
+  the claimed behavior deterministically. A first-cut generated CAN surface may
+  combine an `embedded-can`-aligned blocking API with HAL-specific
+  configuration/filter helpers, but it shall not claim CAN FD, time-triggered
+  CAN, or advanced low-power/wakeup behavior without an explicit later contract
+  extension.
 - Async and DMA-backed generated APIs are allowed only when the document
   carries the interrupt, DMA, pin-routing, and semantic-operation/state-machine
   facts needed to lower those behaviors deterministically.

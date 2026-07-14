@@ -74721,6 +74721,59 @@
           ]
         },
         {
+          "id": "drv.can1",
+          "name": "CAN1",
+          "targetRef": "block.can1",
+          "driverKind": "can",
+          "modulePath": "can",
+          "clockBindingRefs": [
+            "clk.can1"
+          ],
+          "resetBindingRefs": [
+            "rst.can1"
+          ],
+          "pinRoles": [
+            {
+              "role": "tx",
+              "signal": "TX",
+              "routeRefs": [
+                "pinroute.can1.tx.pa12.r0",
+                "pinroute.can1.tx.pd1.r3"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "rx",
+              "signal": "RX",
+              "routeRefs": [
+                "pinroute.can1.rx.pa11.r0",
+                "pinroute.can1.rx.pd0.r3"
+              ],
+              "requirement": "required"
+            }
+          ],
+          "interruptRouteRefs": [
+            "iroute.can1.tx",
+            "iroute.can1.rx0",
+            "iroute.can1.rx1",
+            "iroute.can1.sce"
+          ],
+          "provenance": {
+            "sourceRefs": [
+              "ch32-rs-ch32v203g6u6-yaml",
+              "openwch-ch32v20x-startup-d6"
+            ],
+            "evidenceRefs": [
+              "e_ch32rs_ch32v203g6u6_yaml_variant",
+              "e_ch32rs_ch32v203g6u6_yaml_pin_topology",
+              "e_ch32rs_ch32v203g6u6_yaml_interrupt_topology",
+              "e_startup_vector"
+            ],
+            "status": "verified",
+            "confidence": 0.86
+          }
+        },
+        {
           "id": "drv.dma1",
           "name": "DMA1",
           "targetRef": "block.dma1",

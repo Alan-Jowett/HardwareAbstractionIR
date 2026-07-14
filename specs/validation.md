@@ -113,6 +113,14 @@ cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-
 - The ESP32-C3 reference bundle succeeds without weakening the executable
   lowering contract, demonstrating support for a non-STM32/TM4C GPIO/routing
   family plus any claimed async/DMA-backed UART/I2C/SPI/ADC paths.
+- If a reference bundle claims `can` lowering, generation succeeds only when
+  the approved HAIR inputs explicitly support the claimed classic-CAN
+  controller, mailbox/FIFO, interrupt, and filter-bank behavior. Generated CAN
+  artifacts must remain traceable either to controller-level semantic
+  operations/state machines and structural register/field data or to explicit
+  MCU-topology bindings; generation must fail explicitly rather than
+  synthesizing CAN bring-up, mailbox ownership, or filter configuration from
+  partial evidence.
 - If the ESP32-C3 reference bundle claims `usb-device` lowering, generation
   succeeds only when the approved HAIR inputs explicitly support the claimed USB
   control/data path. Generated USB artifacts must remain traceable either to
