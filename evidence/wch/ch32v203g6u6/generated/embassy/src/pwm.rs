@@ -681,7 +681,7 @@ impl embedded_hal::pwm::ErrorType for TIM2PWMCh1 {
 
 impl embedded_hal::pwm::SetDutyCycle for TIM2PWMCh1 {
     fn max_duty_cycle(&self) -> u16 {
-        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u16>())
+        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u32>())
             .expect("modeled PWM auto-reload register address must be aligned");
         let reload = unsafe { read_volatile(address as *const u32) } as u16;
         reload.saturating_add(1)
@@ -723,7 +723,7 @@ impl embedded_hal::pwm::ErrorType for TIM2PWMCh2 {
 
 impl embedded_hal::pwm::SetDutyCycle for TIM2PWMCh2 {
     fn max_duty_cycle(&self) -> u16 {
-        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u16>())
+        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u32>())
             .expect("modeled PWM auto-reload register address must be aligned");
         let reload = unsafe { read_volatile(address as *const u32) } as u16;
         reload.saturating_add(1)
@@ -765,7 +765,7 @@ impl embedded_hal::pwm::ErrorType for TIM2PWMCh3 {
 
 impl embedded_hal::pwm::SetDutyCycle for TIM2PWMCh3 {
     fn max_duty_cycle(&self) -> u16 {
-        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u16>())
+        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u32>())
             .expect("modeled PWM auto-reload register address must be aligned");
         let reload = unsafe { read_volatile(address as *const u32) } as u16;
         reload.saturating_add(1)
@@ -807,7 +807,7 @@ impl embedded_hal::pwm::ErrorType for TIM2PWMCh4 {
 
 impl embedded_hal::pwm::SetDutyCycle for TIM2PWMCh4 {
     fn max_duty_cycle(&self) -> u16 {
-        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u16>())
+        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u32>())
             .expect("modeled PWM auto-reload register address must be aligned");
         let reload = unsafe { read_volatile(address as *const u32) } as u16;
         reload.saturating_add(1)

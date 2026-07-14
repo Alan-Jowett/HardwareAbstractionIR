@@ -5635,6 +5635,15 @@ fn render_pwm_support_items(
 
     let mut out = String::new();
     for channel in &lowering.channels {
+        let max_duty_align = match lowering.auto_reload_register.width_bits {
+            16 => "u16",
+            32 => "u32",
+            other => bail!(
+                "register {} uses unsupported width {} for PWM max-duty alignment",
+                lowering.auto_reload_register.id,
+                other
+            ),
+        };
         let max_duty_read = match lowering.auto_reload_register.width_bits {
             16 => "        let reload = unsafe { read_volatile(address as *const u16) };\n"
                 .to_string(),
@@ -5656,8 +5665,9 @@ fn render_pwm_support_items(
             ),
         };
         out.push_str(&format!(
-            "#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    compare_addr: u64,\n    auto_reload_addr: u64,\n    enable_addr: u64,\n    enable_clear_mask: u16,\n    enable_set_mask: u16,\n}}\n\nimpl {type_name} {{\n    pub fn enable_output(&self) -> Result<(), metadata::Error> {{\n        modify_u16(self.enable_addr, self.enable_clear_mask, self.enable_set_mask)?;\n        Ok(())\n    }}\n\n    pub fn disable_output(&self) -> Result<(), metadata::Error> {{\n        modify_u16(self.enable_addr, self.enable_clear_mask, 0x0000u16)?;\n        Ok(())\n    }}\n}}\n\nimpl embedded_hal::pwm::ErrorType for {type_name} {{\n    type Error = metadata::Error;\n}}\n\nimpl embedded_hal::pwm::SetDutyCycle for {type_name} {{\n    fn max_duty_cycle(&self) -> u16 {{\n        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u16>())\n            .expect(\"modeled PWM auto-reload register address must be aligned\");\n{max_duty_read}        reload.saturating_add(1)\n    }}\n\n    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {{\n        if duty > self.max_duty_cycle() {{\n            return Err(metadata::Error::Unsupported(\"PWM duty exceeds the configured auto-reload period\"));\n        }}\n{duty_write}        Ok(())\n    }}\n}}\n\n",
+            "#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    compare_addr: u64,\n    auto_reload_addr: u64,\n    enable_addr: u64,\n    enable_clear_mask: u16,\n    enable_set_mask: u16,\n}}\n\nimpl {type_name} {{\n    pub fn enable_output(&self) -> Result<(), metadata::Error> {{\n        modify_u16(self.enable_addr, self.enable_clear_mask, self.enable_set_mask)?;\n        Ok(())\n    }}\n\n    pub fn disable_output(&self) -> Result<(), metadata::Error> {{\n        modify_u16(self.enable_addr, self.enable_clear_mask, 0x0000u16)?;\n        Ok(())\n    }}\n}}\n\nimpl embedded_hal::pwm::ErrorType for {type_name} {{\n    type Error = metadata::Error;\n}}\n\nimpl embedded_hal::pwm::SetDutyCycle for {type_name} {{\n    fn max_duty_cycle(&self) -> u16 {{\n        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<{max_duty_align}>())\n            .expect(\"modeled PWM auto-reload register address must be aligned\");\n{max_duty_read}        reload.saturating_add(1)\n    }}\n\n    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {{\n        if duty > self.max_duty_cycle() {{\n            return Err(metadata::Error::Unsupported(\"PWM duty exceeds the configured auto-reload period\"));\n        }}\n{duty_write}        Ok(())\n    }}\n}}\n\n",
             type_name = channel.type_name,
+            max_duty_align = max_duty_align,
             max_duty_read = max_duty_read,
             duty_write = duty_write,
         ));
