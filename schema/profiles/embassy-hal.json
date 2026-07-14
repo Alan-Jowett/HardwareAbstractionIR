@@ -52,6 +52,7 @@
         "usart",
         "spi",
         "i2c",
+        "rtc",
         "timer",
         "pwm",
         "adc",
@@ -72,20 +73,21 @@
     },
     "timeDriverSource": {
       "type": "string",
-      "description": "Optional generator-facing selector for driver instances that claim capability tag `embassy-time-driver`. `systick` preserves the existing SysTick-backed time-base path on an interrupt driver instance. `hardware-timer` selects a timer-backed async time base on a timer driver instance when the document carries the explicit interrupt, semantic, structural, and tick-rate facts needed for delay helpers plus Embassy wake scheduling.",
+      "description": "Optional generator-facing selector for driver instances that claim capability tag `embassy-time-driver`. `systick` preserves the existing SysTick-backed time-base path on an interrupt driver instance. `hardware-timer` selects a timer-backed async time base on a timer driver instance when the document carries the explicit interrupt, semantic, structural, and tick-rate facts needed for delay helpers plus Embassy wake scheduling. `rtc` selects an RTC-backed async time base on an rtc driver instance when the document carries the explicit interrupt, counter, alarm, pending/clear, and tick-rate facts needed for Embassy wake scheduling.",
       "enum": [
         "systick",
-        "hardware-timer"
+        "hardware-timer",
+        "rtc"
       ]
     },
     "timeDriverTickHz": {
       "type": "integer",
       "minimum": 1,
-      "description": "Optional generator-facing Embassy tick rate for driver instances that claim capability tag `embassy-time-driver`. This must be present for `timeDriverSource = \"hardware-timer\"` so generated Cargo metadata and runtime behavior agree on the timer tick frequency. It must be omitted for `systick`, whose tick rate is defined by the SysTick lowering contract."
+      "description": "Optional generator-facing Embassy tick rate for driver instances that claim capability tag `embassy-time-driver`. This must be present for `timeDriverSource = \"hardware-timer\"` and `timeDriverSource = \"rtc\"` so generated Cargo metadata and runtime behavior agree on the modeled time-base frequency. It must be omitted for `systick`, whose tick rate is defined by the SysTick lowering contract."
     },
     "timeDriverBindings": {
       "type": "object",
-      "description": "Optional explicit timer-lowering bindings for driver instances that claim capability tag `embassy-time-driver` with `timeDriverSource = \"hardware-timer\"` and a lowering family that exposes one direct counter read plus one direct alarm/interrupt path, such as `counter-compare-timer`. These bindings name the exact structural and semantic handles the generator may use for counter reads, alarm programming, interrupt enable, pending checks, and interrupt acknowledgement. Generators must fail explicitly rather than inferring these roles from vendor register names when this binding map is required for the selected lowering family but is absent or incomplete.",
+      "description": "Optional explicit time-base lowering bindings for driver instances that claim capability tag `embassy-time-driver` with a source such as `hardware-timer` or `rtc` and a lowering family that exposes one direct counter read plus one direct alarm/interrupt path. These bindings name the exact structural and semantic handles the generator may use for counter reads, alarm programming, interrupt enable, pending checks, and interrupt acknowledgement. Generators must fail explicitly rather than inferring these roles from vendor register names when this binding map is required for the selected lowering family but is absent or incomplete.",
       "properties": {
         "counterRef": {
           "description": "Entity ref for the free-running counter register or field read by the generated time driver.",
@@ -290,7 +292,7 @@
               "uniqueItems": true
             },
             "capabilityTags": {
-              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support. The accompanying `timeDriverSource` selector determines whether that support is the existing SysTick-backed interrupt path or an explicitly modeled hardware-timer-backed path, `timeDriverTickHz` fixes the Embassy tick rate for modeled hardware-timer sources, and `timeDriverBindings` names the exact hardware-timer lowering handles when that hardware-timer path is used.",
+              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support. The accompanying `timeDriverSource` selector determines whether that support is the existing SysTick-backed interrupt path, an explicitly modeled hardware-timer-backed path, or an explicitly modeled rtc-backed path; `timeDriverTickHz` fixes the Embassy tick rate for modeled non-SysTick sources; and `timeDriverBindings` names the exact non-SysTick lowering handles when that path is used.",
               "type": "array",
               "items": {
                 "type": "string"

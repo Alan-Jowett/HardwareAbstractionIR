@@ -62711,6 +62711,10 @@
         "id": "ic.pfic",
         "name": "PFIC",
         "description": "Fast programmable interrupt controller integrated with the QingKe V4B core.",
+        "interruptNumbering": {
+          "vectorTableIndexing": "interrupt-number",
+          "registerIndexing": "interrupt-number"
+        },
         "targetRefs": [
           "device.ch32v203g6u6"
         ],
@@ -64160,6 +64164,70 @@
           ],
           "status": "inferred",
           "confidence": 0.76
+        }
+      },
+      {
+        "id": "op.rtc.clear_alarm_flag",
+        "name": "Clear RTC alarm flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.rtc"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.rtc.ctlrl",
+            "expression": {
+              "language": "plain",
+              "text": "Clear ALRF"
+            },
+            "description": "Acknowledge the RTC alarm flag."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.8
+        }
+      },
+      {
+        "id": "op.exti.clear_line17_pending",
+        "name": "Clear EXTI line 17 pending flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.exti"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.exti.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Set INTF_INTF17 = 1"
+            },
+            "description": "Acknowledge the EXTI pending state for line 17."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.72
         }
       },
       {
@@ -68134,6 +68202,25 @@
           }
         },
         {
+          "id": "block.rtc",
+          "name": "RTC",
+          "targetRef": "periph.rtc",
+          "blockClass": "rtc-controller",
+          "functionalDomain": "low-power",
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header",
+              "wch-ch32fv2x-v3x-rm"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses",
+              "e_rm_rtc_register_model"
+            ],
+            "status": "verified",
+            "confidence": 0.9
+          }
+        },
+        {
           "id": "block.adc1",
           "name": "ADC1",
           "targetRef": "periph.adc1",
@@ -68495,6 +68582,69 @@
               ],
               "status": "verified",
               "confidence": 0.86
+            }
+          },
+          {
+            "id": "clk.bkp",
+            "name": "BKP clock binding",
+            "consumerRef": "periph.bkp",
+            "clockRef": "clk.pclk1",
+            "controllerRef": "block.rcc",
+            "bindingKind": "gated",
+            "controlRefs": [
+              "reg.rcc.apb1pcenr"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs"
+              ],
+              "status": "verified",
+              "confidence": 0.9
+            }
+          },
+          {
+            "id": "clk.pwr",
+            "name": "PWR clock binding",
+            "consumerRef": "periph.pwr",
+            "clockRef": "clk.pclk1",
+            "controllerRef": "block.rcc",
+            "bindingKind": "gated",
+            "controlRefs": [
+              "reg.rcc.apb1pcenr"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs"
+              ],
+              "status": "verified",
+              "confidence": 0.9
+            }
+          },
+          {
+            "id": "clk.rtc",
+            "name": "RTC clock binding",
+            "consumerRef": "periph.rtc",
+            "clockRef": "clk.lsi",
+            "controllerRef": "block.rcc",
+            "bindingKind": "gated",
+            "controlRefs": [
+              "field.rcc_bdctlr.rtcen"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs"
+              ],
+              "status": "verified",
+              "confidence": 0.9
             }
           },
           {
@@ -69064,6 +69214,43 @@
               ],
               "status": "verified",
               "confidence": 0.86
+            }
+          },
+          {
+            "id": "isrc.rtc.global",
+            "name": "RTC global interrupt source",
+            "sourceRef": "periph.rtc",
+            "kind": "rtc",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_startup_vector"
+              ],
+              "status": "verified",
+              "confidence": 0.88
+            }
+          },
+          {
+            "id": "isrc.rtc.alarm",
+            "name": "RTC alarm interrupt source",
+            "sourceRef": "periph.rtc",
+            "kind": "rtc",
+            "clearOperationRefs": [
+              "op.rtc.clear_alarm_flag"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
             }
           },
           {
@@ -69943,6 +70130,49 @@
               ],
               "evidenceRefs": [
                 "e_ch32rs_ch32v203g6u6_yaml_interrupt_topology",
+                "e_startup_vector"
+              ],
+              "status": "verified",
+              "confidence": 0.88
+            }
+          },
+          {
+            "id": "iroute.rtc.global",
+            "name": "RTC global interrupt route",
+            "sourceRef": "isrc.rtc.global",
+            "interruptRef": "int.rtc",
+            "controllerRef": "block.pfic",
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_startup_vector"
+              ],
+              "status": "verified",
+              "confidence": 0.88
+            }
+          },
+          {
+            "id": "iroute.rtc.alarm",
+            "name": "RTC alarm interrupt route",
+            "sourceRef": "isrc.rtc.alarm",
+            "interruptRef": "int.rtcalarm",
+            "controllerRef": "block.pfic",
+            "controlRefs": [
+              "field.exti_intenr.mr17",
+              "field.exti_rtenr.tr17"
+            ],
+            "acknowledgeOperationRefs": [
+              "op.exti.clear_line17_pending"
+            ],
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
                 "e_startup_vector"
               ],
               "status": "verified",
@@ -74384,57 +74614,74 @@
           }
         },
         {
-          "id": "drv.time-tim4",
-          "name": "TIM4 Embassy time driver",
-          "targetRef": "block.tim4",
-          "driverKind": "timer",
-          "modulePath": "time",
-          "loweringPattern": "counter-compare-timer",
-          "timeDriverSource": "hardware-timer",
-          "timeDriverTickHz": 1000,
+          "id": "drv.rtc",
+          "name": "RTC",
+          "targetRef": "block.rtc",
+          "driverKind": "rtc",
+          "modulePath": "rtc",
           "clockBindingRefs": [
-            "clk.tim4"
-          ],
-          "resetBindingRefs": [
-            "rst.tim4"
+            "clk.pwr",
+            "clk.bkp"
           ],
           "interruptRouteRefs": [
-            "iroute.tim4.cc"
+            "iroute.rtc.global",
+            "iroute.rtc.alarm"
           ],
-          "initOperationRefs": [
-            "op.tim4.configure_counter_compare_timebase",
-            "op.tim4.enable"
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header",
+              "wch-ch32fv2x-v3x-rm",
+              "openwch-ch32v20x-startup-d6"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses",
+              "e_rm_rtc_register_model",
+              "e_startup_vector"
+            ],
+            "status": "inferred",
+            "confidence": 0.82
+          }
+        },
+        {
+          "id": "drv.time-rtc",
+          "name": "RTC Embassy time driver",
+          "targetRef": "block.rtc",
+          "driverKind": "rtc",
+          "modulePath": "time",
+          "timeDriverSource": "rtc",
+          "timeDriverTickHz": 1000,
+          "clockBindingRefs": [
+            "clk.pwr",
+            "clk.bkp"
           ],
-          "stateMachineRefs": [
-            "sm.tim4"
+          "interruptRouteRefs": [
+            "iroute.rtc.alarm"
           ],
           "capabilityTags": [
             "embassy-time-driver"
           ],
           "timeDriverBindings": {
-            "counterRef": "reg.tim4.cnt",
-            "alarmRef": "reg.tim4.ch1cvr",
+            "counterRef": "field.rtc_cntl.rtc_cnt",
+            "alarmRef": "field.rtc_alrml.rtc_alrm",
             "alarmApplyOperationRefs": [],
-            "interruptEnableRef": "field.tim_dmaintenr.cc1ie",
-            "interruptPendingRef": "field.tim_intfr.cc1if",
-            "interruptClearOperationRef": "op.tim4.clear_cc1"
+            "interruptEnableRef": "field.rtc_ctlrh.alrie",
+            "interruptPendingRef": "field.rtc_ctlrl.alrf",
+            "interruptClearOperationRef": "op.rtc.clear_alarm_flag"
           },
           "provenance": {
             "sourceRefs": [
               "wch-ch32fv2x-v3x-rm",
               "openwch-ch32v20x-header",
-              "openwch-ch32v20x-tim-c",
               "openwch-ch32v20x-startup-d6"
             ],
             "evidenceRefs": [
-              "e_rm_tim234_register_model",
+              "e_rm_rtc_register_model",
               "e_header_register_bitdefs",
-              "e_header_register_typedefs",
               "e_startup_vector"
             ],
             "status": "inferred",
-            "confidence": 0.78,
-            "notes": "Embassy async timing binds TIM4 counter and CC1 compare/alarm state to the shared TIM4 interrupt vector via the compare-channel path only."
+            "confidence": 0.8,
+            "notes": "Repository-authored RTC-backed Embassy async timing uses the CH32 RTC split counter/alarm registers and the dedicated RTC alarm interrupt path, with generated bring-up selecting the internal LSI source."
           }
         },
         {
@@ -74763,6 +75010,8 @@
             "iroute.spi1.global",
             "iroute.i2c1.er",
             "iroute.i2c1.ev",
+            "iroute.rtc.global",
+            "iroute.rtc.alarm",
             "iroute.tim1.brk",
             "iroute.tim1.up",
             "iroute.tim1.trg",

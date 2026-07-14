@@ -203,15 +203,15 @@ contract plus referenced semantic operations, not in ad hoc code generation.
 
 Time-base support follows the same explicit-contract rule. The existing
 SysTick-backed `embassy-time-driver` path remains valid, but it is not the only
-allowed architecture. When a document claims a hardware-timer-backed Embassy
-time base, that choice must also be selected explicitly in
+allowed architecture. When a document claims a hardware-timer-backed or
+rtc-backed Embassy time base, that choice must also be selected explicitly in
 `profiles.embassyHal` rather than inferred from `driverKind` or capability tags
-alone. The timer-backed path must remain evidence-bounded: the approved HAIR
-inputs need to justify how the timer is configured, started, acknowledged,
-advanced, and connected to the wake interrupt path. If the generated timer
-driver also exposes blocking delay helpers, those helpers must come from the
-same approved counter/alarm semantics instead of from repository-invented
-timing behavior.
+alone. The non-SysTick path must remain evidence-bounded: the approved HAIR
+inputs need to justify how the timer or rtc source is configured, started,
+acknowledged, advanced, and connected to the wake interrupt path. If the
+generated driver also exposes blocking delay helpers or rtc-specific raw control
+helpers, those helpers must come from the same approved counter/alarm semantics
+instead of from repository-invented timing behavior.
 
 When one supported hardware-timer time-base architecture still has materially
 different lowering families, that family choice must also stay explicit. For
@@ -230,14 +230,24 @@ metadata describing the unique approved interrupt route, but it must not assume
 one specific board runtime owns interrupt binding. A board-level runtime layer
 may use that contract to map and enable the interrupt on a concrete platform
 such as ESP32-C3 without making `esp-hal` part of the core generated HAL model.
+When the runtime layer or generated helper methods must translate
+`structure.device.interrupts[].number` into controller-facing vector slots or
+enable/pending/active register indices, that translation must come from the
+referenced `physical.interruptControllers[]` record rather than from
+architecture-specific generator heuristics. The controller model is therefore
+the authoritative home for vector-table numbering and controller-register
+indexing semantics. If the controller declares that the interrupt number is only
+an external-interrupt index for vector placement, any core exception-slot prefix
+must come from the CPU/runtime contract rather than from controller-local guess
+logic.
 That same contract must also preserve the timer tick frequency explicitly so the
 generated crate can select the matching `embassy-time-driver` tick-rate feature
 instead of silently falling back to Embassy's 1 MHz default.
 
-For hardware-timer Embassy time bases whose lowering family depends on one
-directly named counter/alarm/interrupt path, such as `counter-compare-timer`,
-the profile must also name the exact generator-facing binding handles rather
-than relying on generator-side register name probing. The contract uses
+For non-SysTick Embassy time bases whose lowering family depends on one directly
+named counter/alarm/interrupt path, the profile must also name the exact
+generator-facing binding handles rather than relying on generator-side register
+name probing. The contract uses
 `timeDriverBindings` on the driver instance to name:
 
 - the free-running counter register or field
@@ -250,6 +260,18 @@ than relying on generator-side register name probing. The contract uses
 This keeps the emitted time-driver lowering auditable and prevents the
 generator from silently re-discovering timing semantics from vendor-native
 register names that the approved HAIR profile did not explicitly bind.
+
+RTC lowering follows the same evidence-bounded rule as the other supported
+driver kinds, but aligns with the way Embassy commonly exposes RTC hardware:
+as a HAL-specific rtc module rather than a universal cross-platform trait.
+Within HAIR, an `rtc` driver instance may therefore serve two related but
+distinct roles from the same approved control path:
+
+1. provide an rtc-backed `embassy-time-driver` source when the document carries
+   the explicit counter/alarm/interrupt/tick-rate closure needed for async wake
+   scheduling
+2. expose HAL-specific raw RTC helpers for counter, prescaler, alarm, and
+   flag/interrupt handling that do not fit the generic `embassy-time` contract
 
 When a document also carries explicit normalization canonical mappings, Embassy
 lowering may use those mappings as secondary resolution hints for supported

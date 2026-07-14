@@ -444,6 +444,32 @@
         }
       ]
     },
+    "interruptControllerNumbering": {
+      "type": "object",
+      "properties": {
+        "vectorTableIndexing": {
+          "type": "string",
+          "enum": [
+            "interrupt-number",
+            "external-interrupt-index"
+          ],
+          "description": "How structure.device.interrupts[].number maps into vector-table placement for this controller. 'interrupt-number' uses the declared number directly as the controller-visible slot number; 'external-interrupt-index' treats the declared number as a controller-local external interrupt index, with any architectural exception-slot prefix supplied by the CPU/runtime contract rather than inferred from the controller."
+        },
+        "registerIndexing": {
+          "type": "string",
+          "enum": [
+            "interrupt-number",
+            "external-interrupt-index"
+          ],
+          "description": "How structure.device.interrupts[].number maps into controller enable/pending/active register indexing for this controller. 'interrupt-number' uses the declared number directly; 'external-interrupt-index' treats the declared number as a controller-local external interrupt index."
+        }
+      },
+      "required": [
+        "vectorTableIndexing",
+        "registerIndexing"
+      ],
+      "additionalProperties": false
+    },
     "interruptController": {
       "allOf": [
         {
@@ -461,6 +487,9 @@
             },
             "priorityBits": {
               "$ref": "common.json#/$defs/nonNegativeInteger"
+            },
+            "interruptNumbering": {
+              "$ref": "#/$defs/interruptControllerNumbering"
             }
           },
           "additionalProperties": false
