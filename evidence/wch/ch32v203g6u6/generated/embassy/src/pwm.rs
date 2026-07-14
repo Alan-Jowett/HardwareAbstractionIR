@@ -88,6 +88,12 @@ fn write_u32(address: u64, value: u32) -> Result<(), metadata::Error> {
     Ok(())
 }
 
+impl embedded_hal::pwm::Error for metadata::Error {
+    fn kind(&self) -> embedded_hal::pwm::ErrorKind {
+        embedded_hal::pwm::ErrorKind::Other
+    }
+}
+
 pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProvenance {
     module_name: "pwm",
     document_title: metadata::GENERATED_METADATA.document_title,
@@ -182,6 +188,116 @@ impl TIM1PWM {
         Ok(())
     }
 
+    pub fn set_prescaler(&self, prescaler: u16) -> Result<(), metadata::Error> {
+        write_u16(0x40012C28u64, prescaler)?;
+        Ok(())
+    }
+
+    pub fn set_auto_reload(&self, reload: u16) -> Result<(), metadata::Error> {
+        write_u16(0x40012C2Cu64, reload)?;
+        Ok(())
+    }
+
+    pub fn set_counter(&self, counter: u16) -> Result<(), metadata::Error> {
+        write_u16(0x40012C24u64, counter)?;
+        Ok(())
+    }
+
+    pub fn generate_update(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40012C14u64, 0x0001u16, 0x0001u16)?;
+        Ok(())
+    }
+
+    /// Enable auto-reload buffering for TIM1 PWM.
+    pub fn enable_auto_reload_preload(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40012C00u64, 0x0080u16, 0x0080u16)?;
+        Ok(())
+    }
+
+    /// Enable the main output gate for TIM1 PWM.
+    pub fn enable_main_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40012C44u64, 0x8000u16, 0x8000u16)?;
+        Ok(())
+    }
+
+    /// Disable the main output gate for TIM1 PWM.
+    pub fn disable_main_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40012C44u64, 0x8000u16, 0x0000u16)?;
+        Ok(())
+    }
+
+    pub fn configure_ch2_as_pwm_mode_1(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40012C18u64, 0x0300u16, 0x0000u16)?;
+        modify_u16(0x40012C18u64, 0x0800u16, 0x0800u16)?;
+        modify_u16(0x40012C18u64, 0x7000u16, 0x6000u16)?;
+        Ok(())
+    }
+
+    pub fn channel_ch2(&self) -> TIM1PWMCh2 {
+        TIM1PWMCh2 {
+            compare_addr: 0x40012C38u64,
+            auto_reload_addr: 0x40012C2Cu64,
+            enable_addr: 0x40012C20u64,
+            enable_clear_mask: 0x0010u16,
+            enable_set_mask: 0x0010u16,
+        }
+    }
+
+    /// Configure PA9 for the TIM1 PWM CH2 output.
+    pub fn configure_ch2_pa9_as_pwm_output(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40010004u64, 0x000000C0u32, 0x00000000u32)?;
+        modify_u32(0x40010804u64, 0x000000F0u32, 0x000000B0u32)?;
+        Ok(())
+    }
+
+    pub fn configure_ch3_as_pwm_mode_1(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40012C1Cu64, 0x0003u16, 0x0000u16)?;
+        modify_u16(0x40012C1Cu64, 0x0008u16, 0x0008u16)?;
+        modify_u16(0x40012C1Cu64, 0x0070u16, 0x0060u16)?;
+        Ok(())
+    }
+
+    pub fn channel_ch3(&self) -> TIM1PWMCh3 {
+        TIM1PWMCh3 {
+            compare_addr: 0x40012C3Cu64,
+            auto_reload_addr: 0x40012C2Cu64,
+            enable_addr: 0x40012C20u64,
+            enable_clear_mask: 0x0100u16,
+            enable_set_mask: 0x0100u16,
+        }
+    }
+
+    /// Configure PA10 for the TIM1 PWM CH3 output.
+    pub fn configure_ch3_pa10_as_pwm_output(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40010004u64, 0x000000C0u32, 0x00000000u32)?;
+        modify_u32(0x40010804u64, 0x00000F00u32, 0x00000B00u32)?;
+        Ok(())
+    }
+
+    pub fn configure_ch4_as_pwm_mode_1(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40012C1Cu64, 0x0300u16, 0x0000u16)?;
+        modify_u16(0x40012C1Cu64, 0x0800u16, 0x0800u16)?;
+        modify_u16(0x40012C1Cu64, 0x7000u16, 0x6000u16)?;
+        Ok(())
+    }
+
+    pub fn channel_ch4(&self) -> TIM1PWMCh4 {
+        TIM1PWMCh4 {
+            compare_addr: 0x40012C40u64,
+            auto_reload_addr: 0x40012C2Cu64,
+            enable_addr: 0x40012C20u64,
+            enable_clear_mask: 0x1000u16,
+            enable_set_mask: 0x1000u16,
+        }
+    }
+
+    /// Configure PA11 for the TIM1 PWM CH4 output.
+    pub fn configure_ch4_pa11_as_pwm_output(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40010004u64, 0x000000C0u32, 0x00000000u32)?;
+        modify_u32(0x40010804u64, 0x0000F000u32, 0x0000B000u32)?;
+        Ok(())
+    }
+
     pub fn apply_enable(&self) -> Result<(), metadata::Error> {
         modify_u16(0x40012C00u64, 0x0001u16, 0x0001u16)?;
         Ok(())
@@ -194,6 +310,132 @@ impl TIM1PWM {
 
     pub fn transition_enabled_to_disabled(&self) -> Result<(), metadata::Error> {
         modify_u16(0x40012C00u64, 0x0001u16, 0x0000u16)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM1PWMCh2 {
+    compare_addr: u64,
+    auto_reload_addr: u64,
+    enable_addr: u64,
+    enable_clear_mask: u16,
+    enable_set_mask: u16,
+}
+
+impl TIM1PWMCh2 {
+    pub fn enable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, self.enable_set_mask)?;
+        Ok(())
+    }
+
+    pub fn disable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, 0x0000u16)?;
+        Ok(())
+    }
+}
+
+impl embedded_hal::pwm::ErrorType for TIM1PWMCh2 {
+    type Error = metadata::Error;
+}
+
+impl embedded_hal::pwm::SetDutyCycle for TIM1PWMCh2 {
+    fn max_duty_cycle(&self) -> u16 {
+        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u16>())
+            .expect("modeled PWM auto-reload register address must be aligned");
+        let reload = unsafe { read_volatile(address as *const u16) };
+        reload.saturating_add(1)
+    }
+
+    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+        if duty > self.max_duty_cycle() {
+            return Err(metadata::Error::Unsupported("PWM duty exceeds the configured auto-reload period"));
+        }
+        write_u16(self.compare_addr, duty)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM1PWMCh3 {
+    compare_addr: u64,
+    auto_reload_addr: u64,
+    enable_addr: u64,
+    enable_clear_mask: u16,
+    enable_set_mask: u16,
+}
+
+impl TIM1PWMCh3 {
+    pub fn enable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, self.enable_set_mask)?;
+        Ok(())
+    }
+
+    pub fn disable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, 0x0000u16)?;
+        Ok(())
+    }
+}
+
+impl embedded_hal::pwm::ErrorType for TIM1PWMCh3 {
+    type Error = metadata::Error;
+}
+
+impl embedded_hal::pwm::SetDutyCycle for TIM1PWMCh3 {
+    fn max_duty_cycle(&self) -> u16 {
+        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u16>())
+            .expect("modeled PWM auto-reload register address must be aligned");
+        let reload = unsafe { read_volatile(address as *const u16) };
+        reload.saturating_add(1)
+    }
+
+    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+        if duty > self.max_duty_cycle() {
+            return Err(metadata::Error::Unsupported("PWM duty exceeds the configured auto-reload period"));
+        }
+        write_u16(self.compare_addr, duty)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM1PWMCh4 {
+    compare_addr: u64,
+    auto_reload_addr: u64,
+    enable_addr: u64,
+    enable_clear_mask: u16,
+    enable_set_mask: u16,
+}
+
+impl TIM1PWMCh4 {
+    pub fn enable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, self.enable_set_mask)?;
+        Ok(())
+    }
+
+    pub fn disable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, 0x0000u16)?;
+        Ok(())
+    }
+}
+
+impl embedded_hal::pwm::ErrorType for TIM1PWMCh4 {
+    type Error = metadata::Error;
+}
+
+impl embedded_hal::pwm::SetDutyCycle for TIM1PWMCh4 {
+    fn max_duty_cycle(&self) -> u16 {
+        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u16>())
+            .expect("modeled PWM auto-reload register address must be aligned");
+        let reload = unsafe { read_volatile(address as *const u16) };
+        reload.saturating_add(1)
+    }
+
+    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+        if duty > self.max_duty_cycle() {
+            return Err(metadata::Error::Unsupported("PWM duty exceeds the configured auto-reload period"));
+        }
+        write_u16(self.compare_addr, duty)?;
         Ok(())
     }
 }
@@ -281,6 +523,128 @@ impl TIM2PWM {
         Ok(())
     }
 
+    pub fn set_prescaler(&self, prescaler: u16) -> Result<(), metadata::Error> {
+        write_u16(0x40000028u64, prescaler)?;
+        Ok(())
+    }
+
+    pub fn set_auto_reload(&self, reload: u16) -> Result<(), metadata::Error> {
+        write_u32(0x4000002Cu64, u32::from(reload))?;
+        Ok(())
+    }
+
+    pub fn set_counter(&self, counter: u16) -> Result<(), metadata::Error> {
+        write_u32(0x40000024u64, u32::from(counter))?;
+        Ok(())
+    }
+
+    pub fn generate_update(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40000014u64, 0x0001u16, 0x0001u16)?;
+        Ok(())
+    }
+
+    /// Enable auto-reload buffering for TIM2 PWM.
+    pub fn enable_auto_reload_preload(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40000000u64, 0x0080u16, 0x0080u16)?;
+        Ok(())
+    }
+
+    pub fn configure_ch1_as_pwm_mode_1(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40000018u64, 0x0003u16, 0x0000u16)?;
+        modify_u16(0x40000018u64, 0x0008u16, 0x0008u16)?;
+        modify_u16(0x40000018u64, 0x0070u16, 0x0060u16)?;
+        Ok(())
+    }
+
+    pub fn channel_ch1(&self) -> TIM2PWMCh1 {
+        TIM2PWMCh1 {
+            compare_addr: 0x40000034u64,
+            auto_reload_addr: 0x4000002Cu64,
+            enable_addr: 0x40000020u64,
+            enable_clear_mask: 0x0001u16,
+            enable_set_mask: 0x0001u16,
+        }
+    }
+
+    /// Configure PA0 for the TIM2 PWM CH1 output.
+    pub fn configure_ch1_pa0_as_pwm_output(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40010004u64, 0x00000300u32, 0x00000000u32)?;
+        modify_u32(0x40010800u64, 0x0000000Fu32, 0x0000000Bu32)?;
+        Ok(())
+    }
+
+    pub fn configure_ch2_as_pwm_mode_1(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40000018u64, 0x0300u16, 0x0000u16)?;
+        modify_u16(0x40000018u64, 0x0800u16, 0x0800u16)?;
+        modify_u16(0x40000018u64, 0x7000u16, 0x6000u16)?;
+        Ok(())
+    }
+
+    pub fn channel_ch2(&self) -> TIM2PWMCh2 {
+        TIM2PWMCh2 {
+            compare_addr: 0x40000038u64,
+            auto_reload_addr: 0x4000002Cu64,
+            enable_addr: 0x40000020u64,
+            enable_clear_mask: 0x0010u16,
+            enable_set_mask: 0x0010u16,
+        }
+    }
+
+    /// Configure PA1 for the TIM2 PWM CH2 output.
+    pub fn configure_ch2_pa1_as_pwm_output(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40010004u64, 0x00000300u32, 0x00000000u32)?;
+        modify_u32(0x40010800u64, 0x000000F0u32, 0x000000B0u32)?;
+        Ok(())
+    }
+
+    pub fn configure_ch3_as_pwm_mode_1(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4000001Cu64, 0x0003u16, 0x0000u16)?;
+        modify_u16(0x4000001Cu64, 0x0008u16, 0x0008u16)?;
+        modify_u16(0x4000001Cu64, 0x0070u16, 0x0060u16)?;
+        Ok(())
+    }
+
+    pub fn channel_ch3(&self) -> TIM2PWMCh3 {
+        TIM2PWMCh3 {
+            compare_addr: 0x4000003Cu64,
+            auto_reload_addr: 0x4000002Cu64,
+            enable_addr: 0x40000020u64,
+            enable_clear_mask: 0x0100u16,
+            enable_set_mask: 0x0100u16,
+        }
+    }
+
+    /// Configure PA2 for the TIM2 PWM CH3 output.
+    pub fn configure_ch3_pa2_as_pwm_output(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40010004u64, 0x00000300u32, 0x00000000u32)?;
+        modify_u32(0x40010800u64, 0x00000F00u32, 0x00000B00u32)?;
+        Ok(())
+    }
+
+    pub fn configure_ch4_as_pwm_mode_1(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4000001Cu64, 0x0300u16, 0x0000u16)?;
+        modify_u16(0x4000001Cu64, 0x0800u16, 0x0800u16)?;
+        modify_u16(0x4000001Cu64, 0x7000u16, 0x6000u16)?;
+        Ok(())
+    }
+
+    pub fn channel_ch4(&self) -> TIM2PWMCh4 {
+        TIM2PWMCh4 {
+            compare_addr: 0x40000040u64,
+            auto_reload_addr: 0x4000002Cu64,
+            enable_addr: 0x40000020u64,
+            enable_clear_mask: 0x1000u16,
+            enable_set_mask: 0x1000u16,
+        }
+    }
+
+    /// Configure PA3 for the TIM2 PWM CH4 output.
+    pub fn configure_ch4_pa3_as_pwm_output(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40010004u64, 0x00000300u32, 0x00000000u32)?;
+        modify_u32(0x40010800u64, 0x0000F000u32, 0x0000B000u32)?;
+        Ok(())
+    }
+
     pub fn apply_enable(&self) -> Result<(), metadata::Error> {
         modify_u16(0x40000000u64, 0x0001u16, 0x0001u16)?;
         Ok(())
@@ -293,6 +657,174 @@ impl TIM2PWM {
 
     pub fn transition_enabled_to_disabled(&self) -> Result<(), metadata::Error> {
         modify_u16(0x40000000u64, 0x0001u16, 0x0000u16)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM2PWMCh1 {
+    compare_addr: u64,
+    auto_reload_addr: u64,
+    enable_addr: u64,
+    enable_clear_mask: u16,
+    enable_set_mask: u16,
+}
+
+impl TIM2PWMCh1 {
+    pub fn enable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, self.enable_set_mask)?;
+        Ok(())
+    }
+
+    pub fn disable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, 0x0000u16)?;
+        Ok(())
+    }
+}
+
+impl embedded_hal::pwm::ErrorType for TIM2PWMCh1 {
+    type Error = metadata::Error;
+}
+
+impl embedded_hal::pwm::SetDutyCycle for TIM2PWMCh1 {
+    fn max_duty_cycle(&self) -> u16 {
+        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u32>())
+            .expect("modeled PWM auto-reload register address must be aligned");
+        let reload = unsafe { read_volatile(address as *const u32) } as u16;
+        reload.saturating_add(1)
+    }
+
+    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+        if duty > self.max_duty_cycle() {
+            return Err(metadata::Error::Unsupported("PWM duty exceeds the configured auto-reload period"));
+        }
+        write_u32(self.compare_addr, u32::from(duty))?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM2PWMCh2 {
+    compare_addr: u64,
+    auto_reload_addr: u64,
+    enable_addr: u64,
+    enable_clear_mask: u16,
+    enable_set_mask: u16,
+}
+
+impl TIM2PWMCh2 {
+    pub fn enable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, self.enable_set_mask)?;
+        Ok(())
+    }
+
+    pub fn disable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, 0x0000u16)?;
+        Ok(())
+    }
+}
+
+impl embedded_hal::pwm::ErrorType for TIM2PWMCh2 {
+    type Error = metadata::Error;
+}
+
+impl embedded_hal::pwm::SetDutyCycle for TIM2PWMCh2 {
+    fn max_duty_cycle(&self) -> u16 {
+        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u32>())
+            .expect("modeled PWM auto-reload register address must be aligned");
+        let reload = unsafe { read_volatile(address as *const u32) } as u16;
+        reload.saturating_add(1)
+    }
+
+    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+        if duty > self.max_duty_cycle() {
+            return Err(metadata::Error::Unsupported("PWM duty exceeds the configured auto-reload period"));
+        }
+        write_u32(self.compare_addr, u32::from(duty))?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM2PWMCh3 {
+    compare_addr: u64,
+    auto_reload_addr: u64,
+    enable_addr: u64,
+    enable_clear_mask: u16,
+    enable_set_mask: u16,
+}
+
+impl TIM2PWMCh3 {
+    pub fn enable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, self.enable_set_mask)?;
+        Ok(())
+    }
+
+    pub fn disable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, 0x0000u16)?;
+        Ok(())
+    }
+}
+
+impl embedded_hal::pwm::ErrorType for TIM2PWMCh3 {
+    type Error = metadata::Error;
+}
+
+impl embedded_hal::pwm::SetDutyCycle for TIM2PWMCh3 {
+    fn max_duty_cycle(&self) -> u16 {
+        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u32>())
+            .expect("modeled PWM auto-reload register address must be aligned");
+        let reload = unsafe { read_volatile(address as *const u32) } as u16;
+        reload.saturating_add(1)
+    }
+
+    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+        if duty > self.max_duty_cycle() {
+            return Err(metadata::Error::Unsupported("PWM duty exceeds the configured auto-reload period"));
+        }
+        write_u32(self.compare_addr, u32::from(duty))?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM2PWMCh4 {
+    compare_addr: u64,
+    auto_reload_addr: u64,
+    enable_addr: u64,
+    enable_clear_mask: u16,
+    enable_set_mask: u16,
+}
+
+impl TIM2PWMCh4 {
+    pub fn enable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, self.enable_set_mask)?;
+        Ok(())
+    }
+
+    pub fn disable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, 0x0000u16)?;
+        Ok(())
+    }
+}
+
+impl embedded_hal::pwm::ErrorType for TIM2PWMCh4 {
+    type Error = metadata::Error;
+}
+
+impl embedded_hal::pwm::SetDutyCycle for TIM2PWMCh4 {
+    fn max_duty_cycle(&self) -> u16 {
+        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u32>())
+            .expect("modeled PWM auto-reload register address must be aligned");
+        let reload = unsafe { read_volatile(address as *const u32) } as u16;
+        reload.saturating_add(1)
+    }
+
+    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+        if duty > self.max_duty_cycle() {
+            return Err(metadata::Error::Unsupported("PWM duty exceeds the configured auto-reload period"));
+        }
+        write_u32(self.compare_addr, u32::from(duty))?;
         Ok(())
     }
 }
@@ -380,6 +912,128 @@ impl TIM3PWM {
         Ok(())
     }
 
+    pub fn set_prescaler(&self, prescaler: u16) -> Result<(), metadata::Error> {
+        write_u16(0x40000428u64, prescaler)?;
+        Ok(())
+    }
+
+    pub fn set_auto_reload(&self, reload: u16) -> Result<(), metadata::Error> {
+        write_u16(0x4000042Cu64, reload)?;
+        Ok(())
+    }
+
+    pub fn set_counter(&self, counter: u16) -> Result<(), metadata::Error> {
+        write_u16(0x40000424u64, counter)?;
+        Ok(())
+    }
+
+    pub fn generate_update(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40000414u64, 0x0001u16, 0x0001u16)?;
+        Ok(())
+    }
+
+    /// Enable auto-reload buffering for TIM3 PWM.
+    pub fn enable_auto_reload_preload(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40000400u64, 0x0080u16, 0x0080u16)?;
+        Ok(())
+    }
+
+    pub fn configure_ch1_as_pwm_mode_1(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40000418u64, 0x0003u16, 0x0000u16)?;
+        modify_u16(0x40000418u64, 0x0008u16, 0x0008u16)?;
+        modify_u16(0x40000418u64, 0x0070u16, 0x0060u16)?;
+        Ok(())
+    }
+
+    pub fn channel_ch1(&self) -> TIM3PWMCh1 {
+        TIM3PWMCh1 {
+            compare_addr: 0x40000434u64,
+            auto_reload_addr: 0x4000042Cu64,
+            enable_addr: 0x40000420u64,
+            enable_clear_mask: 0x0001u16,
+            enable_set_mask: 0x0001u16,
+        }
+    }
+
+    /// Configure PA6 for the TIM3 PWM CH1 output.
+    pub fn configure_ch1_pa6_as_pwm_output(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40010004u64, 0x00000C00u32, 0x00000000u32)?;
+        modify_u32(0x40010800u64, 0x0F000000u32, 0x0B000000u32)?;
+        Ok(())
+    }
+
+    pub fn configure_ch2_as_pwm_mode_1(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40000418u64, 0x0300u16, 0x0000u16)?;
+        modify_u16(0x40000418u64, 0x0800u16, 0x0800u16)?;
+        modify_u16(0x40000418u64, 0x7000u16, 0x6000u16)?;
+        Ok(())
+    }
+
+    pub fn channel_ch2(&self) -> TIM3PWMCh2 {
+        TIM3PWMCh2 {
+            compare_addr: 0x40000438u64,
+            auto_reload_addr: 0x4000042Cu64,
+            enable_addr: 0x40000420u64,
+            enable_clear_mask: 0x0010u16,
+            enable_set_mask: 0x0010u16,
+        }
+    }
+
+    /// Configure PA7 for the TIM3 PWM CH2 output.
+    pub fn configure_ch2_pa7_as_pwm_output(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40010004u64, 0x00000C00u32, 0x00000000u32)?;
+        modify_u32(0x40010800u64, 0xF0000000u32, 0xB0000000u32)?;
+        Ok(())
+    }
+
+    pub fn configure_ch3_as_pwm_mode_1(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4000041Cu64, 0x0003u16, 0x0000u16)?;
+        modify_u16(0x4000041Cu64, 0x0008u16, 0x0008u16)?;
+        modify_u16(0x4000041Cu64, 0x0070u16, 0x0060u16)?;
+        Ok(())
+    }
+
+    pub fn channel_ch3(&self) -> TIM3PWMCh3 {
+        TIM3PWMCh3 {
+            compare_addr: 0x4000043Cu64,
+            auto_reload_addr: 0x4000042Cu64,
+            enable_addr: 0x40000420u64,
+            enable_clear_mask: 0x0100u16,
+            enable_set_mask: 0x0100u16,
+        }
+    }
+
+    /// Configure PB0 for the TIM3 PWM CH3 output.
+    pub fn configure_ch3_pb0_as_pwm_output(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40010004u64, 0x00000C00u32, 0x00000000u32)?;
+        modify_u32(0x40010C00u64, 0x0000000Fu32, 0x0000000Bu32)?;
+        Ok(())
+    }
+
+    pub fn configure_ch4_as_pwm_mode_1(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x4000041Cu64, 0x0300u16, 0x0000u16)?;
+        modify_u16(0x4000041Cu64, 0x0800u16, 0x0800u16)?;
+        modify_u16(0x4000041Cu64, 0x7000u16, 0x6000u16)?;
+        Ok(())
+    }
+
+    pub fn channel_ch4(&self) -> TIM3PWMCh4 {
+        TIM3PWMCh4 {
+            compare_addr: 0x40000440u64,
+            auto_reload_addr: 0x4000042Cu64,
+            enable_addr: 0x40000420u64,
+            enable_clear_mask: 0x1000u16,
+            enable_set_mask: 0x1000u16,
+        }
+    }
+
+    /// Configure PB1 for the TIM3 PWM CH4 output.
+    pub fn configure_ch4_pb1_as_pwm_output(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40010004u64, 0x00000C00u32, 0x00000000u32)?;
+        modify_u32(0x40010C00u64, 0x000000F0u32, 0x000000B0u32)?;
+        Ok(())
+    }
+
     pub fn apply_enable(&self) -> Result<(), metadata::Error> {
         modify_u16(0x40000400u64, 0x0001u16, 0x0001u16)?;
         Ok(())
@@ -392,6 +1046,174 @@ impl TIM3PWM {
 
     pub fn transition_enabled_to_disabled(&self) -> Result<(), metadata::Error> {
         modify_u16(0x40000400u64, 0x0001u16, 0x0000u16)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM3PWMCh1 {
+    compare_addr: u64,
+    auto_reload_addr: u64,
+    enable_addr: u64,
+    enable_clear_mask: u16,
+    enable_set_mask: u16,
+}
+
+impl TIM3PWMCh1 {
+    pub fn enable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, self.enable_set_mask)?;
+        Ok(())
+    }
+
+    pub fn disable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, 0x0000u16)?;
+        Ok(())
+    }
+}
+
+impl embedded_hal::pwm::ErrorType for TIM3PWMCh1 {
+    type Error = metadata::Error;
+}
+
+impl embedded_hal::pwm::SetDutyCycle for TIM3PWMCh1 {
+    fn max_duty_cycle(&self) -> u16 {
+        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u16>())
+            .expect("modeled PWM auto-reload register address must be aligned");
+        let reload = unsafe { read_volatile(address as *const u16) };
+        reload.saturating_add(1)
+    }
+
+    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+        if duty > self.max_duty_cycle() {
+            return Err(metadata::Error::Unsupported("PWM duty exceeds the configured auto-reload period"));
+        }
+        write_u16(self.compare_addr, duty)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM3PWMCh2 {
+    compare_addr: u64,
+    auto_reload_addr: u64,
+    enable_addr: u64,
+    enable_clear_mask: u16,
+    enable_set_mask: u16,
+}
+
+impl TIM3PWMCh2 {
+    pub fn enable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, self.enable_set_mask)?;
+        Ok(())
+    }
+
+    pub fn disable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, 0x0000u16)?;
+        Ok(())
+    }
+}
+
+impl embedded_hal::pwm::ErrorType for TIM3PWMCh2 {
+    type Error = metadata::Error;
+}
+
+impl embedded_hal::pwm::SetDutyCycle for TIM3PWMCh2 {
+    fn max_duty_cycle(&self) -> u16 {
+        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u16>())
+            .expect("modeled PWM auto-reload register address must be aligned");
+        let reload = unsafe { read_volatile(address as *const u16) };
+        reload.saturating_add(1)
+    }
+
+    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+        if duty > self.max_duty_cycle() {
+            return Err(metadata::Error::Unsupported("PWM duty exceeds the configured auto-reload period"));
+        }
+        write_u16(self.compare_addr, duty)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM3PWMCh3 {
+    compare_addr: u64,
+    auto_reload_addr: u64,
+    enable_addr: u64,
+    enable_clear_mask: u16,
+    enable_set_mask: u16,
+}
+
+impl TIM3PWMCh3 {
+    pub fn enable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, self.enable_set_mask)?;
+        Ok(())
+    }
+
+    pub fn disable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, 0x0000u16)?;
+        Ok(())
+    }
+}
+
+impl embedded_hal::pwm::ErrorType for TIM3PWMCh3 {
+    type Error = metadata::Error;
+}
+
+impl embedded_hal::pwm::SetDutyCycle for TIM3PWMCh3 {
+    fn max_duty_cycle(&self) -> u16 {
+        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u16>())
+            .expect("modeled PWM auto-reload register address must be aligned");
+        let reload = unsafe { read_volatile(address as *const u16) };
+        reload.saturating_add(1)
+    }
+
+    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+        if duty > self.max_duty_cycle() {
+            return Err(metadata::Error::Unsupported("PWM duty exceeds the configured auto-reload period"));
+        }
+        write_u16(self.compare_addr, duty)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM3PWMCh4 {
+    compare_addr: u64,
+    auto_reload_addr: u64,
+    enable_addr: u64,
+    enable_clear_mask: u16,
+    enable_set_mask: u16,
+}
+
+impl TIM3PWMCh4 {
+    pub fn enable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, self.enable_set_mask)?;
+        Ok(())
+    }
+
+    pub fn disable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, 0x0000u16)?;
+        Ok(())
+    }
+}
+
+impl embedded_hal::pwm::ErrorType for TIM3PWMCh4 {
+    type Error = metadata::Error;
+}
+
+impl embedded_hal::pwm::SetDutyCycle for TIM3PWMCh4 {
+    fn max_duty_cycle(&self) -> u16 {
+        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u16>())
+            .expect("modeled PWM auto-reload register address must be aligned");
+        let reload = unsafe { read_volatile(address as *const u16) };
+        reload.saturating_add(1)
+    }
+
+    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+        if duty > self.max_duty_cycle() {
+            return Err(metadata::Error::Unsupported("PWM duty exceeds the configured auto-reload period"));
+        }
+        write_u16(self.compare_addr, duty)?;
         Ok(())
     }
 }
@@ -477,6 +1299,78 @@ impl TIM4PWM {
         Ok(())
     }
 
+    pub fn set_prescaler(&self, prescaler: u16) -> Result<(), metadata::Error> {
+        write_u16(0x40000828u64, prescaler)?;
+        Ok(())
+    }
+
+    pub fn set_auto_reload(&self, reload: u16) -> Result<(), metadata::Error> {
+        write_u16(0x4000082Cu64, reload)?;
+        Ok(())
+    }
+
+    pub fn set_counter(&self, counter: u16) -> Result<(), metadata::Error> {
+        write_u16(0x40000824u64, counter)?;
+        Ok(())
+    }
+
+    pub fn generate_update(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40000814u64, 0x0001u16, 0x0001u16)?;
+        Ok(())
+    }
+
+    /// Enable auto-reload buffering for TIM4 PWM.
+    pub fn enable_auto_reload_preload(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40000800u64, 0x0080u16, 0x0080u16)?;
+        Ok(())
+    }
+
+    pub fn configure_ch1_as_pwm_mode_1(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40000818u64, 0x0003u16, 0x0000u16)?;
+        modify_u16(0x40000818u64, 0x0008u16, 0x0008u16)?;
+        modify_u16(0x40000818u64, 0x0070u16, 0x0060u16)?;
+        Ok(())
+    }
+
+    pub fn channel_ch1(&self) -> TIM4PWMCh1 {
+        TIM4PWMCh1 {
+            compare_addr: 0x40000834u64,
+            auto_reload_addr: 0x4000082Cu64,
+            enable_addr: 0x40000820u64,
+            enable_clear_mask: 0x0001u16,
+            enable_set_mask: 0x0001u16,
+        }
+    }
+
+    /// Configure PB6 for the TIM4 PWM CH1 output.
+    pub fn configure_ch1_pb6_as_pwm_output(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40010C00u64, 0x0F000000u32, 0x0B000000u32)?;
+        Ok(())
+    }
+
+    pub fn configure_ch2_as_pwm_mode_1(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40000818u64, 0x0300u16, 0x0000u16)?;
+        modify_u16(0x40000818u64, 0x0800u16, 0x0800u16)?;
+        modify_u16(0x40000818u64, 0x7000u16, 0x6000u16)?;
+        Ok(())
+    }
+
+    pub fn channel_ch2(&self) -> TIM4PWMCh2 {
+        TIM4PWMCh2 {
+            compare_addr: 0x40000838u64,
+            auto_reload_addr: 0x4000082Cu64,
+            enable_addr: 0x40000820u64,
+            enable_clear_mask: 0x0010u16,
+            enable_set_mask: 0x0010u16,
+        }
+    }
+
+    /// Configure PB7 for the TIM4 PWM CH2 output.
+    pub fn configure_ch2_pb7_as_pwm_output(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40010C00u64, 0xF0000000u32, 0xB0000000u32)?;
+        Ok(())
+    }
+
     pub fn apply_enable(&self) -> Result<(), metadata::Error> {
         modify_u16(0x40000800u64, 0x0001u16, 0x0001u16)?;
         Ok(())
@@ -489,6 +1383,90 @@ impl TIM4PWM {
 
     pub fn transition_enabled_to_disabled(&self) -> Result<(), metadata::Error> {
         modify_u16(0x40000800u64, 0x0001u16, 0x0000u16)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM4PWMCh1 {
+    compare_addr: u64,
+    auto_reload_addr: u64,
+    enable_addr: u64,
+    enable_clear_mask: u16,
+    enable_set_mask: u16,
+}
+
+impl TIM4PWMCh1 {
+    pub fn enable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, self.enable_set_mask)?;
+        Ok(())
+    }
+
+    pub fn disable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, 0x0000u16)?;
+        Ok(())
+    }
+}
+
+impl embedded_hal::pwm::ErrorType for TIM4PWMCh1 {
+    type Error = metadata::Error;
+}
+
+impl embedded_hal::pwm::SetDutyCycle for TIM4PWMCh1 {
+    fn max_duty_cycle(&self) -> u16 {
+        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u16>())
+            .expect("modeled PWM auto-reload register address must be aligned");
+        let reload = unsafe { read_volatile(address as *const u16) };
+        reload.saturating_add(1)
+    }
+
+    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+        if duty > self.max_duty_cycle() {
+            return Err(metadata::Error::Unsupported("PWM duty exceeds the configured auto-reload period"));
+        }
+        write_u16(self.compare_addr, duty)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM4PWMCh2 {
+    compare_addr: u64,
+    auto_reload_addr: u64,
+    enable_addr: u64,
+    enable_clear_mask: u16,
+    enable_set_mask: u16,
+}
+
+impl TIM4PWMCh2 {
+    pub fn enable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, self.enable_set_mask)?;
+        Ok(())
+    }
+
+    pub fn disable_output(&self) -> Result<(), metadata::Error> {
+        modify_u16(self.enable_addr, self.enable_clear_mask, 0x0000u16)?;
+        Ok(())
+    }
+}
+
+impl embedded_hal::pwm::ErrorType for TIM4PWMCh2 {
+    type Error = metadata::Error;
+}
+
+impl embedded_hal::pwm::SetDutyCycle for TIM4PWMCh2 {
+    fn max_duty_cycle(&self) -> u16 {
+        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<u16>())
+            .expect("modeled PWM auto-reload register address must be aligned");
+        let reload = unsafe { read_volatile(address as *const u16) };
+        reload.saturating_add(1)
+    }
+
+    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+        if duty > self.max_duty_cycle() {
+            return Err(metadata::Error::Unsupported("PWM duty exceeds the configured auto-reload period"));
+        }
+        write_u16(self.compare_addr, duty)?;
         Ok(())
     }
 }

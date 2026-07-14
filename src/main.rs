@@ -1609,6 +1609,43 @@ struct ResolvedEspGpioPinLowering {
     fun_ie_mask: u32,
 }
 
+#[derive(Debug, Clone)]
+struct ResolvedPwmPinConfig {
+    method_name: String,
+    pin_name: String,
+    cfg_addr: u64,
+    cfg_clear_mask: u32,
+    cfg_alt_output_mask: u32,
+    route_statement: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedPwmChannelLowering {
+    channel_index: u8,
+    method_slug: String,
+    type_name: String,
+    compare_register: ResolvedRegister,
+    mode_register: ResolvedRegister,
+    select_field: ResolvedField,
+    preload_field: ResolvedField,
+    mode_field: ResolvedField,
+    enable_register: ResolvedRegister,
+    enable_field: ResolvedField,
+    pin_configs: Vec<ResolvedPwmPinConfig>,
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedPwmDriverLowering {
+    prescaler_register: ResolvedRegister,
+    auto_reload_register: ResolvedRegister,
+    counter_register: Option<ResolvedRegister>,
+    event_register: ResolvedRegister,
+    update_field: ResolvedField,
+    auto_reload_preload: Option<(ResolvedRegister, ResolvedField)>,
+    main_output_enable: Option<(ResolvedRegister, ResolvedField)>,
+    channels: Vec<ResolvedPwmChannelLowering>,
+}
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 enum ResolvedGpioPortLowering {
@@ -3553,9 +3590,15 @@ fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
         .drivers
         .iter()
         .any(driver_uses_usb_fsdev_pma_btable_lowering);
-    if has_time_driver || has_fsdev_usb {
+    let has_pwm = model
+        .drivers
+        .iter()
+        .any(|driver| driver.driver_kind == "pwm");
+    if has_time_driver || has_fsdev_usb || has_pwm {
         out.push_str("\n[dependencies]\n");
-        out.push_str("critical-section = \"1.2\"\n");
+        if has_time_driver || has_fsdev_usb {
+            out.push_str("critical-section = \"1.2\"\n");
+        }
     }
     if has_time_driver {
         out.push_str(&format!(
@@ -3566,6 +3609,9 @@ fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
     }
     if has_fsdev_usb {
         out.push_str("embassy-usb-driver = \"0.2.2\"\n");
+    }
+    if has_pwm {
+        out.push_str("embedded-hal = \"1.0\"\n");
     }
     out
 }
@@ -3680,6 +3726,9 @@ fn render_driver_module(
     {
         out.push_str(render_gpio_module_prelude());
     }
+    if drivers.iter().any(|driver| driver.driver_kind == "pwm") {
+        out.push_str(render_pwm_module_prelude());
+    }
     out.push_str(&render_module_provenance_const(module_name));
     for driver in drivers {
         out.push_str(&render_driver_instance(model, driver)?);
@@ -3772,6 +3821,9 @@ fn render_driver_support_items(
     }
     if driver.driver_kind == "gpio-port" {
         out.push_str(&render_gpio_support_items(model, driver)?);
+    }
+    if driver.driver_kind == "pwm" {
+        out.push_str(&render_pwm_support_items(model, driver)?);
     }
     if driver_uses_usb_fsdev_pma_btable_lowering(driver) {
         out.push_str(&render_usb_fsdev_support_items(driver));
@@ -4758,6 +4810,7 @@ fn render_driver_methods(
     methods.extend(render_reset_binding_methods(model, driver)?);
     methods.extend(render_gpio_methods(model, driver)?);
     methods.extend(render_pin_route_methods(model, driver)?);
+    methods.extend(render_pwm_methods(model, driver)?);
     methods.extend(render_usart_methods(model, driver)?);
     methods.extend(render_spi_methods(model, driver)?);
     methods.extend(render_adc_methods(model, driver)?);
@@ -5160,6 +5213,10 @@ fn render_gpio_module_prelude() -> &'static str {
     "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Level {\n    Low,\n    High,\n}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Pull {\n    None,\n    Up,\n    Down,\n}\n\n"
 }
 
+fn render_pwm_module_prelude() -> &'static str {
+    "impl embedded_hal::pwm::Error for metadata::Error {\n    fn kind(&self) -> embedded_hal::pwm::ErrorKind {\n        embedded_hal::pwm::ErrorKind::Other\n    }\n}\n\n"
+}
+
 fn render_clock_binding_methods(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
@@ -5426,6 +5483,549 @@ fn render_muxed_pin_route_method(
         name: method_name,
         code,
     }))
+}
+
+fn render_pwm_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    if driver.driver_kind != "pwm" {
+        return Ok(Vec::new());
+    }
+
+    let Some(lowering) = resolve_pwm_driver_lowering(model, driver)? else {
+        return Ok(Vec::new());
+    };
+
+    let mut methods = Vec::new();
+    methods.push(GeneratedMethod {
+        name: "set_prescaler".to_string(),
+        code: format!(
+            "    pub fn set_prescaler(&self, prescaler: u16) -> Result<(), metadata::Error> {{\n{}        Ok(())\n    }}\n",
+            render_pwm_register_write_statement(&lowering.prescaler_register, "prescaler", "        ")?
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "set_auto_reload".to_string(),
+        code: format!(
+            "    pub fn set_auto_reload(&self, reload: u16) -> Result<(), metadata::Error> {{\n{}        Ok(())\n    }}\n",
+            render_pwm_register_write_statement(&lowering.auto_reload_register, "reload", "        ")?
+        ),
+    });
+    if let Some(counter_register) = &lowering.counter_register {
+        methods.push(GeneratedMethod {
+            name: "set_counter".to_string(),
+            code: format!(
+                "    pub fn set_counter(&self, counter: u16) -> Result<(), metadata::Error> {{\n{}        Ok(())\n    }}\n",
+                render_pwm_register_write_statement(counter_register, "counter", "        ")?
+            ),
+        });
+    }
+    methods.push(GeneratedMethod {
+        name: "generate_update".to_string(),
+        code: format!(
+            "    pub fn generate_update(&self) -> Result<(), metadata::Error> {{\n{}\n        Ok(())\n    }}\n",
+            render_register_write_statement(
+                &lowering.event_register,
+                &lowering.update_field,
+                1,
+                "        ",
+            )?
+            .trim_end()
+        ),
+    });
+    if let Some((register, field)) = &lowering.auto_reload_preload {
+        methods.push(render_register_write_method(
+            "enable_auto_reload_preload".to_string(),
+            register,
+            field,
+            1,
+            &format!("Enable auto-reload buffering for {}.", driver.name),
+        )?);
+    }
+    if let Some((register, field)) = &lowering.main_output_enable {
+        methods.push(render_register_write_method(
+            "enable_main_output".to_string(),
+            register,
+            field,
+            1,
+            &format!("Enable the main output gate for {}.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_main_output".to_string(),
+            register,
+            field,
+            0,
+            &format!("Disable the main output gate for {}.", driver.name),
+        )?);
+    }
+
+    for channel in &lowering.channels {
+        methods.push(GeneratedMethod {
+            name: format!("configure_{}_as_pwm_mode_1", channel.method_slug),
+            code: format!(
+                "    pub fn configure_{method_slug}_as_pwm_mode_1(&self) -> Result<(), metadata::Error> {{\n{select_stmt}{preload_stmt}{mode_stmt}        Ok(())\n    }}\n",
+                method_slug = channel.method_slug,
+                select_stmt = render_register_write_statement(
+                    &channel.mode_register,
+                    &channel.select_field,
+                    0,
+                    "        ",
+                )?,
+                preload_stmt = render_register_write_statement(
+                    &channel.mode_register,
+                    &channel.preload_field,
+                    1,
+                    "        ",
+                )?,
+                mode_stmt = render_register_write_statement(
+                    &channel.mode_register,
+                    &channel.mode_field,
+                    0b110,
+                    "        ",
+                )?,
+            ),
+        });
+        methods.push(GeneratedMethod {
+            name: format!("channel_{}", channel.method_slug),
+            code: format!(
+                "    pub fn channel_{method_slug}(&self) -> {type_name} {{\n        {type_name} {{\n            compare_addr: 0x{compare_addr:X}u64,\n            auto_reload_addr: 0x{arr_addr:X}u64,\n            enable_addr: 0x{enable_addr:X}u64,\n            enable_clear_mask: 0x{enable_clear_mask:04X}u16,\n            enable_set_mask: 0x{enable_set_mask:04X}u16,\n        }}\n    }}\n",
+                method_slug = channel.method_slug,
+                type_name = channel.type_name,
+                compare_addr = channel.compare_register.absolute_address,
+                arr_addr = lowering.auto_reload_register.absolute_address,
+                enable_addr = channel.enable_register.absolute_address,
+                enable_clear_mask = shifted_field_mask(&channel.enable_field, &channel.enable_register)?,
+                enable_set_mask = field_bit_mask(&channel.enable_field, &channel.enable_register)?,
+            ),
+        });
+        for pin_config in &channel.pin_configs {
+            let route_statement = pin_config.route_statement.as_deref().unwrap_or("");
+            methods.push(GeneratedMethod {
+                name: pin_config.method_name.clone(),
+                code: format!(
+                    "    /// Configure {pin_name} for the {driver_name} {channel_name} output.\n    pub fn {method_name}(&self) -> Result<(), metadata::Error> {{\n{route_statement}        modify_u32(0x{cfg_addr:X}u64, 0x{cfg_clear_mask:08X}u32, 0x{cfg_alt_output_mask:08X}u32)?;\n        Ok(())\n    }}\n",
+                    pin_name = render_comment_text(&pin_config.pin_name),
+                    driver_name = render_comment_text(&driver.name),
+                    channel_name = render_comment_text(&format!("CH{}", channel.channel_index)),
+                    method_name = pin_config.method_name,
+                    route_statement = route_statement,
+                    cfg_addr = pin_config.cfg_addr,
+                    cfg_clear_mask = pin_config.cfg_clear_mask,
+                    cfg_alt_output_mask = pin_config.cfg_alt_output_mask,
+                ),
+            });
+        }
+    }
+
+    Ok(methods)
+}
+
+fn render_pwm_support_items(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    if driver.driver_kind != "pwm" {
+        return Ok(String::new());
+    }
+
+    let Some(lowering) = resolve_pwm_driver_lowering(model, driver)? else {
+        return Ok(String::new());
+    };
+
+    let mut out = String::new();
+    for channel in &lowering.channels {
+        let max_duty_align = match lowering.auto_reload_register.width_bits {
+            16 => "u16",
+            32 => "u32",
+            other => bail!(
+                "register {} uses unsupported width {} for PWM max-duty alignment",
+                lowering.auto_reload_register.id,
+                other
+            ),
+        };
+        let max_duty_read = match lowering.auto_reload_register.width_bits {
+            16 => "        let reload = unsafe { read_volatile(address as *const u16) };\n"
+                .to_string(),
+            32 => "        let reload = unsafe { read_volatile(address as *const u32) } as u16;\n"
+                .to_string(),
+            other => bail!(
+                "register {} uses unsupported width {} for PWM max-duty reads",
+                lowering.auto_reload_register.id,
+                other
+            ),
+        };
+        let duty_write = match channel.compare_register.width_bits {
+            16 => "        write_u16(self.compare_addr, duty)?;\n".to_string(),
+            32 => "        write_u32(self.compare_addr, u32::from(duty))?;\n".to_string(),
+            other => bail!(
+                "register {} uses unsupported width {} for PWM duty writes",
+                channel.compare_register.id,
+                other
+            ),
+        };
+        out.push_str(&format!(
+            "#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    compare_addr: u64,\n    auto_reload_addr: u64,\n    enable_addr: u64,\n    enable_clear_mask: u16,\n    enable_set_mask: u16,\n}}\n\nimpl {type_name} {{\n    pub fn enable_output(&self) -> Result<(), metadata::Error> {{\n        modify_u16(self.enable_addr, self.enable_clear_mask, self.enable_set_mask)?;\n        Ok(())\n    }}\n\n    pub fn disable_output(&self) -> Result<(), metadata::Error> {{\n        modify_u16(self.enable_addr, self.enable_clear_mask, 0x0000u16)?;\n        Ok(())\n    }}\n}}\n\nimpl embedded_hal::pwm::ErrorType for {type_name} {{\n    type Error = metadata::Error;\n}}\n\nimpl embedded_hal::pwm::SetDutyCycle for {type_name} {{\n    fn max_duty_cycle(&self) -> u16 {{\n        let address = checked_address(self.auto_reload_addr, core::mem::align_of::<{max_duty_align}>())\n            .expect(\"modeled PWM auto-reload register address must be aligned\");\n{max_duty_read}        reload.saturating_add(1)\n    }}\n\n    fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {{\n        if duty > self.max_duty_cycle() {{\n            return Err(metadata::Error::Unsupported(\"PWM duty exceeds the configured auto-reload period\"));\n        }}\n{duty_write}        Ok(())\n    }}\n}}\n\n",
+            type_name = channel.type_name,
+            max_duty_align = max_duty_align,
+            max_duty_read = max_duty_read,
+            duty_write = duty_write,
+        ));
+    }
+    Ok(out)
+}
+
+fn resolve_pwm_driver_lowering(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Option<ResolvedPwmDriverLowering>> {
+    if driver.driver_kind != "pwm" {
+        return Ok(None);
+    }
+
+    let target_ref = driver.target.target_ref.as_str();
+    let Some(prescaler_register) = try_resolve_target_register_by_name(model, target_ref, "PSC")?
+    else {
+        return Ok(None);
+    };
+    let Some(auto_reload_register) =
+        try_resolve_target_register_by_names(model, target_ref, &["ATRLR", "ARR"])?
+    else {
+        return Ok(None);
+    };
+    let counter_register = try_resolve_target_register_by_name(model, target_ref, "CNT")?;
+    let Some(event_register) =
+        try_resolve_target_register_by_names(model, target_ref, &["SWEVGR", "EGR"])?
+    else {
+        return Ok(None);
+    };
+    validate_register_width_for_pwm(&prescaler_register, "PWM prescaler register")?;
+    validate_register_width_for_pwm(&auto_reload_register, "PWM auto-reload register")?;
+    if let Some(counter_register) = &counter_register {
+        validate_register_width_for_pwm(counter_register, "PWM counter register")?;
+    }
+    let Some(update_field) = try_resolve_register_field(&event_register, "UG") else {
+        return Ok(None);
+    };
+
+    let auto_reload_preload =
+        try_resolve_target_register_by_names(model, target_ref, &["CTLR1", "CR1"])?.and_then(
+            |register| try_resolve_register_field(&register, "ARPE").map(|field| (register, field)),
+        );
+    let main_output_enable = try_resolve_target_register_by_names(model, target_ref, &["BDTR"])?
+        .and_then(|register| {
+            try_resolve_register_field(&register, "MOE").map(|field| (register, field))
+        });
+
+    let mut channels = Vec::new();
+    for pin_role in &driver.pin_roles {
+        let Some(channel_index) = resolve_pwm_output_channel_index(pin_role) else {
+            continue;
+        };
+        let Some(channel) = resolve_pwm_channel_lowering(model, driver, pin_role, channel_index)?
+        else {
+            continue;
+        };
+        channels.push(channel);
+    }
+    if channels.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(Some(ResolvedPwmDriverLowering {
+        prescaler_register,
+        auto_reload_register,
+        counter_register,
+        event_register,
+        update_field,
+        auto_reload_preload,
+        main_output_enable,
+        channels,
+    }))
+}
+
+fn resolve_pwm_output_channel_index(pin_role: &ResolvedEmbassyPinRole) -> Option<u8> {
+    for candidate in [&pin_role.signal, &pin_role.role] {
+        match candidate.to_ascii_uppercase().as_str() {
+            "CH1" => return Some(1),
+            "CH2" => return Some(2),
+            "CH3" => return Some(3),
+            "CH4" => return Some(4),
+            _ => {}
+        }
+    }
+    None
+}
+
+fn resolve_pwm_channel_lowering(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+    pin_role: &ResolvedEmbassyPinRole,
+    channel_index: u8,
+) -> Result<Option<ResolvedPwmChannelLowering>> {
+    let target_ref = driver.target.target_ref.as_str();
+    let mode_register_names = if channel_index <= 2 {
+        vec!["CHCTLR1", "CHCTLR1_Output", "CCMR1_Output", "CCMR1"]
+    } else {
+        vec!["CHCTLR2", "CHCTLR2_Output", "CCMR2_Output", "CCMR2"]
+    };
+    let Some(mode_register) =
+        try_resolve_target_register_by_names(model, target_ref, &mode_register_names)?
+    else {
+        return Ok(None);
+    };
+    let Some(enable_register) = try_resolve_target_register_by_name(model, target_ref, "CCER")?
+    else {
+        return Ok(None);
+    };
+    let compare_register_names = [
+        format!("CH{}CVR", channel_index),
+        format!("CCR{}", channel_index),
+    ];
+    let compare_register_names_refs = compare_register_names
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    let Some(compare_register) =
+        try_resolve_target_register_by_names(model, target_ref, &compare_register_names_refs)?
+    else {
+        return Ok(None);
+    };
+    validate_register_width_for_pwm(&compare_register, "PWM compare register")?;
+    let select_field_name = format!("CC{}S", channel_index);
+    let preload_field_name = format!("OC{}PE", channel_index);
+    let mode_field_name = format!("OC{}M", channel_index);
+    let enable_field_name = format!("CC{}E", channel_index);
+    let Some(select_field) = try_resolve_register_field(&mode_register, &select_field_name) else {
+        return Ok(None);
+    };
+    let Some(preload_field) = try_resolve_register_field(&mode_register, &preload_field_name)
+    else {
+        return Ok(None);
+    };
+    let Some(mode_field) = try_resolve_register_field(&mode_register, &mode_field_name) else {
+        return Ok(None);
+    };
+    let Some(enable_field) = try_resolve_register_field(&enable_register, &enable_field_name)
+    else {
+        return Ok(None);
+    };
+
+    validate_field_width(&select_field, &mode_register, 2)?;
+    validate_field_width(&preload_field, &mode_register, 1)?;
+    validate_field_width(&mode_field, &mode_register, 3)?;
+    validate_field_width(&enable_field, &enable_register, 1)?;
+
+    let method_slug = format!("ch{}", channel_index);
+    let mut pin_configs = Vec::new();
+    for route in &pin_role.routes {
+        if let Some(pin_config) = resolve_pwm_pin_config(model, route)? {
+            pin_configs.push(pin_config);
+        }
+    }
+
+    Ok(Some(ResolvedPwmChannelLowering {
+        channel_index,
+        method_slug: method_slug.clone(),
+        type_name: format!("{}{}", driver.type_name, to_rust_type_name(&method_slug)),
+        compare_register,
+        mode_register,
+        select_field,
+        preload_field,
+        mode_field,
+        enable_register,
+        enable_field,
+        pin_configs,
+    }))
+}
+
+fn resolve_pwm_pin_config(
+    model: &EmbassyGenerationModel,
+    route: &McuPinRoute,
+) -> Result<Option<ResolvedPwmPinConfig>> {
+    let pin = model
+        .pins
+        .iter()
+        .find(|candidate| candidate.id == route.pin_ref)
+        .ok_or_else(|| {
+            anyhow!(
+                "PWM route {} references unknown physical pin {}",
+                route.id,
+                route.pin_ref
+            )
+        })?;
+    let Some(port) = pin.port.as_deref() else {
+        return Ok(None);
+    };
+    let Some(pin_index) = pin.index else {
+        return Ok(None);
+    };
+
+    let gpio_name = format!("GPIO{}", port.to_ascii_uppercase());
+    let Some(gpio_target_ref) =
+        model
+            .peripherals
+            .iter()
+            .find_map(|(peripheral_ref, peripheral)| {
+                normalize_search_text(&peripheral.name)
+                    .eq(&normalize_search_text(&gpio_name))
+                    .then(|| peripheral_ref.as_str())
+            })
+    else {
+        return Ok(None);
+    };
+
+    if !supports_gpio_register_layout(model, gpio_target_ref, &["CFGLR", "CFGHR", "OUTDR", "INDR"])?
+    {
+        return Ok(None);
+    }
+
+    let cfglr =
+        try_resolve_target_register_by_name(model, gpio_target_ref, "CFGLR")?.ok_or_else(|| {
+            anyhow!(
+                "PWM route {} requires GPIO register CFGLR on {}",
+                route.id,
+                gpio_target_ref
+            )
+        })?;
+    let cfghr =
+        try_resolve_target_register_by_name(model, gpio_target_ref, "CFGHR")?.ok_or_else(|| {
+            anyhow!(
+                "PWM route {} requires GPIO register CFGHR on {}",
+                route.id,
+                gpio_target_ref
+            )
+        })?;
+    if cfglr.width_bits != 32 {
+        bail!(
+            "PWM route {} requires 32-bit CFGLR on {}, but {} uses width {}",
+            route.id,
+            gpio_target_ref,
+            cfglr.id,
+            cfglr.width_bits
+        );
+    }
+    if cfghr.width_bits != 32 {
+        bail!(
+            "PWM route {} requires 32-bit CFGHR on {}, but {} uses width {}",
+            route.id,
+            gpio_target_ref,
+            cfghr.id,
+            cfghr.width_bits
+        );
+    }
+    let cfg_register = if pin_index < 8 { &cfglr } else { &cfghr };
+    let cfg_shift = (pin_index % 8) * 4;
+    let cfg_clear_mask = 0xFu32 << cfg_shift;
+    let cfg_alt_output_mask = 0xBu32 << cfg_shift;
+
+    let route_statement = render_default_pwm_route_statement(model, route)?;
+    if route_statement.is_none()
+        && route.route_type.eq_ignore_ascii_case("selectable")
+        && !route.default_after_reset.unwrap_or(false)
+    {
+        return Ok(None);
+    }
+
+    Ok(Some(ResolvedPwmPinConfig {
+        method_name: format!(
+            "configure_{}_{}_as_pwm_output",
+            to_rust_method_name(&route.signal),
+            to_rust_method_name(&pin.name)
+        ),
+        pin_name: pin.name.clone(),
+        cfg_addr: cfg_register.absolute_address,
+        cfg_clear_mask,
+        cfg_alt_output_mask,
+        route_statement,
+    }))
+}
+
+fn render_default_pwm_route_statement(
+    model: &EmbassyGenerationModel,
+    route: &McuPinRoute,
+) -> Result<Option<String>> {
+    if route.route_type.eq_ignore_ascii_case("hardwired") {
+        return Ok(None);
+    }
+    let route_index = parse_route_variant_index(route);
+    if route_index != Some(0) && !route.default_after_reset.unwrap_or(false) {
+        return Ok(None);
+    }
+    let [control_ref] = route.control_refs.as_slice() else {
+        return Ok(None);
+    };
+    let Some(register) = try_resolve_register_by_ref(model, control_ref)? else {
+        return Ok(None);
+    };
+    let peripheral_name = last_ref_segment(&route.peripheral_ref).to_ascii_uppercase();
+    let remap_suffixes = [
+        format!("{}_REMAP", peripheral_name),
+        format!("{}RM", peripheral_name),
+    ];
+    let Some(field) = remap_suffixes
+        .iter()
+        .find_map(|suffix| try_resolve_register_field_by_suffix(&register, suffix))
+    else {
+        return Ok(None);
+    };
+    Ok(Some(render_register_write_statement(
+        &register, &field, 0, "        ",
+    )?))
+}
+
+fn parse_route_variant_index(route: &McuPinRoute) -> Option<u32> {
+    let suffix = route.id.rsplit(".r").next()?;
+    (suffix != route.id).then_some(())?;
+    suffix.parse().ok()
+}
+
+fn try_resolve_register_field_by_suffix(
+    register: &ResolvedRegister,
+    suffix: &str,
+) -> Option<ResolvedField> {
+    let normalized_suffix = normalize_search_text(suffix);
+    register
+        .fields
+        .iter()
+        .find(|field| normalize_search_text(&field.name).ends_with(&normalized_suffix))
+        .cloned()
+}
+
+fn validate_register_width_for_pwm(register: &ResolvedRegister, usage: &str) -> Result<()> {
+    if matches!(register.width_bits, 16 | 32) {
+        return Ok(());
+    }
+    bail!(
+        "{usage} {} uses unsupported width {}; expected 16 or 32 bits",
+        register.id,
+        register.width_bits
+    )
+}
+
+fn render_pwm_register_write_statement(
+    register: &ResolvedRegister,
+    value_expression: &str,
+    indent: &str,
+) -> Result<String> {
+    let statement = match register.width_bits {
+        16 => format!(
+            "{indent}write_u16(0x{:X}u64, {value_expression})?;\n",
+            register.absolute_address
+        ),
+        32 => format!(
+            "{indent}write_u32(0x{:X}u64, u32::from({value_expression}))?;\n",
+            register.absolute_address
+        ),
+        other => {
+            bail!(
+                "register {} uses unsupported width {} for PWM scalar writes",
+                register.id,
+                other
+            )
+        }
+    };
+    Ok(statement)
 }
 
 fn render_gpio_methods(
@@ -14138,6 +14738,48 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(adc_rs.contains("pub fn enable_done_interrupt"));
         assert!(adc_rs.contains("modify_u32("));
         assert!(dma_rs.contains("pub fn enable_clock"));
+    }
+
+    #[test]
+    fn generate_embassy_emits_pwm_channel_and_duty_helpers_for_ch32v203g6u6() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let input = repo_root
+            .join("evidence")
+            .join("wch")
+            .join("ch32v203g6u6")
+            .join("hair.json");
+        let document = load_validated_hair_document(&input, &repo_root)
+            .expect("reference hair document should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&document, output_dir.path()).expect("embassy generation");
+
+        let cargo_toml =
+            std::fs::read_to_string(output_dir.path().join("Cargo.toml")).expect("Cargo.toml");
+        let pwm_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("pwm.rs")).expect("pwm.rs");
+
+        assert!(cargo_toml.contains("embedded-hal = \"1.0\""));
+        assert!(pwm_rs.contains("pub fn set_prescaler"));
+        assert!(pwm_rs.contains("pub fn set_auto_reload"));
+        assert!(pwm_rs.contains("pub fn generate_update"));
+        assert!(pwm_rs.contains("pub fn configure_ch2_as_pwm_mode_1"));
+        assert!(pwm_rs.contains("pub fn configure_ch2_pa7_as_pwm_output"));
+        assert!(pwm_rs.contains("modify_u32(0x40010004u64, 0x00000C00u32, 0x00000000u32)?;"));
+        assert!(pwm_rs.contains("pub fn channel_ch2(&self) -> TIM3PWMCh2"));
+        assert!(pwm_rs.contains("impl embedded_hal::pwm::SetDutyCycle for TIM3PWMCh2"));
+
+        let cargo_output = Command::new("cargo")
+            .arg("check")
+            .current_dir(output_dir.path())
+            .output()
+            .expect("cargo check");
+        assert!(
+            cargo_output.status.success(),
+            "generated crate should compile:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&cargo_output.stdout),
+            String::from_utf8_lossy(&cargo_output.stderr)
+        );
     }
 
     #[test]
