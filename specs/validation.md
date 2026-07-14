@@ -211,6 +211,7 @@ repository contracts.
 - `evidence\wch\ch32v203g6u6\generated\pac\`
 - `evidence\wch\ch32v203g6u6\generated\embassy\`
 - `evidence\wch\ch32v203g6u6\generated\embassy-smoke\`
+- `evidence\wch\ch32v203g6u6\generated\embassy-pwm-smoke\`
 - `evidence\espressif\esp32-c3fn4\`
 - `evidence\texas-instruments\lm3s6965\embassy-out\`
 - `evidence\texas-instruments\lm3s6965\embassy-smoke\`
@@ -373,6 +374,33 @@ powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\emb
   normal Rust package boundaries for RCC, GPIO, and Embassy time-driver setup.
 - The QT Py onboard RGB LED uses `PA4` as a NeoPixel data input rather than as
   a simple GPIO-driven LED pin.
+
+### V-016 Hardware smoke packaging for the CH32V203G6U6 Embassy PWM example
+
+**Purpose:** provide a hardware-flashable Embassy PWM smoke image for the
+CH32V203G6U6 reference bundle that exercises the generated PWM channel and
+pin-routing helpers on the physical device with an externally observable
+waveform on `PA7`.
+
+**Command**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\embassy-pwm-smoke\build-smoke-bin.ps1 -Release
+```
+
+**Expected result**
+- The smoke firmware builds for `riscv32imc-unknown-none-elf`.
+- The packaging step writes a flashable `.bin` beside the release ELF.
+- When flashed to the physical device, `PA7` emits a PWM waveform whose duty
+  cycle steps from 0% through 100% in 5% increments, advancing every 100 ms.
+
+**Note**
+- This is a hardware-dependent smoke check, not a universal repository
+  precondition.
+- The smoke application shall consume the generated Embassy HAL crate through
+  normal Rust package boundaries for GPIO, PWM, and Embassy time-driver setup.
+- The example uses `TIM3` channel 2 on the default `PA7` route so the waveform
+  can be captured directly on a scope without relying on remap configuration.
 
 ## 6. Requirement-specific validation coverage
 
