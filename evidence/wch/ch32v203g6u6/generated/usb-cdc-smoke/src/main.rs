@@ -103,6 +103,7 @@ const EP_ADDR_MASK: u16 = 0x000f;
 
 const EP_TYPE_BULK: u16 = 0b00 << 9;
 const EP_TYPE_CONTROL: u16 = 0b01 << 9;
+const EP_TYPE_INTERRUPT: u16 = 0b11 << 9;
 
 const EP_STAT_STALL: u8 = 1;
 const EP_STAT_NAK: u8 = 2;
@@ -119,6 +120,7 @@ const PMA_EP0_TX_ADDR: u16 = 0x80;
 const USB_REQ_TYP_IN: u8 = 0x80;
 const USB_REQ_TYP_MASK: u8 = 0x60;
 const USB_REQ_TYP_STANDARD: u8 = 0x00;
+const USB_REQ_TYP_CLASS: u8 = 0x20;
 const USB_REQ_RECIP_MASK: u8 = 0x1f;
 const USB_REQ_RECIP_DEVICE: u8 = 0x00;
 const USB_REQ_RECIP_INTERFACE: u8 = 0x01;
@@ -140,14 +142,34 @@ const USB_DESCR_TYP_DEVICE: u8 = 0x01;
 const USB_DESCR_TYP_CONFIG: u8 = 0x02;
 const USB_DESCR_TYP_STRING: u8 = 0x03;
 
+const CDC_REQ_SET_LINE_CODING: u8 = 0x20;
+const CDC_REQ_GET_LINE_CODING: u8 = 0x21;
+const CDC_REQ_SET_CONTROL_LINE_STATE: u8 = 0x22;
+const CDC_REQ_SEND_BREAK: u8 = 0x23;
+
+const CDC_NOTIF_EP_ADDR: u8 = 0x81;
+const CDC_DATA_OUT_EP_ADDR: u8 = 0x02;
+const CDC_DATA_IN_EP_ADDR: u8 = 0x82;
+const CDC_COMM_ITF_NUM: u16 = 0;
+
+const PMA_CDC_NOTIF_TX_ADDR: u16 = 0xC0;
+const PMA_CDC_DATA_RX_ADDR: u16 = 0x100;
+const PMA_CDC_DATA_TX_ADDR: u16 = 0x140;
+
+const CDC_NOTIF_PACKET_SIZE: u16 = 8;
+const CDC_DATA_PACKET_SIZE: u16 = 64;
+
+const HELLO_INTERVAL_TICKS: u32 = 200_000;
+const HELLO_MESSAGE: &[u8] = b"Hello From ch32v203\r\n";
+
 const DEVICE_DESC: [u8; 18] = [
     0x12,
     0x01,
     0x00,
     0x02,
-    0x00,
-    0x00,
-    0x00,
+    0xEF,
+    0x02,
+    0x01,
     EP0_SIZE as u8,
     0xfe,
     0xca,
@@ -161,9 +183,82 @@ const DEVICE_DESC: [u8; 18] = [
     0x01,
 ];
 
-const CONFIG_DESC: [u8; 18] = [
-    0x09, 0x02, 0x12, 0x00, 0x01, 0x01, 0x00, 0x80, 0x32, 0x09, 0x04, 0x00, 0x00, 0x00, 0xff, 0x00,
-    0x00, 0x00,
+const CONFIG_DESC: [u8; 75] = [
+    0x09,
+    0x02,
+    0x4B,
+    0x00,
+    0x02,
+    0x01,
+    0x00,
+    0x80,
+    0x32,
+    0x08,
+    0x0B,
+    0x00,
+    0x02,
+    0x02,
+    0x02,
+    0x00,
+    0x00,
+    0x09,
+    0x04,
+    0x00,
+    0x00,
+    0x01,
+    0x02,
+    0x02,
+    0x00,
+    0x00,
+    0x05,
+    0x24,
+    0x00,
+    0x20,
+    0x01,
+    0x05,
+    0x24,
+    0x01,
+    0x00,
+    0x01,
+    0x04,
+    0x24,
+    0x02,
+    0x06,
+    0x05,
+    0x24,
+    0x06,
+    0x00,
+    0x01,
+    0x07,
+    0x05,
+    CDC_NOTIF_EP_ADDR,
+    0x03,
+    0x08,
+    0x00,
+    0x01,
+    0x09,
+    0x04,
+    0x01,
+    0x00,
+    0x02,
+    0x0A,
+    0x00,
+    0x00,
+    0x00,
+    0x07,
+    0x05,
+    CDC_DATA_OUT_EP_ADDR,
+    0x02,
+    0x40,
+    0x00,
+    0x00,
+    0x07,
+    0x05,
+    CDC_DATA_IN_EP_ADDR,
+    0x02,
+    0x40,
+    0x00,
+    0x00,
 ];
 
 const LANG_DESC: [u8; 4] = [0x04, 0x03, 0x09, 0x04];
@@ -222,6 +317,7 @@ const EP0_IN_ADDR: u8 = 0x80;
 static mut EP0_SETUP_BUF: [u8; 8] = [0; 8];
 static mut CTRL_EP_BUF: [u8; EP0_SIZE] = [0; EP0_SIZE];
 static mut CTRL_INLINE: [u8; EP0_SIZE] = [0; EP0_SIZE];
+static mut CDC_RX_BUF: [u8; CDC_DATA_PACKET_SIZE as usize] = [0; CDC_DATA_PACKET_SIZE as usize];
 
 #[inline(always)]
 fn ctrl_ep_buf_ptr() -> *mut u8 {
@@ -236,6 +332,11 @@ fn ctrl_inline_ptr() -> *mut u8 {
 #[inline(always)]
 fn ep0_setup_buf_ptr() -> *mut u8 {
     core::ptr::addr_of_mut!(EP0_SETUP_BUF).cast::<u8>()
+}
+
+#[inline(always)]
+fn cdc_rx_buf_ptr() -> *mut u8 {
+    core::ptr::addr_of_mut!(CDC_RX_BUF).cast::<u8>()
 }
 
 #[derive(Clone, Copy, Default)]
@@ -318,6 +419,13 @@ struct State {
     ctrl_xfer: CtrlXfer,
     xfer_out: XferCtl,
     xfer_in: XferCtl,
+    cdc_notif_in: XferCtl,
+    cdc_data_out: XferCtl,
+    cdc_data_in: XferCtl,
+    cdc_line_coding: [u8; 7],
+    cdc_line_state: u16,
+    cdc_endpoints_open: bool,
+    cdc_hello_ticks: u32,
     bus_reset_seen: bool,
     post_reset_sample_delay: u16,
     idle_j_seen: bool,
@@ -349,6 +457,13 @@ impl State {
             ctrl_xfer: CtrlXfer::new(),
             xfer_out: XferCtl::new(),
             xfer_in: XferCtl::new(),
+            cdc_notif_in: XferCtl::new(),
+            cdc_data_out: XferCtl::new(),
+            cdc_data_in: XferCtl::new(),
+            cdc_line_coding: [0x00, 0xC2, 0x01, 0x00, 0x00, 0x00, 0x08],
+            cdc_line_state: 0,
+            cdc_endpoints_open: false,
+            cdc_hello_ticks: 0,
             bus_reset_seen: false,
             post_reset_sample_delay: 0,
             idle_j_seen: false,
@@ -391,6 +506,7 @@ fn main() -> ! {
 
     loop {
         dcd_int_handler(&mut state);
+        cdc_poll(&mut state);
         update_debug_state(&mut state);
         delay(POLL_DELAY_CYCLES);
     }
@@ -596,9 +712,14 @@ fn fsdev_core_reset() {
 }
 
 fn handle_bus_reset(state: &mut State) {
+    epr_write(1, 0);
+    epr_write(2, 0);
     usb_write16(USB_DADDR_OFFSET, 0);
     state.ep0_ctrl_dir_in = false;
     state.ep0_ctrl_has_data = false;
+    state.cdc_endpoints_open = false;
+    state.cdc_line_state = 0;
+    state.cdc_hello_ticks = 0;
     edpt0_open(state);
     usb_write16(USB_DADDR_OFFSET, USB_DADDR_EF);
 }
@@ -730,7 +851,7 @@ fn handle_ctr_setup(state: &mut State, ep_id: u8) {
     let rx_count = ep_rx_count(ep_id);
     unsafe {
         pma_read_bytes(
-            PMA_EP0_RX_ADDR,
+            ep_rx_addr(ep_id),
             core::slice::from_raw_parts_mut(ep0_setup_buf_ptr(), rx_count),
         );
     }
@@ -762,6 +883,11 @@ fn handle_ctr_setup(state: &mut State, ep_id: u8) {
 }
 
 fn handle_ctr_rx(state: &mut State, ep_id: u8) {
+    if ep_id != 0 {
+        handle_data_out_ctr(state, ep_id);
+        return;
+    }
+
     let mut ep_reg = epr_read(ep_id) | EP_CTR_TX | EP_CTR_RX;
     if !state.ep0_ctrl_dir_in && state.ep0_ctrl_has_data {
         ep0_set_type(EP_TYPE_BULK);
@@ -774,7 +900,7 @@ fn handle_ctr_rx(state: &mut State, ep_id: u8) {
         if !dst.is_null() {
             unsafe {
                 pma_read_bytes(
-                    PMA_EP0_RX_ADDR,
+                    ep_rx_addr(ep_id),
                     core::slice::from_raw_parts_mut(
                         dst.add(state.xfer_out.queued_len as usize),
                         rx_count as usize,
@@ -808,6 +934,11 @@ fn handle_ctr_rx(state: &mut State, ep_id: u8) {
 }
 
 fn handle_ctr_tx(state: &mut State, ep_id: u8) {
+    if ep_id != 0 {
+        handle_data_in_ctr(state, ep_id);
+        return;
+    }
+
     if state.xfer_in.total_len != state.xfer_in.queued_len {
         dcd_transmit_packet(state, ep_id);
     } else {
@@ -819,20 +950,20 @@ fn handle_ctr_tx(state: &mut State, ep_id: u8) {
 }
 
 fn dcd_transmit_packet(state: &mut State, ep_idx: u8) {
+    let Some(xfer) = xfer_in_mut(state, ep_idx) else {
+        return;
+    };
     let len = min(
-        state
-            .xfer_in
-            .total_len
-            .saturating_sub(state.xfer_in.queued_len),
-        state.xfer_in.max_packet_size,
+        xfer.total_len.saturating_sub(xfer.queued_len),
+        xfer.max_packet_size,
     ) as usize;
     if len != 0 {
         unsafe {
-            let src = state.xfer_in.buffer.add(state.xfer_in.queued_len as usize);
-            pma_write_bytes(PMA_EP0_TX_ADDR, core::slice::from_raw_parts(src, len));
+            let src = xfer.buffer.add(xfer.queued_len as usize);
+            pma_write_bytes(ep_tx_addr(ep_idx), core::slice::from_raw_parts(src, len));
         }
     }
-    state.xfer_in.queued_len = state.xfer_in.queued_len.saturating_add(len as u16);
+    xfer.queued_len = xfer.queued_len.saturating_add(len as u16);
     ep_tx_count(ep_idx, len as u16);
 
     let mut ep_reg = epr_read(ep_idx) | EP_CTR_TX | EP_CTR_RX;
@@ -843,36 +974,42 @@ fn dcd_transmit_packet(state: &mut State, ep_idx: u8) {
 
 fn dcd_edpt_xfer(state: &mut State, ep_addr: u8, buffer: *mut u8, total_bytes: u16) -> bool {
     let dir_in = (ep_addr & 0x80) != 0;
-    let xfer = if dir_in {
-        &mut state.xfer_in
+    let ep_num = ep_addr & 0x7f;
+    let Some(xfer) = (if dir_in {
+        xfer_in_mut(state, ep_num)
     } else {
-        &mut state.xfer_out
+        xfer_out_mut(state, ep_num)
+    }) else {
+        return false;
     };
     xfer.buffer = buffer;
     xfer.total_len = total_bytes;
     xfer.queued_len = 0;
-    xfer.ep_idx = 0;
-    xfer.max_packet_size = EP0_SIZE as u16;
 
     if dir_in {
-        ep0_set_type(EP_TYPE_CONTROL);
-        dcd_transmit_packet(state, 0);
+        if ep_num == 0 {
+            ep0_set_type(EP_TYPE_CONTROL);
+        }
+        dcd_transmit_packet(state, ep_num);
     } else {
-        let mut ep_reg = epr_read(0) | EP_CTR_TX | EP_CTR_RX;
+        let mut ep_reg = epr_read(ep_num) | EP_CTR_TX | EP_CTR_RX;
         ep_reg &= u_epreg_mask() | EP_STAT_RX_MASK;
-        let cnt = min(total_bytes, EP0_SIZE as u16);
-        btable_set_rx_bufsize(0, cnt);
-        ep_reg = (ep_reg & !EP_TYPE_MASK) | EP_TYPE_CONTROL;
+        let cnt = min(total_bytes, xfer.max_packet_size);
+        btable_set_rx_bufsize(ep_num, cnt);
+        if ep_num == 0 {
+            ep_reg = (ep_reg & !EP_TYPE_MASK) | EP_TYPE_CONTROL;
+        }
         ep_change_status(&mut ep_reg, false, EP_STAT_VALID);
-        epr_write(0, ep_reg);
+        epr_write(ep_num, ep_reg);
     }
 
     true
 }
 
 fn dcd_edpt_stall(ep_addr: u8) {
+    let ep_num = ep_addr & 0x7f;
     let dir_in = (ep_addr & 0x80) != 0;
-    let mut ep_reg = epr_read(0) | EP_CTR_TX | EP_CTR_RX;
+    let mut ep_reg = epr_read(ep_num) | EP_CTR_TX | EP_CTR_RX;
     ep_reg &= u_epreg_mask()
         | if dir_in {
             EP_STAT_TX_MASK
@@ -884,13 +1021,16 @@ fn dcd_edpt_stall(ep_addr: u8) {
     } else {
         ep_change_status(&mut ep_reg, false, EP_STAT_STALL);
     }
-    ep_reg = (ep_reg & !EP_TYPE_MASK) | EP_TYPE_CONTROL;
-    epr_write(0, ep_reg);
+    if ep_num == 0 {
+        ep_reg = (ep_reg & !EP_TYPE_MASK) | EP_TYPE_CONTROL;
+    }
+    epr_write(ep_num, ep_reg);
 }
 
 fn dcd_edpt_clear_stall(ep_addr: u8) {
+    let ep_num = ep_addr & 0x7f;
     let dir_in = (ep_addr & 0x80) != 0;
-    let mut ep_reg = epr_read(0) | EP_CTR_TX | EP_CTR_RX;
+    let mut ep_reg = epr_read(ep_num) | EP_CTR_TX | EP_CTR_RX;
     ep_reg &= u_epreg_mask()
         | if dir_in {
             EP_STAT_TX_MASK | EP_DTOG_TX
@@ -902,7 +1042,7 @@ fn dcd_edpt_clear_stall(ep_addr: u8) {
     } else {
         ep_change_status(&mut ep_reg, false, EP_STAT_NAK);
     }
-    epr_write(0, ep_reg);
+    epr_write(ep_num, ep_reg);
 }
 
 fn process_setup_received(state: &mut State, request: SetupRequest) -> bool {
@@ -919,16 +1059,22 @@ fn process_setup_received(state: &mut State, request: SetupRequest) -> bool {
             }
             process_std_device_request(state, request)
         }
-        USB_REQ_RECIP_INTERFACE => match request.b_request {
-            USB_GET_INTERFACE => {
-                unsafe {
-                    CTRL_INLINE[0] = 0;
+        USB_REQ_RECIP_INTERFACE => {
+            if request.req_type() == USB_REQ_TYP_CLASS {
+                process_cdc_class_request(state, request)
+            } else {
+                match request.b_request {
+                    USB_GET_INTERFACE => {
+                        unsafe {
+                            CTRL_INLINE[0] = 0;
+                        }
+                        tud_control_xfer(state, request, ctrl_inline_ptr(), 1)
+                    }
+                    USB_SET_INTERFACE => tud_control_status(state, request),
+                    _ => false,
                 }
-                tud_control_xfer(state, request, ctrl_inline_ptr(), 1)
             }
-            USB_SET_INTERFACE => tud_control_status(state, request),
-            _ => false,
-        },
+        }
         USB_REQ_RECIP_ENDPOINT => process_std_endpoint_request(state, request),
         _ => false,
     }
@@ -956,6 +1102,11 @@ fn process_std_device_request(state: &mut State, request: SetupRequest) -> bool 
                 return false;
             }
             state.cfg_num = request.w_value as u8;
+            if state.cfg_num == 1 {
+                cdc_open_endpoints(state);
+            } else {
+                cdc_close_endpoints(state);
+            }
             if state.cfg_num == 1 && !state.configured_seen {
                 state.configured_seen = true;
                 pulse_runtime_marker(MARK_CONFIGURED);
@@ -979,6 +1130,7 @@ fn process_std_device_request(state: &mut State, request: SetupRequest) -> bool 
                 false
             }
         }
+
         USB_GET_STATUS => {
             let mut status = 0u16;
             if state.remote_wakeup_en {
@@ -990,6 +1142,27 @@ fn process_std_device_request(state: &mut State, request: SetupRequest) -> bool 
             }
             tud_control_xfer(state, request, ctrl_inline_ptr(), 2)
         }
+        _ => false,
+    }
+}
+
+fn process_cdc_class_request(state: &mut State, request: SetupRequest) -> bool {
+    if request.w_index != CDC_COMM_ITF_NUM {
+        return false;
+    }
+
+    let line_coding_ptr = state.cdc_line_coding.as_mut_ptr();
+    let line_coding_len = state.cdc_line_coding.len() as u16;
+
+    match request.b_request {
+        CDC_REQ_SET_LINE_CODING | CDC_REQ_GET_LINE_CODING => {
+            tud_control_xfer(state, request, line_coding_ptr, line_coding_len)
+        }
+        CDC_REQ_SET_CONTROL_LINE_STATE => {
+            state.cdc_line_state = request.w_value;
+            tud_control_status(state, request)
+        }
+        CDC_REQ_SEND_BREAK => tud_control_status(state, request),
         _ => false,
     }
 }
@@ -1167,10 +1340,190 @@ fn dcd_edpt0_status_complete(request: SetupRequest) {
 }
 
 fn usbd_edpt_stalled(ep_addr: u8) -> bool {
+    let ep_num = ep_addr & 0x7f;
     if (ep_addr & 0x80) != 0 {
-        ((epr_read(0) & EP_STAT_TX_MASK) >> 4) as u8 == EP_STAT_STALL
+        ((epr_read(ep_num) & EP_STAT_TX_MASK) >> 4) as u8 == EP_STAT_STALL
     } else {
-        ((epr_read(0) & EP_STAT_RX_MASK) >> 12) as u8 == EP_STAT_STALL
+        ((epr_read(ep_num) & EP_STAT_RX_MASK) >> 12) as u8 == EP_STAT_STALL
+    }
+}
+
+fn cdc_open_endpoints(state: &mut State) {
+    open_in_endpoint(
+        &mut state.cdc_notif_in,
+        CDC_NOTIF_EP_ADDR & 0x7f,
+        EP_TYPE_INTERRUPT,
+        PMA_CDC_NOTIF_TX_ADDR,
+        CDC_NOTIF_PACKET_SIZE,
+    );
+    open_out_endpoint(
+        &mut state.cdc_data_out,
+        CDC_DATA_OUT_EP_ADDR & 0x7f,
+        EP_TYPE_BULK,
+        PMA_CDC_DATA_RX_ADDR,
+        CDC_DATA_PACKET_SIZE,
+    );
+    open_in_endpoint(
+        &mut state.cdc_data_in,
+        CDC_DATA_IN_EP_ADDR & 0x7f,
+        EP_TYPE_BULK,
+        PMA_CDC_DATA_TX_ADDR,
+        CDC_DATA_PACKET_SIZE,
+    );
+    state.cdc_endpoints_open = true;
+    state.cdc_hello_ticks = 0;
+    arm_cdc_out_receive(state);
+}
+
+fn cdc_close_endpoints(state: &mut State) {
+    epr_write(CDC_NOTIF_EP_ADDR & 0x7f, 0);
+    epr_write(CDC_DATA_OUT_EP_ADDR & 0x7f, 0);
+    state.cdc_endpoints_open = false;
+    state.cdc_line_state = 0;
+    state.cdc_hello_ticks = 0;
+    state.cdc_notif_in = XferCtl::new();
+    state.cdc_data_out = XferCtl::new();
+    state.cdc_data_in = XferCtl::new();
+}
+
+fn arm_cdc_out_receive(state: &mut State) {
+    let _ = dcd_edpt_xfer(
+        state,
+        CDC_DATA_OUT_EP_ADDR,
+        cdc_rx_buf_ptr(),
+        CDC_DATA_PACKET_SIZE,
+    );
+}
+
+fn cdc_poll(state: &mut State) {
+    if !state.cdc_endpoints_open || state.cfg_num != 1 || (state.cdc_line_state & 0x0001) == 0 {
+        state.cdc_hello_ticks = 0;
+        return;
+    }
+
+    state.cdc_hello_ticks = state.cdc_hello_ticks.saturating_add(1);
+    if state.cdc_hello_ticks < HELLO_INTERVAL_TICKS {
+        return;
+    }
+    state.cdc_hello_ticks -= HELLO_INTERVAL_TICKS;
+
+    if state.cdc_data_in.total_len != 0 {
+        return;
+    }
+
+    let _ = dcd_edpt_xfer(
+        state,
+        CDC_DATA_IN_EP_ADDR,
+        HELLO_MESSAGE.as_ptr() as *mut u8,
+        HELLO_MESSAGE.len() as u16,
+    );
+}
+
+fn handle_data_out_ctr(state: &mut State, ep_id: u8) {
+    let Some(xfer) = xfer_out_mut(state, ep_id) else {
+        return;
+    };
+
+    let mut ep_reg = epr_read(ep_id) | EP_CTR_TX | EP_CTR_RX;
+    let rx_count = ep_rx_count(ep_id) as u16;
+    if rx_count != 0 && !xfer.buffer.is_null() {
+        unsafe {
+            pma_read_bytes(
+                ep_rx_addr(ep_id),
+                core::slice::from_raw_parts_mut(
+                    xfer.buffer.add(xfer.queued_len as usize),
+                    rx_count as usize,
+                ),
+            );
+        }
+    }
+    xfer.queued_len = xfer.queued_len.saturating_add(rx_count);
+
+    if rx_count < xfer.max_packet_size || xfer.queued_len >= xfer.total_len {
+        btable_set_rx_bufsize(ep_id, xfer.max_packet_size);
+        xfer.total_len = 0;
+        xfer.queued_len = 0;
+
+        if ep_id == (CDC_DATA_OUT_EP_ADDR & 0x7f) {
+            arm_cdc_out_receive(state);
+        }
+    } else {
+        let cnt = min(
+            xfer.total_len.saturating_sub(xfer.queued_len),
+            xfer.max_packet_size,
+        );
+        btable_set_rx_bufsize(ep_id, cnt);
+        ep_reg &= u_epreg_mask() | EP_STAT_RX_MASK;
+        ep_change_status(&mut ep_reg, false, EP_STAT_VALID);
+        epr_write(ep_id, ep_reg);
+    }
+}
+
+fn handle_data_in_ctr(state: &mut State, ep_id: u8) {
+    let Some(xfer) = xfer_in_mut(state, ep_id) else {
+        return;
+    };
+
+    if xfer.total_len != xfer.queued_len {
+        dcd_transmit_packet(state, ep_id);
+    } else {
+        xfer.total_len = 0;
+        xfer.queued_len = 0;
+    }
+}
+
+fn open_in_endpoint(xfer: &mut XferCtl, ep_num: u8, ep_type: u16, pma_addr: u16, packet_size: u16) {
+    xfer.max_packet_size = packet_size;
+    xfer.ep_idx = ep_num;
+    xfer.total_len = 0;
+    xfer.queued_len = 0;
+    xfer.buffer = null_mut();
+
+    btable_write(ep_num, BTABLE_FIELD_ADDR_TX, pma_addr);
+
+    let mut ep_reg = epr_read(ep_num) & !u_epreg_mask();
+    ep_reg |= u16::from(ep_num) | ep_type;
+    ep_change_status(&mut ep_reg, true, EP_STAT_NAK);
+    ep_reg &= !(EP_STAT_RX_MASK | EP_DTOG_RX);
+    epr_write(ep_num, ep_reg);
+}
+
+fn open_out_endpoint(
+    xfer: &mut XferCtl,
+    ep_num: u8,
+    ep_type: u16,
+    pma_addr: u16,
+    packet_size: u16,
+) {
+    xfer.max_packet_size = packet_size;
+    xfer.ep_idx = ep_num;
+    xfer.total_len = 0;
+    xfer.queued_len = 0;
+    xfer.buffer = null_mut();
+
+    btable_write(ep_num, BTABLE_FIELD_ADDR_RX, pma_addr);
+
+    let mut ep_reg = epr_read(ep_num) & !u_epreg_mask();
+    ep_reg |= u16::from(ep_num) | ep_type;
+    ep_change_status(&mut ep_reg, false, EP_STAT_NAK);
+    ep_reg &= !(EP_STAT_TX_MASK | EP_DTOG_TX);
+    epr_write(ep_num, ep_reg);
+}
+
+fn xfer_in_mut(state: &mut State, ep_num: u8) -> Option<&mut XferCtl> {
+    match ep_num {
+        0 => Some(&mut state.xfer_in),
+        1 => Some(&mut state.cdc_notif_in),
+        2 => Some(&mut state.cdc_data_in),
+        _ => None,
+    }
+}
+
+fn xfer_out_mut(state: &mut State, ep_num: u8) -> Option<&mut XferCtl> {
+    match ep_num {
+        0 => Some(&mut state.xfer_out),
+        2 => Some(&mut state.cdc_data_out),
+        _ => None,
     }
 }
 
@@ -1336,6 +1689,14 @@ fn btable_set_rx_bufsize(ep: u8, size: u16) {
 
 fn ep_tx_count(ep: u8, value: u16) {
     btable_write(ep, BTABLE_FIELD_COUNT_TX, value);
+}
+
+fn ep_tx_addr(ep: u8) -> u16 {
+    btable_read(ep, BTABLE_FIELD_ADDR_TX)
+}
+
+fn ep_rx_addr(ep: u8) -> u16 {
+    btable_read(ep, BTABLE_FIELD_ADDR_RX)
 }
 
 fn ep_rx_count(ep: u8) -> usize {
