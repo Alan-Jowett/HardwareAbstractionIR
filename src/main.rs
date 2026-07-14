@@ -5010,10 +5010,10 @@ fn pfic_interrupt_controller_numbering(
 
 fn render_pfic_irq_index_expression(register_indexing: &str) -> Result<&'static str> {
     match register_indexing {
-        INTERRUPT_NUMBERING_INTERRUPT_NUMBER => Ok("    Ok(irq_index)\n"),
-        INTERRUPT_NUMBERING_EXTERNAL_INTERRUPT_INDEX => Ok(
-            "    irq_index\n        .checked_sub(PFIC_EXTERNAL_IRQ_OFFSET)\n        .ok_or(metadata::Error::Unsupported(\n            \"PFIC runtime helpers only support external interrupts\",\n        ))\n",
+        INTERRUPT_NUMBERING_INTERRUPT_NUMBER => Ok(
+            "    if irq_index < PFIC_EXTERNAL_IRQ_OFFSET {\n        return Err(metadata::Error::Unsupported(\n            \"PFIC runtime helpers only support external interrupts\",\n        ));\n    }\n    Ok(irq_index)\n",
         ),
+        INTERRUPT_NUMBERING_EXTERNAL_INTERRUPT_INDEX => Ok("    Ok(irq_index)\n"),
         other => bail!(
             "unsupported PFIC register indexing mode for generated runtime helpers: {}",
             other
@@ -5151,7 +5151,7 @@ fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<Strin
 fn render_pfic_interrupt_support_items(register_indexing: &str) -> Result<String> {
     let irq_index_body = render_pfic_irq_index_expression(register_indexing)?;
     Ok(format!(
-        "\nconst PFIC_EXTERNAL_IRQ_OFFSET: u32 = 16;\nconst PFIC_IENR_BASE_ADDRESS: u64 = 0xE000_E100;\nconst PFIC_IRER_BASE_ADDRESS: u64 = 0xE000_E180;\nconst PFIC_IACTR_BASE_ADDRESS: u64 = 0xE000_E300;\n\nfn pfic_irq_index(irq: Irq) -> Result<u32, metadata::Error> {{\n    let irq_index = irq as u32;\n    if irq_index < PFIC_EXTERNAL_IRQ_OFFSET {{\n        return Err(metadata::Error::Unsupported(\n            \"PFIC runtime helpers only support external interrupts\",\n        ));\n    }}\n{irq_index_body}}}\n\nfn pfic_register_address(base: u64, irq_index: u32) -> u64 {{\n    base + u64::from((irq_index / 32) * 4)\n}}\n\nfn pfic_irq_bit(irq_index: u32) -> u32 {{\n    1u32 << (irq_index % 32)\n}}\n",
+        "\nconst PFIC_EXTERNAL_IRQ_OFFSET: u32 = 16;\nconst PFIC_IENR_BASE_ADDRESS: u64 = 0xE000_E100;\nconst PFIC_IRER_BASE_ADDRESS: u64 = 0xE000_E180;\nconst PFIC_IACTR_BASE_ADDRESS: u64 = 0xE000_E300;\n\nfn pfic_irq_index(irq: Irq) -> Result<u32, metadata::Error> {{\n    let irq_index = irq as u32;\n{irq_index_body}}}\n\nfn pfic_register_address(base: u64, irq_index: u32) -> u64 {{\n    base + u64::from((irq_index / 32) * 4)\n}}\n\nfn pfic_irq_bit(irq_index: u32) -> u32 {{\n    1u32 << (irq_index % 32)\n}}\n",
         irq_index_body = irq_index_body
     ))
 }
@@ -17109,6 +17109,29 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(interrupt_rs.contains("if irq_index < PFIC_EXTERNAL_IRQ_OFFSET"));
         assert!(interrupt_rs.contains("base + u64::from((irq_index / 32) * 4)"));
         assert!(interrupt_rs.contains("1u32 << (irq_index % 32)"));
+        assert!(interrupt_rs.contains("Ok(irq_index)"));
+    }
+
+    #[test]
+    fn generate_embassy_supports_external_interrupt_indexed_pfic_registers() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        document["physical"]["interruptControllers"][0]["interruptNumbering"]["registerIndexing"] =
+            Value::String(INTERRUPT_NUMBERING_EXTERNAL_INTERRUPT_INDEX.to_string());
+        let file = write_temp_json(&document);
+        let document =
+            load_validated_hair_document(file.path(), &repo_root).expect("fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&document, output_dir.path()).expect("embassy generation");
+
+        let interrupt_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("interrupt.rs"))
+                .expect("interrupt.rs");
+        assert!(interrupt_rs.contains("let irq_index = irq as u32;"));
+        assert!(!interrupt_rs.contains("if irq_index < PFIC_EXTERNAL_IRQ_OFFSET"));
+        assert!(!interrupt_rs.contains(".checked_sub(PFIC_EXTERNAL_IRQ_OFFSET)"));
         assert!(interrupt_rs.contains("Ok(irq_index)"));
     }
 
