@@ -254,14 +254,18 @@ jobs:
           while IFS= read -r manifest_path; do
             [[ -n "$manifest_path" ]] || continue
             echo "Building smoke harness from $manifest_path"
-            cargo build --locked --target "${{ inputs.rust_target }}" --manifest-path "$manifest_path"
+            smoke_dir="$(dirname "$manifest_path")"
+            (
+              cd "$smoke_dir"
+              cargo build --release --target "${{ inputs.rust_target }}" --manifest-path Cargo.toml
+            )
           done <<< "${{ steps.discover-smoke.outputs.manifests }}"
 
       - name: Run smoke harness
         if: ${{ inputs.smoke_mode == 'required' }}
         shell: bash
         env:
-          SMOKE_BINARY: ${{ github.workspace }}/${{ inputs.smoke_dir }}/target/${{ inputs.rust_target }}/debug/embassy-smoke
+          SMOKE_BINARY: ${{ github.workspace }}/${{ inputs.smoke_dir }}/target/${{ inputs.rust_target }}/release/embassy-smoke
           SMOKE_COMMAND: ${{ inputs.smoke_command }}
         run: |
           set -euo pipefail
