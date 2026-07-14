@@ -153,3 +153,55 @@ jobs:
       rust_target: riscv32imc-unknown-none-elf
       pac_svd2rust_target: riscv
       smoke_mode: unsupported
+
+  esp32c3fn4:
+    name: esp32c3fn4
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: riscv32imc-unknown-none-elf
+
+      - name: Build checked-in Embassy HAL crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --target riscv32imc-unknown-none-elf --manifest-path evidence/espressif/esp32-c3fn4/generated/embassy/Cargo.toml
+
+      - name: Discover smoke harnesses
+        id: discover-smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t smoke_manifests < <(find evidence/espressif/esp32-c3fn4/generated -mindepth 2 -maxdepth 2 -path '*/generated/*smoke*/Cargo.toml' | sort)
+          test "${#smoke_manifests[@]}" -gt 0 || {
+            echo "No smoke harnesses found for esp32c3fn4" >&2
+            exit 1
+          }
+
+          {
+            echo "count=${#smoke_manifests[@]}"
+            echo "manifests<<EOF"
+            printf '%s\n' "${smoke_manifests[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build smoke harnesses
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r manifest_path; do
+            [[ -n "$manifest_path" ]] || continue
+            echo "Building smoke harness from $manifest_path"
+            smoke_dir="$(dirname "$manifest_path")"
+            (
+              cd "$smoke_dir"
+              cargo build --release --locked --target riscv32imc-unknown-none-elf --manifest-path Cargo.toml
+            )
+          done <<< "${{ steps.discover-smoke.outputs.manifests }}"
