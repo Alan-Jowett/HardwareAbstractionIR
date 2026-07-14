@@ -361,17 +361,18 @@ powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\emb
 **Expected result**
 - The smoke firmware builds for `riscv32imc-unknown-none-elf`.
 - The packaging step writes a flashable `.bin` beside the release ELF.
-- When flashed to the physical QT Py CH32V203 hardware, the firmware toggles
-  PA7 high and low with one-second `embassy_time::Timer::after(...)` delays so
-  basic `.await` timing can be observed directly on the pin.
+- When flashed to the physical QT Py CH32V203 hardware, the firmware emits a
+  NeoPixel-compatible bitstream on `PA4` and alternates the onboard RGB LED
+  between off and dim white with one-second `embassy_time::Timer::after(...)`
+  delays.
 
 **Note**
 - This is a hardware-dependent smoke check, not a universal repository
   precondition.
 - The smoke application shall consume the generated Embassy HAL crate through
-  normal Rust package boundaries for RCC and Embassy time-driver setup. Until a
-  CH32 GPIO lowering exists, minimal board pin setup may still use direct MMIO
-  writes in the smoke application.
+  normal Rust package boundaries for RCC, GPIO, and Embassy time-driver setup.
+- The QT Py onboard RGB LED uses `PA4` as a NeoPixel data input rather than as
+  a simple GPIO-driven LED pin.
 
 ## 6. Requirement-specific validation coverage
 

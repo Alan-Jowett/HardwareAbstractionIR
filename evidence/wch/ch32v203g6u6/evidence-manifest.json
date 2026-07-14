@@ -108,6 +108,25 @@
       "notes": "Community-curated exact-variant machine-readable chip description for CH32V203G6U6. Useful as an exact-variant cross-check for package, memory sizing, device id, and included peripheral fragments."
     },
     {
+      "id": "adafruit-qt-py-ch32v203-schematic",
+      "kind": "source-code",
+      "uri": "https://raw.githubusercontent.com/adafruit/Adafruit-QT-Py-CH32V203-PCB/c5c1580d9823d2f8923778530339179531d024f6/Adafruit%20QT%20Py%20CH32V203.sch",
+      "version": "c5c1580d9823d2f8923778530339179531d024f6",
+      "notes": "Commit-pinned Adafruit Eagle schematic for the QT Py CH32V203 board. Used only for board-specific connector, header, and NeoPixel wiring facts, not for authoritative MCU pin identity."
+    },
+    {
+      "id": "adafruit-qt-py-ch32v203-overview",
+      "kind": "other",
+      "uri": "https://learn.adafruit.com/adafruit-qt-py-ch32v203/overview.md",
+      "notes": "Adafruit Learn overview page describing the USB-C connector, native USB device / TinyUSB CDC support, RGB NeoPixel, and USB bootloader workflow at board level."
+    },
+    {
+      "id": "adafruit-qt-py-ch32v203-pinouts",
+      "kind": "other",
+      "uri": "https://learn.adafruit.com/adafruit-qt-py-ch32v203/pinouts.md",
+      "notes": "Adafruit Learn pinouts page describing the board-level PA2/PA3 UART header roles and the onboard NeoPixel connection to PA4."
+    },
+    {
       "id": "wch-cnblogs-bldc-tim4-article",
       "kind": "human-annotation",
       "uri": "https://www.cnblogs.com/wchmcu/p/17678923.html",

@@ -89,6 +89,28 @@
         "uri": "https://raw.githubusercontent.com/ch32-rs/ch32-data/a515903589cfbc342dc6ad0d13c02b4382da5628/data/chips/CH32V203G6U6.yaml",
         "version": "a515903589cfbc342dc6ad0d13c02b4382da5628",
         "publisher": "ch32-rs community"
+      },
+      {
+        "id": "adafruit-qt-py-ch32v203-schematic",
+        "name": "Adafruit QT Py CH32V203.sch",
+        "kind": "source-code",
+        "uri": "https://raw.githubusercontent.com/adafruit/Adafruit-QT-Py-CH32V203-PCB/c5c1580d9823d2f8923778530339179531d024f6/Adafruit%20QT%20Py%20CH32V203.sch",
+        "version": "c5c1580d9823d2f8923778530339179531d024f6",
+        "publisher": "Adafruit"
+      },
+      {
+        "id": "adafruit-qt-py-ch32v203-overview",
+        "name": "Adafruit QT Py CH32V203 overview",
+        "kind": "other",
+        "uri": "https://learn.adafruit.com/adafruit-qt-py-ch32v203/overview.md",
+        "publisher": "Adafruit"
+      },
+      {
+        "id": "adafruit-qt-py-ch32v203-pinouts",
+        "name": "Adafruit QT Py CH32V203 pinouts",
+        "kind": "other",
+        "uri": "https://learn.adafruit.com/adafruit-qt-py-ch32v203/pinouts.md",
+        "publisher": "Adafruit"
       }
     ],
     "evidence": [
@@ -549,6 +571,89 @@
         "normalizedClaim": "The official WCH TIM_DMA example initializes DMA1_Channel5 with DMA_DIR_PeripheralDST targeting TIM1_CH1CVR_ADDRESS, enables TIM_DMA_Update on TIM1, and uses that route to update PWM output values.",
         "locator": {
           "fragment": "EVT/EXAM/TIM/TIM_DMA/User/main.c"
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.95
+      },
+      {
+        "id": "e_adafruit_usb_c_usage",
+        "name": "Adafruit USB-C board usage",
+        "sourceRef": "adafruit-qt-py-ch32v203-pinouts",
+        "normalizedClaim": "Adafruit documents the QT Py CH32V203 USB-C port as used for both powering and programming the board.",
+        "locator": {
+          "fragment": "pinouts.md / Power"
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.93
+      },
+      {
+        "id": "e_adafruit_usb_native_cdc",
+        "name": "Adafruit native USB device note",
+        "sourceRef": "adafruit-qt-py-ch32v203-overview",
+        "normalizedClaim": "Adafruit describes the board as exposing the CH32V203 native USB device interface and notes USB CDC support via TinyUSB at board level.",
+        "locator": {
+          "fragment": "overview.md / feature list"
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.88
+      },
+      {
+        "id": "e_adafruit_schematic_usb_native_not_uart",
+        "name": "Adafruit schematic USB nets and separate UART nets",
+        "sourceRef": "adafruit-qt-py-ch32v203-schematic",
+        "normalizedClaim": "The Adafruit schematic routes the USB-C D+ and D- nets directly to IC2 USBD-labeled pins, while the board's RX and TX nets are separately routed to PA3 and PA2; no discrete USB-UART bridge is shown.",
+        "locator": {
+          "fragment": "USB-C and UART nets",
+          "lineStart": 8233,
+          "lineEnd": 8499
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.86
+      },
+      {
+        "id": "e_adafruit_schematic_usb_cc_termination",
+        "name": "Adafruit schematic USB-C CC termination",
+        "sourceRef": "adafruit-qt-py-ch32v203-schematic",
+        "normalizedClaim": "The Adafruit schematic places 5.1 kOhm resistors on both USB-C CC1 and CC2, consistent with a device-side sink attachment on the USB-C receptacle.",
+        "locator": {
+          "fragment": "USB-C CC network",
+          "lineStart": 7907,
+          "lineEnd": 8371
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.9
+      },
+      {
+        "id": "e_adafruit_pinouts_uart_pa23",
+        "name": "Adafruit board UART header roles",
+        "sourceRef": "adafruit-qt-py-ch32v203-pinouts",
+        "normalizedClaim": "Adafruit documents the board UART header as RX on PA3 and TX on PA2.",
+        "locator": {
+          "fragment": "pinouts.md / UART"
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.95
+      },
+      {
+        "id": "e_adafruit_pinouts_neopixel_pa4",
+        "name": "Adafruit board NeoPixel pinout",
+        "sourceRef": "adafruit-qt-py-ch32v203-pinouts",
+        "normalizedClaim": "Adafruit documents the onboard RGB NeoPixel LED as connected to PA4.",
+        "locator": {
+          "fragment": "pinouts.md / NeoPixel LED"
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.97
+      },
+      {
+        "id": "e_adafruit_schematic_neopixel_pa4",
+        "name": "Adafruit schematic NeoPixel net",
+        "sourceRef": "adafruit-qt-py-ch32v203-schematic",
+        "normalizedClaim": "The Adafruit schematic names the onboard RGB LED data net NEOPIX and routes it to IC2 pin PA4.",
+        "locator": {
+          "fragment": "NeoPixel net",
+          "lineStart": 8433,
+          "lineEnd": 8440
         },
         "extractionMethod": "manual",
         "confidence": 0.95
@@ -57866,6 +57971,45 @@
           "id": "periph.usbfsd",
           "name": "USBD",
           "description": "USB device-only interface",
+          "extensions": {
+            "boardAnnotations": {
+              "adafruitQtPyCh32V203": {
+                "connector": "USB Type-C",
+                "boardUses": [
+                  "power-input",
+                  "programming",
+                  "native-usb-device"
+                ],
+                "noOnboardUartBridge": true,
+                "separateHeaderUartPinRefs": [
+                  "pin.pa2",
+                  "pin.pa3"
+                ],
+                "enableRefs": [
+                  "field.rcc_apb1pcenr.usben",
+                  "field.usbfsd_base_ctrl.sys_ctrl",
+                  "field.usbfsd_udev_ctrl.port_en",
+                  "field.usbfsd_udev_ctrl.pd_dis"
+                ],
+                "ccTermination": {
+                  "cc1": "5.1k pull-down",
+                  "cc2": "5.1k pull-down"
+                },
+                "boardSourceRefs": [
+                  "adafruit-qt-py-ch32v203-schematic",
+                  "adafruit-qt-py-ch32v203-overview",
+                  "adafruit-qt-py-ch32v203-pinouts"
+                ],
+                "boardEvidenceRefs": [
+                  "e_adafruit_usb_c_usage",
+                  "e_adafruit_usb_native_cdc",
+                  "e_adafruit_schematic_usb_native_not_uart",
+                  "e_adafruit_schematic_usb_cc_termination"
+                ],
+                "notes": "Board collateral shows USB-C attached to the native USB device interface and not to a discrete USB-UART bridge. The exact D+/D- pad labels in the Adafruit schematic conflict with the WCH exact-variant package map, so the authoritative MCU USB pin routes remain the WCH-backed PA11/PA12 routes already modeled elsewhere in this document."
+              }
+            }
+          },
           "kind": "peripheral",
           "type": "USBFSD",
           "baseAddress": 1342177280,
@@ -62834,6 +62978,22 @@
             "name": "TIM2_CH3_1"
           }
         ],
+        "extensions": {
+          "boardAnnotations": {
+            "adafruitQtPyCh32V203": {
+              "role": "header-uart-tx",
+              "boardNet": "TX",
+              "boardSourceRefs": [
+                "adafruit-qt-py-ch32v203-pinouts",
+                "adafruit-qt-py-ch32v203-schematic"
+              ],
+              "boardEvidenceRefs": [
+                "e_adafruit_pinouts_uart_pa23",
+                "e_adafruit_schematic_usb_native_not_uart"
+              ]
+            }
+          }
+        },
         "provenance": {
           "sourceRefs": [
             "wch-ch32v203-datasheet"
@@ -62873,6 +63033,22 @@
             "name": "TIM2_CH4_1"
           }
         ],
+        "extensions": {
+          "boardAnnotations": {
+            "adafruitQtPyCh32V203": {
+              "role": "header-uart-rx",
+              "boardNet": "RX",
+              "boardSourceRefs": [
+                "adafruit-qt-py-ch32v203-pinouts",
+                "adafruit-qt-py-ch32v203-schematic"
+              ],
+              "boardEvidenceRefs": [
+                "e_adafruit_pinouts_uart_pa23",
+                "e_adafruit_schematic_usb_native_not_uart"
+              ]
+            }
+          }
+        },
         "provenance": {
           "sourceRefs": [
             "wch-ch32v203-datasheet"
@@ -62909,6 +63085,22 @@
             "name": "OPA2_OUT1"
           }
         ],
+        "extensions": {
+          "boardAnnotations": {
+            "adafruitQtPyCh32V203": {
+              "role": "onboard-rgb-neopixel-data",
+              "boardNet": "NEOPIX",
+              "boardSourceRefs": [
+                "adafruit-qt-py-ch32v203-pinouts",
+                "adafruit-qt-py-ch32v203-schematic"
+              ],
+              "boardEvidenceRefs": [
+                "e_adafruit_pinouts_neopixel_pa4",
+                "e_adafruit_schematic_neopixel_pa4"
+              ]
+            }
+          }
+        },
         "provenance": {
           "sourceRefs": [
             "wch-ch32v203-datasheet"
