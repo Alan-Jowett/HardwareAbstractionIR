@@ -5959,8 +5959,14 @@ fn render_default_pwm_route_statement(
         return Ok(None);
     };
     let peripheral_name = last_ref_segment(&route.peripheral_ref).to_ascii_uppercase();
-    let remap_suffix = format!("{}_REMAP", peripheral_name);
-    let Some(field) = try_resolve_register_field_by_suffix(&register, &remap_suffix) else {
+    let remap_suffixes = [
+        format!("{}_REMAP", peripheral_name),
+        format!("{}RM", peripheral_name),
+    ];
+    let Some(field) = remap_suffixes
+        .iter()
+        .find_map(|suffix| try_resolve_register_field_by_suffix(&register, suffix))
+    else {
         return Ok(None);
     };
     Ok(Some(render_register_write_statement(
@@ -14759,6 +14765,7 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(pwm_rs.contains("pub fn generate_update"));
         assert!(pwm_rs.contains("pub fn configure_ch2_as_pwm_mode_1"));
         assert!(pwm_rs.contains("pub fn configure_ch2_pa7_as_pwm_output"));
+        assert!(pwm_rs.contains("modify_u32(0x40010004u64, 0x00000C00u32, 0x00000000u32)?;"));
         assert!(pwm_rs.contains("pub fn channel_ch2(&self) -> TIM3PWMCh2"));
         assert!(pwm_rs.contains("impl embedded_hal::pwm::SetDutyCycle for TIM3PWMCh2"));
 
