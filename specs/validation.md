@@ -91,13 +91,14 @@ cargo run -- generate svd evidence\wch\ch32v203c8t6\hair.json --output <svd-outp
 ### V-005 Embassy generation path
 
 **Purpose:** verify that repository-managed Embassy lowering still operates on
-in-scope reference HAIR documents, including a composite-routing ESP32-C3
-bundle.
+in-scope reference HAIR documents, including the CH32V203G6U6 rtc-backed
+time-driver bundle and a composite-routing ESP32-C3 bundle.
 
 **Command**
 
 ```powershell
 cargo run -- generate embassy evidence\texas-instruments\lm3s6965\hair.json --output-dir <crate-output-dir>
+cargo run -- generate embassy evidence\wch\ch32v203g6u6\hair.json --output-dir <crate-output-dir>
 cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-dir <crate-output-dir>
 ```
 
@@ -106,6 +107,10 @@ cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-
 - The emitted crate contains `Cargo.toml`, `src\lib.rs`, `src\metadata.rs`,
   and generated driver modules justified by the reference document's profile
   scope.
+- The CH32V203G6U6 reference bundle succeeds only when the approved HAIR inputs
+  justify both the rtc-backed `embassy-time-driver` path and any emitted
+  HAL-specific raw RTC control helpers from the same explicit RTC
+  control/status path.
 - When a reference document carries explicit canonical normalization mappings,
   the generator may consume them only as additive lowering hints for supported
   equivalent concepts; missing or ambiguous mappings must not mask unsupported
@@ -128,14 +133,20 @@ cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-
   when the profile carries an explicit `timeDriverSource` selector and the
   referenced interrupt, semantic, and structural inputs justify that exact
   time-base architecture. Existing SysTick-backed paths must remain valid, while
-  hardware-timer-backed paths must fail explicitly unless they justify both the
-  async wake behavior and any claimed blocking delay helpers from approved HAIR
-  data. For approved hardware-timer paths, the emitted core contract must also
-  preserve the unique interrupt-route metadata and wake-handler hook needed for
-  a downstream runtime layer to bind the concrete trap symbol explicitly, plus
-  any generated interrupt-controller helper methods justified by the approved
-  interrupt identities and the explicit Embassy tick rate needed to keep
-  generated async durations aligned with the modeled hardware timer.
+  hardware-timer-backed and rtc-backed paths must fail explicitly unless they
+  justify the async wake behavior from approved HAIR data. When a non-SysTick
+  path also exposes blocking delay helpers or HAL-specific raw RTC control
+  helpers, those helpers must be justified by the same approved control/status
+  path rather than invented by the generator. For approved non-SysTick paths,
+  the emitted core contract must also preserve the unique interrupt-route
+  metadata and wake-handler hook needed for a downstream runtime layer to bind
+  the concrete trap symbol explicitly, plus any generated interrupt-controller
+  helper methods justified by the approved interrupt identities and the explicit
+  Embassy tick rate needed to keep generated async durations aligned with the
+  modeled time base. When those helpers or runtime hooks translate interrupt
+  numbers into vector slots or controller MMIO indices, validation must confirm
+  that the translation follows explicit `physical.interruptControllers[]`
+  numbering metadata rather than repository defaults or architecture guesses.
 - If a hardware-timer time-driver path uses a lowering family whose generated
   code depends on directly named counter/alarm/interrupt roles, such as
   `counter-compare-timer`, generation also succeeds only when the driver
@@ -157,6 +168,11 @@ cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-
   and interrupt topology narrow the generated time base to one explicit
   interrupt route/source pair and one explicit clear operation; a timer that
   merely exposes update/trigger/compare inventory is not yet async-ready.
+- If an rtc driver instance is present, generation succeeds only when any
+  emitted rtc module remains traceable to approved raw counter, prescaler,
+  alarm, and flag/interrupt-handling inputs; the generator must fail explicitly
+  rather than synthesizing calendar or wall-clock behavior the RTC evidence does
+  not model.
 
 ## 3. Artifact-level validation
 
@@ -212,6 +228,7 @@ repository contracts.
 - `evidence\wch\ch32v203g6u6\generated\embassy\`
 - `evidence\wch\ch32v203g6u6\generated\embassy-smoke\`
 - `evidence\wch\ch32v203g6u6\generated\embassy-pwm-smoke\`
+- `evidence\wch\ch32v203g6u6\generated\embassy-rtc-smoke\`
 - `evidence\espressif\esp32-c3fn4\`
 - `evidence\texas-instruments\lm3s6965\embassy-out\`
 - `evidence\texas-instruments\lm3s6965\embassy-smoke\`
@@ -401,6 +418,49 @@ powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\emb
   normal Rust package boundaries for GPIO, PWM, and Embassy time-driver setup.
 - The example uses `TIM3` channel 2 on the default `PA7` route so the waveform
   can be captured directly on a scope without relying on remap configuration.
+
+### V-017 Hardware smoke packaging for the CH32V203G6U6 RTC counter example
+
+**Purpose:** provide a hardware-flashable RTC smoke image for the
+CH32V203G6U6 reference bundle that first validates raw RTC counter progression
+and the generated RTC HAL helper surface independently from the RTC wake
+interrupt path, then adds one minimal `embassy_time::Timer::after(...)` proof
+without removing the lower-level RTC/EXTI/PFIC diagnostics.
+
+**Command**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\embassy-rtc-smoke\build-smoke-bin.ps1 -Release
+```
+
+**Expected result**
+- The smoke firmware builds for `riscv32imc-unknown-none-elf`.
+- The packaging step writes a flashable `.bin` beside the release ELF.
+- When flashed to the physical device, `PA7` transitions from its startup high
+  level into a continuous square wave whose half-period is derived from raw RTC
+  counter polling at 250 ticks per edge.
+- The firmware also enumerates a USB CDC port and emits periodic `count=<value>`
+  lines sourced directly from raw RTC counter reads, without depending on the
+  RTC wake interrupt path.
+- The same firmware also emits `await_count=<value>` lines driven by one minimal
+  `Timer::after(...)` loop, while preserving the direct IRQ/count diagnostics so
+  wake-path regressions can still be localized below the async layer.
+- A stalled startup-high output indicates RTC counter bring-up failed before the
+  first observed counter-driven edge transition.
+
+**Note**
+- This is a hardware-dependent smoke check, not a universal repository
+  precondition.
+- The smoke application shall consume the generated Embassy HAL crate through
+  normal Rust package boundaries for RTC and GPIO, and may reuse the generated
+  RTC time-driver bring-up helper only to initialize the RTC source and
+  prescaler before raw counter polling begins.
+- The raw RTC checks shall stay within the approved generated helper surface:
+  counter, prescaler, alarm, and interrupt/flag handling.
+- The await-based proof in this image is intentionally narrow: it should confirm
+  that the generated Embassy wake path can service repeated `Timer::after(...)`
+  waits once the lower-level RTC alarm route is known-good, without replacing
+  the direct IRQ-path observability needed for debugging.
 
 ## 6. Requirement-specific validation coverage
 

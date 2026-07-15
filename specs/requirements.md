@@ -218,14 +218,17 @@ Embassy profile contract.
   generator emits.
 - If a driver instance claims capability tag `embassy-time-driver`, the profile
   shall also carry an explicit selector distinguishing the existing
-  SysTick-backed path from any hardware-timer-backed path. A SysTick-backed time
-  base is allowed only when the approved interrupt-path inputs justify it
-  explicitly. A hardware-timer-backed time base is allowed only when the
-  approved timer, interrupt, semantic, and structural inputs justify both the
-  async wake behavior and any claimed blocking delay helpers deterministically.
-  For lowering families whose generated code depends on directly named
-  counter/alarm/interrupt roles, such as `counter-compare-timer`, the same
-  hardware-timer profile entry shall also carry explicit
+  SysTick-backed path from any hardware-timer-backed or rtc-backed path. A
+  SysTick-backed time base is allowed only when the approved interrupt-path
+  inputs justify it explicitly. A hardware-timer-backed time base is allowed
+  only when the approved timer, interrupt, semantic, and structural inputs
+  justify both the async wake behavior and any claimed blocking delay helpers
+  deterministically. An rtc-backed time base is allowed only when the approved
+  rtc, interrupt, semantic, and structural inputs justify the monotonic
+  counter/alarm wake path deterministically. For lowering families whose
+  generated code depends on directly named counter/alarm/interrupt roles, such
+  as `counter-compare-timer`, the same non-SysTick profile entry shall also
+  carry explicit
   `timeDriverBindings` naming the exact counter-read, alarm-programming,
   interrupt-enable, interrupt-pending, and interrupt-clear handles used by the
   generated lowering; the generator shall not infer those roles from vendor
@@ -234,17 +237,30 @@ Embassy profile contract.
   also carry the corresponding explicit semantic operation reference(s).
   If multiple hardware-timer lowering families have materially different timer
   semantics, the same profile entry shall also carry an explicit lowering-family
-  selector rather than leaving that choice to generator heuristics.
-  For a hardware-timer-backed path, the generated core contract shall remain
-  runtime-agnostic: it must expose the generated wake handler plus the unique
-  approved interrupt-route metadata needed by a downstream runtime layer to bind
-  and enable that interrupt without repository guesswork. The same profile entry
-  shall also carry the explicit Embassy tick rate used by that hardware timer so
-  generated async timing behavior and generated Cargo metadata agree on the
-  duration unit. When the source timer exposes multiple interrupt sources or
-  shares one device vector across update/trigger/compare causes, the profile and
-  interrupt topology shall still identify one explicit route/source/clear path
-  for the generated time base rather than assuming an implicit default.
+  selector rather than leaving that choice to generator heuristics. For a
+  hardware-timer-backed or rtc-backed path, the generated core contract shall
+  remain runtime-agnostic: it must expose the generated wake handler plus the
+  unique approved interrupt-route metadata needed by a downstream runtime layer
+  to bind and enable that interrupt without repository guesswork. The same
+  controller path shall also carry explicit controller numbering semantics on
+  the referenced `physical.interruptControllers[]` record whenever generated
+  code or runtime helpers must place vectors or program controller
+  enable/pending/active registers; repository heuristics are not an acceptable
+  substitute for that controller contract. Controllers not yet used by such
+  lowering may omit the metadata until a downstream flow needs it. The same
+  profile entry shall also carry the explicit Embassy tick rate used by that
+  non-SysTick source so generated async timing behavior and generated Cargo
+  metadata agree on the duration unit. When the source peripheral exposes
+  multiple interrupt sources or shares one device vector across multiple causes,
+  the profile and interrupt topology shall still identify one explicit
+  route/source/clear path for the generated time base rather than assuming an
+  implicit default.
+- `rtc` lowering is allowed only when the document carries the clock/reset,
+  interrupt, semantic/state-machine, and structural facts needed to lower the
+  claimed raw counter, prescaler, alarm, and flag/interrupt-handling surface
+  deterministically. A generated rtc module may expose HAL-specific helpers for
+  RTC behavior that does not fit the generic `embassy-time` contract, but those
+  helpers must remain traceable to the approved RTC control and status path.
 - Unsupported driver kinds, unresolved references, missing lowering inputs,
   and out-of-subset requests fail explicitly.
 

@@ -168,48 +168,55 @@ Normative consequences:
    running state, counter reads, compare/alarm programming,
    interrupt-enable control, pending checks, and interrupt
    acknowledgement explicitly
-4. a hardware-timer path must also declare the Embassy tick rate
-   explicitly so generated async durations and the modeled hardware
-   counter use the same unit
-5. when one supported hardware-timer architecture still has materially
+4. `timeDriverSource = "rtc"` is allowed only for an approved `rtc`
+   driver instance whose referenced rtc path justifies counter reads,
+   alarm programming, interrupt-enable control, pending checks, and
+   interrupt acknowledgement explicitly
+5. a non-SysTick path must also declare the Embassy tick rate explicitly
+   so generated async durations and the modeled hardware time base use
+   the same unit
+6. when one supported hardware-timer architecture still has materially
    different lowering families, the driver instance must also name an
    explicit `loweringPattern` for that family rather than relying on
    generator heuristics
-6. for timer blocks with multiple interrupt causes or shared device
-   vectors, the driver instance must still identify one explicit
+7. for timer or rtc blocks with multiple interrupt causes or shared
+   device vectors, the driver instance must still identify one explicit
    interrupt route/source pair plus one explicit clear operation for the
-   generated time base; generic timer inventory is not enough
-7. a first-cut counter/compare timer time base uses
+   generated time base; generic inventory is not enough
+8. a first-cut counter/compare timer time base uses
    `loweringPattern = "counter-compare-timer"` and requires the approved
    path to justify prescaler/reload setup, free-running counter reads,
    compare/alarm programming, event/reload application, interrupt enable,
    and interrupt acknowledge/clear explicitly
-8. a `counter-compare-timer` time base must carry explicit
-   `timeDriverBindings` naming the exact counter, alarm/compare,
-   interrupt-enable, interrupt-pending, and interrupt-clear handles the
-   generator may lower; generators must not infer those roles from
-   vendor register names alone. When the timer family requires an
-   explicit event/reload/latch step after reprogramming the alarm, that
-   same binding map must also name the semantic apply operation(s)
-9. the generated core contract for a hardware-timer path must stay
-   runtime-agnostic: the generated crate may emit timer-init helpers,
-   blocking delay helpers, the wake-handler entry point, the unique
-   interrupt-route metadata, and interrupt-controller helper methods that
-   operate on approved interrupt identities, but a downstream runtime layer
-   remains responsible for binding the concrete trap symbol and deciding how
-   to dispatch external interrupts on the board/runtime stack
-10. the tagged driver instance may use generator-facing support-module
+9. a non-SysTick time base whose generated code depends on directly named
+   counter/alarm/interrupt roles must carry explicit `timeDriverBindings`
+   naming the exact counter, alarm/compare, interrupt-enable,
+   interrupt-pending, and interrupt-clear handles the generator may
+   lower; generators must not infer those roles from vendor register
+   names alone. When the selected family requires an explicit
+   event/reload/latch step after reprogramming the alarm, that same
+   binding map must also name the semantic apply operation(s)
+10. the generated core contract for a non-SysTick path must stay
+   runtime-agnostic: the generated crate may emit source-specific init
+   helpers, blocking delay helpers when justified, the wake-handler
+   entry point, the unique interrupt-route metadata, and
+   interrupt-controller helper methods that operate on approved
+   interrupt identities plus any explicit controller numbering
+   semantics, but a downstream runtime layer remains
+   responsible for binding the concrete trap symbol and deciding how to
+   dispatch external interrupts on the board/runtime stack
+11. the tagged driver instance may use generator-facing support-module
    placement such as `modulePath = "time"`; this is still subject to the
    same evidence-bounded lowering rules as any other emitted module
-11. the generator must fail explicitly if zero or more than one driver
+12. the generator must fail explicitly if zero or more than one driver
    instance claims `embassy-time-driver` in a crate that requests async
    timing support
-12. workflows and generators must not treat generic timer inventory alone
-   as evidence of async timing readiness; the document must carry the
-   explicit interrupt inventory plus startup, clear/ack, and counter
-   facts needed to initialize and drive the generated tick source
-   without guesswork
-13. when a checked-in or derived Embassy runtime harness for the same
+13. workflows and generators must not treat generic timer or rtc
+   inventory alone as evidence of async timing readiness; the document
+   must carry the explicit interrupt inventory plus startup, clear/ack,
+   and counter facts needed to initialize and drive the generated tick
+   source without guesswork
+14. when a checked-in or derived Embassy runtime harness for the same
    profile must choose between materially different thread-executor idle
    strategies, `profiles.embassyHal.crate.executorIdleStrategy` must
    declare that choice explicitly rather than relying on target-name
@@ -278,6 +285,7 @@ The first Embassy generator cut is expected to support this driver subset:
 | `uart` / `usart` | supported | Requires explicit pin-routing data. Interrupt and DMA routes are required for async DMA-backed transfers and may be omitted for pure polling-mode instances. |
 | `spi` | supported | Requires explicit pin-routing data and any claimed DMA bindings. |
 | `i2c` | supported | Requires explicit pin-routing data and any claimed interrupt/DMA bindings. |
+| `rtc` | supported | Requires explicit RTC control/status structure plus interrupt and semantic evidence for any claimed raw counter/prescaler/alarm helpers. An rtc driver instance may also serve as the generated Embassy async time-base provider when `timeDriverSource = "rtc"` and the approved path includes the full counter/alarm/interrupt closure plus explicit `timeDriverBindings` when the lowering depends on direct role bindings. |
 | `timer` / `pwm` | supported | Requires state-machine and route data for the supported operating modes being generated. A timer block may also serve as the generated Embassy async time-base provider when `timeDriverSource = "hardware-timer"` and the approved path includes the full counter/alarm/interrupt closure plus explicit `timeDriverBindings` for the generated counter/alarm/interrupt accesses. If the selected timer architecture still has materially different supported lowering families, the driver instance must also carry an explicit `loweringPattern` such as `counter-compare-timer`. |
 | `adc` | supported | Requires calibration/init operations and any claimed DMA bindings. |
 | `dma` | supported | Generates DMA infrastructure from `dmaTopology`. |
@@ -311,6 +319,7 @@ hoc name matching.
 | `uart` / `usart` | `pinTopology.routes` always; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted enable/configure/read/write path; `interruptTopology.routes` and `dmaTopology.routes` only for emitted interrupt-driven or DMA-backed APIs |
 | `spi` | `pinTopology.routes`; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted configuration or transfer path; interrupt/DMA routes only when the emitted API claims them |
 | `i2c` | `pinTopology.routes`; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted bus transaction path; interrupt/DMA routes only when the emitted API claims them |
+| `rtc` | clock/reset support for emitted bring-up helpers when claimed; explicit `interruptTopology.routes` for any emitted interrupt-driven or wakeup behavior; explicit `semantics.operations` and/or `semantics.stateMachines` for claimed raw counter/prescaler/alarm setup or flag/interrupt handling; structural register/field data for the reachable RTC counter, prescaler, alarm, enable, pending, and clear/ack path; and, when the same driver instance also claims `embassy-time-driver`, the explicit tick-rate and binding facts needed for the selected rtc-backed time-base path |
 | `timer` / `pwm` | `pinTopology.routes` for exposed channels; target-local `semantics.stateMachines` and `semantics.operations` for mode transitions; state-machine transitions with exactly one supported effect targeting a field for first-cut lowering; structural register/field data for emitted enable/disable/channel/duty behavior; and, if the driver instance also claims blocking delay helpers or `embassy-time-driver`, the explicit interrupt routes plus semantic/structural counter, alarm, clear/ack, reload, and tick-rate facts needed for that timing path. Shared-vector timers must still narrow the generated time base to one explicit route/source/clear path. For `loweringPattern = "counter-compare-timer"`, that reachable structure includes the timer-enable path plus prescaler, reload, counter, alarm/compare, event/update, interrupt-enable, and interrupt-status/clear registers or canonical equivalents. |
 | `adc` | `semantics.operations` for calibration/init/enable; structural register/field data for any emitted conversion or sample path; pin/electrical data for exposed analog inputs; `dmaTopology.routes` only when the emitted API claims DMA-backed sampling |
 | `dma` | `profiles.mcuSoc.dmaTopology.routes` and the referenced `dmaTopology.channels`; any referenced route `controlRefs`; and structural register/field data for emitted channel enable/launch/status helpers |
@@ -330,6 +339,7 @@ exact naming contract:
 | `uart` / `usart` | Bring-up helpers and only those polling / interrupt / DMA TX/RX methods whose control/data paths are explicitly modeled |
 | `spi` | Bring-up helpers and only those transfer/control methods whose clocking, enable, and data paths are explicitly modeled |
 | `i2c` | Bring-up helpers and only those bus transaction methods whose start/address/data/stop behavior is explicitly modeled |
+| `rtc` | Bring-up helpers plus HAL-specific raw counter/prescaler/alarm/flag methods whose control and status paths are explicitly modeled; and, when selected as `timeDriverSource = "rtc"`, generated Embassy async time-base support only when the approved RTC counter/alarm/interrupt path is explicitly modeled and the emitted raw RTC helpers remain traceable to that same approved path |
 | `timer` / `pwm` | Enable/disable/mode/channel helpers derived from state machines, operations, route controls, and structural register data; plus blocking delay/timebase helpers and, when selected as `timeDriverSource = "hardware-timer"`, generated Embassy async time-base support only when the approved timer counter/alarm path is explicitly modeled. That async support must preserve a runtime-agnostic wake-handler hook, the unique interrupt-route metadata needed by a downstream runtime layer, and the explicit Embassy tick rate used by the timer source. When `loweringPattern = "counter-compare-timer"`, the generated time-base path is specifically the approved counter/compare/event/interrupt closure rather than an inferred generic timer API. |
 | `adc` | Calibration/enable helpers plus only those conversion/sample methods whose trigger/start/complete/data path is explicitly modeled |
 | `dma` | Channel-oriented enable/configure/launch/status helpers derived from DMA topology and any referenced controls |
@@ -385,30 +395,37 @@ companion emulator/state handles and their observation/control methods.
 14. If a driver instance claims `embassy-time-driver`, `timeDriverSource`
     becomes part of the executable lowering contract. `systick` preserves the
     existing SysTick-backed interrupt path. `hardware-timer` selects an
-    explicitly modeled timer-backed time base and must not be inferred from
+    explicitly modeled timer-backed time base. `rtc` selects an explicitly
+    modeled rtc-backed time base. None of those choices may be inferred from
     `driverKind` or capability tags alone.
 15. A `hardware-timer` time-driver claim must remain rooted in a `timer`
     driver instance whose approved HAIR inputs justify timer start, running
     state, compare/alarm or wrap behavior, interrupt acknowledgement, and the
-    counter facts needed for any emitted blocking delay helpers. It must also
-    declare `timeDriverTickHz`.
+    counter facts needed for any emitted blocking delay helpers. An `rtc`
+    time-driver claim must remain rooted in an `rtc` driver instance whose
+    approved HAIR inputs justify rtc counter reads, alarm behavior, interrupt
+    acknowledgement, and any emitted raw RTC helpers. Both non-SysTick paths
+    must declare `timeDriverTickHz`.
 16. If a hardware-timer time-driver claim uses a timer family whose supported
     lowering shape is materially distinct from other supported timer families,
     that driver instance must also declare `loweringPattern`. The first such
     timer-family selector is `counter-compare-timer`.
-17. A hardware-timer time-driver claim must narrow the generated time base to
-    one explicit interrupt route/source pair and one explicit clear operation,
-    even when the underlying timer peripheral exposes multiple causes or shares
-    one device vector across update, trigger, or compare events.
+17. A non-SysTick time-driver claim must narrow the generated time base to one
+    explicit interrupt route/source pair and one explicit clear operation, even
+    when the underlying peripheral exposes multiple causes or shares one device
+    vector across several events.
 18. A `systick` time-driver claim must remain rooted in an `interrupt` driver
     instance whose approved route inventory explicitly targets SysTick.
 19. A `systick` time-driver claim must not declare `timeDriverTickHz`; that
     rate is defined by the SysTick lowering path itself.
-20. A generated `hardware-timer` time-driver path must preserve the approved
-    interrupt-route identity in generated metadata and expose a runtime-agnostic
-    wake-handler hook that a board/runtime layer can call from the concrete
-    interrupt binding. The generated crate metadata must also select the
-    matching `embassy-time-driver` tick-rate feature from `timeDriverTickHz`.
+20. A generated non-SysTick time-driver path must preserve the approved
+    interrupt-route identity in generated metadata and expose a
+    runtime-agnostic wake-handler hook that a board/runtime layer can call from
+    the concrete interrupt binding. The generated crate metadata must also
+    preserve any explicit interrupt-controller numbering semantics needed to
+    place that vector or program controller register indices correctly, and
+    select the matching `embassy-time-driver` tick-rate feature from
+    `timeDriverTickHz`.
 
 ## Building a bootable ESP32-C3 image around a generated Embassy crate
 
@@ -489,8 +506,8 @@ Notes:
 
 - The generated Embassy HAL crate itself is reusable; the boot-image packaging
   lives in the board/application crate wrapped around it.
-- For a generated hardware-timer Embassy time base, that board/application
-  crate also owns the concrete interrupt binding needed to connect the generated
+- For a generated non-SysTick Embassy time base, that board/application crate
+  also owns the concrete interrupt binding needed to connect the generated
   wake-handler hook to the runtime/startup stack.
 - For the current tool versions in this repository, `esptool elf2image` is the
   reliable path for packaging the final flash image. Direct `espflash flash
@@ -509,22 +526,22 @@ For Embassy generation, the following cases must fail explicitly:
 4. the input document carries only resource metadata for a claimed behavior, with no executable lowering path
 5. referenced semantic operations or state machines target a different peripheral than the driver instance, or a lowered state transition effect cannot be represented as one supported field write in the first cut
 6. async timing support is requested or claimed, but no unique `embassy-time-driver` instance carries the explicit source selection plus interrupt/semantic/startup closure needed to drive the generated tick source
-7. a claimed `embassy-time-driver` instance omits `timeDriverSource`, uses a source that contradicts the driver kind, omits the required `timeDriverTickHz` for a hardware-timer path, sets `timeDriverTickHz` on a SysTick path, or lacks the interrupt/semantic/structural closure required for that source
-8. a timer-backed delay or time-base API would require inferred counter, alarm, wrap, or acknowledgement behavior beyond the approved HAIR records
+7. a claimed `embassy-time-driver` instance omits `timeDriverSource`, uses a source that contradicts the driver kind, omits the required `timeDriverTickHz` for a non-SysTick path, sets `timeDriverTickHz` on a SysTick path, or lacks the interrupt/semantic/structural closure required for that source
+8. a timer-backed or rtc-backed delay/time-base/API path would require inferred counter, alarm, wrap, pending, or acknowledgement behavior beyond the approved HAIR records
 9. a `usb-device` API would require inferred USB protocol state, endpoint
    semantics, or serial-style behavior that is not explicitly modeled by the
    approved clock/reset, interrupt, pin, semantic, and structural inputs
 10. a selected `loweringPattern` requires semantic or structural bring-up
    inputs that are absent, contradictory, or would force the generator to
    invent a different attach/reset sequence
-11. a hardware-timer time-driver claim relies on an implicit choice among
-   multiple timer interrupt causes, shared vectors, or clear paths instead of
-   naming one approved route/source/clear sequence explicitly
+11. a non-SysTick time-driver claim relies on an implicit choice among multiple
+   interrupt causes, shared vectors, or clear paths instead of naming one
+   approved route/source/clear sequence explicitly
 12. host-emulated generation would expose a HAL-visible device without a paired
    emulator/state handle
-12. a requested host-only observation or control surface would require
+13. a requested host-only observation or control surface would require
    unsupported inference beyond the approved lowering inputs
-13. host-emulated execution would depend on background wall-clock progression
+14. host-emulated execution would depend on background wall-clock progression
    rather than explicit deterministic test control in the first cut
 
 Generators may emit a smaller API surface than another document of the

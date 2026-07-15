@@ -2,7 +2,7 @@
 
 use crate::interrupt::{DRV_PFIC_RESOURCES, Irq, PFIC};
 use crate::metadata;
-use crate::time::{DRV_TIME_TIM4_RESOURCES, TIM4EmbassyTimeDriver};
+use crate::time::{DRV_TIME_RTC_RESOURCES, RTCEmbassyTimeDriver};
 use core::arch::{asm, global_asm};
 
 pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProvenance {
@@ -27,7 +27,7 @@ union WchVector {
 }
 
 const WCH_VECTOR_COUNT: usize = 63;
-const WCH_TIME_DRIVER_VECTOR_SLOT: usize = 46;
+const WCH_TIME_DRIVER_VECTOR_SLOT: usize = 57;
 const WCH_RESERVED_VECTOR: WchVector = WchVector { reserved: 0 };
 const WCH_HANG_VECTOR: WchVector = WchVector {
     handler: __hair_wch_hang_vector,
@@ -109,8 +109,8 @@ fn pfic() -> PFIC {
     PFIC::new(DRV_PFIC_RESOURCES).expect("generated WCH PFIC resources")
 }
 
-fn time_driver() -> TIM4EmbassyTimeDriver {
-    TIM4EmbassyTimeDriver::new(DRV_TIME_TIM4_RESOURCES).expect("generated WCH time-driver resources")
+fn time_driver() -> RTCEmbassyTimeDriver {
+    RTCEmbassyTimeDriver::new(DRV_TIME_RTC_RESOURCES).expect("generated WCH time-driver resources")
 }
 
 pub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {
@@ -122,10 +122,10 @@ pub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {
             value = in(reg) ((&WCH_VECTOR_TABLE as *const WchVectorTable as usize) | 0x3)
         );
     }
-    pfic().enable_irq(Irq::TIM4)?;
+    pfic().enable_irq(Irq::RTCAlarm)?;
     unsafe {
         asm!("csrs mie, {value}", value = in(reg) 0x800usize);
-        asm!("csrs mstatus, {value}", value = in(reg) 0x8usize);
+        asm!("csrs mstatus, {value}", value = in(reg) 0x88usize);
     }
     Ok(())
 }

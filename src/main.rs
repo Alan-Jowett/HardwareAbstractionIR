@@ -995,6 +995,8 @@ struct Interrupt {
     name: String,
     number: i32,
     #[serde(default)]
+    controller_ref: Option<String>,
+    #[serde(default)]
     description: Option<String>,
 }
 
@@ -1271,6 +1273,29 @@ struct SemanticSideEffect {
 struct HairPhysical {
     #[serde(default)]
     pins: Vec<PhysicalPin>,
+    #[serde(default)]
+    interrupt_controllers: Vec<PhysicalInterruptController>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PhysicalInterruptController {
+    id: String,
+    name: String,
+    #[serde(default)]
+    interrupt_numbering: Option<InterruptControllerNumbering>,
+    #[serde(default)]
+    target_refs: Vec<String>,
+    #[serde(default)]
+    priority_bits: Option<u32>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InterruptControllerNumbering {
+    vector_table_indexing: String,
+    register_indexing: String,
 }
 
 #[allow(dead_code)]
@@ -1821,6 +1846,7 @@ struct DriverResourceScopeInputs<'a> {
 const EMBASSY_TIME_DRIVER_TAG: &str = "embassy-time-driver";
 const EMBASSY_TIME_DRIVER_SOURCE_SYSTICK: &str = "systick";
 const EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER: &str = "hardware-timer";
+const EMBASSY_TIME_DRIVER_SOURCE_RTC: &str = "rtc";
 const EMBASSY_EXECUTOR_IDLE_STRATEGY_WFI: &str = "wfi";
 const EMBASSY_EXECUTOR_IDLE_STRATEGY_SPIN: &str = "spin";
 const TIMER_LOWERING_COUNTER_COMPARE: &str = "counter-compare-timer";
@@ -1889,6 +1915,7 @@ struct EmbassyGenerationModel {
     feature_flags: Vec<String>,
     interrupts: Vec<Interrupt>,
     pins: Vec<PhysicalPin>,
+    interrupt_controllers: HashMap<String, PhysicalInterruptController>,
     drivers: Vec<ResolvedDriverInstance>,
     operations: HashMap<String, SemanticOperation>,
     peripherals: HashMap<String, Peripheral>,
@@ -2016,8 +2043,12 @@ impl EmbassyGenerationModel {
         };
         let required_peripherals =
             collect_embassy_register_scope(&embassy.driver_instances, &register_scope)?;
-        let required_fields =
-            collect_embassy_field_scope(&embassy.driver_instances, &operations, &state_machines)?;
+        let required_fields = collect_embassy_field_scope(
+            &embassy.driver_instances,
+            &operations,
+            &state_machines,
+            &interrupt_routes,
+        )?;
         let registers = collect_register_map(
             &document.structure.device.peripherals,
             &required_peripherals,
@@ -2189,6 +2220,12 @@ impl EmbassyGenerationModel {
             feature_flags: embassy.crate_info.feature_flags.clone(),
             interrupts: document.structure.device.interrupts.clone(),
             pins: document.physical.pins.clone(),
+            interrupt_controllers: document
+                .physical
+                .interrupt_controllers
+                .iter()
+                .map(|controller| (controller.id.clone(), controller.clone()))
+                .collect(),
             drivers,
             operations: operations
                 .iter()
@@ -2256,7 +2293,7 @@ impl EmbassyGenerationModel {
 fn validate_supported_driver_kind(driver_kind: &str) -> Result<()> {
     match driver_kind {
         "rcc" | "gpio-port" | "uart" | "usart" | "spi" | "i2c" | "timer" | "pwm" | "adc"
-        | "dma" | "interrupt" | "usb-device" => Ok(()),
+        | "dma" | "interrupt" | "usb-device" | "rtc" => Ok(()),
         "custom" => bail!("driver kind custom is outside the supported first-cut Embassy subset"),
         other => bail!("driver kind {other} is not supported by the first-cut Embassy generator"),
     }
@@ -2755,6 +2792,78 @@ fn validate_capability_tag_contracts(drivers: &[ResolvedDriverInstance]) -> Resu
                         EMBASSY_TIME_DRIVER_TAG,
                         source,
                         TIMER_LOWERING_COUNTER_COMPARE
+                    );
+                }
+            }
+            EMBASSY_TIME_DRIVER_SOURCE_RTC => {
+                let tick_hz = driver.time_driver_tick_hz.ok_or_else(|| {
+                    anyhow!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but omits required timeDriverTickHz",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source
+                    )
+                })?;
+                if tick_hz == 0 {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but timeDriverTickHz must be greater than zero",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source
+                    );
+                }
+                if driver.driver_kind != "rtc" {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but has unsupported driver kind {}; rtc timing requires an rtc driver",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source,
+                        driver.driver_kind
+                    );
+                }
+                if driver.target.block_class != "rtc-controller" {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but target block {} is not rtc-controller",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source,
+                        driver.target.id
+                    );
+                }
+                if driver.interrupt_routes.len() != 1 || driver.interrupt_sources.len() != 1 {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but must reference exactly one rtc interrupt route/source pair",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source
+                    );
+                }
+                let interrupt_source = &driver.interrupt_sources[0];
+                if interrupt_source.kind != "rtc" {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but interrupt source {} is kind {} instead of rtc",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source,
+                        interrupt_source.id,
+                        interrupt_source.kind
+                    );
+                }
+                if interrupt_source.clear_operation_refs.len() != 1 {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but interrupt source {} must expose exactly one clear operation",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source,
+                        interrupt_source.id
+                    );
+                }
+                if time_driver_bindings(driver).is_none() {
+                    bail!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but omits required timeDriverBindings",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        source
                     );
                 }
             }
@@ -3332,6 +3441,17 @@ fn validate_driver_requirements(
                 );
             }
         }
+        "rtc" => {
+            if requirements.clock_bindings.is_empty()
+                && requirements.interrupt_routes.is_empty()
+                && requirements.init_operations.is_empty()
+            {
+                bail!(
+                    "rtc driver {} requires clock bindings, interrupt routes, or init operations",
+                    driver.id
+                );
+            }
+        }
         "usb-device" => {
             let has_dp = requirements.pin_roles.iter().any(|role| {
                 role.role.eq_ignore_ascii_case("dp")
@@ -3817,13 +3937,19 @@ fn render_driver_support_items(
 ) -> Result<String> {
     let mut out = String::new();
     if driver_uses_pfic_runtime_support(driver) {
-        out.push_str(render_pfic_interrupt_support_items());
+        let numbering = pfic_interrupt_controller_numbering(model)?;
+        out.push_str(&render_pfic_interrupt_support_items(
+            numbering.register_indexing.as_str(),
+        )?);
     }
     if driver.driver_kind == "gpio-port" {
         out.push_str(&render_gpio_support_items(model, driver)?);
     }
     if driver.driver_kind == "pwm" {
         out.push_str(&render_pwm_support_items(model, driver)?);
+    }
+    if driver.driver_kind == "rtc" && driver.module_name == "rtc" {
+        out.push_str(&render_rtc_support_items(model, driver)?);
     }
     if driver_uses_usb_fsdev_pma_btable_lowering(driver) {
         out.push_str(&render_usb_fsdev_support_items(driver));
@@ -4815,10 +4941,11 @@ fn render_driver_methods(
     methods.extend(render_spi_methods(model, driver)?);
     methods.extend(render_adc_methods(model, driver)?);
     methods.extend(render_usb_device_methods(model, driver)?);
+    methods.extend(render_rtc_methods(model, driver)?);
     methods.extend(render_rcc_methods(model, driver)?);
     methods.extend(render_operation_methods(model, driver)?);
     methods.extend(render_state_machine_methods(model, driver)?);
-    methods.extend(render_time_driver_methods(driver)?);
+    methods.extend(render_time_driver_methods(model, driver)?);
 
     if methods.is_empty() {
         bail!(
@@ -4851,6 +4978,122 @@ fn driver_uses_pfic_runtime_support(driver: &ResolvedDriverInstance) -> bool {
         && (driver.target.id == "block.pfic" || driver.target.name.eq_ignore_ascii_case("PFIC"))
 }
 
+const PFIC_INTERRUPT_CONTROLLER_ID: &str = "ic.pfic";
+const INTERRUPT_NUMBERING_INTERRUPT_NUMBER: &str = "interrupt-number";
+const INTERRUPT_NUMBERING_EXTERNAL_INTERRUPT_INDEX: &str = "external-interrupt-index";
+const CORE_EXCEPTION_VECTOR_PREFIX: usize = 16;
+
+fn interrupt_controller_numbering_for_ref<'a>(
+    model: &'a EmbassyGenerationModel,
+    controller_ref: &str,
+) -> Option<&'a InterruptControllerNumbering> {
+    model
+        .interrupt_controllers
+        .get(controller_ref)?
+        .interrupt_numbering
+        .as_ref()
+}
+
+fn pfic_interrupt_controller_numbering(
+    model: &EmbassyGenerationModel,
+) -> Result<&InterruptControllerNumbering> {
+    model
+        .interrupt_controllers
+        .values()
+        .find(|controller| {
+            controller.id == PFIC_INTERRUPT_CONTROLLER_ID
+                || controller.name.eq_ignore_ascii_case("PFIC")
+        })
+        .and_then(|controller| controller.interrupt_numbering.as_ref())
+        .ok_or_else(|| {
+            anyhow!(
+                "PFIC runtime support requires physical interrupt-controller numbering metadata"
+            )
+        })
+}
+
+fn render_pfic_irq_index_expression(register_indexing: &str) -> Result<&'static str> {
+    match register_indexing {
+        INTERRUPT_NUMBERING_INTERRUPT_NUMBER => Ok(
+            "    if irq_index < PFIC_EXTERNAL_IRQ_OFFSET {\n        return Err(metadata::Error::Unsupported(\n            \"PFIC runtime helpers only support external interrupts\",\n        ));\n    }\n    Ok(irq_index)\n",
+        ),
+        INTERRUPT_NUMBERING_EXTERNAL_INTERRUPT_INDEX => Ok("    Ok(irq_index)\n"),
+        other => bail!(
+            "unsupported PFIC register indexing mode for generated runtime helpers: {}",
+            other
+        ),
+    }
+}
+
+fn render_wch_vector_slot(numbering: &InterruptControllerNumbering, number: i32) -> Result<usize> {
+    let irq_number =
+        usize::try_from(number).map_err(|_| anyhow!("interrupt number {} is negative", number))?;
+    match numbering.vector_table_indexing.as_str() {
+        INTERRUPT_NUMBERING_INTERRUPT_NUMBER => Ok(irq_number),
+        INTERRUPT_NUMBERING_EXTERNAL_INTERRUPT_INDEX => irq_number
+            .checked_add(CORE_EXCEPTION_VECTOR_PREFIX)
+            .ok_or_else(|| {
+                anyhow!(
+                    "interrupt number {} overflows WCH vector slot computation",
+                    number
+                )
+            }),
+        other => bail!(
+            "unsupported WCH vector table indexing mode for generated runtime support: {}",
+            other
+        ),
+    }
+}
+
+fn validate_wch_runtime_interrupt_number(
+    numbering: &InterruptControllerNumbering,
+    interrupt: &Interrupt,
+) -> Result<()> {
+    match numbering.vector_table_indexing.as_str() {
+        INTERRUPT_NUMBERING_INTERRUPT_NUMBER => {
+            if interrupt.number < CORE_EXCEPTION_VECTOR_PREFIX as i32 {
+                bail!(
+                    "WCH runtime support requires an external interrupt, but {} has IRQ number {}",
+                    interrupt.id,
+                    interrupt.number
+                );
+            }
+            Ok(())
+        }
+        INTERRUPT_NUMBERING_EXTERNAL_INTERRUPT_INDEX => {
+            if interrupt.number < 0 {
+                bail!(
+                    "WCH runtime support requires a non-negative external interrupt index, but {} has IRQ number {}",
+                    interrupt.id,
+                    interrupt.number
+                );
+            }
+            Ok(())
+        }
+        other => bail!(
+            "unsupported WCH vector table indexing mode for runtime validation: {}",
+            other
+        ),
+    }
+}
+
+fn render_wch_vector_count(
+    numbering: &InterruptControllerNumbering,
+    interrupts: &[Interrupt],
+    controller_ref: &str,
+    fallback_vector_slot: usize,
+) -> Result<usize> {
+    let max_vector_slot = interrupts
+        .iter()
+        .filter(|interrupt| interrupt.controller_ref.as_deref() == Some(controller_ref))
+        .map(|interrupt| render_wch_vector_slot(numbering, interrupt.number))
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .max()
+        .unwrap_or(fallback_vector_slot);
+    Ok(max_vector_slot.max(15) + 1)
+}
+
 fn uses_generated_wch_runtime_module(model: &EmbassyGenerationModel) -> bool {
     generated_wch_runtime_inputs(model).is_ok_and(|inputs| inputs.is_some())
 }
@@ -4872,7 +5115,7 @@ fn generated_wch_runtime_inputs(
         has_time_driver_tag(&driver.capability_tags)
             && matches!(
                 time_driver_source(driver),
-                Some(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER)
+                Some(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER | EMBASSY_TIME_DRIVER_SOURCE_RTC)
             )
     });
     let (Some(interrupt_driver), Some(time_driver)) = (interrupt_driver, time_driver) else {
@@ -4898,13 +5141,18 @@ fn generated_wch_runtime_inputs(
                 interrupt_route.interrupt_ref
             )
         })?;
-    if time_interrupt.number < 16 {
-        bail!(
-            "WCH runtime support requires an external interrupt, but {} has IRQ number {}",
-            time_interrupt.id,
-            time_interrupt.number
-        );
-    }
+    let controller_ref = time_interrupt
+        .controller_ref
+        .as_deref()
+        .ok_or_else(|| anyhow!("interrupt {} is missing controllerRef", time_interrupt.id))?;
+    let numbering =
+        interrupt_controller_numbering_for_ref(model, controller_ref).ok_or_else(|| {
+            anyhow!(
+                "interrupt controller {} is missing interruptNumbering metadata",
+                controller_ref
+            )
+        })?;
+    validate_wch_runtime_interrupt_number(numbering, time_interrupt)?;
     Ok(Some(GeneratedWchRuntimeInputs {
         interrupt_driver,
         time_driver,
@@ -4914,7 +5162,7 @@ fn generated_wch_runtime_inputs(
 
 fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<String> {
     let Some(inputs) = generated_wch_runtime_inputs(model)? else {
-        bail!("WCH runtime support requested without PFIC + hardware-timer time-driver inputs");
+        bail!("WCH runtime support requested without PFIC + non-SysTick time-driver inputs");
     };
     let time_driver_type = &inputs.time_driver.type_name;
     let time_driver_resources = format!("{}_RESOURCES", to_rust_const_name(&inputs.time_driver.id));
@@ -4924,35 +5172,153 @@ fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<Strin
         to_rust_const_name(&inputs.interrupt_driver.id)
     );
     let irq_variant = to_rust_type_name(&inputs.time_interrupt.name);
-    let vector_slot = usize::try_from(inputs.time_interrupt.number).map_err(|_| {
-        anyhow!(
-            "interrupt {} has negative IRQ number",
-            inputs.time_interrupt.id
-        )
-    })?;
-    let vector_count = model
-        .interrupts
-        .iter()
-        .filter_map(|interrupt| usize::try_from(interrupt.number).ok())
-        .max()
-        .unwrap_or(vector_slot)
-        .max(15)
-        + 1;
+    let controller_ref = inputs
+        .time_interrupt
+        .controller_ref
+        .as_deref()
+        .ok_or_else(|| {
+            anyhow!(
+                "interrupt {} is missing controllerRef",
+                inputs.time_interrupt.id
+            )
+        })?;
+    let numbering =
+        interrupt_controller_numbering_for_ref(model, controller_ref).ok_or_else(|| {
+            anyhow!(
+                "interrupt controller {} is missing interruptNumbering metadata",
+                controller_ref
+            )
+        })?;
+    let vector_slot = render_wch_vector_slot(numbering, inputs.time_interrupt.number)?;
+    let vector_count =
+        render_wch_vector_count(numbering, &model.interrupts, controller_ref, vector_slot)?;
 
     Ok(format!(
-        "//! Generated WCH/QingKe runtime support for {}.\n\nuse crate::interrupt::{{{interrupt_driver_resources}, Irq, {interrupt_driver_type}}};\nuse crate::metadata;\nuse crate::time::{{{time_driver_resources}, {time_driver_type}}};\nuse core::arch::{{asm, global_asm}};\n\n{}\nunsafe extern \"C\" {{\n    fn __hair_wch_hang_vector();\n    fn __hair_wch_embassy_time_driver_vector();\n}}\n\n#[derive(Clone, Copy)]\n#[repr(C)]\nunion WchVector {{\n    handler: unsafe extern \"C\" fn(),\n    reserved: usize,\n}}\n\nconst WCH_VECTOR_COUNT: usize = {vector_count};\nconst WCH_TIME_DRIVER_VECTOR_SLOT: usize = {vector_slot};\nconst WCH_RESERVED_VECTOR: WchVector = WchVector {{ reserved: 0 }};\nconst WCH_HANG_VECTOR: WchVector = WchVector {{\n    handler: __hair_wch_hang_vector,\n}};\nconst WCH_TIME_DRIVER_HANDLER_VECTOR: WchVector = WchVector {{\n    handler: __hair_wch_embassy_time_driver_vector,\n}};\n\n#[repr(C, align(64))]\nstruct WchVectorTable([WchVector; WCH_VECTOR_COUNT]);\n\nconst fn build_wch_vector_table() -> WchVectorTable {{\n    let mut table = [WCH_HANG_VECTOR; WCH_VECTOR_COUNT];\n    table[1] = WCH_RESERVED_VECTOR;\n    table[4] = WCH_RESERVED_VECTOR;\n    table[6] = WCH_RESERVED_VECTOR;\n    table[7] = WCH_RESERVED_VECTOR;\n    table[10] = WCH_RESERVED_VECTOR;\n    table[11] = WCH_RESERVED_VECTOR;\n    table[13] = WCH_RESERVED_VECTOR;\n    table[15] = WCH_RESERVED_VECTOR;\n    table[WCH_TIME_DRIVER_VECTOR_SLOT] = WCH_TIME_DRIVER_HANDLER_VECTOR;\n    WchVectorTable(table)\n}}\n\n#[unsafe(link_section = \".vector\")]\n#[used]\nstatic WCH_VECTOR_TABLE: WchVectorTable = build_wch_vector_table();\n\nglobal_asm!(\n    r#\"\n    .global __hair_wch_hang_vector\n__hair_wch_hang_vector:\n1:\n    j 1b\n\n    .global __hair_wch_embassy_time_driver_vector\n__hair_wch_embassy_time_driver_vector:\n    addi sp, sp, -64\n    sw ra, 0(sp)\n    sw t0, 4(sp)\n    sw t1, 8(sp)\n    sw t2, 12(sp)\n    sw t3, 16(sp)\n    sw t4, 20(sp)\n    sw t5, 24(sp)\n    sw t6, 28(sp)\n    sw a0, 32(sp)\n    sw a1, 36(sp)\n    sw a2, 40(sp)\n    sw a3, 44(sp)\n    sw a4, 48(sp)\n    sw a5, 52(sp)\n    sw a6, 56(sp)\n    sw a7, 60(sp)\n    call __hair_wch_embassy_time_driver_irq_rust\n    lw ra, 0(sp)\n    lw t0, 4(sp)\n    lw t1, 8(sp)\n    lw t2, 12(sp)\n    lw t3, 16(sp)\n    lw t4, 20(sp)\n    lw t5, 24(sp)\n    lw t6, 28(sp)\n    lw a0, 32(sp)\n    lw a1, 36(sp)\n    lw a2, 40(sp)\n    lw a3, 44(sp)\n    lw a4, 48(sp)\n    lw a5, 52(sp)\n    lw a6, 56(sp)\n    lw a7, 60(sp)\n    addi sp, sp, 64\n    mret\n\"#\n);\n\nfn pfic() -> {interrupt_driver_type} {{\n    {interrupt_driver_type}::new({interrupt_driver_resources}).expect(\"generated WCH PFIC resources\")\n}}\n\nfn time_driver() -> {time_driver_type} {{\n    {time_driver_type}::new({time_driver_resources}).expect(\"generated WCH time-driver resources\")\n}}\n\npub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {{\n    time_driver().init_time_driver()?;\n    unsafe {{\n        asm!(\"csrw 0x804, {{value}}\", value = in(reg) 0x3usize);\n        asm!(\n            \"csrw mtvec, {{value}}\",\n            value = in(reg) ((&WCH_VECTOR_TABLE as *const WchVectorTable as usize) | 0x3)\n        );\n    }}\n    pfic().enable_irq(Irq::{irq_variant})?;\n    unsafe {{\n        asm!(\"csrs mie, {{value}}\", value = in(reg) 0x800usize);\n        asm!(\"csrs mstatus, {{value}}\", value = in(reg) 0x8usize);\n    }}\n    Ok(())\n}}\n\n#[unsafe(no_mangle)]\nextern \"C\" fn __hair_wch_embassy_time_driver_irq_rust() {{\n    time_driver().on_time_driver_interrupt();\n}}\n",
+        "//! Generated WCH/QingKe runtime support for {}.\n\nuse crate::interrupt::{{{interrupt_driver_resources}, Irq, {interrupt_driver_type}}};\nuse crate::metadata;\nuse crate::time::{{{time_driver_resources}, {time_driver_type}}};\nuse core::arch::{{asm, global_asm}};\n\n{}\nunsafe extern \"C\" {{\n    fn __hair_wch_hang_vector();\n    fn __hair_wch_embassy_time_driver_vector();\n}}\n\n#[derive(Clone, Copy)]\n#[repr(C)]\nunion WchVector {{\n    handler: unsafe extern \"C\" fn(),\n    reserved: usize,\n}}\n\nconst WCH_VECTOR_COUNT: usize = {vector_count};\nconst WCH_TIME_DRIVER_VECTOR_SLOT: usize = {vector_slot};\nconst WCH_RESERVED_VECTOR: WchVector = WchVector {{ reserved: 0 }};\nconst WCH_HANG_VECTOR: WchVector = WchVector {{\n    handler: __hair_wch_hang_vector,\n}};\nconst WCH_TIME_DRIVER_HANDLER_VECTOR: WchVector = WchVector {{\n    handler: __hair_wch_embassy_time_driver_vector,\n}};\n\n#[repr(C, align(64))]\nstruct WchVectorTable([WchVector; WCH_VECTOR_COUNT]);\n\nconst fn build_wch_vector_table() -> WchVectorTable {{\n    let mut table = [WCH_HANG_VECTOR; WCH_VECTOR_COUNT];\n    table[1] = WCH_RESERVED_VECTOR;\n    table[4] = WCH_RESERVED_VECTOR;\n    table[6] = WCH_RESERVED_VECTOR;\n    table[7] = WCH_RESERVED_VECTOR;\n    table[10] = WCH_RESERVED_VECTOR;\n    table[11] = WCH_RESERVED_VECTOR;\n    table[13] = WCH_RESERVED_VECTOR;\n    table[15] = WCH_RESERVED_VECTOR;\n    table[WCH_TIME_DRIVER_VECTOR_SLOT] = WCH_TIME_DRIVER_HANDLER_VECTOR;\n    WchVectorTable(table)\n}}\n\n#[unsafe(link_section = \".vector\")]\n#[used]\nstatic WCH_VECTOR_TABLE: WchVectorTable = build_wch_vector_table();\n\nglobal_asm!(\n    r#\"\n    .global __hair_wch_hang_vector\n__hair_wch_hang_vector:\n1:\n    j 1b\n\n    .global __hair_wch_embassy_time_driver_vector\n__hair_wch_embassy_time_driver_vector:\n    addi sp, sp, -64\n    sw ra, 0(sp)\n    sw t0, 4(sp)\n    sw t1, 8(sp)\n    sw t2, 12(sp)\n    sw t3, 16(sp)\n    sw t4, 20(sp)\n    sw t5, 24(sp)\n    sw t6, 28(sp)\n    sw a0, 32(sp)\n    sw a1, 36(sp)\n    sw a2, 40(sp)\n    sw a3, 44(sp)\n    sw a4, 48(sp)\n    sw a5, 52(sp)\n    sw a6, 56(sp)\n    sw a7, 60(sp)\n    call __hair_wch_embassy_time_driver_irq_rust\n    lw ra, 0(sp)\n    lw t0, 4(sp)\n    lw t1, 8(sp)\n    lw t2, 12(sp)\n    lw t3, 16(sp)\n    lw t4, 20(sp)\n    lw t5, 24(sp)\n    lw t6, 28(sp)\n    lw a0, 32(sp)\n    lw a1, 36(sp)\n    lw a2, 40(sp)\n    lw a3, 44(sp)\n    lw a4, 48(sp)\n    lw a5, 52(sp)\n    lw a6, 56(sp)\n    lw a7, 60(sp)\n    addi sp, sp, 64\n    mret\n\"#\n);\n\nfn pfic() -> {interrupt_driver_type} {{\n    {interrupt_driver_type}::new({interrupt_driver_resources}).expect(\"generated WCH PFIC resources\")\n}}\n\nfn time_driver() -> {time_driver_type} {{\n    {time_driver_type}::new({time_driver_resources}).expect(\"generated WCH time-driver resources\")\n}}\n\npub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {{\n    time_driver().init_time_driver()?;\n    unsafe {{\n        asm!(\"csrw 0x804, {{value}}\", value = in(reg) 0x3usize);\n        asm!(\n            \"csrw mtvec, {{value}}\",\n            value = in(reg) ((&WCH_VECTOR_TABLE as *const WchVectorTable as usize) | 0x3)\n        );\n    }}\n    pfic().enable_irq(Irq::{irq_variant})?;\n    unsafe {{\n        asm!(\"csrs mie, {{value}}\", value = in(reg) 0x800usize);\n        asm!(\"csrs mstatus, {{value}}\", value = in(reg) 0x88usize);\n    }}\n    Ok(())\n}}\n\n#[unsafe(no_mangle)]\nextern \"C\" fn __hair_wch_embassy_time_driver_irq_rust() {{\n    time_driver().on_time_driver_interrupt();\n}}\n",
         render_comment_text(&model.device_name),
         render_module_provenance_const("wch"),
     ))
 }
 
-fn render_pfic_interrupt_support_items() -> &'static str {
-    // WCH's PFIC helper macros index IENR/IRER/IPSR/IACTR by the raw external IRQn
-    // value (for example TIM4_IRQn = 46 -> IENR[1] bit 14), not by IRQn - 16.
-    "\nconst PFIC_EXTERNAL_IRQ_OFFSET: u32 = 16;\nconst PFIC_IENR_BASE_ADDRESS: u64 = 0xE000_E100;\nconst PFIC_IRER_BASE_ADDRESS: u64 = 0xE000_E180;\nconst PFIC_IACTR_BASE_ADDRESS: u64 = 0xE000_E300;\n\nfn pfic_irq_index(irq: Irq) -> Result<u32, metadata::Error> {\n    let irq_index = irq as u32;\n    if irq_index < PFIC_EXTERNAL_IRQ_OFFSET {\n        return Err(metadata::Error::Unsupported(\n            \"PFIC runtime helpers only support external interrupts\",\n        ));\n    }\n    Ok(irq_index)\n}\n\nfn pfic_register_address(base: u64, irq_index: u32) -> u64 {\n    base + u64::from((irq_index / 32) * 4)\n}\n\nfn pfic_irq_bit(irq_index: u32) -> u32 {\n    1u32 << (irq_index % 32)\n}\n"
+fn render_pfic_interrupt_support_items(register_indexing: &str) -> Result<String> {
+    let irq_index_body = render_pfic_irq_index_expression(register_indexing)?;
+    let offset_const = if register_indexing == INTERRUPT_NUMBERING_INTERRUPT_NUMBER {
+        "const PFIC_EXTERNAL_IRQ_OFFSET: u32 = 16;\n"
+    } else {
+        ""
+    };
+    Ok(format!(
+        "\n{offset_const}const PFIC_IENR_BASE_ADDRESS: u64 = 0xE000_E100;\nconst PFIC_IRER_BASE_ADDRESS: u64 = 0xE000_E180;\nconst PFIC_IACTR_BASE_ADDRESS: u64 = 0xE000_E300;\n\nfn pfic_irq_index(irq: Irq) -> Result<u32, metadata::Error> {{\n    let irq_index = irq as u32;\n{irq_index_body}}}\n\nfn pfic_register_address(base: u64, irq_index: u32) -> u64 {{\n    base + u64::from((irq_index / 32) * 4)\n}}\n\nfn pfic_irq_bit(irq_index: u32) -> u32 {{\n    1u32 << (irq_index % 32)\n}}\n",
+        offset_const = offset_const,
+        irq_index_body = irq_index_body
+    ))
 }
 
-fn render_time_driver_methods(driver: &ResolvedDriverInstance) -> Result<Vec<GeneratedMethod>> {
+fn render_time_driver_clock_enable_calls(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> String {
+    let multi_binding_names = driver.clock_bindings.len() > 1 || driver.driver_kind == "rcc";
+    let mut subject_counts = BTreeMap::<String, usize>::new();
+    for binding in &driver.clock_bindings {
+        let subject = model
+            .peripheral_names
+            .get(&binding.consumer_ref)
+            .cloned()
+            .unwrap_or_else(|| last_ref_segment(&binding.consumer_ref).to_string());
+        *subject_counts
+            .entry(to_rust_method_name(&subject))
+            .or_default() += 1;
+    }
+    let mut out = String::new();
+    for binding in &driver.clock_bindings {
+        let subject = model
+            .peripheral_names
+            .get(&binding.consumer_ref)
+            .cloned()
+            .unwrap_or_else(|| last_ref_segment(&binding.consumer_ref).to_string());
+        let subject_slug = to_rust_method_name(&subject);
+        let duplicate_subject = subject_counts
+            .get(&subject_slug)
+            .copied()
+            .unwrap_or_default()
+            > 1;
+        let binding_suffix = duplicate_subject.then(|| to_rust_method_name(&binding.id));
+        let enable_name = if multi_binding_names {
+            binding_method_name("enable", &subject_slug, binding_suffix.as_deref(), "clock")
+        } else {
+            "enable_clock".to_string()
+        };
+        out.push_str(&format!("        self.{enable_name}()?;\n"));
+    }
+    out
+}
+
+fn render_time_driver_reset_release_calls(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> String {
+    let multi_binding_names = driver.reset_bindings.len() > 1 || driver.driver_kind == "rcc";
+    let mut subject_counts = BTreeMap::<String, usize>::new();
+    for binding in &driver.reset_bindings {
+        let subject = model
+            .peripheral_names
+            .get(&binding.target_ref)
+            .cloned()
+            .unwrap_or_else(|| last_ref_segment(&binding.target_ref).to_string());
+        *subject_counts
+            .entry(to_rust_method_name(&subject))
+            .or_default() += 1;
+    }
+    let mut out = String::new();
+    for binding in &driver.reset_bindings {
+        let subject = model
+            .peripheral_names
+            .get(&binding.target_ref)
+            .cloned()
+            .unwrap_or_else(|| last_ref_segment(&binding.target_ref).to_string());
+        let subject_slug = to_rust_method_name(&subject);
+        let duplicate_subject = subject_counts
+            .get(&subject_slug)
+            .copied()
+            .unwrap_or_default()
+            > 1;
+        let binding_suffix = duplicate_subject.then(|| to_rust_method_name(&binding.id));
+        let release_name = if multi_binding_names {
+            binding_method_name("release", &subject_slug, binding_suffix.as_deref(), "reset")
+        } else {
+            "release_reset".to_string()
+        };
+        out.push_str(&format!("        self.{release_name}()?;\n"));
+    }
+    out
+}
+
+fn render_non_systick_time_driver_init_code(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+    driver_prefix: &str,
+) -> String {
+    let mut init_code =
+        "    pub fn init_time_driver(&self) -> Result<(), metadata::Error> {\n".to_string();
+    init_code.push_str(&render_time_driver_clock_enable_calls(model, driver));
+    init_code.push_str(&render_time_driver_reset_release_calls(model, driver));
+    for operation in &driver.init_operations {
+        init_code.push_str(&format!(
+            "        self.apply_{}()?;\n",
+            operation_method_slug(operation)
+        ));
+    }
+    init_code.push_str(&format!(
+        "        initialize_{driver_prefix}_time_driver()\n    }}\n"
+    ));
+    init_code
+}
+
+fn render_time_driver_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
     if !has_time_driver_tag(&driver.capability_tags) {
         return Ok(Vec::new());
     }
@@ -4965,24 +5331,8 @@ fn render_time_driver_methods(driver: &ResolvedDriverInstance) -> Result<Vec<Gen
                 "    pub fn init_time_driver(&self) -> Result<(), metadata::Error> {{\n        initialize_{driver_prefix}_time_driver()\n    }}\n",
             ),
         }]),
-        Some(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER) => {
-            let mut init_code =
-                "    pub fn init_time_driver(&self) -> Result<(), metadata::Error> {\n".to_string();
-            if !driver.clock_bindings.is_empty() {
-                init_code.push_str("        self.enable_clock()?;\n");
-            }
-            if !driver.reset_bindings.is_empty() {
-                init_code.push_str("        self.release_reset()?;\n");
-            }
-            for operation in &driver.init_operations {
-                init_code.push_str(&format!(
-                    "        self.apply_{}()?;\n",
-                    operation_method_slug(operation)
-                ));
-            }
-            init_code.push_str(&format!(
-                "        initialize_{driver_prefix}_time_driver()\n    }}\n"
-            ));
+        Some(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER | EMBASSY_TIME_DRIVER_SOURCE_RTC) => {
+            let init_code = render_non_systick_time_driver_init_code(model, driver, &driver_prefix);
             Ok(vec![
                 GeneratedMethod {
                     name: "init_time_driver".to_string(),
@@ -5091,6 +5441,22 @@ fn render_time_driver_support_items(
                 acknowledge_interrupt = acknowledge_interrupt,
                 schedule_wake_impl = schedule_wake_impl,
             ))
+        }
+        Some(EMBASSY_TIME_DRIVER_SOURCE_RTC) => {
+            let layout = resolve_rtc_time_driver_layout(model, driver)?;
+            render_rtc_time_driver_support_items(
+                &driver_prefix,
+                &init_fn,
+                &layout,
+                time_driver_tick_hz(driver).ok_or_else(|| {
+                    anyhow!(
+                        "driver {} claims capability tag {} with timeDriverSource {} but omits required timeDriverTickHz",
+                        driver.id,
+                        EMBASSY_TIME_DRIVER_TAG,
+                        EMBASSY_TIME_DRIVER_SOURCE_RTC
+                    )
+                })?,
+            )
         }
         Some(other) => bail!(
             "driver {} uses unsupported timeDriverSource {} for generated time-driver support",
@@ -5206,6 +5572,72 @@ fn render_counter_compare_time_driver_support_items(
         alarm_apply_impl = alarm_apply_must_statement,
         set_alarm_enable_impl = set_alarm_enable_impl,
         alarm_pending_impl = alarm_pending_impl,
+    ))
+}
+
+fn render_rtc_time_driver_support_items(
+    driver_prefix: &str,
+    init_fn: &str,
+    layout: &RtcTimeDriverLayout,
+    tick_hz: u64,
+) -> Result<String> {
+    const LSI_HZ: u64 = 40_000;
+    if !LSI_HZ.is_multiple_of(tick_hz) {
+        bail!(
+            "rtc time-driver tick rate {}Hz does not evenly divide the CH32V203 LSI frequency {}Hz",
+            tick_hz,
+            LSI_HZ
+        );
+    }
+    let prescaler_reload = (LSI_HZ / tick_hz)
+        .checked_sub(1)
+        .ok_or_else(|| anyhow!("rtc time-driver tick rate {}Hz is invalid", tick_hz))?;
+    let clear_must_statement = layout
+        .clear_statement
+        .replace("modify_u8(", "must_modify_u8(")
+        .replace("modify_u16(", "must_modify_u16(")
+        .replace("modify_u32(", "must_modify_u32(")
+        .replace("write_u16(", "must_write_u16(")
+        .replace("write_u32(", "must_write_u32(")
+        .replace("?;\n", ";\n");
+    let route_control_must_statement = layout
+        .route_control_statement
+        .replace("modify_u8(", "must_modify_u8(")
+        .replace("modify_u16(", "must_modify_u16(")
+        .replace("modify_u32(", "must_modify_u32(")
+        .replace("write_u16(", "must_write_u16(")
+        .replace("write_u32(", "must_write_u32(")
+        .replace("?;\n", ";\n");
+
+    Ok(format!(
+        "\nuse core::cell::{{Cell, RefCell}};\nuse critical_section::Mutex as CriticalSectionMutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nconst GENERATED_RTC_CNTH_ADDRESS: u64 = 0x{cnth_addr:X}u64;\nconst GENERATED_RTC_CNTL_ADDRESS: u64 = 0x{cntl_addr:X}u64;\nconst GENERATED_RTC_ALRMH_ADDRESS: u64 = 0x{alrmh_addr:X}u64;\nconst GENERATED_RTC_ALRML_ADDRESS: u64 = 0x{alrml_addr:X}u64;\nconst GENERATED_RTC_PSCRH_ADDRESS: u64 = 0x{pscrh_addr:X}u64;\nconst GENERATED_RTC_PSCRL_ADDRESS: u64 = 0x{pscrl_addr:X}u64;\nconst GENERATED_RTC_CTLRH_ADDRESS: u64 = 0x{ctlrh_addr:X}u64;\nconst GENERATED_RTC_CTLRH_ALRIE_MASK: u16 = 0x{alrie_mask:04X}u16;\nconst GENERATED_RTC_CTLRL_ADDRESS: u64 = 0x{ctlrl_addr:X}u64;\nconst GENERATED_RTC_CTLRL_ALRF_MASK: u16 = 0x{alrf_mask:04X}u16;\nconst GENERATED_RTC_CTLRL_CNF_MASK: u16 = 0x{cnf_mask:04X}u16;\nconst GENERATED_RTC_CTLRL_RTOFF_MASK: u16 = 0x{rtoff_mask:04X}u16;\nconst GENERATED_RTC_CTLRL_RSF_MASK: u16 = 0x{rsf_mask:04X}u16;\nconst GENERATED_RTC_TICK_HZ: u64 = {tick_hz}u64;\nconst GENERATED_RTC_PRESCALER_RELOAD: u32 = {prescaler_reload}u32;\nconst GENERATED_RCC_RSTSCKR_ADDRESS: u64 = 0x{rstsckr_addr:X}u64;\nconst GENERATED_RCC_RSTSCKR_LSION_MASK: u32 = 0x{lsion_mask:08X}u32;\nconst GENERATED_RCC_RSTSCKR_LSIRDY_MASK: u32 = 0x{lsirdy_mask:08X}u32;\nconst GENERATED_RCC_BDCTLR_ADDRESS: u64 = 0x{bdctlr_addr:X}u64;\nconst GENERATED_RCC_BDCTLR_RTCSEL_MASK: u32 = 0x{rtcsel_mask:08X}u32;\nconst GENERATED_RCC_BDCTLR_RTCSEL_LSI_MASK: u32 = 0x{rtcsel_lsi_mask:08X}u32;\nconst GENERATED_RCC_BDCTLR_RTCEN_MASK: u32 = 0x{rtcen_mask:08X}u32;\nconst GENERATED_RCC_BDCTLR_BDRST_MASK: u32 = 0x{bdrst_mask:08X}u32;\nconst GENERATED_PWR_CTLR_ADDRESS: u64 = 0x{pwr_ctlr_addr:X}u64;\nconst GENERATED_PWR_CTLR_DBP_MASK: u32 = 0x{dbp_mask:08X}u32;\n\nstruct GeneratedRtcTimeDriver {{\n    initialized: CriticalSectionMutex<Cell<bool>>,\n    wraps: CriticalSectionMutex<Cell<u64>>,\n    last_raw: CriticalSectionMutex<Cell<u32>>,\n    queue: CriticalSectionMutex<RefCell<EmbassyTimeQueue>>,\n}}\n\nimpl GeneratedRtcTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            initialized: CriticalSectionMutex::new(Cell::new(false)),\n            wraps: CriticalSectionMutex::new(Cell::new(0)),\n            last_raw: CriticalSectionMutex::new(Cell::new(0)),\n            queue: CriticalSectionMutex::new(RefCell::new(EmbassyTimeQueue::new())),\n        }}\n    }}\n\n    fn wait_for_lsi_ready(&self) {{\n        must_modify_u32(\n            GENERATED_RCC_RSTSCKR_ADDRESS,\n            GENERATED_RCC_RSTSCKR_LSION_MASK,\n            GENERATED_RCC_RSTSCKR_LSION_MASK,\n        );\n        while (must_read_u32(GENERATED_RCC_RSTSCKR_ADDRESS) & GENERATED_RCC_RSTSCKR_LSIRDY_MASK) == 0 {{\n            core::hint::spin_loop();\n        }}\n    }}\n\n    fn wait_for_rtc_write_ready(&self) {{\n        while (must_read_u16(GENERATED_RTC_CTLRL_ADDRESS) & GENERATED_RTC_CTLRL_RTOFF_MASK) == 0 {{\n            core::hint::spin_loop();\n        }}\n    }}\n\n    fn synchronize_rtc_registers(&self) {{\n        must_modify_u16(GENERATED_RTC_CTLRL_ADDRESS, GENERATED_RTC_CTLRL_RSF_MASK, 0u16);\n        while (must_read_u16(GENERATED_RTC_CTLRL_ADDRESS) & GENERATED_RTC_CTLRL_RSF_MASK) == 0 {{\n            core::hint::spin_loop();\n        }}\n    }}\n\n    fn enter_config_mode(&self) {{\n        self.wait_for_rtc_write_ready();\n        must_modify_u16(\n            GENERATED_RTC_CTLRL_ADDRESS,\n            GENERATED_RTC_CTLRL_CNF_MASK,\n            GENERATED_RTC_CTLRL_CNF_MASK,\n        );\n    }}\n\n    fn exit_config_mode(&self) {{\n        must_modify_u16(GENERATED_RTC_CTLRL_ADDRESS, GENERATED_RTC_CTLRL_CNF_MASK, 0u16);\n        self.wait_for_rtc_write_ready();\n    }}\n\n    fn read_split32(&self, high_address: u64, low_address: u64) -> u32 {{\n        loop {{\n            let high_1 = u32::from(must_read_u16(high_address));\n            let low = u32::from(must_read_u16(low_address));\n            let high_2 = u32::from(must_read_u16(high_address));\n            if high_1 == high_2 {{\n                return (high_1 << 16) | low;\n            }}\n        }}\n    }}\n\n    fn write_split32(&self, high_address: u64, low_address: u64, value: u32) {{\n        must_write_u16(high_address, (value >> 16) as u16);\n        must_write_u16(low_address, value as u16);\n    }}\n\n    fn read_raw_counter(&self) -> u32 {{\n        self.read_split32(GENERATED_RTC_CNTH_ADDRESS, GENERATED_RTC_CNTL_ADDRESS)\n    }}\n\n    fn read_now(&self) -> u64 {{\n        critical_section::with(|cs| {{\n            let raw = self.read_raw_counter();\n            let last = self.last_raw.borrow(cs).get();\n            let mut wraps = self.wraps.borrow(cs).get();\n            if raw < last {{\n                wraps = wraps.wrapping_add(1);\n                self.wraps.borrow(cs).set(wraps);\n            }}\n            self.last_raw.borrow(cs).set(raw);\n            (wraps << 32) | u64::from(raw)\n        }})\n    }}\n\n    fn set_alarm_enabled(&self, enabled: bool) {{\n        let set_mask = enabled.then_some(GENERATED_RTC_CTLRH_ALRIE_MASK).unwrap_or(0u16);\n        must_modify_u16(\n            GENERATED_RTC_CTLRH_ADDRESS,\n            GENERATED_RTC_CTLRH_ALRIE_MASK,\n            set_mask,\n        );\n    }}\n\n    fn clear_alarm_flag(&self) {{\n{clear_statement}    }}\n\n    fn is_alarm_pending(&self) -> bool {{\n        (must_read_u16(GENERATED_RTC_CTLRL_ADDRESS) & GENERATED_RTC_CTLRL_ALRF_MASK) != 0\n    }}\n\n    fn arm_alarm(&self, at: u64) {{\n        self.enter_config_mode();\n        self.write_split32(\n            GENERATED_RTC_ALRMH_ADDRESS,\n            GENERATED_RTC_ALRML_ADDRESS,\n            at as u32,\n        );\n        self.exit_config_mode();\n        self.clear_alarm_flag();\n        self.set_alarm_enabled(true);\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        critical_section::with(|cs| {{\n            if self.initialized.borrow(cs).get() {{\n                return Ok(());\n            }}\n            self.wait_for_lsi_ready();\n            must_modify_u32(\n                GENERATED_PWR_CTLR_ADDRESS,\n                GENERATED_PWR_CTLR_DBP_MASK,\n                GENERATED_PWR_CTLR_DBP_MASK,\n            );\n            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_BDRST_MASK,\n                GENERATED_RCC_BDCTLR_BDRST_MASK,\n            );\n                    must_modify_u32(GENERATED_RCC_BDCTLR_ADDRESS, GENERATED_RCC_BDCTLR_BDRST_MASK, 0u32);\n            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_RTCSEL_MASK,\n                GENERATED_RCC_BDCTLR_RTCSEL_LSI_MASK,\n            );\n            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_RTCEN_MASK,\n                GENERATED_RCC_BDCTLR_RTCEN_MASK,\n            );\n{route_control_statement}            self.synchronize_rtc_registers();\n            self.enter_config_mode();\n            self.write_split32(\n                GENERATED_RTC_PSCRH_ADDRESS,\n                GENERATED_RTC_PSCRL_ADDRESS,\n                GENERATED_RTC_PRESCALER_RELOAD,\n            );\n            self.write_split32(GENERATED_RTC_CNTH_ADDRESS, GENERATED_RTC_CNTL_ADDRESS, 0u32);\n            self.write_split32(\n                GENERATED_RTC_ALRMH_ADDRESS,\n                GENERATED_RTC_ALRML_ADDRESS,\n                u32::MAX,\n            );\n            self.exit_config_mode();\n            self.clear_alarm_flag();\n            self.set_alarm_enabled(false);\n            self.wraps.borrow(cs).set(0);\n            self.last_raw.borrow(cs).set(self.read_raw_counter());\n            self.initialized.borrow(cs).set(true);\n            Ok(())\n        }})\n    }}\n\n    fn on_interrupt(&self) {{\n        if !critical_section::with(|cs| self.initialized.borrow(cs).get()) || !self.is_alarm_pending() {{\n            return;\n        }}\n        self.clear_alarm_flag();\n        let now = self.read_now();\n        critical_section::with(|cs| {{\n            let mut queue = self.queue.borrow(cs).borrow_mut();\n            let next = queue.next_expiration(now);\n            if next == u64::MAX {{\n                self.set_alarm_enabled(false);\n            }} else {{\n                self.arm_alarm(next);\n            }}\n        }});\n    }}\n\n    fn delay_ticks(&self, ticks: u64) -> Result<(), metadata::Error> {{\n        let start = self.read_now();\n        let deadline = start.wrapping_add(ticks);\n        loop {{\n            let now = self.read_now();\n            if now.wrapping_sub(deadline) < (1u64 << 63) {{\n                break;\n            }}\n            core::hint::spin_loop();\n        }}\n        Ok(())\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedRtcTimeDriver {{\n    fn now(&self) -> u64 {{\n        self.read_now()\n    }}\n\n    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {{\n        let should_rearm = critical_section::with(|cs| {{\n            self.queue.borrow(cs).borrow_mut().schedule_wake(at, waker)\n        }});\n        if !should_rearm {{\n            return;\n        }}\n        let now = self.read_now();\n        critical_section::with(|cs| {{\n            let next = self.queue.borrow(cs).borrow_mut().next_expiration(now);\n            if next == u64::MAX {{\n                self.set_alarm_enabled(false);\n            }} else {{\n                self.arm_alarm(next);\n            }}\n        }});\n    }}\n}}\n\n#[allow(dead_code)]\nfn must_read_u16(address: u64) -> u16 {{\n    read_u16(address).expect(\"generated rtc time-driver MMIO read\")\n}}\n\n#[allow(dead_code)]\nfn must_read_u32(address: u64) -> u32 {{\n    read_u32(address).expect(\"generated rtc time-driver MMIO read\")\n}}\n\n#[allow(dead_code)]\nfn must_modify_u16(address: u64, clear_mask: u16, set_mask: u16) {{\n    modify_u16(address, clear_mask, set_mask).expect(\"generated rtc time-driver MMIO write\")\n}}\n\n#[allow(dead_code)]\nfn must_modify_u32(address: u64, clear_mask: u32, set_mask: u32) {{\n    modify_u32(address, clear_mask, set_mask).expect(\"generated rtc time-driver MMIO write\")\n}}\n\n#[allow(dead_code)]\nfn must_write_u16(address: u64, value: u16) {{\n    write_u16(address, value).expect(\"generated rtc time-driver MMIO write\")\n}}\n\nembassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedRtcTimeDriver = GeneratedRtcTimeDriver::new());\n\n#[allow(dead_code)]\npub fn generated_{driver_prefix}_time_driver_interrupt() {{\n    GENERATED_TIME_DRIVER.on_interrupt();\n}}\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    let _ = GENERATED_RTC_TICK_HZ;\n    GENERATED_TIME_DRIVER.init()\n}}\n\nfn generated_{driver_prefix}_time_driver_now() -> u64 {{\n    GENERATED_TIME_DRIVER.now()\n}}\n\nfn generated_{driver_prefix}_time_driver_delay_ticks(ticks: u64) -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.delay_ticks(ticks)\n}}\n",
+        cnth_addr = layout.counter_high.register.absolute_address,
+        cntl_addr = layout.counter_low.register.absolute_address,
+        alrmh_addr = layout.alarm_high.register.absolute_address,
+        alrml_addr = layout.alarm_low.register.absolute_address,
+        pscrh_addr = layout.prescaler_high.register.absolute_address,
+        pscrl_addr = layout.prescaler_low.register.absolute_address,
+        ctlrh_addr = layout.interrupt_enable.register.absolute_address,
+        alrie_mask = layout.interrupt_enable.mask,
+        ctlrl_addr = layout.interrupt_pending.register.absolute_address,
+        alrf_mask = layout.interrupt_pending.mask,
+        cnf_mask = layout.cnf.mask,
+        rtoff_mask = layout.rtoff.mask,
+        rsf_mask = layout.rsf.mask,
+        tick_hz = tick_hz,
+        prescaler_reload = prescaler_reload,
+        rstsckr_addr = layout.lsi_enable.register.absolute_address,
+        lsion_mask = layout.lsi_enable.mask,
+        lsirdy_mask = layout.lsi_ready.mask,
+        bdctlr_addr = layout.rtc_select.register.absolute_address,
+        rtcsel_mask = layout.rtc_select.mask,
+        rtcsel_lsi_mask = layout.rtc_select_lsi.mask,
+        rtcen_mask = layout.rtc_enable.mask,
+        bdrst_mask = layout.backup_domain_reset.mask,
+        pwr_ctlr_addr = layout.backup_write_enable.register.absolute_address,
+        dbp_mask = layout.backup_write_enable.mask,
+        clear_statement = clear_must_statement,
+        route_control_statement = route_control_must_statement,
     ))
 }
 
@@ -5675,6 +6107,41 @@ fn render_pwm_support_items(
     Ok(out)
 }
 
+fn render_rtc_support_items(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    if driver.driver_kind != "rtc" || driver.module_name != "rtc" {
+        return Ok(String::new());
+    }
+
+    let ctlrl = resolve_target_register_by_name(model, &driver.target.target_ref, "CTLRL")?;
+    let cnf = resolve_register_field(&ctlrl, "CNF")?;
+    let rtoff = resolve_register_field(&ctlrl, "RTOFF")?;
+    let cnf_mask = field_bit_mask_or_range_mask(&cnf, &ctlrl)?;
+    let rtoff_mask = field_bit_mask_or_range_mask(&rtoff, &ctlrl)?;
+
+    let cnth = resolve_target_register_by_name(model, &driver.target.target_ref, "CNTH")?;
+    let cntl = resolve_target_register_by_name(model, &driver.target.target_ref, "CNTL")?;
+    let pscrh = resolve_target_register_by_name(model, &driver.target.target_ref, "PSCRH")?;
+    let pscrl = resolve_target_register_by_name(model, &driver.target.target_ref, "PSCRL")?;
+    let alrmh = resolve_target_register_by_name(model, &driver.target.target_ref, "ALRMH")?;
+    let alrml = resolve_target_register_by_name(model, &driver.target.target_ref, "ALRML")?;
+
+    Ok(format!(
+        "\nconst GENERATED_RTC_CTLRL_ADDRESS: u64 = 0x{ctlrl_addr:X}u64;\nconst GENERATED_RTC_CTLRL_CNF_MASK: u16 = 0x{cnf_mask:04X}u16;\nconst GENERATED_RTC_CTLRL_RTOFF_MASK: u16 = 0x{rtoff_mask:04X}u16;\nconst GENERATED_RTC_PSCRH_ADDRESS: u64 = 0x{pscrh_addr:X}u64;\nconst GENERATED_RTC_PSCRL_ADDRESS: u64 = 0x{pscrl_addr:X}u64;\nconst GENERATED_RTC_CNTH_ADDRESS: u64 = 0x{cnth_addr:X}u64;\nconst GENERATED_RTC_CNTL_ADDRESS: u64 = 0x{cntl_addr:X}u64;\nconst GENERATED_RTC_ALRMH_ADDRESS: u64 = 0x{alrmh_addr:X}u64;\nconst GENERATED_RTC_ALRML_ADDRESS: u64 = 0x{alrml_addr:X}u64;\n\nfn wait_generated_rtc_write_ready() -> Result<(), metadata::Error> {{\n    while (read_u16(GENERATED_RTC_CTLRL_ADDRESS)? & GENERATED_RTC_CTLRL_RTOFF_MASK) == 0 {{\n        core::hint::spin_loop();\n    }}\n    Ok(())\n}}\n\nfn read_generated_rtc_split32(high_address: u64, low_address: u64) -> Result<u32, metadata::Error> {{\n    loop {{\n        let high_1 = u32::from(read_u16(high_address)?);\n        let low = u32::from(read_u16(low_address)?);\n        let high_2 = u32::from(read_u16(high_address)?);\n        if high_1 == high_2 {{\n            return Ok((high_1 << 16) | low);\n        }}\n    }}\n}}\n\nfn write_generated_rtc_split32_with_config(\n    high_address: u64,\n    low_address: u64,\n    value: u32,\n) -> Result<(), metadata::Error> {{\n    wait_generated_rtc_write_ready()?;\n    modify_u16(\n        GENERATED_RTC_CTLRL_ADDRESS,\n        GENERATED_RTC_CTLRL_CNF_MASK,\n        GENERATED_RTC_CTLRL_CNF_MASK,\n    )?;\n    write_u16(high_address, (value >> 16) as u16)?;\n    write_u16(low_address, value as u16)?;\n    modify_u16(GENERATED_RTC_CTLRL_ADDRESS, GENERATED_RTC_CTLRL_CNF_MASK, 0u16)?;\n    wait_generated_rtc_write_ready()\n}}\n",
+        ctlrl_addr = ctlrl.absolute_address,
+        cnf_mask = cnf_mask,
+        rtoff_mask = rtoff_mask,
+        pscrh_addr = pscrh.absolute_address,
+        pscrl_addr = pscrl.absolute_address,
+        cnth_addr = cnth.absolute_address,
+        cntl_addr = cntl.absolute_address,
+        alrmh_addr = alrmh.absolute_address,
+        alrml_addr = alrml.absolute_address,
+    ))
+}
+
 fn resolve_pwm_driver_lowering(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
@@ -5869,7 +6336,7 @@ fn resolve_pwm_pin_config(
             .find_map(|(peripheral_ref, peripheral)| {
                 normalize_search_text(&peripheral.name)
                     .eq(&normalize_search_text(&gpio_name))
-                    .then(|| peripheral_ref.as_str())
+                    .then_some(peripheral_ref.as_str())
             })
     else {
         return Ok(None);
@@ -7575,6 +8042,148 @@ fn render_adc_methods(
     Ok(methods)
 }
 
+fn render_rtc_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    if driver.driver_kind != "rtc" || driver.module_name != "rtc" {
+        return Ok(Vec::new());
+    }
+
+    let ctlrh = resolve_target_register_by_name(model, &driver.target.target_ref, "CTLRH")?;
+    let ctlrl = resolve_target_register_by_name(model, &driver.target.target_ref, "CTLRL")?;
+    let alrie = resolve_register_field(&ctlrh, "ALRIE")?;
+    let secie = resolve_register_field(&ctlrh, "SECIE")?;
+    let owie = resolve_register_field(&ctlrh, "OWIE")?;
+    let alrf = resolve_register_field(&ctlrl, "ALRF")?;
+    let secf = resolve_register_field(&ctlrl, "SECF")?;
+    let owf = resolve_register_field(&ctlrl, "OWF")?;
+
+    let alrie_mask = field_bit_mask_or_range_mask(&alrie, &ctlrh)?;
+    let secie_mask = field_bit_mask_or_range_mask(&secie, &ctlrh)?;
+    let owie_mask = field_bit_mask_or_range_mask(&owie, &ctlrh)?;
+    let alrf_mask = field_bit_mask_or_range_mask(&alrf, &ctlrl)?;
+    let secf_mask = field_bit_mask_or_range_mask(&secf, &ctlrl)?;
+    let owf_mask = field_bit_mask_or_range_mask(&owf, &ctlrl)?;
+
+    Ok(vec![
+        GeneratedMethod {
+            name: "read_counter".to_string(),
+            code: "    pub fn read_counter(&self) -> Result<u32, metadata::Error> {\n        read_generated_rtc_split32(GENERATED_RTC_CNTH_ADDRESS, GENERATED_RTC_CNTL_ADDRESS)\n    }\n"
+                .to_string(),
+        },
+        GeneratedMethod {
+            name: "set_counter".to_string(),
+            code: "    pub fn set_counter(&self, value: u32) -> Result<(), metadata::Error> {\n        write_generated_rtc_split32_with_config(\n            GENERATED_RTC_CNTH_ADDRESS,\n            GENERATED_RTC_CNTL_ADDRESS,\n            value,\n        )\n    }\n"
+                .to_string(),
+        },
+        GeneratedMethod {
+            name: "read_prescaler".to_string(),
+            code: "    pub fn read_prescaler(&self) -> Result<u32, metadata::Error> {\n        read_generated_rtc_split32(GENERATED_RTC_PSCRH_ADDRESS, GENERATED_RTC_PSCRL_ADDRESS)\n    }\n"
+                .to_string(),
+        },
+        GeneratedMethod {
+            name: "set_prescaler".to_string(),
+            code: "    pub fn set_prescaler(&self, value: u32) -> Result<(), metadata::Error> {\n        write_generated_rtc_split32_with_config(\n            GENERATED_RTC_PSCRH_ADDRESS,\n            GENERATED_RTC_PSCRL_ADDRESS,\n            value,\n        )\n    }\n"
+                .to_string(),
+        },
+        GeneratedMethod {
+            name: "read_alarm".to_string(),
+            code: "    pub fn read_alarm(&self) -> Result<u32, metadata::Error> {\n        read_generated_rtc_split32(GENERATED_RTC_ALRMH_ADDRESS, GENERATED_RTC_ALRML_ADDRESS)\n    }\n"
+                .to_string(),
+        },
+        GeneratedMethod {
+            name: "set_alarm".to_string(),
+            code: "    pub fn set_alarm(&self, value: u32) -> Result<(), metadata::Error> {\n        write_generated_rtc_split32_with_config(\n            GENERATED_RTC_ALRMH_ADDRESS,\n            GENERATED_RTC_ALRML_ADDRESS,\n            value,\n        )\n    }\n"
+                .to_string(),
+        },
+        GeneratedMethod {
+            name: "enable_second_interrupt".to_string(),
+            code: format!(
+                "    pub fn enable_second_interrupt(&self) -> Result<(), metadata::Error> {{\n        modify_u16(0x{:X}u64, 0x{:04X}u16, 0x{:04X}u16)\n    }}\n",
+                ctlrh.absolute_address, secie_mask, secie_mask
+            ),
+        },
+        GeneratedMethod {
+            name: "disable_second_interrupt".to_string(),
+            code: format!(
+                "    pub fn disable_second_interrupt(&self) -> Result<(), metadata::Error> {{\n        modify_u16(0x{:X}u64, 0x{:04X}u16, 0x0000u16)\n    }}\n",
+                ctlrh.absolute_address, secie_mask
+            ),
+        },
+        GeneratedMethod {
+            name: "enable_alarm_interrupt".to_string(),
+            code: format!(
+                "    pub fn enable_alarm_interrupt(&self) -> Result<(), metadata::Error> {{\n        modify_u16(0x{:X}u64, 0x{:04X}u16, 0x{:04X}u16)\n    }}\n",
+                ctlrh.absolute_address, alrie_mask, alrie_mask
+            ),
+        },
+        GeneratedMethod {
+            name: "disable_alarm_interrupt".to_string(),
+            code: format!(
+                "    pub fn disable_alarm_interrupt(&self) -> Result<(), metadata::Error> {{\n        modify_u16(0x{:X}u64, 0x{:04X}u16, 0x0000u16)\n    }}\n",
+                ctlrh.absolute_address, alrie_mask
+            ),
+        },
+        GeneratedMethod {
+            name: "enable_overflow_interrupt".to_string(),
+            code: format!(
+                "    pub fn enable_overflow_interrupt(&self) -> Result<(), metadata::Error> {{\n        modify_u16(0x{:X}u64, 0x{:04X}u16, 0x{:04X}u16)\n    }}\n",
+                ctlrh.absolute_address, owie_mask, owie_mask
+            ),
+        },
+        GeneratedMethod {
+            name: "disable_overflow_interrupt".to_string(),
+            code: format!(
+                "    pub fn disable_overflow_interrupt(&self) -> Result<(), metadata::Error> {{\n        modify_u16(0x{:X}u64, 0x{:04X}u16, 0x0000u16)\n    }}\n",
+                ctlrh.absolute_address, owie_mask
+            ),
+        },
+        GeneratedMethod {
+            name: "is_second_flag_set".to_string(),
+            code: format!(
+                "    pub fn is_second_flag_set(&self) -> Result<bool, metadata::Error> {{\n        Ok((read_u16(0x{:X}u64)? & 0x{:04X}u16) != 0)\n    }}\n",
+                ctlrl.absolute_address, secf_mask
+            ),
+        },
+        GeneratedMethod {
+            name: "clear_second_flag".to_string(),
+            code: format!(
+                "    pub fn clear_second_flag(&self) -> Result<(), metadata::Error> {{\n        modify_u16(0x{:X}u64, 0x{:04X}u16, 0x0000u16)\n    }}\n",
+                ctlrl.absolute_address, secf_mask
+            ),
+        },
+        GeneratedMethod {
+            name: "is_alarm_flag_set".to_string(),
+            code: format!(
+                "    pub fn is_alarm_flag_set(&self) -> Result<bool, metadata::Error> {{\n        Ok((read_u16(0x{:X}u64)? & 0x{:04X}u16) != 0)\n    }}\n",
+                ctlrl.absolute_address, alrf_mask
+            ),
+        },
+        GeneratedMethod {
+            name: "clear_alarm_flag".to_string(),
+            code: format!(
+                "    pub fn clear_alarm_flag(&self) -> Result<(), metadata::Error> {{\n        modify_u16(0x{:X}u64, 0x{:04X}u16, 0x0000u16)\n    }}\n",
+                ctlrl.absolute_address, alrf_mask
+            ),
+        },
+        GeneratedMethod {
+            name: "is_overflow_flag_set".to_string(),
+            code: format!(
+                "    pub fn is_overflow_flag_set(&self) -> Result<bool, metadata::Error> {{\n        Ok((read_u16(0x{:X}u64)? & 0x{:04X}u16) != 0)\n    }}\n",
+                ctlrl.absolute_address, owf_mask
+            ),
+        },
+        GeneratedMethod {
+            name: "clear_overflow_flag".to_string(),
+            code: format!(
+                "    pub fn clear_overflow_flag(&self) -> Result<(), metadata::Error> {{\n        modify_u16(0x{:X}u64, 0x{:04X}u16, 0x0000u16)\n    }}\n",
+                ctlrl.absolute_address, owf_mask
+            ),
+        },
+    ])
+}
+
 fn render_usb_device_methods(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
@@ -8547,6 +9156,29 @@ struct CounterCompareTimerTimeDriverLayout {
     clear_statement: String,
 }
 
+struct RtcTimeDriverLayout {
+    counter_high: TimeDriverFieldAccess,
+    counter_low: TimeDriverFieldAccess,
+    alarm_high: TimeDriverFieldAccess,
+    alarm_low: TimeDriverFieldAccess,
+    prescaler_high: TimeDriverFieldAccess,
+    prescaler_low: TimeDriverFieldAccess,
+    interrupt_enable: TimeDriverFieldAccess,
+    interrupt_pending: TimeDriverFieldAccess,
+    cnf: TimeDriverFieldAccess,
+    rtoff: TimeDriverFieldAccess,
+    rsf: TimeDriverFieldAccess,
+    lsi_enable: TimeDriverFieldAccess,
+    lsi_ready: TimeDriverFieldAccess,
+    rtc_select: TimeDriverFieldAccess,
+    rtc_select_lsi: TimeDriverFieldAccess,
+    rtc_enable: TimeDriverFieldAccess,
+    backup_domain_reset: TimeDriverFieldAccess,
+    backup_write_enable: TimeDriverFieldAccess,
+    route_control_statement: String,
+    clear_statement: String,
+}
+
 fn register_width_mask(register: &ResolvedRegister) -> Result<u32> {
     match register.width_bits {
         0 => bail!("register {} has invalid width 0", register.id),
@@ -8641,39 +9273,99 @@ fn resolve_time_driver_field_access(
     })
 }
 
+fn resolve_split_time_driver_access_pair(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+    entity_ref: &str,
+    usage: &str,
+) -> Result<(TimeDriverFieldAccess, TimeDriverFieldAccess)> {
+    let low = resolve_time_driver_access_ref(model, driver, entity_ref, usage)?;
+    let low_register_name = low.register.name.as_str();
+    let Some(high_register_name) = low_register_name
+        .strip_suffix('L')
+        .map(|prefix| format!("{prefix}H"))
+    else {
+        bail!(
+            "driver {} {} {} resolves to register {} which does not have a trailing L/H split-register shape",
+            driver.id,
+            usage,
+            entity_ref,
+            low_register_name
+        );
+    };
+    let high_register =
+        resolve_target_register_by_name(model, &driver.target.target_ref, &high_register_name)?;
+    let high = if let Some(field_target) = try_resolve_field_target(
+        &model.fields,
+        entity_ref,
+        Some(driver.target.target_ref.as_str()),
+    )? {
+        let field = resolve_register_field(&high_register, &field_target.field.name)?;
+        TimeDriverFieldAccess {
+            mask: field_bit_mask_or_range_mask(&field, &high_register)?,
+            lsb: field.lsb,
+            register: high_register,
+        }
+    } else {
+        TimeDriverFieldAccess {
+            mask: register_width_mask(&high_register)?,
+            lsb: 0,
+            register: high_register,
+        }
+    };
+    Ok((high, low))
+}
+
 fn render_time_driver_operation_statements(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
     operation_ref: &str,
     usage: &str,
 ) -> Result<String> {
-    let driver_target_ref = driver.target.target_ref.as_str();
+    render_operation_write_statements(
+        model,
+        &driver.id,
+        Some(driver.target.target_ref.as_str()),
+        operation_ref,
+        usage,
+    )
+}
+
+fn render_operation_write_statements(
+    model: &EmbassyGenerationModel,
+    owner_id: &str,
+    expected_target_ref: Option<&str>,
+    operation_ref: &str,
+    usage: &str,
+) -> Result<String> {
     let operation = model.operations.get(operation_ref).ok_or_else(|| {
         anyhow!(
-            "driver {} {} references unknown operation {}",
-            driver.id,
+            "{} {} references unknown operation {}",
+            owner_id,
             usage,
             operation_ref
         )
     })?;
-    for operation_target in &operation.target_refs {
-        if operation_target != driver_target_ref {
-            bail!(
-                "driver {} {} {} targets {} instead of {}",
-                driver.id,
-                usage,
-                operation.id,
-                operation_target,
-                driver_target_ref
-            );
+    if let Some(expected_target_ref) = expected_target_ref {
+        for operation_target in &operation.target_refs {
+            if operation_target != expected_target_ref {
+                bail!(
+                    "{} {} {} targets {} instead of {}",
+                    owner_id,
+                    usage,
+                    operation.id,
+                    operation_target,
+                    expected_target_ref
+                );
+            }
         }
     }
     let mut rendered = String::new();
     for step in &operation.steps {
         if step.action != "write" {
             bail!(
-                "driver {} {} {} uses unsupported action {}",
-                driver.id,
+                "{} {} {} uses unsupported action {}",
+                owner_id,
                 usage,
                 operation.id,
                 step.action
@@ -8681,8 +9373,8 @@ fn render_time_driver_operation_statements(
         }
         let step_target_ref = step.target_ref.as_deref().ok_or_else(|| {
             anyhow!(
-                "driver {} {} {} step {} is missing targetRef",
-                driver.id,
+                "{} {} {} step {} is missing targetRef",
+                owner_id,
                 usage,
                 operation.id,
                 step.index
@@ -8690,24 +9382,26 @@ fn render_time_driver_operation_statements(
         })?;
         let register = model.registers.get(step_target_ref).ok_or_else(|| {
             anyhow!(
-                "driver {} {} {} step {} references unknown register {}",
-                driver.id,
+                "{} {} {} step {} references unknown register {}",
+                owner_id,
                 usage,
                 operation.id,
                 step.index,
                 step_target_ref
             )
         })?;
-        if register.peripheral_ref != driver_target_ref {
+        if let Some(expected_target_ref) = expected_target_ref
+            && register.peripheral_ref != expected_target_ref
+        {
             bail!(
-                "driver {} {} {} step {} references register {} on {} instead of {}",
-                driver.id,
+                "{} {} {} step {} references register {} on {} instead of {}",
+                owner_id,
                 usage,
                 operation.id,
                 step.index,
                 step_target_ref,
                 register.peripheral_ref,
-                driver_target_ref
+                expected_target_ref
             );
         }
         let parsed = parse_field_write_expression(
@@ -8723,6 +9417,63 @@ fn render_time_driver_operation_statements(
             parsed.value,
             "        ",
         )?);
+    }
+    Ok(rendered)
+}
+
+fn render_time_driver_route_control_statement(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    let mut rendered = String::new();
+    for route in &driver.interrupt_routes {
+        for control_ref in &route.control_refs {
+            let field_target = try_resolve_field_target(&model.fields, control_ref, None)?.ok_or_else(|| {
+                anyhow!(
+                    "driver {} time-driver interrupt route {} controlRef {} must resolve to a field for first-cut lowering",
+                    driver.id,
+                    route.id,
+                    control_ref
+                )
+            })?;
+            let register = model
+                .registers
+                .get(field_target.register_id.as_str())
+                .ok_or_else(|| {
+                    anyhow!(
+                        "driver {} time-driver interrupt route {} controlRef {} resolved to unknown register {}",
+                        driver.id,
+                        route.id,
+                        control_ref,
+                        field_target.register_id
+                    )
+                })?;
+            rendered.push_str(&render_register_write_statement(
+                register,
+                &field_target.field,
+                1,
+                "            ",
+            )?);
+        }
+    }
+    Ok(rendered)
+}
+
+fn render_time_driver_route_acknowledge_statement(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    let mut rendered = String::new();
+    for route in &driver.interrupt_routes {
+        for operation_ref in &route.acknowledge_operation_refs {
+            rendered.push_str(&render_operation_write_statements(
+                model,
+                &driver.id,
+                None,
+                operation_ref,
+                "time-driver interrupt route acknowledge operation",
+            )?);
+        }
     }
     Ok(rendered)
 }
@@ -8760,7 +9511,16 @@ fn render_time_driver_clear_statement(
             interrupt_source.id
         );
     }
-    render_time_driver_operation_statements(model, driver, clear_ref, "time-driver clear operation")
+    let mut rendered = render_time_driver_operation_statements(
+        model,
+        driver,
+        clear_ref,
+        "time-driver clear operation",
+    )?;
+    rendered.push_str(&render_time_driver_route_acknowledge_statement(
+        model, driver,
+    )?);
+    Ok(rendered)
 }
 
 fn resolve_hardware_timer_time_driver_layout(
@@ -8897,6 +9657,134 @@ fn resolve_counter_compare_timer_time_driver_layout(
             &bindings.interrupt_pending_ref,
             "time-driver interrupt-pending binding",
         )?,
+        clear_statement: render_time_driver_clear_statement(model, driver)?,
+    })
+}
+
+fn resolve_rtc_time_driver_layout(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<RtcTimeDriverLayout> {
+    let bindings = time_driver_bindings(driver).ok_or_else(|| {
+        anyhow!(
+            "driver {} uses timeDriverSource {} but omits required timeDriverBindings",
+            driver.id,
+            EMBASSY_TIME_DRIVER_SOURCE_RTC
+        )
+    })?;
+    let (counter_high, counter_low) = resolve_split_time_driver_access_pair(
+        model,
+        driver,
+        &bindings.counter_ref,
+        "rtc time-driver counter binding",
+    )?;
+    let (alarm_high, alarm_low) = resolve_split_time_driver_access_pair(
+        model,
+        driver,
+        &bindings.alarm_ref,
+        "rtc time-driver alarm binding",
+    )?;
+    let prescaler_high_register =
+        resolve_target_register_by_name(model, &driver.target.target_ref, "PSCRH")?;
+    let prescaler_low_register =
+        resolve_target_register_by_name(model, &driver.target.target_ref, "PSCRL")?;
+
+    let rcc_target = "periph.rcc";
+    let pwr_target = "periph.pwr";
+    Ok(RtcTimeDriverLayout {
+        counter_high,
+        counter_low,
+        alarm_high,
+        alarm_low,
+        prescaler_high: TimeDriverFieldAccess {
+            mask: register_width_mask(&prescaler_high_register)?,
+            lsb: 0,
+            register: prescaler_high_register,
+        },
+        prescaler_low: TimeDriverFieldAccess {
+            mask: register_width_mask(&prescaler_low_register)?,
+            lsb: 0,
+            register: prescaler_low_register,
+        },
+        interrupt_enable: resolve_time_driver_access_ref(
+            model,
+            driver,
+            &bindings.interrupt_enable_ref,
+            "rtc time-driver interrupt-enable binding",
+        )?,
+        interrupt_pending: resolve_time_driver_access_ref(
+            model,
+            driver,
+            &bindings.interrupt_pending_ref,
+            "rtc time-driver interrupt-pending binding",
+        )?,
+        cnf: resolve_time_driver_field_access(model, driver, "CTLRL", "CNF")?,
+        rtoff: resolve_time_driver_field_access(model, driver, "CTLRL", "RTOFF")?,
+        rsf: resolve_time_driver_field_access(model, driver, "CTLRL", "RSF")?,
+        lsi_enable: {
+            let register = resolve_target_register_by_name(model, rcc_target, "RSTSCKR")?;
+            let field = resolve_register_field(&register, "LSION")?;
+            TimeDriverFieldAccess {
+                mask: field_bit_mask_or_range_mask(&field, &register)?,
+                lsb: field.lsb,
+                register,
+            }
+        },
+        lsi_ready: {
+            let register = resolve_target_register_by_name(model, rcc_target, "RSTSCKR")?;
+            let field = resolve_register_field(&register, "LSIRDY")?;
+            TimeDriverFieldAccess {
+                mask: field_bit_mask_or_range_mask(&field, &register)?,
+                lsb: field.lsb,
+                register,
+            }
+        },
+        rtc_select: {
+            let register = resolve_target_register_by_name(model, rcc_target, "BDCTLR")?;
+            let field = resolve_register_field(&register, "RTCSEL")?;
+            TimeDriverFieldAccess {
+                mask: field_bit_mask_or_range_mask(&field, &register)?,
+                lsb: field.lsb,
+                register,
+            }
+        },
+        rtc_select_lsi: {
+            let register = resolve_target_register_by_name(model, rcc_target, "BDCTLR")?;
+            let field = resolve_register_field(&register, "RTCSEL_LSI")?;
+            TimeDriverFieldAccess {
+                mask: field_bit_mask_or_range_mask(&field, &register)?,
+                lsb: field.lsb,
+                register,
+            }
+        },
+        rtc_enable: {
+            let register = resolve_target_register_by_name(model, rcc_target, "BDCTLR")?;
+            let field = resolve_register_field(&register, "RTCEN")?;
+            TimeDriverFieldAccess {
+                mask: field_bit_mask_or_range_mask(&field, &register)?,
+                lsb: field.lsb,
+                register,
+            }
+        },
+        backup_domain_reset: {
+            let register = resolve_target_register_by_name(model, rcc_target, "BDCTLR")?;
+            let field = resolve_register_field(&register, "BDRST")?;
+            TimeDriverFieldAccess {
+                mask: field_bit_mask_or_range_mask(&field, &register)?,
+                lsb: field.lsb,
+                register,
+            }
+        },
+        backup_write_enable: {
+            let register = resolve_target_register_by_name(model, pwr_target, "CTLR")?;
+            let field = resolve_register_field(&register, "DBP")?;
+            TimeDriverFieldAccess {
+                mask: field_bit_mask_or_range_mask(&field, &register)?,
+                lsb: field.lsb,
+                register,
+            }
+        },
+        route_control_statement: render_time_driver_route_control_statement(model, driver)?,
         clear_statement: render_time_driver_clear_statement(model, driver)?,
     })
 }
@@ -9907,6 +10795,7 @@ fn collect_embassy_field_scope(
     drivers: &[EmbassyDriverInstance],
     operations: &HashMap<&str, SemanticOperation>,
     state_machines: &HashMap<&str, SemanticStateMachine>,
+    interrupt_routes: &HashMap<&str, McuInterruptRoute>,
 ) -> Result<HashSet<String>> {
     let mut required = HashSet::new();
     for driver in drivers {
@@ -9947,6 +10836,28 @@ fn collect_embassy_field_scope(
                 .iter()
                 .chain(std::iter::once(&bindings.interrupt_clear_operation_ref))
             {
+                let operation = operations.get(operation_ref.as_str()).ok_or_else(|| {
+                    anyhow!(
+                        "operation reference {} on driver {} could not be resolved",
+                        operation_ref,
+                        driver.id
+                    )
+                })?;
+                collect_operation_field_refs(&mut required, operation);
+            }
+        }
+        for route_ref in &driver.interrupt_route_refs {
+            let route = interrupt_routes.get(route_ref.as_str()).ok_or_else(|| {
+                anyhow!(
+                    "interrupt route reference {} on driver {} could not be resolved",
+                    route_ref,
+                    driver.id
+                )
+            })?;
+            for control_ref in &route.control_refs {
+                collect_semantic_field_ref(&mut required, Some(control_ref.as_str()));
+            }
+            for operation_ref in &route.acknowledge_operation_refs {
                 let operation = operations.get(operation_ref.as_str()).ok_or_else(|| {
                     anyhow!(
                         "operation reference {} on driver {} could not be resolved",
@@ -12023,7 +12934,10 @@ fn render_embassy_host_driver_support_items(
 ) -> Result<String> {
     let mut out = String::new();
     if driver_uses_pfic_runtime_support(driver) {
-        out.push_str(render_pfic_interrupt_support_items());
+        let numbering = pfic_interrupt_controller_numbering(model)?;
+        out.push_str(&render_pfic_interrupt_support_items(
+            numbering.register_indexing.as_str(),
+        )?);
     }
     if driver.driver_kind == "gpio-port" {
         out.push_str(&render_gpio_support_items(model, driver)?);
@@ -12042,9 +12956,11 @@ fn render_host_time_driver_support_items(driver: &ResolvedDriverInstance) -> Res
         Some(EMBASSY_TIME_DRIVER_SOURCE_SYSTICK) => Ok(format!(
             "\nuse std::sync::Mutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nconst SYST_CSR_ADDRESS: u64 = 0xE000_E010;\nconst SYST_RVR_ADDRESS: u64 = 0xE000_E014;\nconst SYST_CVR_ADDRESS: u64 = 0xE000_E018;\nconst SYST_CSR_ENABLE: u32 = 1 << 0;\nconst SYST_CSR_TICKINT: u32 = 1 << 1;\nconst SYST_CSR_CLKSOURCE: u32 = 1 << 2;\nconst SYST_RELOAD_VALUE: u32 = 15;\n\nstruct GeneratedSystickTimeDriverState {{\n    initialized: bool,\n    ticks: u64,\n    queue: EmbassyTimeQueue,\n}}\n\nstruct GeneratedSystickTimeDriver {{\n    state: Mutex<GeneratedSystickTimeDriverState>,\n}}\n\nimpl GeneratedSystickTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            state: Mutex::new(GeneratedSystickTimeDriverState {{\n                initialized: false,\n                ticks: 0,\n                queue: EmbassyTimeQueue::new(),\n            }}),\n        }}\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if state.initialized {{\n            return Ok(());\n        }}\n        state.ticks = 0;\n        metadata::write_u32(SYST_CSR_ADDRESS, 0)?;\n        metadata::write_u32(SYST_RVR_ADDRESS, SYST_RELOAD_VALUE)?;\n        metadata::write_u32(SYST_CVR_ADDRESS, 0)?;\n        metadata::write_u32(\n            SYST_CSR_ADDRESS,\n            SYST_CSR_ENABLE | SYST_CSR_TICKINT | SYST_CSR_CLKSOURCE,\n        )?;\n        state.initialized = true;\n        Ok(())\n    }}\n\n    fn advance(&self, ticks: u64) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if !state.initialized {{\n            return;\n        }}\n        state.ticks = state.ticks.wrapping_add(ticks);\n        let now = state.ticks;\n        let _ = state.queue.next_expiration(now);\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedSystickTimeDriver {{\n    fn now(&self) -> u64 {{\n        self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).ticks\n    }}\n\n    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        let now = state.ticks;\n        let _ = state.queue.schedule_wake(at, waker);\n        let _ = state.queue.next_expiration(now);\n    }}\n}}\n\nembassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedSystickTimeDriver = GeneratedSystickTimeDriver::new());\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.init()\n}}\n\nfn {advance_fn}(ticks: u64) {{\n    GENERATED_TIME_DRIVER.advance(ticks)\n}}\n"
         )),
-        Some(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER) => Ok(format!(
-            "\nuse std::sync::Mutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nstruct GeneratedHardwareTimerTimeDriverState {{\n    initialized: bool,\n    ticks: u64,\n    queue: EmbassyTimeQueue,\n}}\n\nstruct GeneratedHardwareTimerTimeDriver {{\n    state: Mutex<GeneratedHardwareTimerTimeDriverState>,\n}}\n\nimpl GeneratedHardwareTimerTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            state: Mutex::new(GeneratedHardwareTimerTimeDriverState {{\n                initialized: false,\n                ticks: 0,\n                queue: EmbassyTimeQueue::new(),\n            }}),\n        }}\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if state.initialized {{\n            return Ok(());\n        }}\n        state.ticks = 0;\n        state.initialized = true;\n        Ok(())\n    }}\n\n    fn advance(&self, ticks: u64) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if !state.initialized {{\n            return;\n        }}\n        state.ticks = state.ticks.wrapping_add(ticks);\n        let now = state.ticks;\n        let _ = state.queue.next_expiration(now);\n    }}\n\n    fn on_interrupt(&self) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        let now = state.ticks;\n        let _ = state.queue.next_expiration(now);\n    }}\n\n    fn delay_ticks(&self, ticks: u64) -> Result<(), metadata::Error> {{\n        self.advance(ticks);\n        Ok(())\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedHardwareTimerTimeDriver {{\n    fn now(&self) -> u64 {{\n        self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).ticks\n    }}\n\n    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        let now = state.ticks;\n        let _ = state.queue.schedule_wake(at, waker);\n        let _ = state.queue.next_expiration(now);\n    }}\n}}\n\nembassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedHardwareTimerTimeDriver = GeneratedHardwareTimerTimeDriver::new());\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.init()\n}}\n\nfn {advance_fn}(ticks: u64) {{\n    GENERATED_TIME_DRIVER.advance(ticks)\n}}\n\nfn generated_{driver_prefix}_time_driver_now() -> u64 {{\n    GENERATED_TIME_DRIVER.now()\n}}\n\nfn generated_{driver_prefix}_time_driver_delay_ticks(ticks: u64) -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.delay_ticks(ticks)\n}}\n\npub fn generated_{driver_prefix}_time_driver_interrupt() {{\n    GENERATED_TIME_DRIVER.on_interrupt();\n}}\n"
-        )),
+        Some(EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER | EMBASSY_TIME_DRIVER_SOURCE_RTC) => {
+            Ok(format!(
+                "\nuse std::sync::Mutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nstruct GeneratedHardwareTimerTimeDriverState {{\n    initialized: bool,\n    ticks: u64,\n    queue: EmbassyTimeQueue,\n}}\n\nstruct GeneratedHardwareTimerTimeDriver {{\n    state: Mutex<GeneratedHardwareTimerTimeDriverState>,\n}}\n\nimpl GeneratedHardwareTimerTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            state: Mutex::new(GeneratedHardwareTimerTimeDriverState {{\n                initialized: false,\n                ticks: 0,\n                queue: EmbassyTimeQueue::new(),\n            }}),\n        }}\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if state.initialized {{\n            return Ok(());\n        }}\n        state.ticks = 0;\n        state.initialized = true;\n        Ok(())\n    }}\n\n    fn advance(&self, ticks: u64) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        if !state.initialized {{\n            return;\n        }}\n        state.ticks = state.ticks.wrapping_add(ticks);\n        let now = state.ticks;\n        let _ = state.queue.next_expiration(now);\n    }}\n\n    fn on_interrupt(&self) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        let now = state.ticks;\n        let _ = state.queue.next_expiration(now);\n    }}\n\n    fn delay_ticks(&self, ticks: u64) -> Result<(), metadata::Error> {{\n        self.advance(ticks);\n        Ok(())\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedHardwareTimerTimeDriver {{\n    fn now(&self) -> u64 {{\n        self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).ticks\n    }}\n\n    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {{\n        let mut state = self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());\n        let now = state.ticks;\n        let _ = state.queue.schedule_wake(at, waker);\n        let _ = state.queue.next_expiration(now);\n    }}\n}}\n\nembassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedHardwareTimerTimeDriver = GeneratedHardwareTimerTimeDriver::new());\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.init()\n}}\n\nfn {advance_fn}(ticks: u64) {{\n    GENERATED_TIME_DRIVER.advance(ticks)\n}}\n\nfn generated_{driver_prefix}_time_driver_now() -> u64 {{\n    GENERATED_TIME_DRIVER.now()\n}}\n\nfn generated_{driver_prefix}_time_driver_delay_ticks(ticks: u64) -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.delay_ticks(ticks)\n}}\n\npub fn generated_{driver_prefix}_time_driver_interrupt() {{\n    GENERATED_TIME_DRIVER.on_interrupt();\n}}\n"
+            ))
+        }
         Some(other) => bail!(
             "driver {} uses unsupported timeDriverSource {} for generated host time-driver support",
             driver.id,
@@ -16251,7 +17167,154 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(interrupt_rs.contains("if irq_index < PFIC_EXTERNAL_IRQ_OFFSET"));
         assert!(interrupt_rs.contains("base + u64::from((irq_index / 32) * 4)"));
         assert!(interrupt_rs.contains("1u32 << (irq_index % 32)"));
+        assert!(interrupt_rs.contains("Ok(irq_index)"));
+    }
+
+    #[test]
+    fn generate_embassy_supports_external_interrupt_indexed_pfic_registers() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        document["physical"]["interruptControllers"][0]["interruptNumbering"]["registerIndexing"] =
+            Value::String(INTERRUPT_NUMBERING_EXTERNAL_INTERRUPT_INDEX.to_string());
+        let file = write_temp_json(&document);
+        let document =
+            load_validated_hair_document(file.path(), &repo_root).expect("fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&document, output_dir.path()).expect("embassy generation");
+
+        let interrupt_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("interrupt.rs"))
+                .expect("interrupt.rs");
+        assert!(interrupt_rs.contains("let irq_index = irq as u32;"));
+        assert!(!interrupt_rs.contains("const PFIC_EXTERNAL_IRQ_OFFSET"));
+        assert!(!interrupt_rs.contains("if irq_index < PFIC_EXTERNAL_IRQ_OFFSET"));
         assert!(!interrupt_rs.contains(".checked_sub(PFIC_EXTERNAL_IRQ_OFFSET)"));
+        assert!(interrupt_rs.contains("Ok(irq_index)"));
+    }
+
+    #[test]
+    fn generate_embassy_finds_pfic_numbering_by_stable_controller_id() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        document["physical"]["interruptControllers"][0]["name"] =
+            Value::String("Platform Interrupt Controller".to_string());
+        let file = write_temp_json(&document);
+        let document =
+            load_validated_hair_document(file.path(), &repo_root).expect("fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&document, output_dir.path()).expect("embassy generation");
+
+        let interrupt_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("interrupt.rs"))
+                .expect("interrupt.rs");
+        assert!(interrupt_rs.contains("const PFIC_EXTERNAL_IRQ_OFFSET: u32 = 16;"));
+        assert!(interrupt_rs.contains("Ok(irq_index)"));
+    }
+
+    #[test]
+    fn validate_wch_runtime_interrupt_number_accepts_external_index_mode_below_16() {
+        let numbering = InterruptControllerNumbering {
+            vector_table_indexing: INTERRUPT_NUMBERING_EXTERNAL_INTERRUPT_INDEX.to_string(),
+            register_indexing: INTERRUPT_NUMBERING_EXTERNAL_INTERRUPT_INDEX.to_string(),
+        };
+        let interrupt = Interrupt {
+            id: "irq.tim1".to_string(),
+            name: "TIM1".to_string(),
+            description: None,
+            number: 4,
+            controller_ref: Some(PFIC_INTERRUPT_CONTROLLER_ID.to_string()),
+        };
+
+        validate_wch_runtime_interrupt_number(&numbering, &interrupt)
+            .expect("external interrupt index should be accepted");
+    }
+
+    #[test]
+    fn validate_wch_runtime_interrupt_number_rejects_interrupt_number_mode_below_16() {
+        let numbering = InterruptControllerNumbering {
+            vector_table_indexing: INTERRUPT_NUMBERING_INTERRUPT_NUMBER.to_string(),
+            register_indexing: INTERRUPT_NUMBERING_INTERRUPT_NUMBER.to_string(),
+        };
+        let interrupt = Interrupt {
+            id: "irq.tim1".to_string(),
+            name: "TIM1".to_string(),
+            description: None,
+            number: 4,
+            controller_ref: Some(PFIC_INTERRUPT_CONTROLLER_ID.to_string()),
+        };
+
+        let error = validate_wch_runtime_interrupt_number(&numbering, &interrupt)
+            .expect_err("interrupt-number mode should reject exception slots");
+        assert!(error.to_string().contains("requires an external interrupt"));
+    }
+
+    #[test]
+    fn render_wch_vector_count_uses_controller_specific_vector_slots() {
+        let numbering = InterruptControllerNumbering {
+            vector_table_indexing: INTERRUPT_NUMBERING_EXTERNAL_INTERRUPT_INDEX.to_string(),
+            register_indexing: INTERRUPT_NUMBERING_EXTERNAL_INTERRUPT_INDEX.to_string(),
+        };
+        let interrupts = vec![
+            Interrupt {
+                id: "irq.low".to_string(),
+                name: "LOW".to_string(),
+                description: None,
+                number: 4,
+                controller_ref: Some(PFIC_INTERRUPT_CONTROLLER_ID.to_string()),
+            },
+            Interrupt {
+                id: "irq.high".to_string(),
+                name: "HIGH".to_string(),
+                description: None,
+                number: 50,
+                controller_ref: Some(PFIC_INTERRUPT_CONTROLLER_ID.to_string()),
+            },
+            Interrupt {
+                id: "irq.other".to_string(),
+                name: "OTHER".to_string(),
+                description: None,
+                number: 200,
+                controller_ref: Some("ic.other".to_string()),
+            },
+        ];
+
+        let vector_count =
+            render_wch_vector_count(&numbering, &interrupts, PFIC_INTERRUPT_CONTROLLER_ID, 20)
+                .expect("vector count should render");
+
+        assert_eq!(vector_count, 67);
+    }
+
+    #[test]
+    fn generate_embassy_keeps_wch_and_rtc_time_templates_consistently_indented() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let document = load_validated_hair_document(
+            &repo_root.join(r"evidence\wch\ch32v203g6u6\hair.json"),
+            &repo_root,
+        )
+        .expect("CH32 evidence document should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&document, output_dir.path()).expect("embassy generation");
+
+        let wch_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("wch.rs")).expect("wch.rs");
+        let time_rs = std::fs::read_to_string(output_dir.path().join("src").join("time.rs"))
+            .expect("time.rs");
+
+        assert!(wch_rs.contains("    pfic().enable_irq(Irq::RTCAlarm)?;\n    unsafe {\n"));
+        assert!(!wch_rs.contains("    pfic().enable_irq(Irq::RTCAlarm)?;\n            unsafe {\n"));
+        assert!(time_rs.contains(
+            "            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_RTCSEL_MASK,\n                GENERATED_RCC_BDCTLR_RTCSEL_LSI_MASK,\n            );\n            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_RTCEN_MASK,\n"
+        ));
+        assert!(!time_rs.contains(
+            "must_modify_u32(GENERATED_RCC_BDCTLR_ADDRESS, GENERATED_RCC_BDCTLR_BDRST_MASK, 0u32);\n                    must_modify_u32(\n"
+        ));
+        assert!(!time_rs.contains("            );\n                    must_modify_u32(\n"));
     }
 
     #[test]
@@ -17020,6 +18083,15 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
                         .as_object()
                         .and_then(|item| item.get("id"))
                         .and_then(Value::as_str)
+                        == Some("drv.time-rtc")
+                })
+            })
+            .or_else(|| {
+                drivers.iter().position(|driver| {
+                    driver
+                        .as_object()
+                        .and_then(|item| item.get("id"))
+                        .and_then(Value::as_str)
                         == Some("drv.tim4")
                 })
             })
@@ -17028,6 +18100,16 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             .get_mut(tim4_index)
             .and_then(Value::as_object_mut)
             .expect("tim4 time driver");
+        tim4.insert("id".to_string(), Value::String("drv.time-tim4".to_string()));
+        tim4.insert(
+            "name".to_string(),
+            Value::String("TIM4 Embassy time driver".to_string()),
+        );
+        tim4.insert(
+            "targetRef".to_string(),
+            Value::String("block.tim4".to_string()),
+        );
+        tim4.insert("driverKind".to_string(), Value::String("timer".to_string()));
         tim4.insert("modulePath".to_string(), Value::String("time".to_string()));
         tim4.insert(
             "loweringPattern".to_string(),
@@ -17039,6 +18121,14 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         );
         tim4.insert("timeDriverTickHz".to_string(), serde_json::json!(1_000u64));
         tim4.insert(
+            "clockBindingRefs".to_string(),
+            serde_json::json!(["clk.tim4"]),
+        );
+        tim4.insert(
+            "resetBindingRefs".to_string(),
+            serde_json::json!(["rst.tim4"]),
+        );
+        tim4.insert(
             "interruptRouteRefs".to_string(),
             serde_json::json!(["iroute.tim4.cc"]),
         );
@@ -17048,6 +18138,10 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
                 "op.tim4.configure_counter_compare_timebase",
                 "op.tim4.enable"
             ]),
+        );
+        tim4.insert(
+            "stateMachineRefs".to_string(),
+            serde_json::json!(["sm.tim4"]),
         );
         tim4.insert(
             "capabilityTags".to_string(),
@@ -18401,11 +19495,11 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
                         }
                     },
                     "interrupts": [
-                        { "id": "irq.usart1", "name": "USART1", "number": 1 },
-                        { "id": "irq.spi1", "name": "SPI1", "number": 2 },
-                        { "id": "irq.i2c1", "name": "I2C1", "number": 3 },
-                        { "id": "irq.tim1", "name": "TIM1", "number": 4 },
-                        { "id": "irq.adc1", "name": "ADC1", "number": 5 }
+                        { "id": "irq.usart1", "name": "USART1", "number": 1, "controllerRef": "ic.pfic" },
+                        { "id": "irq.spi1", "name": "SPI1", "number": 2, "controllerRef": "ic.pfic" },
+                        { "id": "irq.i2c1", "name": "I2C1", "number": 3, "controllerRef": "ic.pfic" },
+                        { "id": "irq.tim1", "name": "TIM1", "number": 4, "controllerRef": "ic.pfic" },
+                        { "id": "irq.adc1", "name": "ADC1", "number": 5, "controllerRef": "ic.pfic" }
                     ],
                     "peripherals": [
                         { "id": "periph.rcc", "name": "RCC", "kind": "peripheral", "type": "RCC", "baseAddress": 1073872896u64, "registers": [
@@ -18558,6 +19652,17 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
                 ]
             },
             "physical": {
+                "interruptControllers": [
+                    {
+                        "id": "ic.pfic",
+                        "name": "PFIC",
+                        "interruptNumbering": {
+                            "vectorTableIndexing": "interrupt-number",
+                            "registerIndexing": "interrupt-number"
+                        },
+                        "targetRefs": ["device.fixture-mcu"]
+                    }
+                ],
                 "pins": [
                     { "id": "pin.pa0", "name": "PA0", "modes": ["alternate-function"], "port": "A", "index": 0 },
                     { "id": "pin.pa1", "name": "PA1", "modes": ["alternate-function"], "port": "A", "index": 1 },

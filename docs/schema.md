@@ -214,6 +214,18 @@ It includes:
 
 This layer is important because many MCU and SoC facts needed by HALs, simulators, or validation do not fit into register-only formats.
 
+Interrupt-controller records in `physical.interruptControllers[]` may also carry
+controller-specific interrupt numbering semantics. That controller-level contract
+is where HAIR records whether `structure.device.interrupts[].number` should be
+used directly for vector placement and controller register indexing, or treated
+as an external-interrupt index for those software-facing operations. When the
+controller declares an external-interrupt index for vector placement, the
+architecture/runtime layer still supplies any core exception-slot prefix; the
+controller record is only responsible for saying whether the declared interrupt
+number is already a full slot number or still an external index. This keeps the
+device interrupt inventory authoritative while moving controller programming
+rules onto the controller model instead of leaving them to generator heuristics.
+
 ## `schema/normalization.json`
 
 The normalization layer captures how vendor-specific descriptions map into a canonical cross-vendor model.
