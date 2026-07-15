@@ -8982,8 +8982,12 @@ fn render_regular_sequence_adc_dma_methods(
 
     if let Some(dma_driver) = model.drivers.iter().find(|candidate| {
         candidate.driver_kind == "dma" && candidate.target.id == dma_channel.controller_ref
-    }) && dma_async_bindings(dma_driver).is_some()
-    {
+    }) && dma_async_bindings(dma_driver).is_some_and(|bindings| {
+        bindings
+            .channels
+            .iter()
+            .any(|binding| binding.channel_ref == dma_channel.id)
+    }) {
         methods.push(GeneratedMethod {
             name: "sample_one_shot_dma_u16_async".to_string(),
             code: format!(
@@ -18103,6 +18107,59 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(wch_rs.contains("pfic().enable_irq(Irq::DMA1Channel1)?;"));
         assert!(wch_rs.contains("generated_wch_runtime_drv_dma1().on_interrupt(1);"));
         assert!(wch_rs.contains("const GENERATED_WCH_RUNTIME_DRV_DMA1_RESOURCES: DMA1Resources"));
+    }
+
+    #[test]
+    fn generate_embassy_skips_adc_async_helper_when_dma_channel_is_not_async_bound() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let input = repo_root
+            .join("evidence")
+            .join("wch")
+            .join("ch32v203g6u6")
+            .join("hair.json");
+        let mut document = load_json_file(&input).expect("reference hair json");
+        let driver_instances = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let dma1 = driver_instances
+            .iter_mut()
+            .find(|driver| driver["id"] == "drv.dma1")
+            .and_then(Value::as_object_mut)
+            .expect("drv.dma1");
+        dma1.insert(
+            "interruptRouteRefs".to_string(),
+            serde_json::json!(["iroute.dma1.channel2"]),
+        );
+        dma1.insert(
+            "dmaAsyncBindings".to_string(),
+            serde_json::json!({
+                "channels": [{
+                    "channelRef": "dmach.dma1.ch2",
+                    "transferCompleteFlagRef": "field.dma_intfr.tcif2",
+                    "transferCompleteClearRef": "field.dma_intfcr.ctcif2",
+                    "transferCompleteInterruptEnableRef": "field.dma_cfgr1.tcie"
+                }]
+            }),
+        );
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("mutated hair document should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
+
+        let adc_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("adc.rs")).expect("adc.rs");
+        assert!(!adc_rs.contains("pub async fn sample_one_shot_dma_u16_async"));
     }
 
     #[test]
