@@ -123,7 +123,7 @@ pub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {
         );
     }
     pfic().enable_irq(Irq::RTCAlarm)?;
-            unsafe {
+    unsafe {
         asm!("csrs mie, {value}", value = in(reg) 0x800usize);
         asm!("csrs mstatus, {value}", value = in(reg) 0x88usize);
     }
