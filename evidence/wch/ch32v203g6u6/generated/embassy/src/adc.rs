@@ -1914,11 +1914,14 @@ impl ADC1 {
         buffer: &mut [u16],
     ) -> Result<(), metadata::Error> {
         dma.enable_clock()?;
+        let _ = dma.disable_transfer_complete_interrupt(1);
+        self.start_one_shot_dma_u16(channels, sample_time_code, buffer)?;
         dma.prepare_transfer_complete_wait(1)?;
         dma.enable_transfer_complete_interrupt(1)?;
-        if let Err(error) = self.start_one_shot_dma_u16(channels, sample_time_code, buffer) {
-            let _ = dma.disable_transfer_complete_interrupt(1);
-            return Err(error);
+        if dma.is_transfer_complete(1)? {
+            dma.disable_transfer_complete_interrupt(1)?;
+            self.stop_dma_sampling()?;
+            return Ok(());
         }
         let wait_result = dma.wait_transfer_complete(1).await;
         let disable_result = dma.disable_transfer_complete_interrupt(1);

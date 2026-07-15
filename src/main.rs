@@ -5421,6 +5421,18 @@ struct GeneratedWchRuntimeInputs<'a> {
     time_interrupt: &'a Interrupt,
 }
 
+#[derive(Debug, Clone)]
+struct GeneratedWchRuntimeVectorHandler {
+    vector_slot: usize,
+    irq_variant: String,
+    vector_const_name: String,
+    vector_symbol_name: String,
+    rust_handler_name: String,
+    import_line: Option<String>,
+    helper_items: String,
+    rust_handler_body: String,
+}
+
 fn generated_wch_runtime_inputs(
     model: &EmbassyGenerationModel,
 ) -> Result<Option<GeneratedWchRuntimeInputs<'_>>> {
@@ -5477,6 +5489,149 @@ fn generated_wch_runtime_inputs(
     }))
 }
 
+fn render_wch_runtime_vector_wrapper(vector_symbol_name: &str, rust_handler_name: &str) -> String {
+    format!(
+        "    .global {vector_symbol_name}\n{vector_symbol_name}:\n    addi sp, sp, -64\n    sw ra, 0(sp)\n    sw t0, 4(sp)\n    sw t1, 8(sp)\n    sw t2, 12(sp)\n    sw t3, 16(sp)\n    sw t4, 20(sp)\n    sw t5, 24(sp)\n    sw t6, 28(sp)\n    sw a0, 32(sp)\n    sw a1, 36(sp)\n    sw a2, 40(sp)\n    sw a3, 44(sp)\n    sw a4, 48(sp)\n    sw a5, 52(sp)\n    sw a6, 56(sp)\n    sw a7, 60(sp)\n    call {rust_handler_name}\n    lw ra, 0(sp)\n    lw t0, 4(sp)\n    lw t1, 8(sp)\n    lw t2, 12(sp)\n    lw t3, 16(sp)\n    lw t4, 20(sp)\n    lw t5, 24(sp)\n    lw t6, 28(sp)\n    lw a0, 32(sp)\n    lw a1, 36(sp)\n    lw a2, 40(sp)\n    lw a3, 44(sp)\n    lw a4, 48(sp)\n    lw a5, 52(sp)\n    lw a6, 56(sp)\n    lw a7, 60(sp)\n    addi sp, sp, 64\n    mret\n"
+    )
+}
+
+fn generated_wch_runtime_vector_handlers(
+    model: &EmbassyGenerationModel,
+    inputs: &GeneratedWchRuntimeInputs<'_>,
+    numbering: &InterruptControllerNumbering,
+) -> Result<Vec<GeneratedWchRuntimeVectorHandler>> {
+    let mut handlers = vec![GeneratedWchRuntimeVectorHandler {
+        vector_slot: render_wch_vector_slot(numbering, inputs.time_interrupt.number)?,
+        irq_variant: to_rust_type_name(&inputs.time_interrupt.name),
+        vector_const_name: "WCH_TIME_DRIVER_HANDLER_VECTOR".to_string(),
+        vector_symbol_name: "__hair_wch_embassy_time_driver_vector".to_string(),
+        rust_handler_name: "__hair_wch_embassy_time_driver_irq_rust".to_string(),
+        import_line: None,
+        helper_items: String::new(),
+        rust_handler_body: "    time_driver().on_time_driver_interrupt();\n".to_string(),
+    }];
+    let mut emitted_driver_helpers = BTreeSet::new();
+
+    for driver in &model.drivers {
+        let Some(bindings) = dma_async_bindings(driver) else {
+            continue;
+        };
+        for binding in &bindings.channels {
+            let channel = driver
+                .dma_channels
+                .iter()
+                .find(|candidate| candidate.id == binding.channel_ref)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "driver {} dmaAsyncBindings references unresolved DMA channel {}",
+                        driver.id,
+                        binding.channel_ref
+                    )
+                })?;
+            let interrupt_source = driver
+                .interrupt_sources
+                .iter()
+                .find(|source| source.source_ref == channel.id)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "driver {} dmaAsyncBindings channel {} lacks a referenced interrupt source",
+                        driver.id,
+                        binding.channel_ref
+                    )
+                })?;
+            let interrupt_route = driver
+                .interrupt_routes
+                .iter()
+                .find(|route| route.source_ref == interrupt_source.id)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "driver {} dmaAsyncBindings channel {} lacks a referenced interrupt route",
+                        driver.id,
+                        binding.channel_ref
+                    )
+                })?;
+            if interrupt_route.controller_ref != inputs.interrupt_driver.target.id {
+                bail!(
+                    "driver {} dmaAsyncBindings channel {} uses interrupt controller {} instead of WCH runtime controller {}",
+                    driver.id,
+                    binding.channel_ref,
+                    interrupt_route.controller_ref,
+                    inputs.interrupt_driver.target.id
+                );
+            }
+            let interrupt = model
+                .interrupts
+                .iter()
+                .find(|interrupt| interrupt.id == interrupt_route.interrupt_ref)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "driver {} dmaAsyncBindings channel {} references unknown interrupt {}",
+                        driver.id,
+                        binding.channel_ref,
+                        interrupt_route.interrupt_ref
+                    )
+                })?;
+            validate_wch_runtime_interrupt_number(numbering, interrupt)?;
+            let vector_slot = render_wch_vector_slot(numbering, interrupt.number)?;
+            let handler_slug = format!(
+                "{}_ch{}",
+                to_rust_const_name(&driver.id).to_lowercase(),
+                channel.channel_index
+            );
+            let type_name = driver.type_name.as_str();
+            let resource_type = format!("{type_name}Resources");
+            let helper_fn_name =
+                format!("generated_wch_runtime_{}", to_rust_method_name(&driver.id));
+            let helper_const_name = format!(
+                "GENERATED_WCH_RUNTIME_{}_RESOURCES",
+                to_rust_const_name(&driver.id)
+            );
+            let helper_items = if emitted_driver_helpers.insert(driver.id.clone()) {
+                format!(
+                    "const {helper_const_name}: {resource_type} = {resource_type} {{\n    clocks: &[],\n    resets: &[],\n    interrupt_sources: &[],\n    interrupts: &[],\n    dma_channels: &[],\n    dma: &[],\n    pins: &[],\n    init_operations: &[],\n    state_machines: &[],\n    lowering_pattern: None,\n    time_driver_source: None,\n    capability_tags: &[],\n}};\n\nfn {helper_fn_name}() -> {type_name} {{\n    {type_name}::new({helper_const_name}).expect(\"generated WCH runtime driver resources\")\n}}\n\n"
+                )
+            } else {
+                String::new()
+            };
+            handlers.push(GeneratedWchRuntimeVectorHandler {
+                vector_slot,
+                irq_variant: to_rust_type_name(&interrupt.name),
+                vector_const_name: format!(
+                    "WCH_RUNTIME_{}_HANDLER_VECTOR",
+                    to_rust_const_name(&handler_slug)
+                ),
+                vector_symbol_name: format!("__hair_wch_{}_vector", handler_slug),
+                rust_handler_name: format!("__hair_wch_{}_irq_rust", handler_slug),
+                import_line: Some(format!(
+                    "use crate::{}::{{{}, {}}};",
+                    driver.module_name, type_name, resource_type
+                )),
+                helper_items,
+                rust_handler_body: format!(
+                    "    let _ = {helper_fn_name}().on_interrupt({});\n",
+                    channel.channel_index
+                ),
+            });
+        }
+    }
+
+    let mut seen_slots = BTreeMap::<usize, String>::new();
+    for handler in &handlers {
+        if let Some(previous) =
+            seen_slots.insert(handler.vector_slot, handler.vector_const_name.clone())
+        {
+            bail!(
+                "WCH runtime generated conflicting vector handlers {} and {} for slot {}",
+                previous,
+                handler.vector_const_name,
+                handler.vector_slot
+            );
+        }
+    }
+
+    Ok(handlers)
+}
+
 fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<String> {
     let Some(inputs) = generated_wch_runtime_inputs(model)? else {
         bail!("WCH runtime support requested without PFIC + non-SysTick time-driver inputs");
@@ -5488,7 +5643,6 @@ fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<Strin
         "{}_RESOURCES",
         to_rust_const_name(&inputs.interrupt_driver.id)
     );
-    let irq_variant = to_rust_type_name(&inputs.time_interrupt.name);
     let controller_ref = inputs
         .time_interrupt
         .controller_ref
@@ -5506,14 +5660,76 @@ fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<Strin
                 controller_ref
             )
         })?;
-    let vector_slot = render_wch_vector_slot(numbering, inputs.time_interrupt.number)?;
-    let vector_count =
-        render_wch_vector_count(numbering, &model.interrupts, controller_ref, vector_slot)?;
+    let handlers = generated_wch_runtime_vector_handlers(model, &inputs, numbering)?;
+    let max_vector_slot = handlers
+        .iter()
+        .map(|handler| handler.vector_slot)
+        .max()
+        .ok_or_else(|| anyhow!("WCH runtime did not generate any vector handlers"))?;
+    let vector_count = render_wch_vector_count(
+        numbering,
+        &model.interrupts,
+        controller_ref,
+        max_vector_slot,
+    )?;
+    let mut import_lines = BTreeSet::new();
+    let mut extern_decls = String::new();
+    let mut vector_consts = String::new();
+    let mut table_assignments = String::new();
+    let mut asm_wrappers = String::new();
+    let mut init_enable_calls = String::new();
+    let mut helper_items = String::new();
+    let mut rust_handlers = String::new();
+    for handler in &handlers {
+        if let Some(import_line) = &handler.import_line {
+            import_lines.insert(import_line.clone());
+        }
+        extern_decls.push_str(&format!("    fn {}();\n", handler.vector_symbol_name));
+        vector_consts.push_str(&format!(
+            "const {}: WchVector = WchVector {{\n    handler: {},\n}};\n",
+            handler.vector_const_name, handler.vector_symbol_name
+        ));
+        table_assignments.push_str(&format!(
+            "    table[{}] = {};\n",
+            handler.vector_slot, handler.vector_const_name
+        ));
+        asm_wrappers.push_str(&render_wch_runtime_vector_wrapper(
+            &handler.vector_symbol_name,
+            &handler.rust_handler_name,
+        ));
+        init_enable_calls.push_str(&format!(
+            "    pfic().enable_irq(Irq::{})?;\n",
+            handler.irq_variant
+        ));
+        if !handler.helper_items.is_empty() {
+            helper_items.push_str(&handler.helper_items);
+        }
+        rust_handlers.push_str(&format!(
+            "#[unsafe(no_mangle)]\nextern \"C\" fn {}() {{\n{}}}\n\n",
+            handler.rust_handler_name, handler.rust_handler_body
+        ));
+    }
+    let extra_imports = if import_lines.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "{}\n\n",
+            import_lines.into_iter().collect::<Vec<_>>().join("\n")
+        )
+    };
 
     Ok(format!(
-        "//! Generated WCH/QingKe runtime support for {}.\n\nuse crate::interrupt::{{{interrupt_driver_resources}, Irq, {interrupt_driver_type}}};\nuse crate::metadata;\nuse crate::time::{{{time_driver_resources}, {time_driver_type}}};\nuse core::arch::{{asm, global_asm}};\n\n{}\nunsafe extern \"C\" {{\n    fn __hair_wch_hang_vector();\n    fn __hair_wch_embassy_time_driver_vector();\n}}\n\n#[derive(Clone, Copy)]\n#[repr(C)]\nunion WchVector {{\n    handler: unsafe extern \"C\" fn(),\n    reserved: usize,\n}}\n\nconst WCH_VECTOR_COUNT: usize = {vector_count};\nconst WCH_TIME_DRIVER_VECTOR_SLOT: usize = {vector_slot};\nconst WCH_RESERVED_VECTOR: WchVector = WchVector {{ reserved: 0 }};\nconst WCH_HANG_VECTOR: WchVector = WchVector {{\n    handler: __hair_wch_hang_vector,\n}};\nconst WCH_TIME_DRIVER_HANDLER_VECTOR: WchVector = WchVector {{\n    handler: __hair_wch_embassy_time_driver_vector,\n}};\n\n#[repr(C, align(64))]\nstruct WchVectorTable([WchVector; WCH_VECTOR_COUNT]);\n\nconst fn build_wch_vector_table() -> WchVectorTable {{\n    let mut table = [WCH_HANG_VECTOR; WCH_VECTOR_COUNT];\n    table[1] = WCH_RESERVED_VECTOR;\n    table[4] = WCH_RESERVED_VECTOR;\n    table[6] = WCH_RESERVED_VECTOR;\n    table[7] = WCH_RESERVED_VECTOR;\n    table[10] = WCH_RESERVED_VECTOR;\n    table[11] = WCH_RESERVED_VECTOR;\n    table[13] = WCH_RESERVED_VECTOR;\n    table[15] = WCH_RESERVED_VECTOR;\n    table[WCH_TIME_DRIVER_VECTOR_SLOT] = WCH_TIME_DRIVER_HANDLER_VECTOR;\n    WchVectorTable(table)\n}}\n\n#[unsafe(link_section = \".vector\")]\n#[used]\nstatic WCH_VECTOR_TABLE: WchVectorTable = build_wch_vector_table();\n\nglobal_asm!(\n    r#\"\n    .global __hair_wch_hang_vector\n__hair_wch_hang_vector:\n1:\n    j 1b\n\n    .global __hair_wch_embassy_time_driver_vector\n__hair_wch_embassy_time_driver_vector:\n    addi sp, sp, -64\n    sw ra, 0(sp)\n    sw t0, 4(sp)\n    sw t1, 8(sp)\n    sw t2, 12(sp)\n    sw t3, 16(sp)\n    sw t4, 20(sp)\n    sw t5, 24(sp)\n    sw t6, 28(sp)\n    sw a0, 32(sp)\n    sw a1, 36(sp)\n    sw a2, 40(sp)\n    sw a3, 44(sp)\n    sw a4, 48(sp)\n    sw a5, 52(sp)\n    sw a6, 56(sp)\n    sw a7, 60(sp)\n    call __hair_wch_embassy_time_driver_irq_rust\n    lw ra, 0(sp)\n    lw t0, 4(sp)\n    lw t1, 8(sp)\n    lw t2, 12(sp)\n    lw t3, 16(sp)\n    lw t4, 20(sp)\n    lw t5, 24(sp)\n    lw t6, 28(sp)\n    lw a0, 32(sp)\n    lw a1, 36(sp)\n    lw a2, 40(sp)\n    lw a3, 44(sp)\n    lw a4, 48(sp)\n    lw a5, 52(sp)\n    lw a6, 56(sp)\n    lw a7, 60(sp)\n    addi sp, sp, 64\n    mret\n\"#\n);\n\nfn pfic() -> {interrupt_driver_type} {{\n    {interrupt_driver_type}::new({interrupt_driver_resources}).expect(\"generated WCH PFIC resources\")\n}}\n\nfn time_driver() -> {time_driver_type} {{\n    {time_driver_type}::new({time_driver_resources}).expect(\"generated WCH time-driver resources\")\n}}\n\npub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {{\n    time_driver().init_time_driver()?;\n    unsafe {{\n        asm!(\"csrw 0x804, {{value}}\", value = in(reg) 0x3usize);\n        asm!(\n            \"csrw mtvec, {{value}}\",\n            value = in(reg) ((&WCH_VECTOR_TABLE as *const WchVectorTable as usize) | 0x3)\n        );\n    }}\n    pfic().enable_irq(Irq::{irq_variant})?;\n    unsafe {{\n        asm!(\"csrs mie, {{value}}\", value = in(reg) 0x800usize);\n        asm!(\"csrs mstatus, {{value}}\", value = in(reg) 0x88usize);\n    }}\n    Ok(())\n}}\n\n#[unsafe(no_mangle)]\nextern \"C\" fn __hair_wch_embassy_time_driver_irq_rust() {{\n    time_driver().on_time_driver_interrupt();\n}}\n",
+        "//! Generated WCH/QingKe runtime support for {}.\n\nuse crate::interrupt::{{{interrupt_driver_resources}, Irq, {interrupt_driver_type}}};\nuse crate::metadata;\nuse crate::time::{{{time_driver_resources}, {time_driver_type}}};\nuse core::arch::{{asm, global_asm}};\n{extra_imports}{module_provenance}\nunsafe extern \"C\" {{\n    fn __hair_wch_hang_vector();\n{extern_decls}}}\n\n#[derive(Clone, Copy)]\n#[repr(C)]\nunion WchVector {{\n    handler: unsafe extern \"C\" fn(),\n    reserved: usize,\n}}\n\nconst WCH_VECTOR_COUNT: usize = {vector_count};\nconst WCH_RESERVED_VECTOR: WchVector = WchVector {{ reserved: 0 }};\nconst WCH_HANG_VECTOR: WchVector = WchVector {{\n    handler: __hair_wch_hang_vector,\n}};\n{vector_consts}\n#[repr(C, align(64))]\nstruct WchVectorTable([WchVector; WCH_VECTOR_COUNT]);\n\nconst fn build_wch_vector_table() -> WchVectorTable {{\n    let mut table = [WCH_HANG_VECTOR; WCH_VECTOR_COUNT];\n    table[1] = WCH_RESERVED_VECTOR;\n    table[4] = WCH_RESERVED_VECTOR;\n    table[6] = WCH_RESERVED_VECTOR;\n    table[7] = WCH_RESERVED_VECTOR;\n    table[10] = WCH_RESERVED_VECTOR;\n    table[11] = WCH_RESERVED_VECTOR;\n    table[13] = WCH_RESERVED_VECTOR;\n    table[15] = WCH_RESERVED_VECTOR;\n{table_assignments}    WchVectorTable(table)\n}}\n\n#[unsafe(link_section = \".vector\")]\n#[used]\nstatic WCH_VECTOR_TABLE: WchVectorTable = build_wch_vector_table();\n\nglobal_asm!(\n    r#\"\n    .global __hair_wch_hang_vector\n__hair_wch_hang_vector:\n1:\n    j 1b\n\n{asm_wrappers}\"#\n);\n\nfn pfic() -> {interrupt_driver_type} {{\n    {interrupt_driver_type}::new({interrupt_driver_resources}).expect(\"generated WCH PFIC resources\")\n}}\n\nfn time_driver() -> {time_driver_type} {{\n    {time_driver_type}::new({time_driver_resources}).expect(\"generated WCH time-driver resources\")\n}}\n\n{helper_items}pub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {{\n    time_driver().init_time_driver()?;\n    unsafe {{\n        asm!(\"csrw 0x804, {{value}}\", value = in(reg) 0x3usize);\n        asm!(\n            \"csrw mtvec, {{value}}\",\n            value = in(reg) ((&WCH_VECTOR_TABLE as *const WchVectorTable as usize) | 0x3)\n        );\n    }}\n{init_enable_calls}    unsafe {{\n        asm!(\"csrs mie, {{value}}\", value = in(reg) 0x800usize);\n        asm!(\"csrs mstatus, {{value}}\", value = in(reg) 0x88usize);\n    }}\n    Ok(())\n}}\n\n{rust_handlers}",
         render_comment_text(&model.device_name),
-        render_module_provenance_const("wch"),
+        extra_imports = extra_imports,
+        module_provenance = render_module_provenance_const("wch"),
+        extern_decls = extern_decls,
+        vector_consts = vector_consts,
+        table_assignments = table_assignments,
+        asm_wrappers = asm_wrappers,
+        helper_items = helper_items,
+        init_enable_calls = init_enable_calls,
+        rust_handlers = rust_handlers,
     ))
 }
 
@@ -8761,7 +8977,7 @@ fn render_regular_sequence_adc_dma_methods(
         methods.push(GeneratedMethod {
             name: "sample_one_shot_dma_u16_async".to_string(),
             code: format!(
-                "    pub async fn sample_one_shot_dma_u16_async(&self, dma: &crate::dma::{dma_type}, channels: &[u8], sample_time_code: u8, buffer: &mut [u16]) -> Result<(), metadata::Error> {{\n        dma.enable_clock()?;\n        dma.prepare_transfer_complete_wait({channel_index})?;\n        dma.enable_transfer_complete_interrupt({channel_index})?;\n        if let Err(error) = self.start_one_shot_dma_u16(channels, sample_time_code, buffer) {{\n            let _ = dma.disable_transfer_complete_interrupt({channel_index});\n            return Err(error);\n        }}\n        let wait_result = dma.wait_transfer_complete({channel_index}).await;\n        let disable_result = dma.disable_transfer_complete_interrupt({channel_index});\n        if let Err(error) = wait_result {{\n            let _ = disable_result;\n            return Err(error);\n        }}\n        disable_result?;\n        self.stop_dma_sampling()?;\n        Ok(())\n    }}\n",
+                "    pub async fn sample_one_shot_dma_u16_async(&self, dma: &crate::dma::{dma_type}, channels: &[u8], sample_time_code: u8, buffer: &mut [u16]) -> Result<(), metadata::Error> {{\n        dma.enable_clock()?;\n        let _ = dma.disable_transfer_complete_interrupt({channel_index});\n        self.start_one_shot_dma_u16(channels, sample_time_code, buffer)?;\n        dma.prepare_transfer_complete_wait({channel_index})?;\n        dma.enable_transfer_complete_interrupt({channel_index})?;\n        if dma.is_transfer_complete({channel_index})? {{\n            dma.disable_transfer_complete_interrupt({channel_index})?;\n            self.stop_dma_sampling()?;\n            return Ok(());\n        }}\n        let wait_result = dma.wait_transfer_complete({channel_index}).await;\n        let disable_result = dma.disable_transfer_complete_interrupt({channel_index});\n        if let Err(error) = wait_result {{\n            let _ = disable_result;\n            return Err(error);\n        }}\n        disable_result?;\n        self.stop_dma_sampling()?;\n        Ok(())\n    }}\n",
                 dma_type = dma_driver.type_name,
                 channel_index = dma_channel.channel_index,
             ),
@@ -17832,6 +18048,8 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             std::fs::read_to_string(output_dir.path().join("src").join("adc.rs")).expect("adc.rs");
         let dma_rs =
             std::fs::read_to_string(output_dir.path().join("src").join("dma.rs")).expect("dma.rs");
+        let wch_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("wch.rs")).expect("wch.rs");
 
         assert!(adc_rs.contains("pub fn start_one_shot_dma_u16"));
         assert!(adc_rs.contains("pub async fn sample_one_shot_dma_u16_async"));
@@ -17860,6 +18078,14 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(dma_rs.contains("pub async fn wait_transfer_complete"));
         assert!(dma_rs.contains("pub fn on_interrupt("));
         assert!(dma_rs.contains("pub fn enable_transfer_complete_interrupt("));
+        assert!(
+            adc_rs.contains("self.start_one_shot_dma_u16(channels, sample_time_code, buffer)?;")
+        );
+        assert!(adc_rs.contains("dma.prepare_transfer_complete_wait(1)?;"));
+        assert!(adc_rs.contains("if dma.is_transfer_complete(1)? {"));
+        assert!(wch_rs.contains("pfic().enable_irq(Irq::DMA1Channel1)?;"));
+        assert!(wch_rs.contains("generated_wch_runtime_drv_dma1().on_interrupt(1);"));
+        assert!(wch_rs.contains("const GENERATED_WCH_RUNTIME_DRV_DMA1_RESOURCES: DMA1Resources"));
     }
 
     #[test]

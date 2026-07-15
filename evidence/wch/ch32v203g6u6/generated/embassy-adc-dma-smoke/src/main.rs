@@ -69,8 +69,6 @@ const SMOKE_DMA1_RESOURCES: DMA1Resources = DMA1Resources {
 
 const RCC_CFGR0: *mut u32 = 0x4002_1004 as *mut u32;
 const GPIOA_CFGLR: *mut u32 = 0x4001_0800 as *mut u32;
-const PFIC_IENR1: *mut u32 = 0xE000_E100 as *mut u32;
-const PFIC_DMA1_CHANNEL1_IRQ_BIT: u32 = 1 << 27;
 const RCC_CFGR0_ADCPRE_MASK: u32 = 0x0000_C000;
 const RCC_CFGR0_ADCPRE_DIV8: u32 = 0x0000_C000;
 const GPIOA_CFGLR_PA7_MASK: u32 = 0xF000_0000;
@@ -95,22 +93,9 @@ fn configure_adc_path() {
     modify_u32(GPIOA_CFGLR, GPIOA_CFGLR_PA7_MASK, 0x0000_0000);
 }
 
-fn enable_dma1_channel1_irq() {
-    unsafe {
-        write_volatile(PFIC_IENR1, PFIC_DMA1_CHANNEL1_IRQ_BIT);
-    }
-}
-
 #[embassy_executor::task]
 async fn usb_task(mut device: UsbDevice<'static, USBDUsbDriver>) -> ! {
     device.run().await
-}
-
-#[allow(non_snake_case)]
-#[unsafe(no_mangle)]
-extern "C" fn DMA1_Channel1() {
-    let dma1 = DMA1::new(SMOKE_DMA1_RESOURCES).unwrap();
-    let _ = dma1.on_interrupt(DMA_CHANNEL_INDEX);
 }
 
 struct SampleStats {
@@ -215,7 +200,6 @@ async fn main(spawner: Spawner) -> ! {
     adc1.release_reset().unwrap();
     adc1.apply_calibrate().unwrap();
     let dma1 = DMA1::new(SMOKE_DMA1_RESOURCES).unwrap();
-    enable_dma1_channel1_irq();
 
     let usbd = USBD::new(DRV_USBD_RESOURCES).unwrap();
     let driver = usbd.embassy_usb_driver();
