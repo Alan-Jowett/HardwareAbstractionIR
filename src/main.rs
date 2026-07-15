@@ -5045,6 +5045,38 @@ fn render_wch_vector_slot(numbering: &InterruptControllerNumbering, number: i32)
     }
 }
 
+fn validate_wch_runtime_interrupt_number(
+    numbering: &InterruptControllerNumbering,
+    interrupt: &Interrupt,
+) -> Result<()> {
+    match numbering.vector_table_indexing.as_str() {
+        INTERRUPT_NUMBERING_INTERRUPT_NUMBER => {
+            if interrupt.number < CORE_EXCEPTION_VECTOR_PREFIX as i32 {
+                bail!(
+                    "WCH runtime support requires an external interrupt, but {} has IRQ number {}",
+                    interrupt.id,
+                    interrupt.number
+                );
+            }
+            Ok(())
+        }
+        INTERRUPT_NUMBERING_EXTERNAL_INTERRUPT_INDEX => {
+            if interrupt.number < 0 {
+                bail!(
+                    "WCH runtime support requires a non-negative external interrupt index, but {} has IRQ number {}",
+                    interrupt.id,
+                    interrupt.number
+                );
+            }
+            Ok(())
+        }
+        other => bail!(
+            "unsupported WCH vector table indexing mode for runtime validation: {}",
+            other
+        ),
+    }
+}
+
 fn uses_generated_wch_runtime_module(model: &EmbassyGenerationModel) -> bool {
     generated_wch_runtime_inputs(model).is_ok_and(|inputs| inputs.is_some())
 }
@@ -5092,13 +5124,18 @@ fn generated_wch_runtime_inputs(
                 interrupt_route.interrupt_ref
             )
         })?;
-    if time_interrupt.number < 16 {
-        bail!(
-            "WCH runtime support requires an external interrupt, but {} has IRQ number {}",
-            time_interrupt.id,
-            time_interrupt.number
-        );
-    }
+    let controller_ref = time_interrupt
+        .controller_ref
+        .as_deref()
+        .ok_or_else(|| anyhow!("interrupt {} is missing controllerRef", time_interrupt.id))?;
+    let numbering =
+        interrupt_controller_numbering_for_ref(model, controller_ref).ok_or_else(|| {
+            anyhow!(
+                "interrupt controller {} is missing interruptNumbering metadata",
+                controller_ref
+            )
+        })?;
+    validate_wch_runtime_interrupt_number(numbering, time_interrupt)?;
     Ok(Some(GeneratedWchRuntimeInputs {
         interrupt_driver,
         time_driver,
@@ -17165,6 +17202,43 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
                 .expect("interrupt.rs");
         assert!(interrupt_rs.contains("const PFIC_EXTERNAL_IRQ_OFFSET: u32 = 16;"));
         assert!(interrupt_rs.contains("Ok(irq_index)"));
+    }
+
+    #[test]
+    fn validate_wch_runtime_interrupt_number_accepts_external_index_mode_below_16() {
+        let numbering = InterruptControllerNumbering {
+            vector_table_indexing: INTERRUPT_NUMBERING_EXTERNAL_INTERRUPT_INDEX.to_string(),
+            register_indexing: INTERRUPT_NUMBERING_EXTERNAL_INTERRUPT_INDEX.to_string(),
+        };
+        let interrupt = Interrupt {
+            id: "irq.tim1".to_string(),
+            name: "TIM1".to_string(),
+            description: None,
+            number: 4,
+            controller_ref: Some(PFIC_INTERRUPT_CONTROLLER_ID.to_string()),
+        };
+
+        validate_wch_runtime_interrupt_number(&numbering, &interrupt)
+            .expect("external interrupt index should be accepted");
+    }
+
+    #[test]
+    fn validate_wch_runtime_interrupt_number_rejects_interrupt_number_mode_below_16() {
+        let numbering = InterruptControllerNumbering {
+            vector_table_indexing: INTERRUPT_NUMBERING_INTERRUPT_NUMBER.to_string(),
+            register_indexing: INTERRUPT_NUMBERING_INTERRUPT_NUMBER.to_string(),
+        };
+        let interrupt = Interrupt {
+            id: "irq.tim1".to_string(),
+            name: "TIM1".to_string(),
+            description: None,
+            number: 4,
+            controller_ref: Some(PFIC_INTERRUPT_CONTROLLER_ID.to_string()),
+        };
+
+        let error = validate_wch_runtime_interrupt_number(&numbering, &interrupt)
+            .expect_err("interrupt-number mode should reject exception slots");
+        assert!(error.to_string().contains("requires an external interrupt"));
     }
 
     #[test]
