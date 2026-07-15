@@ -362,7 +362,7 @@ impl GeneratedRtcTimeDriver {
                 GENERATED_RCC_BDCTLR_BDRST_MASK,
                 GENERATED_RCC_BDCTLR_BDRST_MASK,
             );
-            must_modify_u32(GENERATED_RCC_BDCTLR_ADDRESS, GENERATED_RCC_BDCTLR_BDRST_MASK, 0u32);
+                    must_modify_u32(GENERATED_RCC_BDCTLR_ADDRESS, GENERATED_RCC_BDCTLR_BDRST_MASK, 0u32);
             must_modify_u32(
                 GENERATED_RCC_BDCTLR_ADDRESS,
                 GENERATED_RCC_BDCTLR_RTCSEL_MASK,
