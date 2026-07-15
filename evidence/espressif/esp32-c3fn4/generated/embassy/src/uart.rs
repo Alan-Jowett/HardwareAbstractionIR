@@ -5,10 +5,13 @@ use core::ptr::{read_volatile, write_volatile};
 
 #[allow(dead_code)]
 fn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {
-    let address = usize::try_from(address)
-        .map_err(|_| metadata::Error::Unsupported("MMIO address does not fit usize on this target"))?;
+    let address = usize::try_from(address).map_err(|_| {
+        metadata::Error::Unsupported("MMIO address does not fit usize on this target")
+    })?;
     if address % align != 0 {
-        return Err(metadata::Error::Unsupported("MMIO address is not naturally aligned for the target register width"));
+        return Err(metadata::Error::Unsupported(
+            "MMIO address is not naturally aligned for the target register width",
+        ));
     }
     Ok(address)
 }
@@ -44,9 +47,39 @@ fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metada
 }
 
 #[allow(dead_code)]
+fn read_u8(address: u64) -> Result<u8, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe { Ok(read_volatile(address as *const u8)) }
+}
+
+#[allow(dead_code)]
+fn read_u16(address: u64) -> Result<u16, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe { Ok(read_volatile(address as *const u16)) }
+}
+
+#[allow(dead_code)]
 fn read_u32(address: u64) -> Result<u32, metadata::Error> {
     let address = checked_address(address, core::mem::align_of::<u32>())?;
     unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u8(address: u64, value: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        write_volatile(address as *mut u8, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        write_volatile(address as *mut u16, value);
+    }
+    Ok(())
 }
 
 #[allow(dead_code)]
@@ -67,15 +100,91 @@ pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProven
 };
 
 // Driver instance: Uart0 (uart) from canonical block block.uart0 -> uart
-pub const DRV_UART0_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clkbind.uart0", name: "UART_CLK_EN", consumer_ref: "per.uart0", clock_ref: "clk.apb", controller_ref: Some("block.system"), binding_kind: "gated", control_refs: &["reg.system.perip_clk_en0"], enable_operation_refs: &[], disable_operation_refs: &[] }];
-pub const DRV_UART0_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rstbind.uart0", name: "UART_RST", target_ref: "per.uart0", controller_ref: Some("block.system"), reset_domain_ref: Some("rst.system"), binding_kind: "local", control_refs: &["reg.system.perip_rst_en0"], assert_operation_refs: &[], release_operation_refs: &[] }];
-pub const DRV_UART0_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource { id: "isrc.uart0", name: "UART0", source_ref: "per.uart0", producer_ref: Some("block.uart0"), kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }];
-pub const DRV_UART0_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute { id: "iroute.uart0", name: "UART0 interrupt matrix source", source_ref: "isrc.uart0", interrupt_ref: "irq.ets_uart0_intr_source", controller_ref: "block.interrupt_matrix0", cpu_target_ref: Some("block.cpu0"), line_index: None, route_type: "matrix", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }];
+pub const DRV_UART0_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding {
+    id: "clkbind.uart0",
+    name: "UART_CLK_EN",
+    consumer_ref: "per.uart0",
+    clock_ref: "clk.apb",
+    controller_ref: Some("block.system"),
+    binding_kind: "gated",
+    control_refs: &["reg.system.perip_clk_en0"],
+    enable_operation_refs: &[],
+    disable_operation_refs: &[],
+}];
+pub const DRV_UART0_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding {
+    id: "rstbind.uart0",
+    name: "UART_RST",
+    target_ref: "per.uart0",
+    controller_ref: Some("block.system"),
+    reset_domain_ref: Some("rst.system"),
+    binding_kind: "local",
+    control_refs: &["reg.system.perip_rst_en0"],
+    assert_operation_refs: &[],
+    release_operation_refs: &[],
+}];
+pub const DRV_UART0_INTERRUPT_SOURCES: &[metadata::InterruptSource] =
+    &[metadata::InterruptSource {
+        id: "isrc.uart0",
+        name: "UART0",
+        source_ref: "per.uart0",
+        producer_ref: Some("block.uart0"),
+        kind: "peripheral",
+        flag_refs: &[],
+        clear_operation_refs: &[],
+    }];
+pub const DRV_UART0_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute {
+    id: "iroute.uart0",
+    name: "UART0 interrupt matrix source",
+    source_ref: "isrc.uart0",
+    interrupt_ref: "irq.ets_uart0_intr_source",
+    controller_ref: "block.interrupt_matrix0",
+    cpu_target_ref: Some("block.cpu0"),
+    line_index: None,
+    route_type: "matrix",
+    control_refs: &[],
+    acknowledge_operation_refs: &[],
+    shared_group: None,
+}];
 pub const DRV_UART0_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_UART0_DMA_ROUTES: &[metadata::DmaRoute] = &[];
-pub const DRV_UART0_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.uart0.rx.gpio20", name: "UART0 RX on GPIO20", pin_ref: "pin.gpio20", peripheral_ref: "per.uart0", signal: "U0RXD", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_UART0_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.uart0.tx.gpio21", name: "UART0 TX on GPIO21", pin_ref: "pin.gpio21", peripheral_ref: "per.uart0", signal: "U0TXD", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_UART0_PIN_ROLES: &[metadata::PinRole] = &[metadata::PinRole { role: "rx", signal: "U0RXD", routes: DRV_UART0_PIN_ROLE_0_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "tx", signal: "U0TXD", routes: DRV_UART0_PIN_ROLE_1_ROUTES, requirement: metadata::ResourceRequirement::Required }];
+pub const DRV_UART0_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.uart0.rx.gpio20",
+    name: "UART0 RX on GPIO20",
+    pin_ref: "pin.gpio20",
+    peripheral_ref: "per.uart0",
+    signal: "U0RXD",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_UART0_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.uart0.tx.gpio21",
+    name: "UART0 TX on GPIO21",
+    pin_ref: "pin.gpio21",
+    peripheral_ref: "per.uart0",
+    signal: "U0TXD",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_UART0_PIN_ROLES: &[metadata::PinRole] = &[
+    metadata::PinRole {
+        role: "rx",
+        signal: "U0RXD",
+        routes: DRV_UART0_PIN_ROLE_0_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "tx",
+        signal: "U0TXD",
+        routes: DRV_UART0_PIN_ROLE_1_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+];
 pub const DRV_UART0_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_UART0_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_UART0_CAPABILITY_TAGS: &[&str] = &[];
@@ -172,12 +281,20 @@ impl Uart0 {
 
     pub fn set_baud_divider(&self, divider: u16, fraction: u8) -> Result<(), metadata::Error> {
         if u32::from(divider) > 0xFFFu32 {
-            return Err(metadata::Error::Unsupported("UART baud divider exceeds modeled field width"));
+            return Err(metadata::Error::Unsupported(
+                "UART baud divider exceeds modeled field width",
+            ));
         }
         if u32::from(fraction) > 0xFu32 {
-            return Err(metadata::Error::Unsupported("UART baud fraction exceeds modeled field width"));
+            return Err(metadata::Error::Unsupported(
+                "UART baud fraction exceeds modeled field width",
+            ));
         }
-        modify_u32(0x60000014u64, 0x00F00FFFu32, ((u32::from(divider) & 0xFFFu32) << 0) | ((u32::from(fraction) & 0xFu32) << 20))?;
+        modify_u32(
+            0x60000014u64,
+            0x00F00FFFu32,
+            u32::from(divider) & 0xFFFu32 | (u32::from(fraction) & 0xFu32) << 20,
+        )?;
         Ok(())
     }
 
@@ -194,12 +311,12 @@ impl Uart0 {
     }
 
     pub fn flush(&self) -> Result<(), metadata::Error> {
-        while ((read_u32(0x6000001Cu64)? & 0x03FF0000u32) >> 16) != 0 {}
+        while ((read_u32(0x6000001Cu64)?) & 0x03FF0000u32) >> 16 != 0 {}
         Ok(())
     }
 
     pub fn read_byte(&self) -> Result<u8, metadata::Error> {
-        while ((read_u32(0x6000001Cu64)? & 0x000003FFu32) >> 0) == 0 {}
+        while (read_u32(0x6000001Cu64)?) & 0x000003FFu32 == 0 {}
         Ok((read_u32(0x60000000u64)? & 0xFFu32) as u8)
     }
 
@@ -226,7 +343,4 @@ impl Uart0 {
         modify_u32(0x6000000Cu64, 0x00000001u32, 0x00000000u32)?;
         Ok(())
     }
-
-
 }
-

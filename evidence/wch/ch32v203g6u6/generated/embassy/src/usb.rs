@@ -5,10 +5,13 @@ use core::ptr::{read_volatile, write_volatile};
 
 #[allow(dead_code)]
 fn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {
-    let address = usize::try_from(address)
-        .map_err(|_| metadata::Error::Unsupported("MMIO address does not fit usize on this target"))?;
+    let address = usize::try_from(address).map_err(|_| {
+        metadata::Error::Unsupported("MMIO address does not fit usize on this target")
+    })?;
     if address % align != 0 {
-        return Err(metadata::Error::Unsupported("MMIO address is not naturally aligned for the target register width"));
+        return Err(metadata::Error::Unsupported(
+            "MMIO address is not naturally aligned for the target register width",
+        ));
     }
     Ok(address)
 }
@@ -97,15 +100,138 @@ pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProven
 };
 
 // Driver instance: USBD (usb-device) from canonical block block.usbd -> usb-device
-pub const DRV_USBD_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.usbd", name: "USBD clock binding", consumer_ref: "periph.usbfsd", clock_ref: "clk.pclk1", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb1pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }];
-pub const DRV_USBD_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.usbd", name: "USBD reset binding", target_ref: "periph.usbfsd", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb1"), binding_kind: "local", control_refs: &["reg.rcc.apb1prstr"], assert_operation_refs: &[], release_operation_refs: &[] }];
-pub const DRV_USBD_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource { id: "isrc.usbd.hp", name: "USBD HP interrupt source", source_ref: "periph.usbfsd", producer_ref: None, kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.usbd.lp", name: "USBD LP interrupt source", source_ref: "periph.usbfsd", producer_ref: None, kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }, metadata::InterruptSource { id: "isrc.usbd.wkup", name: "USBD WKUP interrupt source", source_ref: "periph.usbfsd", producer_ref: None, kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }];
-pub const DRV_USBD_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute { id: "iroute.usbd.hp", name: "USBD HP interrupt route", source_ref: "isrc.usbd.hp", interrupt_ref: "int.usbhpcan1tx", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.usbd.lp", name: "USBD LP interrupt route", source_ref: "isrc.usbd.lp", interrupt_ref: "int.usblpcan1rx0", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }, metadata::InterruptRoute { id: "iroute.usbd.wkup", name: "USBD WKUP interrupt route", source_ref: "isrc.usbd.wkup", interrupt_ref: "int.usbwakeup", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }];
+pub const DRV_USBD_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding {
+    id: "clk.usbd",
+    name: "USBD clock binding",
+    consumer_ref: "periph.usbfsd",
+    clock_ref: "clk.pclk1",
+    controller_ref: Some("block.rcc"),
+    binding_kind: "gated",
+    control_refs: &["reg.rcc.apb1pcenr"],
+    enable_operation_refs: &[],
+    disable_operation_refs: &[],
+}];
+pub const DRV_USBD_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding {
+    id: "rst.usbd",
+    name: "USBD reset binding",
+    target_ref: "periph.usbfsd",
+    controller_ref: Some("block.rcc"),
+    reset_domain_ref: Some("rst.apb1"),
+    binding_kind: "local",
+    control_refs: &["reg.rcc.apb1prstr"],
+    assert_operation_refs: &[],
+    release_operation_refs: &[],
+}];
+pub const DRV_USBD_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[
+    metadata::InterruptSource {
+        id: "isrc.usbd.hp",
+        name: "USBD HP interrupt source",
+        source_ref: "periph.usbfsd",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &[],
+        clear_operation_refs: &[],
+    },
+    metadata::InterruptSource {
+        id: "isrc.usbd.lp",
+        name: "USBD LP interrupt source",
+        source_ref: "periph.usbfsd",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &[],
+        clear_operation_refs: &[],
+    },
+    metadata::InterruptSource {
+        id: "isrc.usbd.wkup",
+        name: "USBD WKUP interrupt source",
+        source_ref: "periph.usbfsd",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &[],
+        clear_operation_refs: &[],
+    },
+];
+pub const DRV_USBD_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[
+    metadata::InterruptRoute {
+        id: "iroute.usbd.hp",
+        name: "USBD HP interrupt route",
+        source_ref: "isrc.usbd.hp",
+        interrupt_ref: "int.usbhpcan1tx",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: None,
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: None,
+    },
+    metadata::InterruptRoute {
+        id: "iroute.usbd.lp",
+        name: "USBD LP interrupt route",
+        source_ref: "isrc.usbd.lp",
+        interrupt_ref: "int.usblpcan1rx0",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: None,
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: None,
+    },
+    metadata::InterruptRoute {
+        id: "iroute.usbd.wkup",
+        name: "USBD WKUP interrupt route",
+        source_ref: "isrc.usbd.wkup",
+        interrupt_ref: "int.usbwakeup",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: None,
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: None,
+    },
+];
 pub const DRV_USBD_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_USBD_DMA_ROUTES: &[metadata::DmaRoute] = &[];
-pub const DRV_USBD_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.usbd.dm.pa11", name: "USBD DM on PA11", pin_ref: "pin.pa11", peripheral_ref: "periph.usbfsd", signal: "DM", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_USBD_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.usbd.dp.pa12", name: "USBD DP on PA12", pin_ref: "pin.pa12", peripheral_ref: "periph.usbfsd", signal: "DP", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_USBD_PIN_ROLES: &[metadata::PinRole] = &[metadata::PinRole { role: "dm", signal: "DM", routes: DRV_USBD_PIN_ROLE_0_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "dp", signal: "DP", routes: DRV_USBD_PIN_ROLE_1_ROUTES, requirement: metadata::ResourceRequirement::Required }];
+pub const DRV_USBD_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.usbd.dm.pa11",
+    name: "USBD DM on PA11",
+    pin_ref: "pin.pa11",
+    peripheral_ref: "periph.usbfsd",
+    signal: "DM",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_USBD_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.usbd.dp.pa12",
+    name: "USBD DP on PA12",
+    pin_ref: "pin.pa12",
+    peripheral_ref: "periph.usbfsd",
+    signal: "DP",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_USBD_PIN_ROLES: &[metadata::PinRole] = &[
+    metadata::PinRole {
+        role: "dm",
+        signal: "DM",
+        routes: DRV_USBD_PIN_ROLE_0_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "dp",
+        signal: "DP",
+        routes: DRV_USBD_PIN_ROLE_1_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+];
 pub const DRV_USBD_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_USBD_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_USBD_CAPABILITY_TAGS: &[&str] = &[];
@@ -183,9 +309,11 @@ impl USBD {
     }
 }
 
-
 use core::{cell::RefCell, future::poll_fn, task::Poll};
-use embassy_usb_driver::{Bus, ControlPipe, Direction, Driver, Endpoint, EndpointAddress, EndpointAllocError, EndpointError, EndpointInfo, EndpointIn, EndpointOut, EndpointType, Event, Unsupported};
+use embassy_usb_driver::{
+    Bus, ControlPipe, Direction, Driver, Endpoint, EndpointAddress, EndpointAllocError,
+    EndpointError, EndpointIn, EndpointInfo, EndpointOut, EndpointType, Event, Unsupported,
+};
 
 const USB_BASE: usize = 0x4000_5C00;
 const USBRAM_BASE: usize = 0x4000_6000;
@@ -365,7 +493,10 @@ impl USBDUsbDriver {
     ) -> Result<EndpointInfo, EndpointAllocError> {
         let type_bits = endpoint_type_bits(ep_type)?;
         let index = if let Some(addr) = ep_addr {
-            if addr.direction() != direction || addr.index() == 0 || addr.index() >= self.pairs.len() {
+            if addr.direction() != direction
+                || addr.index() == 0
+                || addr.index() >= self.pairs.len()
+            {
                 return Err(EndpointAllocError);
             }
             let pair = &self.pairs[addr.index()];
@@ -429,7 +560,13 @@ impl<'d> Driver<'d> for USBDUsbDriver {
         max_packet_size: u16,
         interval_ms: u8,
     ) -> Result<Self::EndpointOut, EndpointAllocError> {
-        let info = self.allocate_endpoint(Direction::Out, ep_type, ep_addr, max_packet_size, interval_ms)?;
+        let info = self.allocate_endpoint(
+            Direction::Out,
+            ep_type,
+            ep_addr,
+            max_packet_size,
+            interval_ms,
+        )?;
         Ok(USBDEndpointOut { info })
     }
 
@@ -440,7 +577,13 @@ impl<'d> Driver<'d> for USBDUsbDriver {
         max_packet_size: u16,
         interval_ms: u8,
     ) -> Result<Self::EndpointIn, EndpointAllocError> {
-        let info = self.allocate_endpoint(Direction::In, ep_type, ep_addr, max_packet_size, interval_ms)?;
+        let info = self.allocate_endpoint(
+            Direction::In,
+            ep_type,
+            ep_addr,
+            max_packet_size,
+            interval_ms,
+        )?;
         Ok(USBDEndpointIn { info })
     }
 
@@ -450,7 +593,9 @@ impl<'d> Driver<'d> for USBDUsbDriver {
             runtime.control_max_packet_size = control_max_packet_size;
         });
         (
-            USBDUsbBus { power_reported: false },
+            USBDUsbBus {
+                power_reported: false,
+            },
             USBDControlPipe {
                 max_packet_size: control_max_packet_size as usize,
             },
@@ -541,15 +686,35 @@ impl Bus for USBDUsbBus {
             dir_config_mut(pair, direction).stalled = false;
             if enabled {
                 if direction == Direction::In {
-                    open_in_endpoint(index, pair.ep_type, dir_config(pair, Direction::In).pma_addr, dir_config(pair, Direction::In).max_packet_size);
+                    open_in_endpoint(
+                        index,
+                        pair.ep_type,
+                        dir_config(pair, Direction::In).pma_addr,
+                        dir_config(pair, Direction::In).max_packet_size,
+                    );
                 } else {
-                    open_out_endpoint(index, pair.ep_type, dir_config(pair, Direction::Out).pma_addr, dir_config(pair, Direction::Out).max_packet_size);
+                    open_out_endpoint(
+                        index,
+                        pair.ep_type,
+                        dir_config(pair, Direction::Out).pma_addr,
+                        dir_config(pair, Direction::Out).max_packet_size,
+                    );
                 }
             } else if dir_config(pair, opposite_direction(direction)).enabled {
                 if direction == Direction::In {
-                    open_out_endpoint(index, pair.ep_type, dir_config(pair, Direction::Out).pma_addr, dir_config(pair, Direction::Out).max_packet_size);
+                    open_out_endpoint(
+                        index,
+                        pair.ep_type,
+                        dir_config(pair, Direction::Out).pma_addr,
+                        dir_config(pair, Direction::Out).max_packet_size,
+                    );
                 } else {
-                    open_in_endpoint(index, pair.ep_type, dir_config(pair, Direction::In).pma_addr, dir_config(pair, Direction::In).max_packet_size);
+                    open_in_endpoint(
+                        index,
+                        pair.ep_type,
+                        dir_config(pair, Direction::In).pma_addr,
+                        dir_config(pair, Direction::In).max_packet_size,
+                    );
                 }
             } else {
                 epr_write(index, 0);
@@ -570,7 +735,9 @@ impl Bus for USBDUsbBus {
     }
 
     fn endpoint_is_stalled(&mut self, ep_addr: EndpointAddress) -> bool {
-        with_fsdev_runtime(|runtime| dir_config(&runtime.pairs[ep_addr.index()], ep_addr.direction()).stalled)
+        with_fsdev_runtime(|runtime| {
+            dir_config(&runtime.pairs[ep_addr.index()], ep_addr.direction()).stalled
+        })
     }
 
     async fn remote_wakeup(&mut self) -> Result<(), Unsupported> {
@@ -702,7 +869,12 @@ impl ControlPipe for USBDControlPipe {
         .await
     }
 
-    async fn data_out(&mut self, buf: &mut [u8], _first: bool, _last: bool) -> Result<usize, EndpointError> {
+    async fn data_out(
+        &mut self,
+        buf: &mut [u8],
+        _first: bool,
+        _last: bool,
+    ) -> Result<usize, EndpointError> {
         arm_ep0_out_data(buf.len() as u16);
         poll_fn(|cx| {
             cx.waker().wake_by_ref();
@@ -724,7 +896,12 @@ impl ControlPipe for USBDControlPipe {
         .await
     }
 
-    async fn data_in(&mut self, data: &[u8], _first: bool, last: bool) -> Result<(), EndpointError> {
+    async fn data_in(
+        &mut self,
+        data: &[u8],
+        _first: bool,
+        last: bool,
+    ) -> Result<(), EndpointError> {
         if data.len() > self.max_packet_size {
             return Err(EndpointError::BufferOverflow);
         }
@@ -816,11 +993,15 @@ async fn wait_endpoint_enabled(ep_addr: EndpointAddress) {
 }
 
 fn endpoint_enabled(ep_addr: EndpointAddress) -> bool {
-    with_fsdev_runtime(|runtime| dir_config(&runtime.pairs[ep_addr.index()], ep_addr.direction()).enabled)
+    with_fsdev_runtime(|runtime| {
+        dir_config(&runtime.pairs[ep_addr.index()], ep_addr.direction()).enabled
+    })
 }
 
 fn endpoint_busy(ep_addr: EndpointAddress) -> bool {
-    with_fsdev_runtime(|runtime| dir_config(&runtime.pairs[ep_addr.index()], ep_addr.direction()).busy)
+    with_fsdev_runtime(|runtime| {
+        dir_config(&runtime.pairs[ep_addr.index()], ep_addr.direction()).busy
+    })
 }
 
 fn set_endpoint_busy(ep_addr: EndpointAddress, busy: bool) {
@@ -960,7 +1141,12 @@ fn dcd_edpt_stall(ep_addr: u8) {
     let ep_num = ep_addr & 0x7F;
     let dir_in = (ep_addr & 0x80) != 0;
     let mut ep_reg = epr_read(ep_num) | EP_CTR_TX | EP_CTR_RX;
-    ep_reg &= u_epreg_mask() | if dir_in { EP_STAT_TX_MASK } else { EP_STAT_RX_MASK };
+    ep_reg &= u_epreg_mask()
+        | if dir_in {
+            EP_STAT_TX_MASK
+        } else {
+            EP_STAT_RX_MASK
+        };
     if dir_in {
         ep_change_status(&mut ep_reg, true, EP_STAT_STALL);
     } else {
@@ -1099,7 +1285,11 @@ unsafe fn pma_write_bytes(offset: u16, bytes: &[u8]) {
     let mut index = 0;
     while index < bytes.len() {
         let lo = bytes[index];
-        let hi = if index + 1 < bytes.len() { bytes[index + 1] } else { 0 };
+        let hi = if index + 1 < bytes.len() {
+            bytes[index + 1]
+        } else {
+            0
+        };
         pma_write16(pma_offset, u16::from(lo) | (u16::from(hi) << 8));
         pma_offset += 2;
         index += 2;

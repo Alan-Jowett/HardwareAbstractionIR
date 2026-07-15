@@ -5,10 +5,13 @@ use core::ptr::{read_volatile, write_volatile};
 
 #[allow(dead_code)]
 fn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {
-    let address = usize::try_from(address)
-        .map_err(|_| metadata::Error::Unsupported("MMIO address does not fit usize on this target"))?;
+    let address = usize::try_from(address).map_err(|_| {
+        metadata::Error::Unsupported("MMIO address does not fit usize on this target")
+    })?;
     if address % align != 0 {
-        return Err(metadata::Error::Unsupported("MMIO address is not naturally aligned for the target register width"));
+        return Err(metadata::Error::Unsupported(
+            "MMIO address is not naturally aligned for the target register width",
+        ));
     }
     Ok(address)
 }
@@ -44,9 +47,39 @@ fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metada
 }
 
 #[allow(dead_code)]
+fn read_u8(address: u64) -> Result<u8, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe { Ok(read_volatile(address as *const u8)) }
+}
+
+#[allow(dead_code)]
+fn read_u16(address: u64) -> Result<u16, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe { Ok(read_volatile(address as *const u16)) }
+}
+
+#[allow(dead_code)]
 fn read_u32(address: u64) -> Result<u32, metadata::Error> {
     let address = checked_address(address, core::mem::align_of::<u32>())?;
     unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u8(address: u64, value: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        write_volatile(address as *mut u8, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        write_volatile(address as *mut u16, value);
+    }
+    Ok(())
 }
 
 #[allow(dead_code)]
@@ -67,8 +100,186 @@ pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProven
 };
 
 // Driver instance: SystemClockReset (rcc) from canonical block block.system -> system-controller
-pub const DRV_RCC_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clkbind.uart0", name: "UART_CLK_EN", consumer_ref: "per.uart0", clock_ref: "clk.apb", controller_ref: Some("block.system"), binding_kind: "gated", control_refs: &["reg.system.perip_clk_en0"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clkbind.uart1", name: "UART1_CLK_EN", consumer_ref: "per.uart1", clock_ref: "clk.apb", controller_ref: Some("block.system"), binding_kind: "gated", control_refs: &["reg.system.perip_clk_en0"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clkbind.spi2", name: "SPI2_CLK_EN", consumer_ref: "per.spi2", clock_ref: "clk.apb", controller_ref: Some("block.system"), binding_kind: "gated", control_refs: &["reg.system.perip_clk_en0"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clkbind.i2c0", name: "I2C_EXT0_CLK_EN", consumer_ref: "per.i2c0", clock_ref: "clk.apb", controller_ref: Some("block.system"), binding_kind: "gated", control_refs: &["reg.system.perip_clk_en0"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clkbind.apb_saradc", name: "APB_SARADC_CLK_EN", consumer_ref: "per.apb_saradc", clock_ref: "clk.apb", controller_ref: Some("block.system"), binding_kind: "gated", control_refs: &["reg.system.perip_clk_en0"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clkbind.usb_device", name: "USB_DEVICE_CLK_EN", consumer_ref: "per.usb_device", clock_ref: "clk.apb", controller_ref: Some("block.system"), binding_kind: "gated", control_refs: &["reg.system.perip_clk_en0"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clkbind.systimer", name: "SYSTIMER_CLK_EN", consumer_ref: "per.systimer", clock_ref: "clk.systimer", controller_ref: Some("block.system"), binding_kind: "gated", control_refs: &["reg.system.perip_clk_en0"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clkbind.dma", name: "DMA_CLK_EN", consumer_ref: "per.dma", clock_ref: "clk.apb", controller_ref: Some("block.system"), binding_kind: "gated", control_refs: &["reg.system.perip_clk_en1"], enable_operation_refs: &[], disable_operation_refs: &[] }];
-pub const DRV_RCC_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rstbind.uart0", name: "UART_RST", target_ref: "per.uart0", controller_ref: Some("block.system"), reset_domain_ref: Some("rst.system"), binding_kind: "local", control_refs: &["reg.system.perip_rst_en0"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rstbind.uart1", name: "UART1_RST", target_ref: "per.uart1", controller_ref: Some("block.system"), reset_domain_ref: Some("rst.system"), binding_kind: "local", control_refs: &["reg.system.perip_rst_en0"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rstbind.spi2", name: "SPI2_RST", target_ref: "per.spi2", controller_ref: Some("block.system"), reset_domain_ref: Some("rst.system"), binding_kind: "local", control_refs: &["reg.system.perip_rst_en0"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rstbind.i2c0", name: "I2C_EXT0_RST", target_ref: "per.i2c0", controller_ref: Some("block.system"), reset_domain_ref: Some("rst.system"), binding_kind: "local", control_refs: &["reg.system.perip_rst_en0"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rstbind.apb_saradc", name: "APB_SARADC_RST", target_ref: "per.apb_saradc", controller_ref: Some("block.system"), reset_domain_ref: Some("rst.system"), binding_kind: "local", control_refs: &["reg.system.perip_rst_en0"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rstbind.usb_device", name: "USB_DEVICE_RST", target_ref: "per.usb_device", controller_ref: Some("block.system"), reset_domain_ref: Some("rst.system"), binding_kind: "local", control_refs: &["reg.system.perip_rst_en0"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rstbind.systimer", name: "SYSTIMER_RST", target_ref: "per.systimer", controller_ref: Some("block.system"), reset_domain_ref: Some("rst.system"), binding_kind: "local", control_refs: &["reg.system.perip_rst_en0"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rstbind.dma", name: "DMA_RST", target_ref: "per.dma", controller_ref: Some("block.system"), reset_domain_ref: Some("rst.system"), binding_kind: "local", control_refs: &["reg.system.perip_rst_en1"], assert_operation_refs: &[], release_operation_refs: &[] }];
+pub const DRV_RCC_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[
+    metadata::ClockBinding {
+        id: "clkbind.uart0",
+        name: "UART_CLK_EN",
+        consumer_ref: "per.uart0",
+        clock_ref: "clk.apb",
+        controller_ref: Some("block.system"),
+        binding_kind: "gated",
+        control_refs: &["reg.system.perip_clk_en0"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clkbind.uart1",
+        name: "UART1_CLK_EN",
+        consumer_ref: "per.uart1",
+        clock_ref: "clk.apb",
+        controller_ref: Some("block.system"),
+        binding_kind: "gated",
+        control_refs: &["reg.system.perip_clk_en0"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clkbind.spi2",
+        name: "SPI2_CLK_EN",
+        consumer_ref: "per.spi2",
+        clock_ref: "clk.apb",
+        controller_ref: Some("block.system"),
+        binding_kind: "gated",
+        control_refs: &["reg.system.perip_clk_en0"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clkbind.i2c0",
+        name: "I2C_EXT0_CLK_EN",
+        consumer_ref: "per.i2c0",
+        clock_ref: "clk.apb",
+        controller_ref: Some("block.system"),
+        binding_kind: "gated",
+        control_refs: &["reg.system.perip_clk_en0"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clkbind.apb_saradc",
+        name: "APB_SARADC_CLK_EN",
+        consumer_ref: "per.apb_saradc",
+        clock_ref: "clk.apb",
+        controller_ref: Some("block.system"),
+        binding_kind: "gated",
+        control_refs: &["reg.system.perip_clk_en0"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clkbind.usb_device",
+        name: "USB_DEVICE_CLK_EN",
+        consumer_ref: "per.usb_device",
+        clock_ref: "clk.apb",
+        controller_ref: Some("block.system"),
+        binding_kind: "gated",
+        control_refs: &["reg.system.perip_clk_en0"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clkbind.systimer",
+        name: "SYSTIMER_CLK_EN",
+        consumer_ref: "per.systimer",
+        clock_ref: "clk.systimer",
+        controller_ref: Some("block.system"),
+        binding_kind: "gated",
+        control_refs: &["reg.system.perip_clk_en0"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clkbind.dma",
+        name: "DMA_CLK_EN",
+        consumer_ref: "per.dma",
+        clock_ref: "clk.apb",
+        controller_ref: Some("block.system"),
+        binding_kind: "gated",
+        control_refs: &["reg.system.perip_clk_en1"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+];
+pub const DRV_RCC_RESET_BINDINGS: &[metadata::ResetBinding] = &[
+    metadata::ResetBinding {
+        id: "rstbind.uart0",
+        name: "UART_RST",
+        target_ref: "per.uart0",
+        controller_ref: Some("block.system"),
+        reset_domain_ref: Some("rst.system"),
+        binding_kind: "local",
+        control_refs: &["reg.system.perip_rst_en0"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rstbind.uart1",
+        name: "UART1_RST",
+        target_ref: "per.uart1",
+        controller_ref: Some("block.system"),
+        reset_domain_ref: Some("rst.system"),
+        binding_kind: "local",
+        control_refs: &["reg.system.perip_rst_en0"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rstbind.spi2",
+        name: "SPI2_RST",
+        target_ref: "per.spi2",
+        controller_ref: Some("block.system"),
+        reset_domain_ref: Some("rst.system"),
+        binding_kind: "local",
+        control_refs: &["reg.system.perip_rst_en0"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rstbind.i2c0",
+        name: "I2C_EXT0_RST",
+        target_ref: "per.i2c0",
+        controller_ref: Some("block.system"),
+        reset_domain_ref: Some("rst.system"),
+        binding_kind: "local",
+        control_refs: &["reg.system.perip_rst_en0"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rstbind.apb_saradc",
+        name: "APB_SARADC_RST",
+        target_ref: "per.apb_saradc",
+        controller_ref: Some("block.system"),
+        reset_domain_ref: Some("rst.system"),
+        binding_kind: "local",
+        control_refs: &["reg.system.perip_rst_en0"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rstbind.usb_device",
+        name: "USB_DEVICE_RST",
+        target_ref: "per.usb_device",
+        controller_ref: Some("block.system"),
+        reset_domain_ref: Some("rst.system"),
+        binding_kind: "local",
+        control_refs: &["reg.system.perip_rst_en0"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rstbind.systimer",
+        name: "SYSTIMER_RST",
+        target_ref: "per.systimer",
+        controller_ref: Some("block.system"),
+        reset_domain_ref: Some("rst.system"),
+        binding_kind: "local",
+        control_refs: &["reg.system.perip_rst_en0"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rstbind.dma",
+        name: "DMA_RST",
+        target_ref: "per.dma",
+        controller_ref: Some("block.system"),
+        reset_domain_ref: Some("rst.system"),
+        binding_kind: "local",
+        control_refs: &["reg.system.perip_rst_en1"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+];
 pub const DRV_RCC_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];
 pub const DRV_RCC_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];
 pub const DRV_RCC_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
@@ -313,7 +524,4 @@ impl SystemClockReset {
         modify_u32(0x600C001Cu64, 0x00000040u32, 0x00000000u32)?;
         Ok(())
     }
-
-
 }
-

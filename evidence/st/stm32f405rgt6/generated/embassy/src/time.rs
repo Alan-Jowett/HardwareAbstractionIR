@@ -5,10 +5,13 @@ use core::ptr::{read_volatile, write_volatile};
 
 #[allow(dead_code)]
 fn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {
-    let address = usize::try_from(address)
-        .map_err(|_| metadata::Error::Unsupported("MMIO address does not fit usize on this target"))?;
+    let address = usize::try_from(address).map_err(|_| {
+        metadata::Error::Unsupported("MMIO address does not fit usize on this target")
+    })?;
     if address % align != 0 {
-        return Err(metadata::Error::Unsupported("MMIO address is not naturally aligned for the target register width"));
+        return Err(metadata::Error::Unsupported(
+            "MMIO address is not naturally aligned for the target register width",
+        ));
     }
     Ok(address)
 }
@@ -99,8 +102,28 @@ pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProven
 // Driver instance: Time (interrupt) from canonical block block.nvic -> interrupt-controller
 pub const DRV_TIME_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[];
 pub const DRV_TIME_RESET_BINDINGS: &[metadata::ResetBinding] = &[];
-pub const DRV_TIME_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource { id: "isrc.systick", name: "SysTick source", source_ref: "block.cpu0", producer_ref: Some("block.cpu0"), kind: "timer", flag_refs: &[], clear_operation_refs: &[] }];
-pub const DRV_TIME_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute { id: "iroute.systick", name: "SysTick route", source_ref: "isrc.systick", interrupt_ref: "irq.systick", controller_ref: "block.nvic", cpu_target_ref: Some("block.cpu0"), line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }];
+pub const DRV_TIME_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource {
+    id: "isrc.systick",
+    name: "SysTick source",
+    source_ref: "block.cpu0",
+    producer_ref: Some("block.cpu0"),
+    kind: "timer",
+    flag_refs: &[],
+    clear_operation_refs: &[],
+}];
+pub const DRV_TIME_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute {
+    id: "iroute.systick",
+    name: "SysTick route",
+    source_ref: "isrc.systick",
+    interrupt_ref: "irq.systick",
+    controller_ref: "block.nvic",
+    cpu_target_ref: Some("block.cpu0"),
+    line_index: None,
+    route_type: "hardwired",
+    control_refs: &[],
+    acknowledge_operation_refs: &[],
+    shared_group: None,
+}];
 pub const DRV_TIME_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_TIME_DMA_ROUTES: &[metadata::DmaRoute] = &[];
 pub const DRV_TIME_PIN_ROLES: &[metadata::PinRole] = &[];
@@ -160,7 +183,6 @@ impl Time {
         initialize_drv_time_time_driver()
     }
 }
-
 
 use core::cell::{Cell, RefCell};
 use critical_section::Mutex as CriticalSectionMutex;

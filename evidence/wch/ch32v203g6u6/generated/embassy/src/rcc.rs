@@ -5,10 +5,13 @@ use core::ptr::{read_volatile, write_volatile};
 
 #[allow(dead_code)]
 fn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {
-    let address = usize::try_from(address)
-        .map_err(|_| metadata::Error::Unsupported("MMIO address does not fit usize on this target"))?;
+    let address = usize::try_from(address).map_err(|_| {
+        metadata::Error::Unsupported("MMIO address does not fit usize on this target")
+    })?;
     if address % align != 0 {
-        return Err(metadata::Error::Unsupported("MMIO address is not naturally aligned for the target register width"));
+        return Err(metadata::Error::Unsupported(
+            "MMIO address is not naturally aligned for the target register width",
+        ));
     }
     Ok(address)
 }
@@ -97,8 +100,329 @@ pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProven
 };
 
 // Driver instance: RCC (rcc) from canonical block block.rcc -> clock-controller
-pub const DRV_RCC_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.gpioa", name: "GPIOA clock binding", consumer_ref: "periph.gpioa", clock_ref: "clk.pclk2", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb2pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clk.gpiob", name: "GPIOB clock binding", consumer_ref: "periph.gpiob", clock_ref: "clk.pclk2", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb2pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clk.gpioc", name: "GPIOC clock binding", consumer_ref: "periph.gpioc", clock_ref: "clk.pclk2", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb2pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clk.gpiod", name: "GPIOD clock binding", consumer_ref: "periph.gpiod", clock_ref: "clk.pclk2", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb2pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clk.usart1", name: "USART1 clock binding", consumer_ref: "periph.usart1", clock_ref: "clk.pclk2", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb2pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clk.usart2", name: "USART2 clock binding", consumer_ref: "periph.usart2", clock_ref: "clk.pclk1", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb1pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clk.spi1", name: "SPI1 clock binding", consumer_ref: "periph.spi1", clock_ref: "clk.pclk2", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb2pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clk.i2c1", name: "I2C1 clock binding", consumer_ref: "periph.i2c1", clock_ref: "clk.pclk1", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb1pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clk.tim1", name: "TIM1 clock binding", consumer_ref: "periph.tim1", clock_ref: "clk.pclk2-tim", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb2pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clk.tim2", name: "TIM2 clock binding", consumer_ref: "periph.tim2", clock_ref: "clk.pclk1-tim", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb1pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clk.tim3", name: "TIM3 clock binding", consumer_ref: "periph.tim3", clock_ref: "clk.pclk1-tim", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb1pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clk.tim4", name: "TIM4 clock binding", consumer_ref: "periph.tim4", clock_ref: "clk.pclk1-tim", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb1pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clk.adc1", name: "ADC1 clock binding", consumer_ref: "periph.adc1", clock_ref: "clk.adc", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb2pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clk.adc2", name: "ADC2 clock binding", consumer_ref: "periph.adc2", clock_ref: "clk.adc", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb2pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clk.dma1", name: "DMA1 clock binding", consumer_ref: "periph.dma1", clock_ref: "clk.hclk", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.ahbpcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }];
-pub const DRV_RCC_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.gpioa", name: "GPIOA reset binding", target_ref: "periph.gpioa", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb2"), binding_kind: "local", control_refs: &["reg.rcc.apb2prstr"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rst.gpiob", name: "GPIOB reset binding", target_ref: "periph.gpiob", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb2"), binding_kind: "local", control_refs: &["reg.rcc.apb2prstr"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rst.gpioc", name: "GPIOC reset binding", target_ref: "periph.gpioc", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb2"), binding_kind: "local", control_refs: &["reg.rcc.apb2prstr"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rst.gpiod", name: "GPIOD reset binding", target_ref: "periph.gpiod", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb2"), binding_kind: "local", control_refs: &["reg.rcc.apb2prstr"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rst.usart1", name: "USART1 reset binding", target_ref: "periph.usart1", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb2"), binding_kind: "local", control_refs: &["reg.rcc.apb2prstr"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rst.usart2", name: "USART2 reset binding", target_ref: "periph.usart2", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb1"), binding_kind: "local", control_refs: &["reg.rcc.apb1prstr"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rst.spi1", name: "SPI1 reset binding", target_ref: "periph.spi1", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb2"), binding_kind: "local", control_refs: &["reg.rcc.apb2prstr"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rst.i2c1", name: "I2C1 reset binding", target_ref: "periph.i2c1", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb1"), binding_kind: "local", control_refs: &["reg.rcc.apb1prstr"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rst.tim1", name: "TIM1 reset binding", target_ref: "periph.tim1", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb2"), binding_kind: "local", control_refs: &["reg.rcc.apb2prstr"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rst.tim2", name: "TIM2 reset binding", target_ref: "periph.tim2", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb1"), binding_kind: "local", control_refs: &["reg.rcc.apb1prstr"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rst.tim3", name: "TIM3 reset binding", target_ref: "periph.tim3", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb1"), binding_kind: "local", control_refs: &["reg.rcc.apb1prstr"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rst.tim4", name: "TIM4 reset binding", target_ref: "periph.tim4", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb1"), binding_kind: "local", control_refs: &["reg.rcc.apb1prstr"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rst.adc1", name: "ADC1 reset binding", target_ref: "periph.adc1", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb2"), binding_kind: "local", control_refs: &["reg.rcc.apb2prstr"], assert_operation_refs: &[], release_operation_refs: &[] }, metadata::ResetBinding { id: "rst.adc2", name: "ADC2 reset binding", target_ref: "periph.adc2", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rst.apb2"), binding_kind: "local", control_refs: &["reg.rcc.apb2prstr"], assert_operation_refs: &[], release_operation_refs: &[] }];
+pub const DRV_RCC_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[
+    metadata::ClockBinding {
+        id: "clk.gpioa",
+        name: "GPIOA clock binding",
+        consumer_ref: "periph.gpioa",
+        clock_ref: "clk.pclk2",
+        controller_ref: Some("block.rcc"),
+        binding_kind: "gated",
+        control_refs: &["reg.rcc.apb2pcenr"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clk.gpiob",
+        name: "GPIOB clock binding",
+        consumer_ref: "periph.gpiob",
+        clock_ref: "clk.pclk2",
+        controller_ref: Some("block.rcc"),
+        binding_kind: "gated",
+        control_refs: &["reg.rcc.apb2pcenr"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clk.gpioc",
+        name: "GPIOC clock binding",
+        consumer_ref: "periph.gpioc",
+        clock_ref: "clk.pclk2",
+        controller_ref: Some("block.rcc"),
+        binding_kind: "gated",
+        control_refs: &["reg.rcc.apb2pcenr"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clk.gpiod",
+        name: "GPIOD clock binding",
+        consumer_ref: "periph.gpiod",
+        clock_ref: "clk.pclk2",
+        controller_ref: Some("block.rcc"),
+        binding_kind: "gated",
+        control_refs: &["reg.rcc.apb2pcenr"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clk.usart1",
+        name: "USART1 clock binding",
+        consumer_ref: "periph.usart1",
+        clock_ref: "clk.pclk2",
+        controller_ref: Some("block.rcc"),
+        binding_kind: "gated",
+        control_refs: &["reg.rcc.apb2pcenr"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clk.usart2",
+        name: "USART2 clock binding",
+        consumer_ref: "periph.usart2",
+        clock_ref: "clk.pclk1",
+        controller_ref: Some("block.rcc"),
+        binding_kind: "gated",
+        control_refs: &["reg.rcc.apb1pcenr"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clk.spi1",
+        name: "SPI1 clock binding",
+        consumer_ref: "periph.spi1",
+        clock_ref: "clk.pclk2",
+        controller_ref: Some("block.rcc"),
+        binding_kind: "gated",
+        control_refs: &["reg.rcc.apb2pcenr"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clk.i2c1",
+        name: "I2C1 clock binding",
+        consumer_ref: "periph.i2c1",
+        clock_ref: "clk.pclk1",
+        controller_ref: Some("block.rcc"),
+        binding_kind: "gated",
+        control_refs: &["reg.rcc.apb1pcenr"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clk.tim1",
+        name: "TIM1 clock binding",
+        consumer_ref: "periph.tim1",
+        clock_ref: "clk.pclk2-tim",
+        controller_ref: Some("block.rcc"),
+        binding_kind: "gated",
+        control_refs: &["reg.rcc.apb2pcenr"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clk.tim2",
+        name: "TIM2 clock binding",
+        consumer_ref: "periph.tim2",
+        clock_ref: "clk.pclk1-tim",
+        controller_ref: Some("block.rcc"),
+        binding_kind: "gated",
+        control_refs: &["reg.rcc.apb1pcenr"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clk.tim3",
+        name: "TIM3 clock binding",
+        consumer_ref: "periph.tim3",
+        clock_ref: "clk.pclk1-tim",
+        controller_ref: Some("block.rcc"),
+        binding_kind: "gated",
+        control_refs: &["reg.rcc.apb1pcenr"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clk.tim4",
+        name: "TIM4 clock binding",
+        consumer_ref: "periph.tim4",
+        clock_ref: "clk.pclk1-tim",
+        controller_ref: Some("block.rcc"),
+        binding_kind: "gated",
+        control_refs: &["reg.rcc.apb1pcenr"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clk.adc1",
+        name: "ADC1 clock binding",
+        consumer_ref: "periph.adc1",
+        clock_ref: "clk.adc",
+        controller_ref: Some("block.rcc"),
+        binding_kind: "gated",
+        control_refs: &["reg.rcc.apb2pcenr"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clk.adc2",
+        name: "ADC2 clock binding",
+        consumer_ref: "periph.adc2",
+        clock_ref: "clk.adc",
+        controller_ref: Some("block.rcc"),
+        binding_kind: "gated",
+        control_refs: &["reg.rcc.apb2pcenr"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clk.dma1",
+        name: "DMA1 clock binding",
+        consumer_ref: "periph.dma1",
+        clock_ref: "clk.hclk",
+        controller_ref: Some("block.rcc"),
+        binding_kind: "gated",
+        control_refs: &["reg.rcc.ahbpcenr"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+];
+pub const DRV_RCC_RESET_BINDINGS: &[metadata::ResetBinding] = &[
+    metadata::ResetBinding {
+        id: "rst.gpioa",
+        name: "GPIOA reset binding",
+        target_ref: "periph.gpioa",
+        controller_ref: Some("block.rcc"),
+        reset_domain_ref: Some("rst.apb2"),
+        binding_kind: "local",
+        control_refs: &["reg.rcc.apb2prstr"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rst.gpiob",
+        name: "GPIOB reset binding",
+        target_ref: "periph.gpiob",
+        controller_ref: Some("block.rcc"),
+        reset_domain_ref: Some("rst.apb2"),
+        binding_kind: "local",
+        control_refs: &["reg.rcc.apb2prstr"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rst.gpioc",
+        name: "GPIOC reset binding",
+        target_ref: "periph.gpioc",
+        controller_ref: Some("block.rcc"),
+        reset_domain_ref: Some("rst.apb2"),
+        binding_kind: "local",
+        control_refs: &["reg.rcc.apb2prstr"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rst.gpiod",
+        name: "GPIOD reset binding",
+        target_ref: "periph.gpiod",
+        controller_ref: Some("block.rcc"),
+        reset_domain_ref: Some("rst.apb2"),
+        binding_kind: "local",
+        control_refs: &["reg.rcc.apb2prstr"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rst.usart1",
+        name: "USART1 reset binding",
+        target_ref: "periph.usart1",
+        controller_ref: Some("block.rcc"),
+        reset_domain_ref: Some("rst.apb2"),
+        binding_kind: "local",
+        control_refs: &["reg.rcc.apb2prstr"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rst.usart2",
+        name: "USART2 reset binding",
+        target_ref: "periph.usart2",
+        controller_ref: Some("block.rcc"),
+        reset_domain_ref: Some("rst.apb1"),
+        binding_kind: "local",
+        control_refs: &["reg.rcc.apb1prstr"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rst.spi1",
+        name: "SPI1 reset binding",
+        target_ref: "periph.spi1",
+        controller_ref: Some("block.rcc"),
+        reset_domain_ref: Some("rst.apb2"),
+        binding_kind: "local",
+        control_refs: &["reg.rcc.apb2prstr"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rst.i2c1",
+        name: "I2C1 reset binding",
+        target_ref: "periph.i2c1",
+        controller_ref: Some("block.rcc"),
+        reset_domain_ref: Some("rst.apb1"),
+        binding_kind: "local",
+        control_refs: &["reg.rcc.apb1prstr"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rst.tim1",
+        name: "TIM1 reset binding",
+        target_ref: "periph.tim1",
+        controller_ref: Some("block.rcc"),
+        reset_domain_ref: Some("rst.apb2"),
+        binding_kind: "local",
+        control_refs: &["reg.rcc.apb2prstr"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rst.tim2",
+        name: "TIM2 reset binding",
+        target_ref: "periph.tim2",
+        controller_ref: Some("block.rcc"),
+        reset_domain_ref: Some("rst.apb1"),
+        binding_kind: "local",
+        control_refs: &["reg.rcc.apb1prstr"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rst.tim3",
+        name: "TIM3 reset binding",
+        target_ref: "periph.tim3",
+        controller_ref: Some("block.rcc"),
+        reset_domain_ref: Some("rst.apb1"),
+        binding_kind: "local",
+        control_refs: &["reg.rcc.apb1prstr"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rst.tim4",
+        name: "TIM4 reset binding",
+        target_ref: "periph.tim4",
+        controller_ref: Some("block.rcc"),
+        reset_domain_ref: Some("rst.apb1"),
+        binding_kind: "local",
+        control_refs: &["reg.rcc.apb1prstr"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rst.adc1",
+        name: "ADC1 reset binding",
+        target_ref: "periph.adc1",
+        controller_ref: Some("block.rcc"),
+        reset_domain_ref: Some("rst.apb2"),
+        binding_kind: "local",
+        control_refs: &["reg.rcc.apb2prstr"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+    metadata::ResetBinding {
+        id: "rst.adc2",
+        name: "ADC2 reset binding",
+        target_ref: "periph.adc2",
+        controller_ref: Some("block.rcc"),
+        reset_domain_ref: Some("rst.apb2"),
+        binding_kind: "local",
+        control_refs: &["reg.rcc.apb2prstr"],
+        assert_operation_refs: &[],
+        release_operation_refs: &[],
+    },
+];
 pub const DRV_RCC_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];
 pub const DRV_RCC_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];
 pub const DRV_RCC_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
@@ -530,7 +854,14 @@ impl RCC {
 
         modify_u32(EXTEN_CTR, EXTEN_PLL_HSI_PRE, 0)?;
         let mut cfgr0 = read_u32(RCC_CFGR0)?;
-        cfgr0 &= !(RCC_SW_MASK | RCC_HPRE_MASK | RCC_PPRE1_MASK | RCC_PPRE2_MASK | RCC_PLLSRC | RCC_PLLXTPRE | RCC_PLLMULL_MASK | RCC_USBPRE_MASK);
+        cfgr0 &= !(RCC_SW_MASK
+            | RCC_HPRE_MASK
+            | RCC_PPRE1_MASK
+            | RCC_PPRE2_MASK
+            | RCC_PLLSRC
+            | RCC_PLLXTPRE
+            | RCC_PLLMULL_MASK
+            | RCC_USBPRE_MASK);
         cfgr0 |= RCC_PPRE1_DIV2 | RCC_PLLMULL6;
         write_u32(RCC_CFGR0, cfgr0)?;
 
@@ -550,7 +881,10 @@ impl RCC {
                         write_u32(RCC_CFGR0, switched)?;
                         for _ in 0..SWITCH_TIMEOUT {
                             if (read_u32(RCC_CFGR0)? & RCC_SWS_MASK) == RCC_SWS_PLL {
-                                write_u32(RCC_APB1PCENR, read_u32(RCC_APB1PCENR)? | RCC_APB1_USB_EN)?;
+                                write_u32(
+                                    RCC_APB1PCENR,
+                                    read_u32(RCC_APB1PCENR)? | RCC_APB1_USB_EN,
+                                )?;
                                 return Ok(());
                             }
                         }
@@ -563,7 +897,14 @@ impl RCC {
 
         modify_u32(EXTEN_CTR, 0, EXTEN_PLL_HSI_PRE)?;
         let mut cfgr0 = read_u32(RCC_CFGR0)?;
-        cfgr0 &= !(RCC_SW_MASK | RCC_HPRE_MASK | RCC_PPRE1_MASK | RCC_PPRE2_MASK | RCC_PLLSRC | RCC_PLLXTPRE | RCC_PLLMULL_MASK | RCC_USBPRE_MASK);
+        cfgr0 &= !(RCC_SW_MASK
+            | RCC_HPRE_MASK
+            | RCC_PPRE1_MASK
+            | RCC_PPRE2_MASK
+            | RCC_PLLSRC
+            | RCC_PLLXTPRE
+            | RCC_PLLMULL_MASK
+            | RCC_USBPRE_MASK);
         cfgr0 |= RCC_PPRE1_DIV2 | RCC_PLLMULL6;
         write_u32(RCC_CFGR0, cfgr0)?;
         write_u32(RCC_CTLR, read_u32(RCC_CTLR)? | RCC_PLLON)?;
@@ -583,6 +924,8 @@ impl RCC {
             }
         }
 
-        Err(metadata::Error::Unsupported("failed to configure CH32 FSDEV USB clock to 48 MHz"))
+        Err(metadata::Error::Unsupported(
+            "failed to configure CH32 FSDEV USB clock to 48 MHz",
+        ))
     }
 }

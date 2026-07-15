@@ -1,11 +1,11 @@
 #![no_std]
 
-pub mod metadata;
 pub mod adc;
 pub mod dma;
 pub mod gpio;
 pub mod i2c;
 pub mod interrupt;
+pub mod metadata;
 pub mod pwm;
 pub mod rcc;
 pub mod rtc;

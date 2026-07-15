@@ -5,10 +5,13 @@ use core::ptr::{read_volatile, write_volatile};
 
 #[allow(dead_code)]
 fn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {
-    let address = usize::try_from(address)
-        .map_err(|_| metadata::Error::Unsupported("MMIO address does not fit usize on this target"))?;
+    let address = usize::try_from(address).map_err(|_| {
+        metadata::Error::Unsupported("MMIO address does not fit usize on this target")
+    })?;
     if address % align != 0 {
-        return Err(metadata::Error::Unsupported("MMIO address is not naturally aligned for the target register width"));
+        return Err(metadata::Error::Unsupported(
+            "MMIO address is not naturally aligned for the target register width",
+        ));
     }
     Ok(address)
 }
@@ -44,9 +47,39 @@ fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metada
 }
 
 #[allow(dead_code)]
+fn read_u8(address: u64) -> Result<u8, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe { Ok(read_volatile(address as *const u8)) }
+}
+
+#[allow(dead_code)]
+fn read_u16(address: u64) -> Result<u16, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe { Ok(read_volatile(address as *const u16)) }
+}
+
+#[allow(dead_code)]
 fn read_u32(address: u64) -> Result<u32, metadata::Error> {
     let address = checked_address(address, core::mem::align_of::<u32>())?;
     unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u8(address: u64, value: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        write_volatile(address as *mut u8, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        write_volatile(address as *mut u16, value);
+    }
+    Ok(())
 }
 
 #[allow(dead_code)]
@@ -67,16 +100,177 @@ pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProven
 };
 
 // Driver instance: UsbSerialJtag (usb-device) from canonical block block.usb_device -> usb-device
-pub const DRV_USB_DEVICE_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clkbind.usb_device", name: "USB_DEVICE_CLK_EN", consumer_ref: "per.usb_device", clock_ref: "clk.apb", controller_ref: Some("block.system"), binding_kind: "gated", control_refs: &["reg.system.perip_clk_en0"], enable_operation_refs: &[], disable_operation_refs: &[] }];
-pub const DRV_USB_DEVICE_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rstbind.usb_device", name: "USB_DEVICE_RST", target_ref: "per.usb_device", controller_ref: Some("block.system"), reset_domain_ref: Some("rst.system"), binding_kind: "local", control_refs: &["reg.system.perip_rst_en0"], assert_operation_refs: &[], release_operation_refs: &[] }];
-pub const DRV_USB_DEVICE_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource { id: "isrc.usb_device", name: "USB_SERIAL_JTAG", source_ref: "per.usb_device", producer_ref: Some("block.usb_device"), kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }];
-pub const DRV_USB_DEVICE_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute { id: "iroute.usb_device", name: "USB Serial/JTAG interrupt matrix source", source_ref: "isrc.usb_device", interrupt_ref: "irq.ets_usb_serial_jtag_intr_source", controller_ref: "block.interrupt_matrix0", cpu_target_ref: Some("block.cpu0"), line_index: None, route_type: "matrix", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }];
+pub const DRV_USB_DEVICE_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding {
+    id: "clkbind.usb_device",
+    name: "USB_DEVICE_CLK_EN",
+    consumer_ref: "per.usb_device",
+    clock_ref: "clk.apb",
+    controller_ref: Some("block.system"),
+    binding_kind: "gated",
+    control_refs: &["reg.system.perip_clk_en0"],
+    enable_operation_refs: &[],
+    disable_operation_refs: &[],
+}];
+pub const DRV_USB_DEVICE_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding {
+    id: "rstbind.usb_device",
+    name: "USB_DEVICE_RST",
+    target_ref: "per.usb_device",
+    controller_ref: Some("block.system"),
+    reset_domain_ref: Some("rst.system"),
+    binding_kind: "local",
+    control_refs: &["reg.system.perip_rst_en0"],
+    assert_operation_refs: &[],
+    release_operation_refs: &[],
+}];
+pub const DRV_USB_DEVICE_INTERRUPT_SOURCES: &[metadata::InterruptSource] =
+    &[metadata::InterruptSource {
+        id: "isrc.usb_device",
+        name: "USB_SERIAL_JTAG",
+        source_ref: "per.usb_device",
+        producer_ref: Some("block.usb_device"),
+        kind: "peripheral",
+        flag_refs: &[],
+        clear_operation_refs: &[],
+    }];
+pub const DRV_USB_DEVICE_INTERRUPT_ROUTES: &[metadata::InterruptRoute] =
+    &[metadata::InterruptRoute {
+        id: "iroute.usb_device",
+        name: "USB Serial/JTAG interrupt matrix source",
+        source_ref: "isrc.usb_device",
+        interrupt_ref: "irq.ets_usb_serial_jtag_intr_source",
+        controller_ref: "block.interrupt_matrix0",
+        cpu_target_ref: Some("block.cpu0"),
+        line_index: None,
+        route_type: "matrix",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: None,
+    }];
 pub const DRV_USB_DEVICE_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_USB_DEVICE_DMA_ROUTES: &[metadata::DmaRoute] = &[];
-pub const DRV_USB_DEVICE_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.usb.dm.gpio18", name: "USB D- on GPIO18", pin_ref: "pin.gpio18", peripheral_ref: "per.usb_device", signal: "USB_D-", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_USB_DEVICE_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.usb.dp.gpio19", name: "USB D+ on GPIO19", pin_ref: "pin.gpio19", peripheral_ref: "per.usb_device", signal: "USB_D+", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_USB_DEVICE_PIN_ROLES: &[metadata::PinRole] = &[metadata::PinRole { role: "dm", signal: "USB_D-", routes: DRV_USB_DEVICE_PIN_ROLE_0_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "dp", signal: "USB_D+", routes: DRV_USB_DEVICE_PIN_ROLE_1_ROUTES, requirement: metadata::ResourceRequirement::Required }];
-pub const DRV_USB_DEVICE_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[metadata::SemanticOperation { id: "op.usb_device.preserve_serial_jtag_link", name: "Preserve boot-established USB Serial/JTAG link", description: None, kind: Some("initialization"), target_refs: &["per.usb_device"], steps: &[metadata::SemanticOperationStep { index: 0, action: "write", target_ref: Some("reg.usb_device.int_ena"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Clear SERIAL_IN_EMPTY_INT_ENA" }), value: None, description: Some("Disable the Serial IN empty interrupt so firmware can start from a quiescent USB Serial/JTAG state without forcing a reattach.") }, metadata::SemanticOperationStep { index: 1, action: "write", target_ref: Some("reg.usb_device.int_ena"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Clear SERIAL_OUT_RECV_PKT_INT_ENA" }), value: None, description: Some("Disable the Serial OUT packet interrupt so bring-up preserves the boot-established link instead of depending on a fresh attach sequence.") }, metadata::SemanticOperationStep { index: 2, action: "write", target_ref: Some("reg.usb_device.int_clr"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Set SERIAL_IN_EMPTY_INT_CLR" }), value: None, description: Some("Clear any stale Serial IN empty interrupt state left by the boot ROM or previous firmware.") }, metadata::SemanticOperationStep { index: 3, action: "write", target_ref: Some("reg.usb_device.int_clr"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Set SERIAL_OUT_RECV_PKT_INT_CLR" }), value: None, description: Some("Clear any stale Serial OUT packet interrupt state while leaving the active USB Serial/JTAG connection intact.") }], preconditions: &[], postconditions: &[] }, metadata::SemanticOperation { id: "op.usb_device.complete_serial_in_packet", name: "Commit USB Serial/JTAG IN packet", description: None, kind: Some("transaction"), target_refs: &["per.usb_device"], steps: &[metadata::SemanticOperationStep { index: 0, action: "write", target_ref: Some("reg.usb_device.ep1_conf"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Set WR_DONE" }), value: None, description: Some("Hand the queued Serial IN bytes to the host-visible endpoint.") }], preconditions: &[], postconditions: &[] }];
+pub const DRV_USB_DEVICE_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.usb.dm.gpio18",
+    name: "USB D- on GPIO18",
+    pin_ref: "pin.gpio18",
+    peripheral_ref: "per.usb_device",
+    signal: "USB_D-",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_USB_DEVICE_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.usb.dp.gpio19",
+    name: "USB D+ on GPIO19",
+    pin_ref: "pin.gpio19",
+    peripheral_ref: "per.usb_device",
+    signal: "USB_D+",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_USB_DEVICE_PIN_ROLES: &[metadata::PinRole] = &[
+    metadata::PinRole {
+        role: "dm",
+        signal: "USB_D-",
+        routes: DRV_USB_DEVICE_PIN_ROLE_0_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "dp",
+        signal: "USB_D+",
+        routes: DRV_USB_DEVICE_PIN_ROLE_1_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+];
+pub const DRV_USB_DEVICE_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[
+    metadata::SemanticOperation {
+        id: "op.usb_device.preserve_serial_jtag_link",
+        name: "Preserve boot-established USB Serial/JTAG link",
+        description: None,
+        kind: Some("initialization"),
+        target_refs: &["per.usb_device"],
+        steps: &[
+            metadata::SemanticOperationStep {
+                index: 0,
+                action: "write",
+                target_ref: Some("reg.usb_device.int_ena"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Clear SERIAL_IN_EMPTY_INT_ENA",
+                }),
+                value: None,
+                description: Some(
+                    "Disable the Serial IN empty interrupt so firmware can start from a quiescent USB Serial/JTAG state without forcing a reattach.",
+                ),
+            },
+            metadata::SemanticOperationStep {
+                index: 1,
+                action: "write",
+                target_ref: Some("reg.usb_device.int_ena"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Clear SERIAL_OUT_RECV_PKT_INT_ENA",
+                }),
+                value: None,
+                description: Some(
+                    "Disable the Serial OUT packet interrupt so bring-up preserves the boot-established link instead of depending on a fresh attach sequence.",
+                ),
+            },
+            metadata::SemanticOperationStep {
+                index: 2,
+                action: "write",
+                target_ref: Some("reg.usb_device.int_clr"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Set SERIAL_IN_EMPTY_INT_CLR",
+                }),
+                value: None,
+                description: Some(
+                    "Clear any stale Serial IN empty interrupt state left by the boot ROM or previous firmware.",
+                ),
+            },
+            metadata::SemanticOperationStep {
+                index: 3,
+                action: "write",
+                target_ref: Some("reg.usb_device.int_clr"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Set SERIAL_OUT_RECV_PKT_INT_CLR",
+                }),
+                value: None,
+                description: Some(
+                    "Clear any stale Serial OUT packet interrupt state while leaving the active USB Serial/JTAG connection intact.",
+                ),
+            },
+        ],
+        preconditions: &[],
+        postconditions: &[],
+    },
+    metadata::SemanticOperation {
+        id: "op.usb_device.complete_serial_in_packet",
+        name: "Commit USB Serial/JTAG IN packet",
+        description: None,
+        kind: Some("transaction"),
+        target_refs: &["per.usb_device"],
+        steps: &[metadata::SemanticOperationStep {
+            index: 0,
+            action: "write",
+            target_ref: Some("reg.usb_device.ep1_conf"),
+            expression: Some(metadata::SemanticExpression {
+                language: Some("plain"),
+                text: "Set WR_DONE",
+            }),
+            value: None,
+            description: Some("Hand the queued Serial IN bytes to the host-visible endpoint."),
+        }],
+        preconditions: &[],
+        postconditions: &[],
+    },
+];
 pub const DRV_USB_DEVICE_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_USB_DEVICE_CAPABILITY_TAGS: &[&str] = &[];
 
@@ -137,7 +331,7 @@ impl UsbSerialJtag {
     /// Queue one byte for the UsbSerialJtag Serial IN endpoint.
     pub fn write_serial_byte(&self, byte: u8) -> Result<(), metadata::Error> {
         while !self.serial_in_ready()? {}
-        write_u32(0x60043000u64, u32::from(byte) << 0)?;
+        write_u32(0x60043000u64, u32::from(byte))?;
         Ok(())
     }
 
@@ -152,7 +346,7 @@ impl UsbSerialJtag {
     /// Read one byte from the UsbSerialJtag Serial OUT endpoint.
     pub fn read_serial_byte(&self) -> Result<u8, metadata::Error> {
         while !self.serial_out_data_available()? {}
-        Ok(((read_u32(0x60043000u64)? & 0x000000FFu32) >> 0) as u8)
+        Ok(((read_u32(0x60043000u64)?) & 0x000000FFu32) as u8)
     }
 
     /// Read bytes from the UsbSerialJtag Serial OUT endpoint into the supplied buffer.
@@ -246,7 +440,4 @@ impl UsbSerialJtag {
         modify_u32(0x60043004u64, 0x00000001u32, 0x00000001u32)?;
         Ok(())
     }
-
-
 }
-

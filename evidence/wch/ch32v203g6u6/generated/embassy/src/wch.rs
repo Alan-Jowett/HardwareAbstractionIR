@@ -13,7 +13,6 @@ pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProven
     evidence_ids: metadata::GENERATED_PROVENANCE_EVIDENCE_IDS,
 };
 
-
 unsafe extern "C" {
     fn __hair_wch_hang_vector();
     fn __hair_wch_embassy_time_driver_vector();
