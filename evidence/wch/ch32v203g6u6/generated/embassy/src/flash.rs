@@ -362,10 +362,17 @@ fn drv_flash_flash_check_erase(from: u32, to: u32) -> Result<(), FLASHFlashError
     let align = 4096usize;
     let from = usize::try_from(from).map_err(|_| FLASHFlashError::OutOfBounds)?;
     let to = usize::try_from(to).map_err(|_| FLASHFlashError::OutOfBounds)?;
-    if from >= to || from % align != 0 || to % align != 0 || to > DRV_FLASH_FLASH_STORAGE_SIZE {
+    if from >= to || to > DRV_FLASH_FLASH_STORAGE_SIZE {
         return Err(FLASHFlashError::OutOfBounds);
     }
+    if from % align != 0 || to % align != 0 {
+        return Err(FLASHFlashError::NotAligned);
+    }
     Ok(())
+}
+
+fn drv_flash_flash_checked_add(left: u32, right: u32) -> Result<u32, FLASHFlashError> {
+    left.checked_add(right).ok_or(FLASHFlashError::OutOfBounds)
 }
 
 fn drv_flash_flash_status() -> Result<u32, FLASHFlashError> {
@@ -476,8 +483,9 @@ impl embedded_storage::nor_flash::NorFlash for FLASH {
         let result = (|| {
             let mut page = from;
             while page < to {
-                drv_flash_flash_erase_page(self, DRV_FLASH_FLASH_STORAGE_BASE + page)?;
-                page = page.wrapping_add(Self::ERASE_SIZE as u32);
+                let page_address = drv_flash_flash_checked_add(DRV_FLASH_FLASH_STORAGE_BASE, page)?;
+                drv_flash_flash_erase_page(self, page_address)?;
+                page = drv_flash_flash_checked_add(page, Self::ERASE_SIZE as u32)?;
             }
             Ok(())
         })();
@@ -494,9 +502,14 @@ impl embedded_storage::nor_flash::NorFlash for FLASH {
         drv_flash_flash_begin(self)?;
         let result = (|| {
             for (index, chunk) in bytes.chunks_exact(Self::WRITE_SIZE).enumerate() {
-                let address = DRV_FLASH_FLASH_STORAGE_BASE
-                    .wrapping_add(offset)
-                    .wrapping_add((index * Self::WRITE_SIZE) as u32);
+                let chunk_offset = u32::try_from(index)
+                    .map_err(|_| FLASHFlashError::OutOfBounds)?
+                    .checked_mul(Self::WRITE_SIZE as u32)
+                    .ok_or(FLASHFlashError::OutOfBounds)?;
+                let address = drv_flash_flash_checked_add(
+                    drv_flash_flash_checked_add(DRV_FLASH_FLASH_STORAGE_BASE, offset)?,
+                    chunk_offset,
+                )?;
                 let value = u16::from_le_bytes([chunk[0], chunk[1]]);
                 drv_flash_flash_program_halfword(self, address, value)?;
             }

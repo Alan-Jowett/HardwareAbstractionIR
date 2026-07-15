@@ -10707,10 +10707,17 @@ fn {helper_prefix}_flash_check_erase(from: u32, to: u32) -> Result<(), {error_ty
     let align = {erase_size}usize;
     let from = usize::try_from(from).map_err(|_| {error_type_name}::OutOfBounds)?;
     let to = usize::try_from(to).map_err(|_| {error_type_name}::OutOfBounds)?;
-    if from >= to || from % align != 0 || to % align != 0 || to > {driver_prefix}_FLASH_STORAGE_SIZE {{
+    if from >= to || to > {driver_prefix}_FLASH_STORAGE_SIZE {{
         return Err({error_type_name}::OutOfBounds);
     }}
+    if from % align != 0 || to % align != 0 {{
+        return Err({error_type_name}::NotAligned);
+    }}
     Ok(())
+}}
+
+fn {helper_prefix}_flash_checked_add(left: u32, right: u32) -> Result<u32, {error_type_name}> {{
+    left.checked_add(right).ok_or({error_type_name}::OutOfBounds)
 }}
 
 fn {helper_prefix}_flash_status() -> Result<u32, {error_type_name}> {{
@@ -10797,8 +10804,10 @@ impl embedded_storage::nor_flash::NorFlash for {type_name} {{
         let result = (|| {{
             let mut page = from;
             while page < to {{
-                {helper_prefix}_flash_erase_page(self, {driver_prefix}_FLASH_STORAGE_BASE + page)?;
-                page = page.wrapping_add(Self::ERASE_SIZE as u32);
+                let page_address =
+                    {helper_prefix}_flash_checked_add({driver_prefix}_FLASH_STORAGE_BASE, page)?;
+                {helper_prefix}_flash_erase_page(self, page_address)?;
+                page = {helper_prefix}_flash_checked_add(page, Self::ERASE_SIZE as u32)?;
             }}
             Ok(())
         }})();
@@ -10815,9 +10824,14 @@ impl embedded_storage::nor_flash::NorFlash for {type_name} {{
         {helper_prefix}_flash_begin(self)?;
         let result = (|| {{
             for (index, chunk) in bytes.chunks_exact(Self::WRITE_SIZE).enumerate() {{
-                let address = {driver_prefix}_FLASH_STORAGE_BASE
-                    .wrapping_add(offset)
-                    .wrapping_add((index * Self::WRITE_SIZE) as u32);
+                let chunk_offset = u32::try_from(index)
+                    .map_err(|_| {error_type_name}::OutOfBounds)?
+                    .checked_mul(Self::WRITE_SIZE as u32)
+                    .ok_or({error_type_name}::OutOfBounds)?;
+                let address = {helper_prefix}_flash_checked_add(
+                    {helper_prefix}_flash_checked_add({driver_prefix}_FLASH_STORAGE_BASE, offset)?,
+                    chunk_offset,
+                )?;
                 let value = u16::from_le_bytes([chunk[0], chunk[1]]);
                 {helper_prefix}_flash_program_halfword(self, address, value)?;
             }}
@@ -19402,6 +19416,9 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(flash_rs.contains("const WRITE_SIZE: usize = 2;"));
         assert!(flash_rs.contains("const ERASE_SIZE: usize = 4096;"));
         assert!(flash_rs.contains("WriteProtectError"));
+        assert!(flash_rs.contains("fn drv_flash_flash_checked_add("));
+        assert!(flash_rs.contains(".checked_mul(Self::WRITE_SIZE as u32)"));
+        assert!(flash_rs.contains("return Err(FLASHFlashError::NotAligned);"));
 
         let cargo_output = Command::new("cargo")
             .arg("check")
