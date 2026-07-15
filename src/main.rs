@@ -10179,6 +10179,26 @@ fn resolve_flash_optional_operation_method_name(
         .transpose()
 }
 
+fn ensure_flash_status_register(
+    driver: &ResolvedDriverInstance,
+    busy: &ResolvedFieldTarget,
+    candidate: &ResolvedFieldTarget,
+    binding_name: &str,
+) -> Result<()> {
+    if busy.register_id != candidate.register_id {
+        bail!(
+            "flash driver {} lowering pattern {} requires {} to share the busyFlagRef register {}; found {} on {}",
+            driver.id,
+            FLASH_LOWERING_STM32F1_PAGE_FLASH,
+            binding_name,
+            busy.register_id,
+            candidate.field.id,
+            candidate.register_id
+        );
+    }
+    Ok(())
+}
+
 fn resolve_flash_lowering(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
@@ -10236,31 +10256,42 @@ fn resolve_flash_lowering(
             write_size_bytes
         );
     }
+    let busy = resolve_flash_binding_field(model, driver, &bindings.busy_flag_ref, "busyFlagRef")?;
+    let end_of_operation = resolve_flash_binding_field(
+        model,
+        driver,
+        &bindings.end_of_operation_flag_ref,
+        "endOfOperationFlagRef",
+    )?;
+    ensure_flash_status_register(driver, &busy, &end_of_operation, "endOfOperationFlagRef")?;
+    let program_error = bindings
+        .program_error_flag_ref
+        .as_deref()
+        .map(|field_ref| {
+            resolve_flash_binding_field(model, driver, field_ref, "programErrorFlagRef")
+        })
+        .transpose()?;
+    if let Some(field) = &program_error {
+        ensure_flash_status_register(driver, &busy, field, "programErrorFlagRef")?;
+    }
+    let write_protect_error = bindings
+        .write_protect_error_flag_ref
+        .as_deref()
+        .map(|field_ref| {
+            resolve_flash_binding_field(model, driver, field_ref, "writeProtectErrorFlagRef")
+        })
+        .transpose()?;
+    if let Some(field) = &write_protect_error {
+        ensure_flash_status_register(driver, &busy, field, "writeProtectErrorFlagRef")?;
+    }
     Ok(ResolvedFlashLowering {
         storage_region,
         erase_size_bytes,
         write_size_bytes,
-        busy: resolve_flash_binding_field(model, driver, &bindings.busy_flag_ref, "busyFlagRef")?,
-        end_of_operation: resolve_flash_binding_field(
-            model,
-            driver,
-            &bindings.end_of_operation_flag_ref,
-            "endOfOperationFlagRef",
-        )?,
-        program_error: bindings
-            .program_error_flag_ref
-            .as_deref()
-            .map(|field_ref| {
-                resolve_flash_binding_field(model, driver, field_ref, "programErrorFlagRef")
-            })
-            .transpose()?,
-        write_protect_error: bindings
-            .write_protect_error_flag_ref
-            .as_deref()
-            .map(|field_ref| {
-                resolve_flash_binding_field(model, driver, field_ref, "writeProtectErrorFlagRef")
-            })
-            .transpose()?,
+        busy,
+        end_of_operation,
+        program_error,
+        write_protect_error,
         program_enable: resolve_flash_binding_field(
             model,
             driver,
@@ -19508,6 +19539,54 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             .expect_err("generation should reject non-halfword flash programming");
         assert!(
             error.to_string().contains("requires writeSizeBytes = 2"),
+            "unexpected error: {error:#}"
+        );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_flash_status_flags_on_different_registers() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        add_fixture_flash_driver(&mut document);
+
+        let driver_instances = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let flash_driver = driver_instances
+            .iter_mut()
+            .find(|driver| driver["id"] == "drv.flash")
+            .and_then(Value::as_object_mut)
+            .expect("drv.flash");
+        flash_driver
+            .get_mut("flashBindings")
+            .and_then(Value::as_object_mut)
+            .expect("flashBindings")
+            .insert(
+                "endOfOperationFlagRef".to_string(),
+                serde_json::json!("field.flash_ctlr.pg"),
+            );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("flash fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        let error = generate_embassy_crate(&validated, output_dir.path())
+            .expect_err("generation should reject split flash status registers");
+        assert!(
+            error
+                .to_string()
+                .contains("requires endOfOperationFlagRef to share the busyFlagRef register"),
             "unexpected error: {error:#}"
         );
     }
