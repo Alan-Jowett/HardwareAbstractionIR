@@ -5,10 +5,13 @@ use core::ptr::{read_volatile, write_volatile};
 
 #[allow(dead_code)]
 fn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {
-    let address = usize::try_from(address)
-        .map_err(|_| metadata::Error::Unsupported("MMIO address does not fit usize on this target"))?;
+    let address = usize::try_from(address).map_err(|_| {
+        metadata::Error::Unsupported("MMIO address does not fit usize on this target")
+    })?;
     if address % align != 0 {
-        return Err(metadata::Error::Unsupported("MMIO address is not naturally aligned for the target register width"));
+        return Err(metadata::Error::Unsupported(
+            "MMIO address is not naturally aligned for the target register width",
+        ));
     }
     Ok(address)
 }
@@ -44,9 +47,39 @@ fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metada
 }
 
 #[allow(dead_code)]
+fn read_u8(address: u64) -> Result<u8, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe { Ok(read_volatile(address as *const u8)) }
+}
+
+#[allow(dead_code)]
+fn read_u16(address: u64) -> Result<u16, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe { Ok(read_volatile(address as *const u16)) }
+}
+
+#[allow(dead_code)]
 fn read_u32(address: u64) -> Result<u32, metadata::Error> {
     let address = checked_address(address, core::mem::align_of::<u32>())?;
     unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u8(address: u64, value: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        write_volatile(address as *mut u8, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        write_volatile(address as *mut u16, value);
+    }
+    Ok(())
 }
 
 #[allow(dead_code)]
@@ -67,15 +100,147 @@ pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProven
 };
 
 // Driver instance: SystemTimer (timer) from canonical block block.systimer0 -> timer-general
-pub const DRV_TIME_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clkbind.systimer", name: "SYSTIMER_CLK_EN", consumer_ref: "per.systimer", clock_ref: "clk.systimer", controller_ref: Some("block.system"), binding_kind: "gated", control_refs: &["reg.system.perip_clk_en0"], enable_operation_refs: &[], disable_operation_refs: &[] }];
-pub const DRV_TIME_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rstbind.systimer", name: "SYSTIMER_RST", target_ref: "per.systimer", controller_ref: Some("block.system"), reset_domain_ref: Some("rst.system"), binding_kind: "local", control_refs: &["reg.system.perip_rst_en0"], assert_operation_refs: &[], release_operation_refs: &[] }];
-pub const DRV_TIME_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource { id: "isrc.systimer0", name: "SYSTIMER_TARGET0", source_ref: "per.systimer", producer_ref: Some("block.systimer0"), kind: "timer", flag_refs: &[], clear_operation_refs: &["op.systimer.clear_target0_interrupt"] }];
-pub const DRV_TIME_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute { id: "iroute.systimer0", name: "SYSTIMER target0 interrupt matrix source", source_ref: "isrc.systimer0", interrupt_ref: "irq.ets_systimer_target0_intr_source", controller_ref: "block.interrupt_matrix0", cpu_target_ref: Some("block.cpu0"), line_index: None, route_type: "matrix", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }];
+pub const DRV_TIME_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding {
+    id: "clkbind.systimer",
+    name: "SYSTIMER_CLK_EN",
+    consumer_ref: "per.systimer",
+    clock_ref: "clk.systimer",
+    controller_ref: Some("block.system"),
+    binding_kind: "gated",
+    control_refs: &["reg.system.perip_clk_en0"],
+    enable_operation_refs: &[],
+    disable_operation_refs: &[],
+}];
+pub const DRV_TIME_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding {
+    id: "rstbind.systimer",
+    name: "SYSTIMER_RST",
+    target_ref: "per.systimer",
+    controller_ref: Some("block.system"),
+    reset_domain_ref: Some("rst.system"),
+    binding_kind: "local",
+    control_refs: &["reg.system.perip_rst_en0"],
+    assert_operation_refs: &[],
+    release_operation_refs: &[],
+}];
+pub const DRV_TIME_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource {
+    id: "isrc.systimer0",
+    name: "SYSTIMER_TARGET0",
+    source_ref: "per.systimer",
+    producer_ref: Some("block.systimer0"),
+    kind: "timer",
+    flag_refs: &[],
+    clear_operation_refs: &["op.systimer.clear_target0_interrupt"],
+}];
+pub const DRV_TIME_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute {
+    id: "iroute.systimer0",
+    name: "SYSTIMER target0 interrupt matrix source",
+    source_ref: "isrc.systimer0",
+    interrupt_ref: "irq.ets_systimer_target0_intr_source",
+    controller_ref: "block.interrupt_matrix0",
+    cpu_target_ref: Some("block.cpu0"),
+    line_index: None,
+    route_type: "matrix",
+    control_refs: &[],
+    acknowledge_operation_refs: &[],
+    shared_group: None,
+}];
 pub const DRV_TIME_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_TIME_DMA_ROUTES: &[metadata::DmaRoute] = &[];
 pub const DRV_TIME_PIN_ROLES: &[metadata::PinRole] = &[];
-pub const DRV_TIME_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[metadata::SemanticOperation { id: "op.systimer.enable_target0", name: "Enable SYSTIMER target0 time base", description: None, kind: Some("initialization"), target_refs: &["per.systimer"], steps: &[metadata::SemanticOperationStep { index: 0, action: "write", target_ref: Some("reg.systimer.conf"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Set CLK_EN" }), value: None, description: Some("Enable the SYSTIMER register clock.") }, metadata::SemanticOperationStep { index: 1, action: "write", target_ref: Some("reg.systimer.conf"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Set TIMER_UNIT0_WORK_EN" }), value: None, description: Some("Start counter unit 0 so the generated timer-backed delay and time base can observe a running counter.") }, metadata::SemanticOperationStep { index: 2, action: "write", target_ref: Some("reg.systimer.conf"), expression: Some(metadata::SemanticExpression { language: Some("plain"), text: "Set TARGET0_WORK_EN" }), value: None, description: Some("Enable comparator target 0 so the generated async time base can arm wake alarms.") }], preconditions: &[], postconditions: &[] }];
-pub const DRV_TIME_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[metadata::SemanticStateMachine { id: "sm.systimer", name: "SYSTIMER target0 running state", description: None, target_refs: &["per.systimer"], initial_state: Some("disabled"), states: &[metadata::SemanticState { name: "disabled", description: None, invariants: &[] }, metadata::SemanticState { name: "enabled", description: None, invariants: &[] }], transitions: &[metadata::SemanticTransition { from: "disabled", to: "enabled", trigger: Some("enable requested"), conditions: &[], effects: &[metadata::SemanticSideEffect { kind: "starts-hardware", target_ref: Some("field.systimer.conf.timer_unit0_work_en"), description: None }] }, metadata::SemanticTransition { from: "enabled", to: "disabled", trigger: Some("disable requested"), conditions: &[], effects: &[metadata::SemanticSideEffect { kind: "stops-hardware", target_ref: Some("field.systimer.conf.timer_unit0_work_en"), description: None }] }] }];
+pub const DRV_TIME_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[
+    metadata::SemanticOperation {
+        id: "op.systimer.enable_target0",
+        name: "Enable SYSTIMER target0 time base",
+        description: None,
+        kind: Some("initialization"),
+        target_refs: &["per.systimer"],
+        steps: &[
+            metadata::SemanticOperationStep {
+                index: 0,
+                action: "write",
+                target_ref: Some("reg.systimer.conf"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Set CLK_EN",
+                }),
+                value: None,
+                description: Some("Enable the SYSTIMER register clock."),
+            },
+            metadata::SemanticOperationStep {
+                index: 1,
+                action: "write",
+                target_ref: Some("reg.systimer.conf"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Set TIMER_UNIT0_WORK_EN",
+                }),
+                value: None,
+                description: Some(
+                    "Start counter unit 0 so the generated timer-backed delay and time base can observe a running counter.",
+                ),
+            },
+            metadata::SemanticOperationStep {
+                index: 2,
+                action: "write",
+                target_ref: Some("reg.systimer.conf"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Set TARGET0_WORK_EN",
+                }),
+                value: None,
+                description: Some(
+                    "Enable comparator target 0 so the generated async time base can arm wake alarms.",
+                ),
+            },
+        ],
+        preconditions: &[],
+        postconditions: &[],
+    },
+];
+pub const DRV_TIME_STATE_MACHINES: &[metadata::SemanticStateMachine] =
+    &[metadata::SemanticStateMachine {
+        id: "sm.systimer",
+        name: "SYSTIMER target0 running state",
+        description: None,
+        target_refs: &["per.systimer"],
+        initial_state: Some("disabled"),
+        states: &[
+            metadata::SemanticState {
+                name: "disabled",
+                description: None,
+                invariants: &[],
+            },
+            metadata::SemanticState {
+                name: "enabled",
+                description: None,
+                invariants: &[],
+            },
+        ],
+        transitions: &[
+            metadata::SemanticTransition {
+                from: "disabled",
+                to: "enabled",
+                trigger: Some("enable requested"),
+                conditions: &[],
+                effects: &[metadata::SemanticSideEffect {
+                    kind: "starts-hardware",
+                    target_ref: Some("field.systimer.conf.timer_unit0_work_en"),
+                    description: None,
+                }],
+            },
+            metadata::SemanticTransition {
+                from: "enabled",
+                to: "disabled",
+                trigger: Some("disable requested"),
+                conditions: &[],
+                effects: &[metadata::SemanticSideEffect {
+                    kind: "stops-hardware",
+                    target_ref: Some("field.systimer.conf.timer_unit0_work_en"),
+                    description: None,
+                }],
+            },
+        ],
+    }];
 pub const DRV_TIME_CAPABILITY_TAGS: &[&str] = &["embassy-time-driver"];
 
 #[derive(Debug, Clone, Copy)]
@@ -181,10 +346,7 @@ impl SystemTimer {
     pub fn on_time_driver_interrupt(&self) {
         generated_drv_time_time_driver_interrupt();
     }
-
-
 }
-
 
 use core::cell::{Cell, RefCell};
 use critical_section::Mutex as CriticalSectionMutex;
@@ -252,8 +414,12 @@ impl GeneratedHardwareTimerTimeDriver {
                     | GENERATED_TIME_TARGET0_UNIT_SEL_MASK,
                 0u32,
             )?;
-            modify_u32(GENERATED_TIME_INT_ENA_ADDRESS, GENERATED_TIME_INT_ENA_TARGET0_MASK, 0u32)?;
-        modify_u32(0x6002306Cu64, 0x00000001u32, 0x00000001u32)?;
+            modify_u32(
+                GENERATED_TIME_INT_ENA_ADDRESS,
+                GENERATED_TIME_INT_ENA_TARGET0_MASK,
+                0u32,
+            )?;
+            modify_u32(0x6002306Cu64, 0x00000001u32, 0x00000001u32)?;
             self.initialized.borrow(cs).set(true);
             Ok(())
         })
@@ -266,9 +432,16 @@ impl GeneratedHardwareTimerTimeDriver {
             GENERATED_TIME_UNIT0_OP_UPDATE_MASK,
         );
         loop {
-            if (must_read_u32(GENERATED_TIME_UNIT0_OP_ADDRESS) & GENERATED_TIME_UNIT0_OP_VALUE_VALID_MASK) != 0 {
-                let high = ((must_read_u32(GENERATED_TIME_UNIT0_VALUE_HI_ADDRESS) & GENERATED_TIME_UNIT0_VALUE_HI_MASK) >> GENERATED_TIME_UNIT0_VALUE_HI_SHIFT) as u64;
-                let low = ((must_read_u32(GENERATED_TIME_UNIT0_VALUE_LO_ADDRESS) & GENERATED_TIME_UNIT0_VALUE_LO_MASK) >> GENERATED_TIME_UNIT0_VALUE_LO_SHIFT) as u64;
+            if (must_read_u32(GENERATED_TIME_UNIT0_OP_ADDRESS)
+                & GENERATED_TIME_UNIT0_OP_VALUE_VALID_MASK)
+                != 0
+            {
+                let high = ((must_read_u32(GENERATED_TIME_UNIT0_VALUE_HI_ADDRESS)
+                    & GENERATED_TIME_UNIT0_VALUE_HI_MASK)
+                    >> GENERATED_TIME_UNIT0_VALUE_HI_SHIFT) as u64;
+                let low = ((must_read_u32(GENERATED_TIME_UNIT0_VALUE_LO_ADDRESS)
+                    & GENERATED_TIME_UNIT0_VALUE_LO_MASK)
+                    >> GENERATED_TIME_UNIT0_VALUE_LO_SHIFT) as u64;
                 return (high << 32) | low;
             }
         }
@@ -277,11 +450,21 @@ impl GeneratedHardwareTimerTimeDriver {
     fn arm_alarm(&self, at: u64) {
         let high = ((at >> 32) as u32) << GENERATED_TIME_TARGET0_HI_SHIFT;
         let low = (at as u32) << GENERATED_TIME_TARGET0_LO_SHIFT;
-        must_modify_u32(GENERATED_TIME_TARGET0_HI_ADDRESS, GENERATED_TIME_TARGET0_HI_MASK, high & GENERATED_TIME_TARGET0_HI_MASK);
-        must_modify_u32(GENERATED_TIME_TARGET0_LO_ADDRESS, GENERATED_TIME_TARGET0_LO_MASK, low & GENERATED_TIME_TARGET0_LO_MASK);
+        must_modify_u32(
+            GENERATED_TIME_TARGET0_HI_ADDRESS,
+            GENERATED_TIME_TARGET0_HI_MASK,
+            high & GENERATED_TIME_TARGET0_HI_MASK,
+        );
+        must_modify_u32(
+            GENERATED_TIME_TARGET0_LO_ADDRESS,
+            GENERATED_TIME_TARGET0_LO_MASK,
+            low & GENERATED_TIME_TARGET0_LO_MASK,
+        );
         must_modify_u32(
             GENERATED_TIME_TARGET0_CONF_ADDRESS,
-            GENERATED_TIME_TARGET0_PERIOD_MASK | GENERATED_TIME_TARGET0_PERIOD_MODE_MASK | GENERATED_TIME_TARGET0_UNIT_SEL_MASK,
+            GENERATED_TIME_TARGET0_PERIOD_MASK
+                | GENERATED_TIME_TARGET0_PERIOD_MODE_MASK
+                | GENERATED_TIME_TARGET0_UNIT_SEL_MASK,
             0u32,
         );
         must_modify_u32(
@@ -297,7 +480,11 @@ impl GeneratedHardwareTimerTimeDriver {
     }
 
     fn disarm_alarm(&self) {
-        must_modify_u32(GENERATED_TIME_INT_ENA_ADDRESS, GENERATED_TIME_INT_ENA_TARGET0_MASK, 0u32);
+        must_modify_u32(
+            GENERATED_TIME_INT_ENA_ADDRESS,
+            GENERATED_TIME_INT_ENA_TARGET0_MASK,
+            0u32,
+        );
     }
 
     fn acknowledge_interrupt(&self) {

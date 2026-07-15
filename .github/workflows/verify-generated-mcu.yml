@@ -58,6 +58,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
+          components: rustfmt, clippy
           targets: ${{ inputs.rust_target }}
 
       - name: Validate reusable workflow inputs
@@ -216,6 +217,18 @@ jobs:
             cp "${{ inputs.embassy_dir }}/Cargo.lock" "$RUNNER_TEMP/generated-embassy/Cargo.lock"
           fi
           cargo check --locked --target "${{ inputs.rust_target }}" --manifest-path "$RUNNER_TEMP/generated-embassy/Cargo.toml"
+
+      - name: Check checked-in Embassy HAL formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path "${{ inputs.embassy_dir }}/Cargo.toml" --check
+
+      - name: Lint checked-in Embassy HAL crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy --locked --target "${{ inputs.rust_target }}" --manifest-path "${{ inputs.embassy_dir }}/Cargo.toml" --lib -- -D warnings
 
       - name: Report intentionally unsupported smoke target
         if: ${{ inputs.smoke_mode == 'unsupported' }}

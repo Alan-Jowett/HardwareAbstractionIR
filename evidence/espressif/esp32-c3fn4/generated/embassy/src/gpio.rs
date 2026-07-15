@@ -5,10 +5,13 @@ use core::ptr::{read_volatile, write_volatile};
 
 #[allow(dead_code)]
 fn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {
-    let address = usize::try_from(address)
-        .map_err(|_| metadata::Error::Unsupported("MMIO address does not fit usize on this target"))?;
+    let address = usize::try_from(address).map_err(|_| {
+        metadata::Error::Unsupported("MMIO address does not fit usize on this target")
+    })?;
     if address % align != 0 {
-        return Err(metadata::Error::Unsupported("MMIO address is not naturally aligned for the target register width"));
+        return Err(metadata::Error::Unsupported(
+            "MMIO address is not naturally aligned for the target register width",
+        ));
     }
     Ok(address)
 }
@@ -44,9 +47,39 @@ fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metada
 }
 
 #[allow(dead_code)]
+fn read_u8(address: u64) -> Result<u8, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe { Ok(read_volatile(address as *const u8)) }
+}
+
+#[allow(dead_code)]
+fn read_u16(address: u64) -> Result<u16, metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe { Ok(read_volatile(address as *const u16)) }
+}
+
+#[allow(dead_code)]
 fn read_u32(address: u64) -> Result<u32, metadata::Error> {
     let address = checked_address(address, core::mem::align_of::<u32>())?;
     unsafe { Ok(read_volatile(address as *const u32)) }
+}
+
+#[allow(dead_code)]
+fn write_u8(address: u64, value: u8) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u8>())?;
+    unsafe {
+        write_volatile(address as *mut u8, value);
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {
+    let address = checked_address(address, core::mem::align_of::<u16>())?;
+    unsafe {
+        write_volatile(address as *mut u16, value);
+    }
+    Ok(())
 }
 
 #[allow(dead_code)]
@@ -86,29 +119,404 @@ pub const DRV_GPIO_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];
 pub const DRV_GPIO_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];
 pub const DRV_GPIO_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_GPIO_DMA_ROUTES: &[metadata::DmaRoute] = &[];
-pub const DRV_GPIO_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio0", name: "GPIO function on GPIO0", pin_ref: "pin.gpio0", peripheral_ref: "per.gpio", signal: "GPIO0", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio1", name: "GPIO function on GPIO1", pin_ref: "pin.gpio1", peripheral_ref: "per.gpio", signal: "GPIO1", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_2_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio2", name: "GPIO function on GPIO2", pin_ref: "pin.gpio2", peripheral_ref: "per.gpio", signal: "GPIO2", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_3_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio3", name: "GPIO function on GPIO3", pin_ref: "pin.gpio3", peripheral_ref: "per.gpio", signal: "GPIO3", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_4_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio4", name: "GPIO function on GPIO4", pin_ref: "pin.gpio4", peripheral_ref: "per.gpio", signal: "GPIO4", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_5_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio5", name: "GPIO function on GPIO5", pin_ref: "pin.gpio5", peripheral_ref: "per.gpio", signal: "GPIO5", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_6_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio6", name: "GPIO function on GPIO6", pin_ref: "pin.gpio6", peripheral_ref: "per.gpio", signal: "GPIO6", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_7_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio7", name: "GPIO function on GPIO7", pin_ref: "pin.gpio7", peripheral_ref: "per.gpio", signal: "GPIO7", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_8_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio8", name: "GPIO function on GPIO8", pin_ref: "pin.gpio8", peripheral_ref: "per.gpio", signal: "GPIO8", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_9_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio9", name: "GPIO function on GPIO9", pin_ref: "pin.gpio9", peripheral_ref: "per.gpio", signal: "GPIO9", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_10_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio10", name: "GPIO function on GPIO10", pin_ref: "pin.gpio10", peripheral_ref: "per.gpio", signal: "GPIO10", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_11_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio11", name: "GPIO function on GPIO11", pin_ref: "pin.gpio11", peripheral_ref: "per.gpio", signal: "GPIO11", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_12_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio12", name: "GPIO function on GPIO12", pin_ref: "pin.gpio12", peripheral_ref: "per.gpio", signal: "GPIO12", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_13_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio13", name: "GPIO function on GPIO13", pin_ref: "pin.gpio13", peripheral_ref: "per.gpio", signal: "GPIO13", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_14_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio14", name: "GPIO function on GPIO14", pin_ref: "pin.gpio14", peripheral_ref: "per.gpio", signal: "GPIO14", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_15_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio15", name: "GPIO function on GPIO15", pin_ref: "pin.gpio15", peripheral_ref: "per.gpio", signal: "GPIO15", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_16_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio16", name: "GPIO function on GPIO16", pin_ref: "pin.gpio16", peripheral_ref: "per.gpio", signal: "GPIO16", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_17_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio17", name: "GPIO function on GPIO17", pin_ref: "pin.gpio17", peripheral_ref: "per.gpio", signal: "GPIO17", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_18_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio18", name: "GPIO function on GPIO18", pin_ref: "pin.gpio18", peripheral_ref: "per.gpio", signal: "GPIO18", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_19_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio19", name: "GPIO function on GPIO19", pin_ref: "pin.gpio19", peripheral_ref: "per.gpio", signal: "GPIO19", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_20_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio20", name: "GPIO function on GPIO20", pin_ref: "pin.gpio20", peripheral_ref: "per.gpio", signal: "GPIO20", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLE_21_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.gpio.gpio21", name: "GPIO function on GPIO21", pin_ref: "pin.gpio21", peripheral_ref: "per.gpio", signal: "GPIO21", route_type: "hardwired", control_refs: &[], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(true) }];
-pub const DRV_GPIO_PIN_ROLES: &[metadata::PinRole] = &[metadata::PinRole { role: "gpio0", signal: "GPIO0", routes: DRV_GPIO_PIN_ROLE_0_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio1", signal: "GPIO1", routes: DRV_GPIO_PIN_ROLE_1_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio2", signal: "GPIO2", routes: DRV_GPIO_PIN_ROLE_2_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio3", signal: "GPIO3", routes: DRV_GPIO_PIN_ROLE_3_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio4", signal: "GPIO4", routes: DRV_GPIO_PIN_ROLE_4_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio5", signal: "GPIO5", routes: DRV_GPIO_PIN_ROLE_5_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio6", signal: "GPIO6", routes: DRV_GPIO_PIN_ROLE_6_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio7", signal: "GPIO7", routes: DRV_GPIO_PIN_ROLE_7_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio8", signal: "GPIO8", routes: DRV_GPIO_PIN_ROLE_8_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio9", signal: "GPIO9", routes: DRV_GPIO_PIN_ROLE_9_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio10", signal: "GPIO10", routes: DRV_GPIO_PIN_ROLE_10_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio11", signal: "GPIO11", routes: DRV_GPIO_PIN_ROLE_11_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio12", signal: "GPIO12", routes: DRV_GPIO_PIN_ROLE_12_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio13", signal: "GPIO13", routes: DRV_GPIO_PIN_ROLE_13_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio14", signal: "GPIO14", routes: DRV_GPIO_PIN_ROLE_14_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio15", signal: "GPIO15", routes: DRV_GPIO_PIN_ROLE_15_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio16", signal: "GPIO16", routes: DRV_GPIO_PIN_ROLE_16_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio17", signal: "GPIO17", routes: DRV_GPIO_PIN_ROLE_17_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio18", signal: "GPIO18", routes: DRV_GPIO_PIN_ROLE_18_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio19", signal: "GPIO19", routes: DRV_GPIO_PIN_ROLE_19_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio20", signal: "GPIO20", routes: DRV_GPIO_PIN_ROLE_20_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "gpio21", signal: "GPIO21", routes: DRV_GPIO_PIN_ROLE_21_ROUTES, requirement: metadata::ResourceRequirement::Required }];
+pub const DRV_GPIO_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio0",
+    name: "GPIO function on GPIO0",
+    pin_ref: "pin.gpio0",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO0",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio1",
+    name: "GPIO function on GPIO1",
+    pin_ref: "pin.gpio1",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO1",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_2_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio2",
+    name: "GPIO function on GPIO2",
+    pin_ref: "pin.gpio2",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO2",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_3_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio3",
+    name: "GPIO function on GPIO3",
+    pin_ref: "pin.gpio3",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO3",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_4_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio4",
+    name: "GPIO function on GPIO4",
+    pin_ref: "pin.gpio4",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO4",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_5_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio5",
+    name: "GPIO function on GPIO5",
+    pin_ref: "pin.gpio5",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO5",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_6_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio6",
+    name: "GPIO function on GPIO6",
+    pin_ref: "pin.gpio6",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO6",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_7_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio7",
+    name: "GPIO function on GPIO7",
+    pin_ref: "pin.gpio7",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO7",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_8_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio8",
+    name: "GPIO function on GPIO8",
+    pin_ref: "pin.gpio8",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO8",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_9_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio9",
+    name: "GPIO function on GPIO9",
+    pin_ref: "pin.gpio9",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO9",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_10_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio10",
+    name: "GPIO function on GPIO10",
+    pin_ref: "pin.gpio10",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO10",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_11_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio11",
+    name: "GPIO function on GPIO11",
+    pin_ref: "pin.gpio11",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO11",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_12_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio12",
+    name: "GPIO function on GPIO12",
+    pin_ref: "pin.gpio12",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO12",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_13_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio13",
+    name: "GPIO function on GPIO13",
+    pin_ref: "pin.gpio13",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO13",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_14_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio14",
+    name: "GPIO function on GPIO14",
+    pin_ref: "pin.gpio14",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO14",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_15_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio15",
+    name: "GPIO function on GPIO15",
+    pin_ref: "pin.gpio15",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO15",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_16_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio16",
+    name: "GPIO function on GPIO16",
+    pin_ref: "pin.gpio16",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO16",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_17_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio17",
+    name: "GPIO function on GPIO17",
+    pin_ref: "pin.gpio17",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO17",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_18_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio18",
+    name: "GPIO function on GPIO18",
+    pin_ref: "pin.gpio18",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO18",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_19_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio19",
+    name: "GPIO function on GPIO19",
+    pin_ref: "pin.gpio19",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO19",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_20_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio20",
+    name: "GPIO function on GPIO20",
+    pin_ref: "pin.gpio20",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO20",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLE_21_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.gpio.gpio21",
+    name: "GPIO function on GPIO21",
+    pin_ref: "pin.gpio21",
+    peripheral_ref: "per.gpio",
+    signal: "GPIO21",
+    route_type: "hardwired",
+    control_refs: &[],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(true),
+}];
+pub const DRV_GPIO_PIN_ROLES: &[metadata::PinRole] = &[
+    metadata::PinRole {
+        role: "gpio0",
+        signal: "GPIO0",
+        routes: DRV_GPIO_PIN_ROLE_0_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio1",
+        signal: "GPIO1",
+        routes: DRV_GPIO_PIN_ROLE_1_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio2",
+        signal: "GPIO2",
+        routes: DRV_GPIO_PIN_ROLE_2_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio3",
+        signal: "GPIO3",
+        routes: DRV_GPIO_PIN_ROLE_3_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio4",
+        signal: "GPIO4",
+        routes: DRV_GPIO_PIN_ROLE_4_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio5",
+        signal: "GPIO5",
+        routes: DRV_GPIO_PIN_ROLE_5_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio6",
+        signal: "GPIO6",
+        routes: DRV_GPIO_PIN_ROLE_6_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio7",
+        signal: "GPIO7",
+        routes: DRV_GPIO_PIN_ROLE_7_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio8",
+        signal: "GPIO8",
+        routes: DRV_GPIO_PIN_ROLE_8_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio9",
+        signal: "GPIO9",
+        routes: DRV_GPIO_PIN_ROLE_9_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio10",
+        signal: "GPIO10",
+        routes: DRV_GPIO_PIN_ROLE_10_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio11",
+        signal: "GPIO11",
+        routes: DRV_GPIO_PIN_ROLE_11_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio12",
+        signal: "GPIO12",
+        routes: DRV_GPIO_PIN_ROLE_12_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio13",
+        signal: "GPIO13",
+        routes: DRV_GPIO_PIN_ROLE_13_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio14",
+        signal: "GPIO14",
+        routes: DRV_GPIO_PIN_ROLE_14_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio15",
+        signal: "GPIO15",
+        routes: DRV_GPIO_PIN_ROLE_15_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio16",
+        signal: "GPIO16",
+        routes: DRV_GPIO_PIN_ROLE_16_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio17",
+        signal: "GPIO17",
+        routes: DRV_GPIO_PIN_ROLE_17_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio18",
+        signal: "GPIO18",
+        routes: DRV_GPIO_PIN_ROLE_18_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio19",
+        signal: "GPIO19",
+        routes: DRV_GPIO_PIN_ROLE_19_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio20",
+        signal: "GPIO20",
+        routes: DRV_GPIO_PIN_ROLE_20_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "gpio21",
+        signal: "GPIO21",
+        routes: DRV_GPIO_PIN_ROLE_21_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+];
 pub const DRV_GPIO_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_GPIO_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_GPIO_CAPABILITY_TAGS: &[&str] = &[];
@@ -166,7 +574,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -194,7 +601,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -222,7 +628,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -250,7 +655,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -278,7 +682,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -306,7 +709,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -334,7 +736,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -362,7 +763,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -390,7 +790,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -418,7 +817,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -446,7 +844,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -474,7 +871,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -502,7 +898,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -530,7 +925,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -558,7 +952,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -586,7 +979,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -614,7 +1006,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -642,7 +1033,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -670,7 +1060,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -698,7 +1087,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -726,7 +1114,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -754,7 +1141,6 @@ impl GPIOPort {
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
             out_w1tc_addr: 0x6000400Cu64,
-            enable_addr: 0x60004020u64,
             enable_w1ts_addr: 0x60004024u64,
             enable_w1tc_addr: 0x60004028u64,
             input_addr: 0x6000403Cu64,
@@ -772,8 +1158,6 @@ impl GPIOPort {
             fun_ie_mask: 0x00000200u32,
         }
     }
-
-
 }
 
 #[derive(Debug, Clone)]
@@ -784,7 +1168,6 @@ pub struct GPIOPortFlex {
     out_addr: u64,
     out_w1ts_addr: u64,
     out_w1tc_addr: u64,
-    enable_addr: u64,
     enable_w1ts_addr: u64,
     enable_w1tc_addr: u64,
     input_addr: u64,
@@ -837,15 +1220,27 @@ impl GPIOPortFlex {
 
     pub fn set_as_input(&self, pull: Pull) -> Result<(), metadata::Error> {
         self.set_pull(pull)?;
-        modify_u32(self.io_mux_addr, self.mcu_sel_mask | self.fun_ie_mask, self.fun_ie_mask)?;
+        modify_u32(
+            self.io_mux_addr,
+            self.mcu_sel_mask | self.fun_ie_mask,
+            self.fun_ie_mask,
+        )?;
         write_u32(self.enable_w1tc_addr, self.bit_mask)?;
         Ok(())
     }
 
     pub fn set_as_output(&self, initial_level: Level) -> Result<(), metadata::Error> {
-        modify_u32(self.out_sel_cfg_addr, self.out_sel_clear_mask | self.inv_sel_mask | self.oen_sel_mask | self.oen_inv_sel_mask, self.out_sel_gpio_mask)?;
+        modify_u32(
+            self.out_sel_cfg_addr,
+            self.out_sel_clear_mask | self.inv_sel_mask | self.oen_sel_mask | self.oen_inv_sel_mask,
+            self.out_sel_gpio_mask,
+        )?;
         self.set_level(initial_level)?;
-        modify_u32(self.io_mux_addr, self.mcu_sel_mask | self.fun_ie_mask, 0x00000000u32)?;
+        modify_u32(
+            self.io_mux_addr,
+            self.mcu_sel_mask | self.fun_ie_mask,
+            0x00000000u32,
+        )?;
         write_u32(self.enable_w1ts_addr, self.bit_mask)?;
         Ok(())
     }
@@ -856,7 +1251,11 @@ impl GPIOPortFlex {
             Pull::Up => self.fun_wpu_mask,
             Pull::Down => self.fun_wpd_mask,
         };
-        modify_u32(self.io_mux_addr, self.fun_wpu_mask | self.fun_wpd_mask, set_mask)?;
+        modify_u32(
+            self.io_mux_addr,
+            self.fun_wpu_mask | self.fun_wpd_mask,
+            set_mask,
+        )?;
         Ok(())
     }
 
@@ -869,7 +1268,11 @@ impl GPIOPortFlex {
     }
 
     pub fn get_level(&self) -> Result<Level, metadata::Error> {
-        Ok(if self.is_high()? { Level::High } else { Level::Low })
+        Ok(if self.is_high()? {
+            Level::High
+        } else {
+            Level::Low
+        })
     }
 
     pub fn is_set_high(&self) -> Result<bool, metadata::Error> {
@@ -881,7 +1284,11 @@ impl GPIOPortFlex {
     }
 
     pub fn get_output_level(&self) -> Result<Level, metadata::Error> {
-        Ok(if self.is_set_high()? { Level::High } else { Level::Low })
+        Ok(if self.is_set_high()? {
+            Level::High
+        } else {
+            Level::Low
+        })
     }
 
     pub fn set_high(&self) -> Result<(), metadata::Error> {
@@ -973,4 +1380,3 @@ impl GPIOPortOutput {
         self.pin.get_output_level()
     }
 }
-

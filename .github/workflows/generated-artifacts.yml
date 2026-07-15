@@ -166,6 +166,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
+          components: rustfmt, clippy
           targets: riscv32imc-unknown-none-elf
 
       - name: Build checked-in Embassy HAL crate
@@ -173,6 +174,18 @@ jobs:
         run: |
           set -euo pipefail
           cargo check --target riscv32imc-unknown-none-elf --manifest-path evidence/espressif/esp32-c3fn4/generated/embassy/Cargo.toml
+
+      - name: Check checked-in Embassy HAL formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path evidence/espressif/esp32-c3fn4/generated/embassy/Cargo.toml --check
+
+      - name: Lint checked-in Embassy HAL crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy --target riscv32imc-unknown-none-elf --manifest-path evidence/espressif/esp32-c3fn4/generated/embassy/Cargo.toml --lib -- -D warnings
 
       - name: Discover smoke harnesses
         id: discover-smoke

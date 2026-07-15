@@ -5,10 +5,13 @@ use core::ptr::{read_volatile, write_volatile};
 
 #[allow(dead_code)]
 fn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {
-    let address = usize::try_from(address)
-        .map_err(|_| metadata::Error::Unsupported("MMIO address does not fit usize on this target"))?;
+    let address = usize::try_from(address).map_err(|_| {
+        metadata::Error::Unsupported("MMIO address does not fit usize on this target")
+    })?;
     if address % align != 0 {
-        return Err(metadata::Error::Unsupported("MMIO address is not naturally aligned for the target register width"));
+        return Err(metadata::Error::Unsupported(
+            "MMIO address is not naturally aligned for the target register width",
+        ));
     }
     Ok(address)
 }
@@ -97,17 +100,126 @@ pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProven
 };
 
 // Driver instance: SSI0 (spi) from canonical block block.ssi0 -> spi
-pub const DRV_SSI0_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.ssi0", name: "SSI0", consumer_ref: "periph.ssi0", clock_ref: "clock.sysclk", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.sysctl.rcgc1"], enable_operation_refs: &[], disable_operation_refs: &[] }];
-pub const DRV_SSI0_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding { id: "rst.ssi0", name: "SSI0", target_ref: "periph.ssi0", controller_ref: Some("block.rcc"), reset_domain_ref: Some("rd.software"), binding_kind: "software", control_refs: &["reg.sysctl.srcr1"], assert_operation_refs: &[], release_operation_refs: &[] }];
-pub const DRV_SSI0_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource { id: "isrc.ssi0", name: "SSI0 interrupt source", source_ref: "periph.ssi0", producer_ref: Some("periph.ssi0"), kind: "peripheral", flag_refs: &[], clear_operation_refs: &[] }];
-pub const DRV_SSI0_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute { id: "iroute.ssi0", name: "SSI0 interrupt source route", source_ref: "isrc.ssi0", interrupt_ref: "int.ssi0", controller_ref: "block.nvic", cpu_target_ref: Some("block.cpu0"), line_index: None, route_type: "hardwired", control_refs: &[], acknowledge_operation_refs: &[], shared_group: None }];
+pub const DRV_SSI0_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding {
+    id: "clk.ssi0",
+    name: "SSI0",
+    consumer_ref: "periph.ssi0",
+    clock_ref: "clock.sysclk",
+    controller_ref: Some("block.rcc"),
+    binding_kind: "gated",
+    control_refs: &["reg.sysctl.rcgc1"],
+    enable_operation_refs: &[],
+    disable_operation_refs: &[],
+}];
+pub const DRV_SSI0_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::ResetBinding {
+    id: "rst.ssi0",
+    name: "SSI0",
+    target_ref: "periph.ssi0",
+    controller_ref: Some("block.rcc"),
+    reset_domain_ref: Some("rd.software"),
+    binding_kind: "software",
+    control_refs: &["reg.sysctl.srcr1"],
+    assert_operation_refs: &[],
+    release_operation_refs: &[],
+}];
+pub const DRV_SSI0_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource {
+    id: "isrc.ssi0",
+    name: "SSI0 interrupt source",
+    source_ref: "periph.ssi0",
+    producer_ref: Some("periph.ssi0"),
+    kind: "peripheral",
+    flag_refs: &[],
+    clear_operation_refs: &[],
+}];
+pub const DRV_SSI0_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute {
+    id: "iroute.ssi0",
+    name: "SSI0 interrupt source route",
+    source_ref: "isrc.ssi0",
+    interrupt_ref: "int.ssi0",
+    controller_ref: "block.nvic",
+    cpu_target_ref: Some("block.cpu0"),
+    line_index: None,
+    route_type: "hardwired",
+    control_refs: &[],
+    acknowledge_operation_refs: &[],
+    shared_group: None,
+}];
 pub const DRV_SSI0_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_SSI0_DMA_ROUTES: &[metadata::DmaRoute] = &[];
-pub const DRV_SSI0_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.ssi0.sck.pa2", name: "SSI0 CLK on PA2", pin_ref: "pin.pa2", peripheral_ref: "periph.ssi0", signal: "SCK", route_type: "hardwired", control_refs: &["reg.gpioa.afsel", "reg.gpioa.den"], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(false) }];
-pub const DRV_SSI0_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.ssi0.miso.pa4", name: "SSI0 RX on PA4", pin_ref: "pin.pa4", peripheral_ref: "periph.ssi0", signal: "MISO", route_type: "hardwired", control_refs: &["reg.gpioa.afsel", "reg.gpioa.den"], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(false) }];
-pub const DRV_SSI0_PIN_ROLE_2_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.ssi0.mosi.pa5", name: "SSI0 TX on PA5", pin_ref: "pin.pa5", peripheral_ref: "periph.ssi0", signal: "MOSI", route_type: "hardwired", control_refs: &["reg.gpioa.afsel", "reg.gpioa.den"], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(false) }];
-pub const DRV_SSI0_PIN_ROLE_3_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute { id: "pinroute.ssi0.fss.pa3", name: "SSI0 FSS on PA3", pin_ref: "pin.pa3", peripheral_ref: "periph.ssi0", signal: "FSS", route_type: "hardwired", control_refs: &["reg.gpioa.afsel", "reg.gpioa.den"], electrical_constraint_refs: &[], conflict_refs: &[], default_after_reset: Some(false) }];
-pub const DRV_SSI0_PIN_ROLES: &[metadata::PinRole] = &[metadata::PinRole { role: "sck", signal: "SCK", routes: DRV_SSI0_PIN_ROLE_0_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "miso", signal: "MISO", routes: DRV_SSI0_PIN_ROLE_1_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "mosi", signal: "MOSI", routes: DRV_SSI0_PIN_ROLE_2_ROUTES, requirement: metadata::ResourceRequirement::Required }, metadata::PinRole { role: "fss", signal: "FSS", routes: DRV_SSI0_PIN_ROLE_3_ROUTES, requirement: metadata::ResourceRequirement::Optional }];
+pub const DRV_SSI0_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.ssi0.sck.pa2",
+    name: "SSI0 CLK on PA2",
+    pin_ref: "pin.pa2",
+    peripheral_ref: "periph.ssi0",
+    signal: "SCK",
+    route_type: "hardwired",
+    control_refs: &["reg.gpioa.afsel", "reg.gpioa.den"],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(false),
+}];
+pub const DRV_SSI0_PIN_ROLE_1_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.ssi0.miso.pa4",
+    name: "SSI0 RX on PA4",
+    pin_ref: "pin.pa4",
+    peripheral_ref: "periph.ssi0",
+    signal: "MISO",
+    route_type: "hardwired",
+    control_refs: &["reg.gpioa.afsel", "reg.gpioa.den"],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(false),
+}];
+pub const DRV_SSI0_PIN_ROLE_2_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.ssi0.mosi.pa5",
+    name: "SSI0 TX on PA5",
+    pin_ref: "pin.pa5",
+    peripheral_ref: "periph.ssi0",
+    signal: "MOSI",
+    route_type: "hardwired",
+    control_refs: &["reg.gpioa.afsel", "reg.gpioa.den"],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(false),
+}];
+pub const DRV_SSI0_PIN_ROLE_3_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
+    id: "pinroute.ssi0.fss.pa3",
+    name: "SSI0 FSS on PA3",
+    pin_ref: "pin.pa3",
+    peripheral_ref: "periph.ssi0",
+    signal: "FSS",
+    route_type: "hardwired",
+    control_refs: &["reg.gpioa.afsel", "reg.gpioa.den"],
+    electrical_constraint_refs: &[],
+    conflict_refs: &[],
+    default_after_reset: Some(false),
+}];
+pub const DRV_SSI0_PIN_ROLES: &[metadata::PinRole] = &[
+    metadata::PinRole {
+        role: "sck",
+        signal: "SCK",
+        routes: DRV_SSI0_PIN_ROLE_0_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "miso",
+        signal: "MISO",
+        routes: DRV_SSI0_PIN_ROLE_1_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "mosi",
+        signal: "MOSI",
+        routes: DRV_SSI0_PIN_ROLE_2_ROUTES,
+        requirement: metadata::ResourceRequirement::Required,
+    },
+    metadata::PinRole {
+        role: "fss",
+        signal: "FSS",
+        routes: DRV_SSI0_PIN_ROLE_3_ROUTES,
+        requirement: metadata::ResourceRequirement::Optional,
+    },
+];
 pub const DRV_SSI0_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_SSI0_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_SSI0_CAPABILITY_TAGS: &[&str] = &[];

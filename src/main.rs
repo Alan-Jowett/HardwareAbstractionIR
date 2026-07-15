@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::process::{self, Command};
+use std::process::{self, Command, Stdio};
 use std::sync::Mutex;
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -280,7 +280,60 @@ fn write_generated_text(path: &Path, contents: &str) -> Result<()> {
         fs::create_dir_all(parent)
             .with_context(|| format!("creating output directory {}", parent.display()))?;
     }
-    fs::write(path, contents).with_context(|| format!("writing {}", path.display()))
+    let rendered = if path.extension().is_some_and(|ext| ext == "rs") {
+        format_generated_rust_source(contents)
+            .with_context(|| format!("formatting generated Rust source for {}", path.display()))?
+    } else {
+        contents.to_string()
+    };
+    fs::write(path, rendered).with_context(|| format!("writing {}", path.display()))
+}
+
+fn format_generated_rust_source(contents: &str) -> Result<String> {
+    let mut child = Command::new("rustfmt")
+        .args(["--edition", "2024", "--emit", "stdout"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .context("spawning rustfmt for generated Rust source")?;
+    child
+        .stdin
+        .as_mut()
+        .context("opening rustfmt stdin")?
+        .write_all(contents.as_bytes())
+        .context("writing generated Rust source to rustfmt")?;
+    let output = child
+        .wait_with_output()
+        .context("waiting for rustfmt to finish formatting generated Rust source")?;
+    if !output.status.success() {
+        bail!(
+            "rustfmt failed for generated Rust source: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+    let mut rendered = String::from_utf8(output.stdout)
+        .context("decoding rustfmt output for generated Rust source")?;
+    if !rendered.ends_with('\n') {
+        rendered.push('\n');
+    }
+    Ok(rendered)
+}
+
+fn format_u32_shift_left(expr: &str, shift: u32) -> String {
+    if shift == 0 {
+        expr.to_string()
+    } else {
+        format!("({expr}) << {shift}")
+    }
+}
+
+fn format_u32_masked_shift_right(expr: &str, mask: u32, shift: u32) -> String {
+    if shift == 0 {
+        format!("({expr}) & 0x{mask:08X}u32")
+    } else {
+        format!("(({expr}) & 0x{mask:08X}u32) >> {shift}")
+    }
 }
 
 fn run_diff(left: &str, right: &str) -> Result<CommandOutcome> {
@@ -5523,13 +5576,13 @@ fn render_counter_compare_time_driver_support_items(
 
     let set_alarm_enable_impl = match layout.interrupt_enable.register.width_bits {
         8 => {
-            "        let set_mask = enabled.then_some(GENERATED_TIME_INTERRUPT_ENABLE_MASK as u8).unwrap_or(0u8);\n        must_modify_u8(GENERATED_TIME_INTERRUPT_ENABLE_ADDRESS, GENERATED_TIME_INTERRUPT_ENABLE_MASK as u8, set_mask);\n".to_string()
+            "        let set_mask = if enabled {\n            GENERATED_TIME_INTERRUPT_ENABLE_MASK as u8\n        } else {\n            0u8\n        };\n        must_modify_u8(GENERATED_TIME_INTERRUPT_ENABLE_ADDRESS, GENERATED_TIME_INTERRUPT_ENABLE_MASK as u8, set_mask);\n".to_string()
         }
         16 => {
-            "        let set_mask = enabled.then_some(GENERATED_TIME_INTERRUPT_ENABLE_MASK as u16).unwrap_or(0u16);\n        must_modify_u16(GENERATED_TIME_INTERRUPT_ENABLE_ADDRESS, GENERATED_TIME_INTERRUPT_ENABLE_MASK as u16, set_mask);\n".to_string()
+            "        let set_mask = if enabled {\n            GENERATED_TIME_INTERRUPT_ENABLE_MASK as u16\n        } else {\n            0u16\n        };\n        must_modify_u16(GENERATED_TIME_INTERRUPT_ENABLE_ADDRESS, GENERATED_TIME_INTERRUPT_ENABLE_MASK as u16, set_mask);\n".to_string()
         }
         32 => {
-            "        let set_mask = enabled.then_some(GENERATED_TIME_INTERRUPT_ENABLE_MASK).unwrap_or(0u32);\n        must_modify_u32(GENERATED_TIME_INTERRUPT_ENABLE_ADDRESS, GENERATED_TIME_INTERRUPT_ENABLE_MASK, set_mask);\n".to_string()
+            "        let set_mask = if enabled {\n            GENERATED_TIME_INTERRUPT_ENABLE_MASK\n        } else {\n            0u32\n        };\n        must_modify_u32(GENERATED_TIME_INTERRUPT_ENABLE_ADDRESS, GENERATED_TIME_INTERRUPT_ENABLE_MASK, set_mask);\n".to_string()
         }
         other => bail!(
             "counter-compare time driver uses unsupported interrupt-enable register width {}",
@@ -5610,7 +5663,7 @@ fn render_rtc_time_driver_support_items(
         .replace("?;\n", ";\n");
 
     Ok(format!(
-        "\nuse core::cell::{{Cell, RefCell}};\nuse critical_section::Mutex as CriticalSectionMutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nconst GENERATED_RTC_CNTH_ADDRESS: u64 = 0x{cnth_addr:X}u64;\nconst GENERATED_RTC_CNTL_ADDRESS: u64 = 0x{cntl_addr:X}u64;\nconst GENERATED_RTC_ALRMH_ADDRESS: u64 = 0x{alrmh_addr:X}u64;\nconst GENERATED_RTC_ALRML_ADDRESS: u64 = 0x{alrml_addr:X}u64;\nconst GENERATED_RTC_PSCRH_ADDRESS: u64 = 0x{pscrh_addr:X}u64;\nconst GENERATED_RTC_PSCRL_ADDRESS: u64 = 0x{pscrl_addr:X}u64;\nconst GENERATED_RTC_CTLRH_ADDRESS: u64 = 0x{ctlrh_addr:X}u64;\nconst GENERATED_RTC_CTLRH_ALRIE_MASK: u16 = 0x{alrie_mask:04X}u16;\nconst GENERATED_RTC_CTLRL_ADDRESS: u64 = 0x{ctlrl_addr:X}u64;\nconst GENERATED_RTC_CTLRL_ALRF_MASK: u16 = 0x{alrf_mask:04X}u16;\nconst GENERATED_RTC_CTLRL_CNF_MASK: u16 = 0x{cnf_mask:04X}u16;\nconst GENERATED_RTC_CTLRL_RTOFF_MASK: u16 = 0x{rtoff_mask:04X}u16;\nconst GENERATED_RTC_CTLRL_RSF_MASK: u16 = 0x{rsf_mask:04X}u16;\nconst GENERATED_RTC_TICK_HZ: u64 = {tick_hz}u64;\nconst GENERATED_RTC_PRESCALER_RELOAD: u32 = {prescaler_reload}u32;\nconst GENERATED_RCC_RSTSCKR_ADDRESS: u64 = 0x{rstsckr_addr:X}u64;\nconst GENERATED_RCC_RSTSCKR_LSION_MASK: u32 = 0x{lsion_mask:08X}u32;\nconst GENERATED_RCC_RSTSCKR_LSIRDY_MASK: u32 = 0x{lsirdy_mask:08X}u32;\nconst GENERATED_RCC_BDCTLR_ADDRESS: u64 = 0x{bdctlr_addr:X}u64;\nconst GENERATED_RCC_BDCTLR_RTCSEL_MASK: u32 = 0x{rtcsel_mask:08X}u32;\nconst GENERATED_RCC_BDCTLR_RTCSEL_LSI_MASK: u32 = 0x{rtcsel_lsi_mask:08X}u32;\nconst GENERATED_RCC_BDCTLR_RTCEN_MASK: u32 = 0x{rtcen_mask:08X}u32;\nconst GENERATED_RCC_BDCTLR_BDRST_MASK: u32 = 0x{bdrst_mask:08X}u32;\nconst GENERATED_PWR_CTLR_ADDRESS: u64 = 0x{pwr_ctlr_addr:X}u64;\nconst GENERATED_PWR_CTLR_DBP_MASK: u32 = 0x{dbp_mask:08X}u32;\n\nstruct GeneratedRtcTimeDriver {{\n    initialized: CriticalSectionMutex<Cell<bool>>,\n    wraps: CriticalSectionMutex<Cell<u64>>,\n    last_raw: CriticalSectionMutex<Cell<u32>>,\n    queue: CriticalSectionMutex<RefCell<EmbassyTimeQueue>>,\n}}\n\nimpl GeneratedRtcTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            initialized: CriticalSectionMutex::new(Cell::new(false)),\n            wraps: CriticalSectionMutex::new(Cell::new(0)),\n            last_raw: CriticalSectionMutex::new(Cell::new(0)),\n            queue: CriticalSectionMutex::new(RefCell::new(EmbassyTimeQueue::new())),\n        }}\n    }}\n\n    fn wait_for_lsi_ready(&self) {{\n        must_modify_u32(\n            GENERATED_RCC_RSTSCKR_ADDRESS,\n            GENERATED_RCC_RSTSCKR_LSION_MASK,\n            GENERATED_RCC_RSTSCKR_LSION_MASK,\n        );\n        while (must_read_u32(GENERATED_RCC_RSTSCKR_ADDRESS) & GENERATED_RCC_RSTSCKR_LSIRDY_MASK) == 0 {{\n            core::hint::spin_loop();\n        }}\n    }}\n\n    fn wait_for_rtc_write_ready(&self) {{\n        while (must_read_u16(GENERATED_RTC_CTLRL_ADDRESS) & GENERATED_RTC_CTLRL_RTOFF_MASK) == 0 {{\n            core::hint::spin_loop();\n        }}\n    }}\n\n    fn synchronize_rtc_registers(&self) {{\n        must_modify_u16(GENERATED_RTC_CTLRL_ADDRESS, GENERATED_RTC_CTLRL_RSF_MASK, 0u16);\n        while (must_read_u16(GENERATED_RTC_CTLRL_ADDRESS) & GENERATED_RTC_CTLRL_RSF_MASK) == 0 {{\n            core::hint::spin_loop();\n        }}\n    }}\n\n    fn enter_config_mode(&self) {{\n        self.wait_for_rtc_write_ready();\n        must_modify_u16(\n            GENERATED_RTC_CTLRL_ADDRESS,\n            GENERATED_RTC_CTLRL_CNF_MASK,\n            GENERATED_RTC_CTLRL_CNF_MASK,\n        );\n    }}\n\n    fn exit_config_mode(&self) {{\n        must_modify_u16(GENERATED_RTC_CTLRL_ADDRESS, GENERATED_RTC_CTLRL_CNF_MASK, 0u16);\n        self.wait_for_rtc_write_ready();\n    }}\n\n    fn read_split32(&self, high_address: u64, low_address: u64) -> u32 {{\n        loop {{\n            let high_1 = u32::from(must_read_u16(high_address));\n            let low = u32::from(must_read_u16(low_address));\n            let high_2 = u32::from(must_read_u16(high_address));\n            if high_1 == high_2 {{\n                return (high_1 << 16) | low;\n            }}\n        }}\n    }}\n\n    fn write_split32(&self, high_address: u64, low_address: u64, value: u32) {{\n        must_write_u16(high_address, (value >> 16) as u16);\n        must_write_u16(low_address, value as u16);\n    }}\n\n    fn read_raw_counter(&self) -> u32 {{\n        self.read_split32(GENERATED_RTC_CNTH_ADDRESS, GENERATED_RTC_CNTL_ADDRESS)\n    }}\n\n    fn read_now(&self) -> u64 {{\n        critical_section::with(|cs| {{\n            let raw = self.read_raw_counter();\n            let last = self.last_raw.borrow(cs).get();\n            let mut wraps = self.wraps.borrow(cs).get();\n            if raw < last {{\n                wraps = wraps.wrapping_add(1);\n                self.wraps.borrow(cs).set(wraps);\n            }}\n            self.last_raw.borrow(cs).set(raw);\n            (wraps << 32) | u64::from(raw)\n        }})\n    }}\n\n    fn set_alarm_enabled(&self, enabled: bool) {{\n        let set_mask = enabled.then_some(GENERATED_RTC_CTLRH_ALRIE_MASK).unwrap_or(0u16);\n        must_modify_u16(\n            GENERATED_RTC_CTLRH_ADDRESS,\n            GENERATED_RTC_CTLRH_ALRIE_MASK,\n            set_mask,\n        );\n    }}\n\n    fn clear_alarm_flag(&self) {{\n{clear_statement}    }}\n\n    fn is_alarm_pending(&self) -> bool {{\n        (must_read_u16(GENERATED_RTC_CTLRL_ADDRESS) & GENERATED_RTC_CTLRL_ALRF_MASK) != 0\n    }}\n\n    fn arm_alarm(&self, at: u64) {{\n        self.enter_config_mode();\n        self.write_split32(\n            GENERATED_RTC_ALRMH_ADDRESS,\n            GENERATED_RTC_ALRML_ADDRESS,\n            at as u32,\n        );\n        self.exit_config_mode();\n        self.clear_alarm_flag();\n        self.set_alarm_enabled(true);\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        critical_section::with(|cs| {{\n            if self.initialized.borrow(cs).get() {{\n                return Ok(());\n            }}\n            self.wait_for_lsi_ready();\n            must_modify_u32(\n                GENERATED_PWR_CTLR_ADDRESS,\n                GENERATED_PWR_CTLR_DBP_MASK,\n                GENERATED_PWR_CTLR_DBP_MASK,\n            );\n            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_BDRST_MASK,\n                GENERATED_RCC_BDCTLR_BDRST_MASK,\n            );\n                    must_modify_u32(GENERATED_RCC_BDCTLR_ADDRESS, GENERATED_RCC_BDCTLR_BDRST_MASK, 0u32);\n            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_RTCSEL_MASK,\n                GENERATED_RCC_BDCTLR_RTCSEL_LSI_MASK,\n            );\n            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_RTCEN_MASK,\n                GENERATED_RCC_BDCTLR_RTCEN_MASK,\n            );\n{route_control_statement}            self.synchronize_rtc_registers();\n            self.enter_config_mode();\n            self.write_split32(\n                GENERATED_RTC_PSCRH_ADDRESS,\n                GENERATED_RTC_PSCRL_ADDRESS,\n                GENERATED_RTC_PRESCALER_RELOAD,\n            );\n            self.write_split32(GENERATED_RTC_CNTH_ADDRESS, GENERATED_RTC_CNTL_ADDRESS, 0u32);\n            self.write_split32(\n                GENERATED_RTC_ALRMH_ADDRESS,\n                GENERATED_RTC_ALRML_ADDRESS,\n                u32::MAX,\n            );\n            self.exit_config_mode();\n            self.clear_alarm_flag();\n            self.set_alarm_enabled(false);\n            self.wraps.borrow(cs).set(0);\n            self.last_raw.borrow(cs).set(self.read_raw_counter());\n            self.initialized.borrow(cs).set(true);\n            Ok(())\n        }})\n    }}\n\n    fn on_interrupt(&self) {{\n        if !critical_section::with(|cs| self.initialized.borrow(cs).get()) || !self.is_alarm_pending() {{\n            return;\n        }}\n        self.clear_alarm_flag();\n        let now = self.read_now();\n        critical_section::with(|cs| {{\n            let mut queue = self.queue.borrow(cs).borrow_mut();\n            let next = queue.next_expiration(now);\n            if next == u64::MAX {{\n                self.set_alarm_enabled(false);\n            }} else {{\n                self.arm_alarm(next);\n            }}\n        }});\n    }}\n\n    fn delay_ticks(&self, ticks: u64) -> Result<(), metadata::Error> {{\n        let start = self.read_now();\n        let deadline = start.wrapping_add(ticks);\n        loop {{\n            let now = self.read_now();\n            if now.wrapping_sub(deadline) < (1u64 << 63) {{\n                break;\n            }}\n            core::hint::spin_loop();\n        }}\n        Ok(())\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedRtcTimeDriver {{\n    fn now(&self) -> u64 {{\n        self.read_now()\n    }}\n\n    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {{\n        let should_rearm = critical_section::with(|cs| {{\n            self.queue.borrow(cs).borrow_mut().schedule_wake(at, waker)\n        }});\n        if !should_rearm {{\n            return;\n        }}\n        let now = self.read_now();\n        critical_section::with(|cs| {{\n            let next = self.queue.borrow(cs).borrow_mut().next_expiration(now);\n            if next == u64::MAX {{\n                self.set_alarm_enabled(false);\n            }} else {{\n                self.arm_alarm(next);\n            }}\n        }});\n    }}\n}}\n\n#[allow(dead_code)]\nfn must_read_u16(address: u64) -> u16 {{\n    read_u16(address).expect(\"generated rtc time-driver MMIO read\")\n}}\n\n#[allow(dead_code)]\nfn must_read_u32(address: u64) -> u32 {{\n    read_u32(address).expect(\"generated rtc time-driver MMIO read\")\n}}\n\n#[allow(dead_code)]\nfn must_modify_u16(address: u64, clear_mask: u16, set_mask: u16) {{\n    modify_u16(address, clear_mask, set_mask).expect(\"generated rtc time-driver MMIO write\")\n}}\n\n#[allow(dead_code)]\nfn must_modify_u32(address: u64, clear_mask: u32, set_mask: u32) {{\n    modify_u32(address, clear_mask, set_mask).expect(\"generated rtc time-driver MMIO write\")\n}}\n\n#[allow(dead_code)]\nfn must_write_u16(address: u64, value: u16) {{\n    write_u16(address, value).expect(\"generated rtc time-driver MMIO write\")\n}}\n\nembassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedRtcTimeDriver = GeneratedRtcTimeDriver::new());\n\n#[allow(dead_code)]\npub fn generated_{driver_prefix}_time_driver_interrupt() {{\n    GENERATED_TIME_DRIVER.on_interrupt();\n}}\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    let _ = GENERATED_RTC_TICK_HZ;\n    GENERATED_TIME_DRIVER.init()\n}}\n\nfn generated_{driver_prefix}_time_driver_now() -> u64 {{\n    GENERATED_TIME_DRIVER.now()\n}}\n\nfn generated_{driver_prefix}_time_driver_delay_ticks(ticks: u64) -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.delay_ticks(ticks)\n}}\n",
+        "\nuse core::cell::{{Cell, RefCell}};\nuse critical_section::Mutex as CriticalSectionMutex;\nuse embassy_time_driver::Driver as EmbassyTimeDriver;\nuse embassy_time_queue_utils::Queue as EmbassyTimeQueue;\n\nconst GENERATED_RTC_CNTH_ADDRESS: u64 = 0x{cnth_addr:X}u64;\nconst GENERATED_RTC_CNTL_ADDRESS: u64 = 0x{cntl_addr:X}u64;\nconst GENERATED_RTC_ALRMH_ADDRESS: u64 = 0x{alrmh_addr:X}u64;\nconst GENERATED_RTC_ALRML_ADDRESS: u64 = 0x{alrml_addr:X}u64;\nconst GENERATED_RTC_PSCRH_ADDRESS: u64 = 0x{pscrh_addr:X}u64;\nconst GENERATED_RTC_PSCRL_ADDRESS: u64 = 0x{pscrl_addr:X}u64;\nconst GENERATED_RTC_CTLRH_ADDRESS: u64 = 0x{ctlrh_addr:X}u64;\nconst GENERATED_RTC_CTLRH_ALRIE_MASK: u16 = 0x{alrie_mask:04X}u16;\nconst GENERATED_RTC_CTLRL_ADDRESS: u64 = 0x{ctlrl_addr:X}u64;\nconst GENERATED_RTC_CTLRL_ALRF_MASK: u16 = 0x{alrf_mask:04X}u16;\nconst GENERATED_RTC_CTLRL_CNF_MASK: u16 = 0x{cnf_mask:04X}u16;\nconst GENERATED_RTC_CTLRL_RTOFF_MASK: u16 = 0x{rtoff_mask:04X}u16;\nconst GENERATED_RTC_CTLRL_RSF_MASK: u16 = 0x{rsf_mask:04X}u16;\nconst GENERATED_RTC_TICK_HZ: u64 = {tick_hz}u64;\nconst GENERATED_RTC_PRESCALER_RELOAD: u32 = {prescaler_reload}u32;\nconst GENERATED_RCC_RSTSCKR_ADDRESS: u64 = 0x{rstsckr_addr:X}u64;\nconst GENERATED_RCC_RSTSCKR_LSION_MASK: u32 = 0x{lsion_mask:08X}u32;\nconst GENERATED_RCC_RSTSCKR_LSIRDY_MASK: u32 = 0x{lsirdy_mask:08X}u32;\nconst GENERATED_RCC_BDCTLR_ADDRESS: u64 = 0x{bdctlr_addr:X}u64;\nconst GENERATED_RCC_BDCTLR_RTCSEL_MASK: u32 = 0x{rtcsel_mask:08X}u32;\nconst GENERATED_RCC_BDCTLR_RTCSEL_LSI_MASK: u32 = 0x{rtcsel_lsi_mask:08X}u32;\nconst GENERATED_RCC_BDCTLR_RTCEN_MASK: u32 = 0x{rtcen_mask:08X}u32;\nconst GENERATED_RCC_BDCTLR_BDRST_MASK: u32 = 0x{bdrst_mask:08X}u32;\nconst GENERATED_PWR_CTLR_ADDRESS: u64 = 0x{pwr_ctlr_addr:X}u64;\nconst GENERATED_PWR_CTLR_DBP_MASK: u32 = 0x{dbp_mask:08X}u32;\n\nstruct GeneratedRtcTimeDriver {{\n    initialized: CriticalSectionMutex<Cell<bool>>,\n    wraps: CriticalSectionMutex<Cell<u64>>,\n    last_raw: CriticalSectionMutex<Cell<u32>>,\n    queue: CriticalSectionMutex<RefCell<EmbassyTimeQueue>>,\n}}\n\nimpl GeneratedRtcTimeDriver {{\n    const fn new() -> Self {{\n        Self {{\n            initialized: CriticalSectionMutex::new(Cell::new(false)),\n            wraps: CriticalSectionMutex::new(Cell::new(0)),\n            last_raw: CriticalSectionMutex::new(Cell::new(0)),\n            queue: CriticalSectionMutex::new(RefCell::new(EmbassyTimeQueue::new())),\n        }}\n    }}\n\n    fn wait_for_lsi_ready(&self) {{\n        must_modify_u32(\n            GENERATED_RCC_RSTSCKR_ADDRESS,\n            GENERATED_RCC_RSTSCKR_LSION_MASK,\n            GENERATED_RCC_RSTSCKR_LSION_MASK,\n        );\n        while (must_read_u32(GENERATED_RCC_RSTSCKR_ADDRESS) & GENERATED_RCC_RSTSCKR_LSIRDY_MASK) == 0 {{\n            core::hint::spin_loop();\n        }}\n    }}\n\n    fn wait_for_rtc_write_ready(&self) {{\n        while (must_read_u16(GENERATED_RTC_CTLRL_ADDRESS) & GENERATED_RTC_CTLRL_RTOFF_MASK) == 0 {{\n            core::hint::spin_loop();\n        }}\n    }}\n\n    fn synchronize_rtc_registers(&self) {{\n        must_modify_u16(GENERATED_RTC_CTLRL_ADDRESS, GENERATED_RTC_CTLRL_RSF_MASK, 0u16);\n        while (must_read_u16(GENERATED_RTC_CTLRL_ADDRESS) & GENERATED_RTC_CTLRL_RSF_MASK) == 0 {{\n            core::hint::spin_loop();\n        }}\n    }}\n\n    fn enter_config_mode(&self) {{\n        self.wait_for_rtc_write_ready();\n        must_modify_u16(\n            GENERATED_RTC_CTLRL_ADDRESS,\n            GENERATED_RTC_CTLRL_CNF_MASK,\n            GENERATED_RTC_CTLRL_CNF_MASK,\n        );\n    }}\n\n    fn exit_config_mode(&self) {{\n        must_modify_u16(GENERATED_RTC_CTLRL_ADDRESS, GENERATED_RTC_CTLRL_CNF_MASK, 0u16);\n        self.wait_for_rtc_write_ready();\n    }}\n\n    fn read_split32(&self, high_address: u64, low_address: u64) -> u32 {{\n        loop {{\n            let high_1 = u32::from(must_read_u16(high_address));\n            let low = u32::from(must_read_u16(low_address));\n            let high_2 = u32::from(must_read_u16(high_address));\n            if high_1 == high_2 {{\n                return (high_1 << 16) | low;\n            }}\n        }}\n    }}\n\n    fn write_split32(&self, high_address: u64, low_address: u64, value: u32) {{\n        must_write_u16(high_address, (value >> 16) as u16);\n        must_write_u16(low_address, value as u16);\n    }}\n\n    fn read_raw_counter(&self) -> u32 {{\n        self.read_split32(GENERATED_RTC_CNTH_ADDRESS, GENERATED_RTC_CNTL_ADDRESS)\n    }}\n\n    fn read_now(&self) -> u64 {{\n        critical_section::with(|cs| {{\n            let raw = self.read_raw_counter();\n            let last = self.last_raw.borrow(cs).get();\n            let mut wraps = self.wraps.borrow(cs).get();\n            if raw < last {{\n                wraps = wraps.wrapping_add(1);\n                self.wraps.borrow(cs).set(wraps);\n            }}\n            self.last_raw.borrow(cs).set(raw);\n            (wraps << 32) | u64::from(raw)\n        }})\n    }}\n\n    fn set_alarm_enabled(&self, enabled: bool) {{\n                let set_mask = if enabled {{\n            GENERATED_RTC_CTLRH_ALRIE_MASK\n        }} else {{\n            0u16\n        }};\n        must_modify_u16(\n            GENERATED_RTC_CTLRH_ADDRESS,\n            GENERATED_RTC_CTLRH_ALRIE_MASK,\n            set_mask,\n        );\n    }}\n\n    fn clear_alarm_flag(&self) {{\n{clear_statement}    }}\n\n    fn is_alarm_pending(&self) -> bool {{\n        (must_read_u16(GENERATED_RTC_CTLRL_ADDRESS) & GENERATED_RTC_CTLRL_ALRF_MASK) != 0\n    }}\n\n    fn arm_alarm(&self, at: u64) {{\n        self.enter_config_mode();\n        self.write_split32(\n            GENERATED_RTC_ALRMH_ADDRESS,\n            GENERATED_RTC_ALRML_ADDRESS,\n            at as u32,\n        );\n        self.exit_config_mode();\n        self.clear_alarm_flag();\n        self.set_alarm_enabled(true);\n    }}\n\n    fn init(&self) -> Result<(), metadata::Error> {{\n        critical_section::with(|cs| {{\n            if self.initialized.borrow(cs).get() {{\n                return Ok(());\n            }}\n            self.wait_for_lsi_ready();\n            must_modify_u32(\n                GENERATED_PWR_CTLR_ADDRESS,\n                GENERATED_PWR_CTLR_DBP_MASK,\n                GENERATED_PWR_CTLR_DBP_MASK,\n            );\n            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_BDRST_MASK,\n                GENERATED_RCC_BDCTLR_BDRST_MASK,\n            );\n            must_modify_u32(GENERATED_RCC_BDCTLR_ADDRESS, GENERATED_RCC_BDCTLR_BDRST_MASK, 0u32);\n            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_RTCSEL_MASK,\n                GENERATED_RCC_BDCTLR_RTCSEL_LSI_MASK,\n            );\n            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_RTCEN_MASK,\n                GENERATED_RCC_BDCTLR_RTCEN_MASK,\n            );\n{route_control_statement}            self.synchronize_rtc_registers();\n            self.enter_config_mode();\n            self.write_split32(\n                GENERATED_RTC_PSCRH_ADDRESS,\n                GENERATED_RTC_PSCRL_ADDRESS,\n                GENERATED_RTC_PRESCALER_RELOAD,\n            );\n            self.write_split32(GENERATED_RTC_CNTH_ADDRESS, GENERATED_RTC_CNTL_ADDRESS, 0u32);\n            self.write_split32(\n                GENERATED_RTC_ALRMH_ADDRESS,\n                GENERATED_RTC_ALRML_ADDRESS,\n                u32::MAX,\n            );\n            self.exit_config_mode();\n            self.clear_alarm_flag();\n            self.set_alarm_enabled(false);\n            self.wraps.borrow(cs).set(0);\n            self.last_raw.borrow(cs).set(self.read_raw_counter());\n            self.initialized.borrow(cs).set(true);\n            Ok(())\n        }})\n    }}\n\n    fn on_interrupt(&self) {{\n        if !critical_section::with(|cs| self.initialized.borrow(cs).get()) || !self.is_alarm_pending() {{\n            return;\n        }}\n        self.clear_alarm_flag();\n        let now = self.read_now();\n        critical_section::with(|cs| {{\n            let mut queue = self.queue.borrow(cs).borrow_mut();\n            let next = queue.next_expiration(now);\n            if next == u64::MAX {{\n                self.set_alarm_enabled(false);\n            }} else {{\n                self.arm_alarm(next);\n            }}\n        }});\n    }}\n\n    fn delay_ticks(&self, ticks: u64) -> Result<(), metadata::Error> {{\n        let start = self.read_now();\n        let deadline = start.wrapping_add(ticks);\n        loop {{\n            let now = self.read_now();\n            if now.wrapping_sub(deadline) < (1u64 << 63) {{\n                break;\n            }}\n            core::hint::spin_loop();\n        }}\n        Ok(())\n    }}\n}}\n\nimpl EmbassyTimeDriver for GeneratedRtcTimeDriver {{\n    fn now(&self) -> u64 {{\n        self.read_now()\n    }}\n\n    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {{\n        let should_rearm = critical_section::with(|cs| {{\n            self.queue.borrow(cs).borrow_mut().schedule_wake(at, waker)\n        }});\n        if !should_rearm {{\n            return;\n        }}\n        let now = self.read_now();\n        critical_section::with(|cs| {{\n            let next = self.queue.borrow(cs).borrow_mut().next_expiration(now);\n            if next == u64::MAX {{\n                self.set_alarm_enabled(false);\n            }} else {{\n                self.arm_alarm(next);\n            }}\n        }});\n    }}\n}}\n\n#[allow(dead_code)]\nfn must_read_u16(address: u64) -> u16 {{\n    read_u16(address).expect(\"generated rtc time-driver MMIO read\")\n}}\n\n#[allow(dead_code)]\nfn must_read_u32(address: u64) -> u32 {{\n    read_u32(address).expect(\"generated rtc time-driver MMIO read\")\n}}\n\n#[allow(dead_code)]\nfn must_modify_u16(address: u64, clear_mask: u16, set_mask: u16) {{\n    modify_u16(address, clear_mask, set_mask).expect(\"generated rtc time-driver MMIO write\")\n}}\n\n#[allow(dead_code)]\nfn must_modify_u32(address: u64, clear_mask: u32, set_mask: u32) {{\n    modify_u32(address, clear_mask, set_mask).expect(\"generated rtc time-driver MMIO write\")\n}}\n\n#[allow(dead_code)]\nfn must_write_u16(address: u64, value: u16) {{\n    write_u16(address, value).expect(\"generated rtc time-driver MMIO write\")\n}}\n\nembassy_time_driver::time_driver_impl!(static GENERATED_TIME_DRIVER: GeneratedRtcTimeDriver = GeneratedRtcTimeDriver::new());\n\n#[allow(dead_code)]\npub fn generated_{driver_prefix}_time_driver_interrupt() {{\n    GENERATED_TIME_DRIVER.on_interrupt();\n}}\n\nfn {init_fn}() -> Result<(), metadata::Error> {{\n    let _ = GENERATED_RTC_TICK_HZ;\n    GENERATED_TIME_DRIVER.init()\n}}\n\nfn generated_{driver_prefix}_time_driver_now() -> u64 {{\n    GENERATED_TIME_DRIVER.now()\n}}\n\nfn generated_{driver_prefix}_time_driver_delay_ticks(ticks: u64) -> Result<(), metadata::Error> {{\n    GENERATED_TIME_DRIVER.delay_ticks(ticks)\n}}\n",
         cnth_addr = layout.counter_high.register.absolute_address,
         cntl_addr = layout.counter_low.register.absolute_address,
         alrmh_addr = layout.alarm_high.register.absolute_address,
@@ -6627,7 +6680,7 @@ fn render_gpio_methods(
             out,
             out_w1ts,
             out_w1tc,
-            enable,
+            enable: _,
             enable_w1ts,
             enable_w1tc,
             input,
@@ -6644,14 +6697,13 @@ fn render_gpio_methods(
                     pin.accessor_name, flex_type
                 ));
                 code.push_str(&format!(
-                    "        {} {{\n            resources: self.resources,\n            role: &self.resources.pins[{}],\n            pin_name: {},\n            out_addr: 0x{:X}u64,\n            out_w1ts_addr: 0x{:X}u64,\n            out_w1tc_addr: 0x{:X}u64,\n            enable_addr: 0x{:X}u64,\n            enable_w1ts_addr: 0x{:X}u64,\n            enable_w1tc_addr: 0x{:X}u64,\n            input_addr: 0x{:X}u64,\n            out_sel_cfg_addr: 0x{:X}u64,\n            out_sel_clear_mask: 0x{:08X}u32,\n            out_sel_gpio_mask: 0x{:08X}u32,\n            inv_sel_mask: 0x{:08X}u32,\n            oen_sel_mask: 0x{:08X}u32,\n            oen_inv_sel_mask: 0x{:08X}u32,\n            io_mux_addr: 0x{:X}u64,\n            mcu_sel_mask: 0x{:08X}u32,\n            bit_mask: 0x{:08X}u32,\n            fun_wpd_mask: 0x{:08X}u32,\n            fun_wpu_mask: 0x{:08X}u32,\n            fun_ie_mask: 0x{:08X}u32,\n        }}\n",
+                    "        {} {{\n            resources: self.resources,\n            role: &self.resources.pins[{}],\n            pin_name: {},\n            out_addr: 0x{:X}u64,\n            out_w1ts_addr: 0x{:X}u64,\n            out_w1tc_addr: 0x{:X}u64,\n            enable_w1ts_addr: 0x{:X}u64,\n            enable_w1tc_addr: 0x{:X}u64,\n            input_addr: 0x{:X}u64,\n            out_sel_cfg_addr: 0x{:X}u64,\n            out_sel_clear_mask: 0x{:08X}u32,\n            out_sel_gpio_mask: 0x{:08X}u32,\n            inv_sel_mask: 0x{:08X}u32,\n            oen_sel_mask: 0x{:08X}u32,\n            oen_inv_sel_mask: 0x{:08X}u32,\n            io_mux_addr: 0x{:X}u64,\n            mcu_sel_mask: 0x{:08X}u32,\n            bit_mask: 0x{:08X}u32,\n            fun_wpd_mask: 0x{:08X}u32,\n            fun_wpu_mask: 0x{:08X}u32,\n            fun_ie_mask: 0x{:08X}u32,\n        }}\n",
                     flex_type,
                     pin.role_index,
                     render_rust_string(&pin.pin_name),
                     out.absolute_address,
                     out_w1ts.absolute_address,
                     out_w1tc.absolute_address,
-                    enable.absolute_address,
                     enable_w1ts.absolute_address,
                     enable_w1tc.absolute_address,
                     input.absolute_address,
@@ -6739,7 +6791,6 @@ fn render_gpio_support_items(
             out.push_str("    out_addr: u64,\n");
             out.push_str("    out_w1ts_addr: u64,\n");
             out.push_str("    out_w1tc_addr: u64,\n");
-            out.push_str("    enable_addr: u64,\n");
             out.push_str("    enable_w1ts_addr: u64,\n");
             out.push_str("    enable_w1tc_addr: u64,\n");
             out.push_str("    input_addr: u64,\n");
@@ -8312,10 +8363,11 @@ fn render_usb_device_methods(
         "    pub fn write_serial_byte(&self, byte: u8) -> Result<(), metadata::Error> {\n",
     );
     write_byte.push_str("        while !self.serial_in_ready()? {}\n");
+    let rdwr_write_expr = format_u32_shift_left("u32::from(byte)", rdwr_byte_lsb);
     write_byte.push_str(&format!(
-        "        write_u32(0x{address:X}u64, u32::from(byte) << {rdwr_byte_lsb})?;\n",
+        "        write_u32(0x{address:X}u64, {rdwr_write_expr})?;\n",
         address = ep1.absolute_address,
-        rdwr_byte_lsb = rdwr_byte_lsb,
+        rdwr_write_expr = rdwr_write_expr,
     ));
     write_byte.push_str("        Ok(())\n    }\n");
     methods.push(GeneratedMethod {
@@ -8345,12 +8397,12 @@ fn render_usb_device_methods(
     );
     read_byte.push_str("    pub fn read_serial_byte(&self) -> Result<u8, metadata::Error> {\n");
     read_byte.push_str("        while !self.serial_out_data_available()? {}\n");
-    read_byte.push_str(&format!(
-        "        Ok(((read_u32(0x{address:X}u64)? & 0x{rdwr_byte_mask:08X}u32) >> {rdwr_byte_lsb}) as u8)\n",
-        address = ep1.absolute_address,
-        rdwr_byte_mask = rdwr_byte_mask,
-        rdwr_byte_lsb = rdwr_byte_lsb,
-    ));
+    let rdwr_read_expr = format_u32_masked_shift_right(
+        &format!("read_u32(0x{:X}u64)?", ep1.absolute_address),
+        rdwr_byte_mask,
+        rdwr_byte_lsb,
+    );
+    read_byte.push_str(&format!("        Ok(({rdwr_read_expr}) as u8)\n",));
     read_byte.push_str("    }\n");
     methods.push(GeneratedMethod {
         name: "read_serial_byte".to_string(),
@@ -8651,14 +8703,22 @@ fn render_stm32_usart_methods(
         code: configure_code,
     });
 
+    let mantissa_expr = format_u32_shift_left(
+        &format!("u32::from(mantissa) & 0x{mantissa_value_mask:X}u32"),
+        div_mantissa.lsb,
+    );
+    let fraction_expr = format_u32_shift_left(
+        &format!("u32::from(fraction) & 0x{fraction_value_mask:X}u32"),
+        div_fraction.lsb,
+    );
     methods.push(GeneratedMethod {
         name: "set_baud_divider".to_string(),
         code: format!(
-            "    pub fn set_baud_divider(&self, mantissa: u16, fraction: u8) -> Result<(), metadata::Error> {{\n        if u32::from(mantissa) > 0x{mantissa_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"USART baud mantissa exceeds modeled field width\"));\n        }}\n        if u32::from(fraction) > 0x{fraction_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"USART baud fraction exceeds modeled field width\"));\n        }}\n        modify_u32(0x{brr_address:X}u64, 0x{combined_clear_mask:08X}u32, ((u32::from(mantissa) & 0x{mantissa_value_mask:X}u32) << {mantissa_lsb}) | ((u32::from(fraction) & 0x{fraction_value_mask:X}u32) << {fraction_lsb}))?;\n        Ok(())\n    }}\n",
+            "    pub fn set_baud_divider(&self, mantissa: u16, fraction: u8) -> Result<(), metadata::Error> {{\n        if u32::from(mantissa) > 0x{mantissa_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"USART baud mantissa exceeds modeled field width\"));\n        }}\n        if u32::from(fraction) > 0x{fraction_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"USART baud fraction exceeds modeled field width\"));\n        }}\n        modify_u32(0x{brr_address:X}u64, 0x{combined_clear_mask:08X}u32, {mantissa_expr} | {fraction_expr})?;\n        Ok(())\n    }}\n",
             brr_address = brr.absolute_address,
             combined_clear_mask = mantissa_clear_mask | fraction_clear_mask,
-            mantissa_lsb = div_mantissa.lsb,
-            fraction_lsb = div_fraction.lsb,
+            mantissa_expr = mantissa_expr,
+            fraction_expr = fraction_expr,
         ),
     });
 
@@ -8869,14 +8929,22 @@ fn render_esp_uart_methods(
         code: configure_code,
     });
 
+    let clkdiv_expr = format_u32_shift_left(
+        &format!("u32::from(divider) & 0x{clkdiv_value_mask:X}u32"),
+        clkdiv_field.lsb,
+    );
+    let frag_expr = format_u32_shift_left(
+        &format!("u32::from(fraction) & 0x{frag_value_mask:X}u32"),
+        frag_field.lsb,
+    );
     methods.push(GeneratedMethod {
         name: "set_baud_divider".to_string(),
         code: format!(
-            "    pub fn set_baud_divider(&self, divider: u16, fraction: u8) -> Result<(), metadata::Error> {{\n        if u32::from(divider) > 0x{clkdiv_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"UART baud divider exceeds modeled field width\"));\n        }}\n        if u32::from(fraction) > 0x{frag_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"UART baud fraction exceeds modeled field width\"));\n        }}\n        modify_u32(0x{clkdiv_address:X}u64, 0x{combined_clear_mask:08X}u32, ((u32::from(divider) & 0x{clkdiv_value_mask:X}u32) << {clkdiv_lsb}) | ((u32::from(fraction) & 0x{frag_value_mask:X}u32) << {frag_lsb}))?;\n        Ok(())\n    }}\n",
+            "    pub fn set_baud_divider(&self, divider: u16, fraction: u8) -> Result<(), metadata::Error> {{\n        if u32::from(divider) > 0x{clkdiv_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"UART baud divider exceeds modeled field width\"));\n        }}\n        if u32::from(fraction) > 0x{frag_value_mask:X}u32 {{\n            return Err(metadata::Error::Unsupported(\"UART baud fraction exceeds modeled field width\"));\n        }}\n        modify_u32(0x{clkdiv_address:X}u64, 0x{combined_clear_mask:08X}u32, {clkdiv_expr} | {frag_expr})?;\n        Ok(())\n    }}\n",
             clkdiv_address = clkdiv.absolute_address,
             combined_clear_mask = clkdiv_clear_mask | frag_clear_mask,
-            clkdiv_lsb = clkdiv_field.lsb,
-            frag_lsb = frag_field.lsb,
+            clkdiv_expr = clkdiv_expr,
+            frag_expr = frag_expr,
         ),
     });
 
@@ -8896,9 +8964,12 @@ fn render_esp_uart_methods(
         methods.push(GeneratedMethod {
             name: "flush".to_string(),
             code: format!(
-                "    pub fn flush(&self) -> Result<(), metadata::Error> {{\n        while ((read_u32(0x{status_address:X}u64)? & 0x{txfifo_cnt_mask:08X}u32) >> {txfifo_cnt_lsb}) != 0 {{}}\n        Ok(())\n    }}\n",
-                status_address = status.absolute_address,
-                txfifo_cnt_lsb = txfifo_cnt.lsb,
+                "    pub fn flush(&self) -> Result<(), metadata::Error> {{\n        while {txfifo_count_expr} != 0 {{}}\n        Ok(())\n    }}\n",
+                txfifo_count_expr = format_u32_masked_shift_right(
+                    &format!("read_u32(0x{:X}u64)?", status.absolute_address),
+                    txfifo_cnt_mask,
+                    txfifo_cnt.lsb,
+                ),
             ),
         });
     }
@@ -8907,10 +8978,13 @@ fn render_esp_uart_methods(
         methods.push(GeneratedMethod {
             name: "read_byte".to_string(),
             code: format!(
-                "    pub fn read_byte(&self) -> Result<u8, metadata::Error> {{\n        while ((read_u32(0x{status_address:X}u64)? & 0x{rxfifo_cnt_mask:08X}u32) >> {rxfifo_cnt_lsb}) == 0 {{}}\n        Ok((read_u32(0x{fifo_address:X}u64)? & 0xFFu32) as u8)\n    }}\n",
-                status_address = status.absolute_address,
+                "    pub fn read_byte(&self) -> Result<u8, metadata::Error> {{\n        while {rxfifo_count_expr} == 0 {{}}\n        Ok((read_u32(0x{fifo_address:X}u64)? & 0xFFu32) as u8)\n    }}\n",
+                rxfifo_count_expr = format_u32_masked_shift_right(
+                    &format!("read_u32(0x{:X}u64)?", status.absolute_address),
+                    rxfifo_cnt_mask,
+                    rxfifo_cnt.lsb,
+                ),
                 fifo_address = fifo.absolute_address,
-                rxfifo_cnt_lsb = rxfifo_cnt.lsb,
             ),
         });
     }
@@ -14586,8 +14660,8 @@ mod tests {
         assert!(uart_rs.contains("reset_domain_ref: Some(\"rst.apb2\")"));
         assert!(rcc_rs.contains("control_refs: &[\"reg.rcc.apb2pcenr\"]"));
         assert!(uart_rs.contains("default_after_reset: Some(true)"));
-        assert!(rcc_rs.contains("steps: &[metadata::SemanticOperationStep"));
-        assert!(timer_rs.contains("transitions: &[metadata::SemanticTransition"));
+        assert!(rcc_rs.contains("metadata::SemanticOperationStep"));
+        assert!(timer_rs.contains("metadata::SemanticTransition"));
         assert!(uart_rs.contains("MODULE_PROVENANCE"));
 
         let cargo_output = Command::new("cargo")
@@ -14893,8 +14967,8 @@ fn host_emulator_tracks_esp_gpio_output_level() {
 
         let usb_rs = std::fs::read_to_string(output_dir.path().join("src").join("usb.rs"))
             .expect("generated usb.rs");
-        assert!(usb_rs.contains("write_u32(0x60043000u64, u32::from(byte) << 8)?;"));
-        assert!(usb_rs.contains("Ok(((read_u32(0x60043000u64)? & 0x0000FF00u32) >> 8) as u8)"));
+        assert!(usb_rs.contains("write_u32(0x60043000u64, (u32::from(byte)) << 8)?;"));
+        assert!(usb_rs.contains("0x0000FF00u32) >> 8"));
     }
 
     #[test]
@@ -15553,10 +15627,8 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
 
         let timer_rs = std::fs::read_to_string(output_dir.path().join("src").join("timer.rs"))
             .expect("timer.rs");
-        assert!(timer_rs.contains("Some(metadata::ValueLiteral::Number(1.5f64))"));
-        assert!(
-            timer_rs.contains("Some(metadata::ValueLiteral::Unsigned(18446744073709551615u64))")
-        );
+        assert!(timer_rs.contains("metadata::ValueLiteral::Number(1.5f64)"));
+        assert!(timer_rs.contains("metadata::ValueLiteral::Unsigned(18446744073709551615u64)"));
 
         let cargo_output = Command::new("cargo")
             .arg("check")
@@ -15615,7 +15687,8 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(!gpio_rs.contains("#[derive(Debug, Clone, Copy)]\npub struct GpioAOutput"));
         assert!(gpio_rs.contains("pub fn pa0(&self) -> GpioAFlex"));
         assert!(gpio_rs.contains("pub fn into_input(self, pull: Pull)"));
-        assert!(gpio_rs.contains("pub fn into_output(self, initial_level: Level)"));
+        assert!(gpio_rs.contains("pub fn into_output("));
+        assert!(gpio_rs.contains("initial_level: Level"));
         assert!(gpio_rs.contains("pub fn set_pull(&self, pull: Pull)"));
         assert!(gpio_rs.contains("pub fn is_high(&self) -> Result<bool, metadata::Error>"));
         assert!(
@@ -15630,7 +15703,8 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(uart_rs.contains("0x00000400u32"));
         assert!(uart_rs.contains("0x00000200u32"));
         assert!(uart_rs.contains("pub fn set_baud_divider"));
-        assert!(uart_rs.contains(") | ((u32::from(fraction) & 0xFu32) << 0))?;"));
+        assert!(uart_rs.contains("u32::from(fraction) & 0xFu32"));
+        assert!(!uart_rs.contains("<< 0))?;"));
         assert!(uart_rs.contains("pub fn write_byte"));
         assert!(uart_rs.contains("pub fn write_bytes"));
         assert!(uart_rs.contains("pub fn read_byte"));
@@ -17311,10 +17385,14 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(time_rs.contains(
             "            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_RTCSEL_MASK,\n                GENERATED_RCC_BDCTLR_RTCSEL_LSI_MASK,\n            );\n            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_RTCEN_MASK,\n"
         ));
+        assert!(time_rs.contains("let set_mask = if enabled {"));
+        assert!(time_rs.contains("GENERATED_RTC_CTLRH_ALRIE_MASK"));
+        assert!(time_rs.contains("0u16"));
         assert!(!time_rs.contains(
             "must_modify_u32(GENERATED_RCC_BDCTLR_ADDRESS, GENERATED_RCC_BDCTLR_BDRST_MASK, 0u32);\n                    must_modify_u32(\n"
         ));
         assert!(!time_rs.contains("            );\n                    must_modify_u32(\n"));
+        assert!(!time_rs.contains(".then_some("));
     }
 
     #[test]

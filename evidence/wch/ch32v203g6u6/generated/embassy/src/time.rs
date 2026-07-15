@@ -5,10 +5,13 @@ use core::ptr::{read_volatile, write_volatile};
 
 #[allow(dead_code)]
 fn checked_address(address: u64, align: usize) -> Result<usize, metadata::Error> {
-    let address = usize::try_from(address)
-        .map_err(|_| metadata::Error::Unsupported("MMIO address does not fit usize on this target"))?;
+    let address = usize::try_from(address).map_err(|_| {
+        metadata::Error::Unsupported("MMIO address does not fit usize on this target")
+    })?;
     if address % align != 0 {
-        return Err(metadata::Error::Unsupported("MMIO address is not naturally aligned for the target register width"));
+        return Err(metadata::Error::Unsupported(
+            "MMIO address is not naturally aligned for the target register width",
+        ));
     }
     Ok(address)
 }
@@ -97,10 +100,55 @@ pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProven
 };
 
 // Driver instance: RTC Embassy time driver (rtc) from canonical block block.rtc -> rtc-controller
-pub const DRV_TIME_RTC_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding { id: "clk.pwr", name: "PWR clock binding", consumer_ref: "periph.pwr", clock_ref: "clk.pclk1", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb1pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }, metadata::ClockBinding { id: "clk.bkp", name: "BKP clock binding", consumer_ref: "periph.bkp", clock_ref: "clk.pclk1", controller_ref: Some("block.rcc"), binding_kind: "gated", control_refs: &["reg.rcc.apb1pcenr"], enable_operation_refs: &[], disable_operation_refs: &[] }];
+pub const DRV_TIME_RTC_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[
+    metadata::ClockBinding {
+        id: "clk.pwr",
+        name: "PWR clock binding",
+        consumer_ref: "periph.pwr",
+        clock_ref: "clk.pclk1",
+        controller_ref: Some("block.rcc"),
+        binding_kind: "gated",
+        control_refs: &["reg.rcc.apb1pcenr"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+    metadata::ClockBinding {
+        id: "clk.bkp",
+        name: "BKP clock binding",
+        consumer_ref: "periph.bkp",
+        clock_ref: "clk.pclk1",
+        controller_ref: Some("block.rcc"),
+        binding_kind: "gated",
+        control_refs: &["reg.rcc.apb1pcenr"],
+        enable_operation_refs: &[],
+        disable_operation_refs: &[],
+    },
+];
 pub const DRV_TIME_RTC_RESET_BINDINGS: &[metadata::ResetBinding] = &[];
-pub const DRV_TIME_RTC_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource { id: "isrc.rtc.alarm", name: "RTC alarm interrupt source", source_ref: "periph.rtc", producer_ref: None, kind: "rtc", flag_refs: &[], clear_operation_refs: &["op.rtc.clear_alarm_flag"] }];
-pub const DRV_TIME_RTC_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute { id: "iroute.rtc.alarm", name: "RTC alarm interrupt route", source_ref: "isrc.rtc.alarm", interrupt_ref: "int.rtcalarm", controller_ref: "block.pfic", cpu_target_ref: None, line_index: None, route_type: "hardwired", control_refs: &["field.exti_intenr.mr17", "field.exti_rtenr.tr17"], acknowledge_operation_refs: &["op.exti.clear_line17_pending"], shared_group: None }];
+pub const DRV_TIME_RTC_INTERRUPT_SOURCES: &[metadata::InterruptSource] =
+    &[metadata::InterruptSource {
+        id: "isrc.rtc.alarm",
+        name: "RTC alarm interrupt source",
+        source_ref: "periph.rtc",
+        producer_ref: None,
+        kind: "rtc",
+        flag_refs: &[],
+        clear_operation_refs: &["op.rtc.clear_alarm_flag"],
+    }];
+pub const DRV_TIME_RTC_INTERRUPT_ROUTES: &[metadata::InterruptRoute] =
+    &[metadata::InterruptRoute {
+        id: "iroute.rtc.alarm",
+        name: "RTC alarm interrupt route",
+        source_ref: "isrc.rtc.alarm",
+        interrupt_ref: "int.rtcalarm",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: None,
+        route_type: "hardwired",
+        control_refs: &["field.exti_intenr.mr17", "field.exti_rtenr.tr17"],
+        acknowledge_operation_refs: &["op.exti.clear_line17_pending"],
+        shared_group: None,
+    }];
 pub const DRV_TIME_RTC_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_TIME_RTC_DMA_ROUTES: &[metadata::DmaRoute] = &[];
 pub const DRV_TIME_RTC_PIN_ROLES: &[metadata::PinRole] = &[];
@@ -195,7 +243,6 @@ impl RTCEmbassyTimeDriver {
     }
 }
 
-
 use core::cell::{Cell, RefCell};
 use critical_section::Mutex as CriticalSectionMutex;
 use embassy_time_driver::Driver as EmbassyTimeDriver;
@@ -250,7 +297,9 @@ impl GeneratedRtcTimeDriver {
             GENERATED_RCC_RSTSCKR_LSION_MASK,
             GENERATED_RCC_RSTSCKR_LSION_MASK,
         );
-        while (must_read_u32(GENERATED_RCC_RSTSCKR_ADDRESS) & GENERATED_RCC_RSTSCKR_LSIRDY_MASK) == 0 {
+        while (must_read_u32(GENERATED_RCC_RSTSCKR_ADDRESS) & GENERATED_RCC_RSTSCKR_LSIRDY_MASK)
+            == 0
+        {
             core::hint::spin_loop();
         }
     }
@@ -262,7 +311,11 @@ impl GeneratedRtcTimeDriver {
     }
 
     fn synchronize_rtc_registers(&self) {
-        must_modify_u16(GENERATED_RTC_CTLRL_ADDRESS, GENERATED_RTC_CTLRL_RSF_MASK, 0u16);
+        must_modify_u16(
+            GENERATED_RTC_CTLRL_ADDRESS,
+            GENERATED_RTC_CTLRL_RSF_MASK,
+            0u16,
+        );
         while (must_read_u16(GENERATED_RTC_CTLRL_ADDRESS) & GENERATED_RTC_CTLRL_RSF_MASK) == 0 {
             core::hint::spin_loop();
         }
@@ -278,7 +331,11 @@ impl GeneratedRtcTimeDriver {
     }
 
     fn exit_config_mode(&self) {
-        must_modify_u16(GENERATED_RTC_CTLRL_ADDRESS, GENERATED_RTC_CTLRL_CNF_MASK, 0u16);
+        must_modify_u16(
+            GENERATED_RTC_CTLRL_ADDRESS,
+            GENERATED_RTC_CTLRL_CNF_MASK,
+            0u16,
+        );
         self.wait_for_rtc_write_ready();
     }
 
@@ -317,7 +374,11 @@ impl GeneratedRtcTimeDriver {
     }
 
     fn set_alarm_enabled(&self, enabled: bool) {
-        let set_mask = enabled.then_some(GENERATED_RTC_CTLRH_ALRIE_MASK).unwrap_or(0u16);
+        let set_mask = if enabled {
+            GENERATED_RTC_CTLRH_ALRIE_MASK
+        } else {
+            0u16
+        };
         must_modify_u16(
             GENERATED_RTC_CTLRH_ADDRESS,
             GENERATED_RTC_CTLRH_ALRIE_MASK,
@@ -362,7 +423,11 @@ impl GeneratedRtcTimeDriver {
                 GENERATED_RCC_BDCTLR_BDRST_MASK,
                 GENERATED_RCC_BDCTLR_BDRST_MASK,
             );
-                    must_modify_u32(GENERATED_RCC_BDCTLR_ADDRESS, GENERATED_RCC_BDCTLR_BDRST_MASK, 0u32);
+            must_modify_u32(
+                GENERATED_RCC_BDCTLR_ADDRESS,
+                GENERATED_RCC_BDCTLR_BDRST_MASK,
+                0u32,
+            );
             must_modify_u32(
                 GENERATED_RCC_BDCTLR_ADDRESS,
                 GENERATED_RCC_BDCTLR_RTCSEL_MASK,
@@ -399,7 +464,9 @@ impl GeneratedRtcTimeDriver {
     }
 
     fn on_interrupt(&self) {
-        if !critical_section::with(|cs| self.initialized.borrow(cs).get()) || !self.is_alarm_pending() {
+        if !critical_section::with(|cs| self.initialized.borrow(cs).get())
+            || !self.is_alarm_pending()
+        {
             return;
         }
         self.clear_alarm_flag();
