@@ -64,11 +64,12 @@
     },
     "loweringPattern": {
       "type": "string",
-      "description": "Optional generator-facing lowering selector for cases where one supported driver kind has more than one approved evidence-backed lowering family with materially different bring-up behavior. Reserved values currently include `serial-jtag-preserve-link`, which selects a USB Serial/JTAG-style lowering that preserves an already boot-established link instead of synthesizing a reset-and-reattach sequence; `fsdev-pma-btable`, which selects a controller-level full-speed USB device family built around PMA/BTABLE-style endpoint state and attach/reset servicing; and `counter-compare-timer`, which selects a timer-backed Embassy async timing family built around an explicitly modeled free-running counter plus compare/alarm path. Generators must fail explicitly if a selected lowering pattern lacks the referenced semantic inputs it requires.",
+      "description": "Optional generator-facing lowering selector for cases where one supported driver kind has more than one approved evidence-backed lowering family with materially different bring-up behavior. Reserved values currently include `serial-jtag-preserve-link`, which selects a USB Serial/JTAG-style lowering that preserves an already boot-established link instead of synthesizing a reset-and-reattach sequence; `fsdev-pma-btable`, which selects a controller-level full-speed USB device family built around PMA/BTABLE-style endpoint state and attach/reset servicing; `counter-compare-timer`, which selects a timer-backed Embassy async timing family built around an explicitly modeled free-running counter plus compare/alarm path; and `regular-sequence-adc-dma`, which selects a software-started regular-group buffered ADC sampling family backed by one explicit DMA path. Generators must fail explicitly if a selected lowering pattern lacks the referenced semantic inputs it requires.",
       "enum": [
         "serial-jtag-preserve-link",
         "fsdev-pma-btable",
-        "counter-compare-timer"
+        "counter-compare-timer",
+        "regular-sequence-adc-dma"
       ]
     },
     "timeDriverSource": {
@@ -124,6 +125,219 @@
         "interruptEnableRef",
         "interruptPendingRef",
         "interruptClearOperationRef"
+      ],
+      "additionalProperties": false
+    },
+    "adcDmaChannelSampleTimeBinding": {
+      "type": "object",
+      "description": "Explicit mapping from an ADC input channel index to the structural field used to program that channel's sample time for `regular-sequence-adc-dma` lowering.",
+      "properties": {
+        "channelIndex": {
+          "$ref": "../common.json#/$defs/nonNegativeInteger"
+        },
+        "sampleTimeRef": {
+          "$ref": "../common.json#/$defs/entityRef"
+        }
+      },
+      "required": [
+        "channelIndex",
+        "sampleTimeRef"
+      ],
+      "additionalProperties": false
+    },
+    "dmaAsyncChannelBindings": {
+      "type": "object",
+      "description": "Explicit async-completion bindings for one DMA controller channel. These bindings name the transfer-complete and optional half-transfer handles needed to expose Embassy-aligned IRQ-driven DMA futures on a `dma` driver instance.",
+      "properties": {
+        "channelRef": {
+          "description": "Entity ref for the DMA channel whose async completion state this binding describes.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "transferCompleteFlagRef": {
+          "description": "Entity ref for the DMA transfer-complete status flag for this channel.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "transferCompleteClearRef": {
+          "description": "Entity ref for the DMA transfer-complete clear/acknowledge handle written by the generated DMA interrupt handler.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "transferCompleteInterruptEnableRef": {
+          "description": "Entity ref for the DMA transfer-complete interrupt-enable handle for this channel.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "halfTransferFlagRef": {
+          "description": "Optional entity ref for the DMA half-transfer status flag for this channel.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "halfTransferClearRef": {
+          "description": "Optional entity ref for the DMA half-transfer clear/acknowledge handle written by the generated DMA interrupt handler.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "halfTransferInterruptEnableRef": {
+          "description": "Optional entity ref for the DMA half-transfer interrupt-enable handle for this channel.",
+          "$ref": "../common.json#/$defs/entityRef"
+        }
+      },
+      "required": [
+        "channelRef",
+        "transferCompleteFlagRef",
+        "transferCompleteClearRef",
+        "transferCompleteInterruptEnableRef"
+      ],
+      "additionalProperties": false
+    },
+    "dmaAsyncBindings": {
+      "type": "object",
+      "description": "Optional explicit async-completion lowering bindings for `dma` driver instances. These bindings authorize the generator to expose IRQ-driven DMA completion futures only for the named channels and only when the same driver instance also carries the corresponding interrupt routes.",
+      "properties": {
+        "channels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dmaAsyncChannelBindings"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "channels"
+      ],
+      "additionalProperties": false
+    },
+    "adcDmaBindings": {
+      "type": "object",
+      "description": "Optional explicit buffered-sampling lowering bindings for `adc` driver instances that select `loweringPattern = \"regular-sequence-adc-dma\"`. These bindings name the exact ADC and DMA roles the generator may use for software-started regular-group buffered sampling. They do not authorize injected-group or dual-ADC DMA behavior. Generators must fail explicitly rather than inferring these roles from vendor register names when the selected lowering family requires them.",
+      "properties": {
+        "prepareOneShotOperationRefs": {
+          "description": "Semantic operations that establish the fixed family-specific ADC and DMA mode bits for a one-shot buffered capture before the generator programs dynamic sequence/address/count values.",
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "prepareCircularOperationRefs": {
+          "description": "Semantic operations that establish the fixed family-specific ADC and DMA mode bits for circular/continuous buffered capture before the generator programs dynamic sequence/address/count values. Required only when the generated API claims circular buffered sampling.",
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "stopOperationRefs": {
+          "description": "Semantic operations used to stop or disarm the buffered ADC DMA path after one-shot or circular sampling when the family requires an explicit shutdown or disable sequence.",
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "dataRegisterRef": {
+          "description": "Entity ref for the ADC regular-group data register read by the DMA path.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "startRef": {
+          "description": "Entity ref for a single software-start control used to begin a regular-group conversion sequence when one direct structural write is sufficient for the selected family.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "startOperationRefs": {
+          "description": "Semantic operations used to begin a regular-group conversion sequence when the selected family requires a composite start sequence such as arming an enable gate plus asserting software-start.",
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "regularSequenceLengthRef": {
+          "description": "Entity ref for the regular-sequence length field programmed by the generated sampling helpers.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "regularSequenceSlotRefs": {
+          "description": "Ordered entity refs for the regular-sequence slot fields (`SQ1`, `SQ2`, etc.) programmed by the generated sampling helpers.",
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "channelSampleTimeRefs": {
+          "description": "Explicit mappings from ADC input channel indices to the sample-time fields programmed by the generated sampling helpers.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/adcDmaChannelSampleTimeBinding"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "dmaTransferCountRef": {
+          "description": "Entity ref for the DMA transfer-count register or field programmed with the sample count.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "dmaPeripheralAddressRef": {
+          "description": "Entity ref for the DMA peripheral-address register or field programmed with the ADC data-register address.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "dmaMemoryAddressRef": {
+          "description": "Entity ref for the DMA memory-address register or field programmed with the caller buffer address.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "dmaChannelEnableRef": {
+          "description": "Entity ref for the DMA channel-enable field used to arm or disarm the configured transfer.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "dmaHalfTransferFlagRef": {
+          "description": "Entity ref for the DMA half-transfer status flag used by circular buffered sampling helpers when claimed.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "dmaTransferCompleteFlagRef": {
+          "description": "Entity ref for the DMA transfer-complete status flag used by one-shot and circular buffered sampling helpers.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "dmaHalfTransferInterruptEnableRef": {
+          "description": "Entity ref for the DMA half-transfer interrupt-enable handle used when the generated circular helper claims half-buffer interrupt-driven servicing.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "dmaTransferCompleteInterruptEnableRef": {
+          "description": "Entity ref for the DMA transfer-complete interrupt-enable handle used when the generated buffered-sampling helper claims interrupt-driven completion servicing.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "dmaHalfTransferClearOperationRef": {
+          "description": "Entity ref for the semantic operation that acknowledges or clears the DMA half-transfer event when circular buffered sampling claims half-buffer servicing.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "dmaTransferCompleteClearOperationRef": {
+          "description": "Entity ref for the semantic operation that acknowledges or clears the DMA transfer-complete event.",
+          "$ref": "../common.json#/$defs/entityRef"
+        }
+      },
+      "required": [
+        "prepareOneShotOperationRefs",
+        "dataRegisterRef",
+        "regularSequenceLengthRef",
+        "regularSequenceSlotRefs",
+        "channelSampleTimeRefs",
+        "dmaTransferCountRef",
+        "dmaPeripheralAddressRef",
+        "dmaMemoryAddressRef",
+        "dmaChannelEnableRef",
+        "dmaTransferCompleteFlagRef",
+        "dmaTransferCompleteClearOperationRef"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "startRef"
+          ]
+        },
+        {
+          "required": [
+            "startOperationRefs"
+          ]
+        }
       ],
       "additionalProperties": false
     },
@@ -235,6 +449,12 @@
             "timeDriverBindings": {
               "$ref": "#/$defs/timeDriverBindings"
             },
+            "adcDmaBindings": {
+              "$ref": "#/$defs/adcDmaBindings"
+            },
+            "dmaAsyncBindings": {
+              "$ref": "#/$defs/dmaAsyncBindings"
+            },
             "clockBindingRefs": {
               "description": "Referenced clock bindings that may justify emitted clock-gating or bring-up helpers when those bindings and their linked structural/semantic data are sufficient for real lowering.",
               "type": "array",
@@ -292,7 +512,7 @@
               "uniqueItems": true
             },
             "capabilityTags": {
-              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support. The accompanying `timeDriverSource` selector determines whether that support is the existing SysTick-backed interrupt path, an explicitly modeled hardware-timer-backed path, or an explicitly modeled rtc-backed path; `timeDriverTickHz` fixes the Embassy tick rate for modeled non-SysTick sources; and `timeDriverBindings` names the exact non-SysTick lowering handles when that path is used.",
+              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support. The accompanying `timeDriverSource` selector determines whether that support is the existing SysTick-backed interrupt path, an explicitly modeled hardware-timer-backed path, or an explicitly modeled rtc-backed path; `timeDriverTickHz` fixes the Embassy tick rate for modeled non-SysTick sources; `timeDriverBindings` names the exact non-SysTick lowering handles when that path is used; `adcDmaBindings` names the exact direct roles for `regular-sequence-adc-dma` buffered sampling when that ADC family is selected; and `dmaAsyncBindings` names the exact channel-local interrupt/flag handles for generated DMA completion futures.",
               "type": "array",
               "items": {
                 "type": "string"

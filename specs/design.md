@@ -261,6 +261,60 @@ This keeps the emitted time-driver lowering auditable and prevents the
 generator from silently re-discovering timing semantics from vendor-native
 register names that the approved HAIR profile did not explicitly bind.
 
+Higher-level ADC DMA lowering needs the same discipline. Some MCU families can
+support buffered regular-group sampling through a stable combination of ADC
+sequence programming, sample-time programming, a data register, and one linked
+DMA channel, but the exact control path is still family-specific. For that
+case, the profile uses `driverInstances[].loweringPattern` on an `adc` driver
+instance to select an approved lowering family instead of letting the generator
+probe register names heuristically. The first such family is
+`regular-sequence-adc-dma`, which is intentionally limited to software-started
+regular-group buffered sampling and does not imply injected or dual-ADC modes.
+
+When that ADC family is selected, the same driver instance must also carry an
+explicit `adcDmaBindings` map naming the direct roles the generated API needs:
+
+- the regular-sequence length field
+- the ordered regular-sequence slot fields
+- the per-channel sample-time fields
+- the ADC data register
+- either one direct software-start control or an explicit semantic start sequence
+- the DMA transfer-count register or field
+- the DMA peripheral-address and memory-address registers or fields
+- the DMA channel-enable control
+- the DMA half-transfer and transfer-complete status flags
+- the matching DMA interrupt-enable handles when interrupt-driven circular
+  sampling is claimed
+- the semantic setup operations for one-shot and circular mode
+- the semantic clear/ack operations for DMA half-transfer and
+  transfer-complete events
+
+The DMA controller bring-up for this family is intentionally not repeated in
+`adcDmaBindings`. The ADC lowering already names its DMA path through
+`dmaRouteRefs`, and the matching `dma` driver instance already owns the
+controller-local clock/reset bindings for that path. Reusing that
+route-to-controller closure keeps the ADC family explicit about
+sequence/sample/data roles while avoiding a second, drifting source of truth
+for the same DMA controller gate or reset path.
+
+IRQ-driven DMA futures sit one layer lower. Instead of letting each peripheral
+family invent its own wake/clear/interrupt bookkeeping, the `dma` driver
+instance now owns an explicit `dmaAsyncBindings` map for the DMA channels that
+may wake async tasks. Peripheral families such as
+`regular-sequence-adc-dma` compose on top of that controller-local async DMA
+surface rather than embedding a second copy of the same interrupt logic.
+
+Separately, ADC families may require init/calibration helpers to wait for
+ready-status bits to clear before software start or DMA sampling is valid. That
+wait must stay in the approved semantic operation itself as explicit field polls
+rather than as an undocumented generator-side delay or ad hoc busy loop.
+
+This keeps the CH32-style buffered ADC path auditable while still allowing the
+generated API to expose higher-level one-shot and circular sampling helpers.
+The family-specific setup operations carry the fixed register writes whose
+encoding differs across vendors, while the binding refs name the dynamic roles
+that the generated code must program per call.
+
 RTC lowering follows the same evidence-bounded rule as the other supported
 driver kinds, but aligns with the way Embassy commonly exposes RTC hardware:
 as a HAL-specific rtc module rather than a universal cross-platform trait.

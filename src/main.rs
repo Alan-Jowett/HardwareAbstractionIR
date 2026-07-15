@@ -1795,6 +1795,69 @@ struct EmbassyTimeDriverBindings {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct EmbassyAdcDmaChannelSampleTimeBinding {
+    channel_index: u32,
+    sample_time_ref: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EmbassyAdcDmaBindings {
+    #[serde(default)]
+    prepare_one_shot_operation_refs: Vec<String>,
+    #[serde(default)]
+    prepare_circular_operation_refs: Vec<String>,
+    #[serde(default)]
+    stop_operation_refs: Vec<String>,
+    data_register_ref: String,
+    #[serde(default)]
+    start_ref: Option<String>,
+    #[serde(default)]
+    start_operation_refs: Vec<String>,
+    regular_sequence_length_ref: String,
+    #[serde(default)]
+    regular_sequence_slot_refs: Vec<String>,
+    #[serde(default)]
+    channel_sample_time_refs: Vec<EmbassyAdcDmaChannelSampleTimeBinding>,
+    dma_transfer_count_ref: String,
+    dma_peripheral_address_ref: String,
+    dma_memory_address_ref: String,
+    dma_channel_enable_ref: String,
+    #[serde(default)]
+    dma_half_transfer_flag_ref: Option<String>,
+    dma_transfer_complete_flag_ref: String,
+    #[serde(default)]
+    dma_half_transfer_interrupt_enable_ref: Option<String>,
+    #[serde(default)]
+    dma_transfer_complete_interrupt_enable_ref: Option<String>,
+    #[serde(default)]
+    dma_half_transfer_clear_operation_ref: Option<String>,
+    dma_transfer_complete_clear_operation_ref: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EmbassyDmaAsyncChannelBindings {
+    channel_ref: String,
+    transfer_complete_flag_ref: String,
+    transfer_complete_clear_ref: String,
+    transfer_complete_interrupt_enable_ref: String,
+    #[serde(default)]
+    half_transfer_flag_ref: Option<String>,
+    #[serde(default)]
+    half_transfer_clear_ref: Option<String>,
+    #[serde(default)]
+    half_transfer_interrupt_enable_ref: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EmbassyDmaAsyncBindings {
+    channels: Vec<EmbassyDmaAsyncChannelBindings>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct EmbassyDriverInstance {
     id: String,
     name: String,
@@ -1809,6 +1872,10 @@ struct EmbassyDriverInstance {
     time_driver_tick_hz: Option<u64>,
     #[serde(default)]
     time_driver_bindings: Option<EmbassyTimeDriverBindings>,
+    #[serde(default)]
+    adc_dma_bindings: Option<EmbassyAdcDmaBindings>,
+    #[serde(default)]
+    dma_async_bindings: Option<EmbassyDmaAsyncBindings>,
     #[serde(default)]
     clock_binding_refs: Vec<String>,
     #[serde(default)]
@@ -1863,6 +1930,8 @@ struct ResolvedDriverInstance {
     time_driver_source: Option<String>,
     time_driver_tick_hz: Option<u64>,
     time_driver_bindings: Option<EmbassyTimeDriverBindings>,
+    adc_dma_bindings: Option<EmbassyAdcDmaBindings>,
+    dma_async_bindings: Option<EmbassyDmaAsyncBindings>,
     target: McuCanonicalBlock,
     clock_bindings: Vec<McuClockBinding>,
     reset_bindings: Vec<McuResetBinding>,
@@ -1902,6 +1971,7 @@ const EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER: &str = "hardware-timer";
 const EMBASSY_TIME_DRIVER_SOURCE_RTC: &str = "rtc";
 const EMBASSY_EXECUTOR_IDLE_STRATEGY_WFI: &str = "wfi";
 const EMBASSY_EXECUTOR_IDLE_STRATEGY_SPIN: &str = "spin";
+const ADC_LOWERING_REGULAR_SEQUENCE_DMA: &str = "regular-sequence-adc-dma";
 const TIMER_LOWERING_COUNTER_COMPARE: &str = "counter-compare-timer";
 const USB_LOWERING_FSDEV_PMA_BTABLE: &str = "fsdev-pma-btable";
 const USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK: &str = "serial-jtag-preserve-link";
@@ -1923,6 +1993,18 @@ fn time_driver_bindings(driver: &ResolvedDriverInstance) -> Option<&EmbassyTimeD
     driver.time_driver_bindings.as_ref()
 }
 
+fn adc_dma_bindings(driver: &ResolvedDriverInstance) -> Option<&EmbassyAdcDmaBindings> {
+    driver.adc_dma_bindings.as_ref()
+}
+
+fn dma_async_bindings(driver: &ResolvedDriverInstance) -> Option<&EmbassyDmaAsyncBindings> {
+    driver.dma_async_bindings.as_ref()
+}
+
+fn has_regular_sequence_adc_dma_lowering(pattern: Option<&str>) -> bool {
+    matches!(pattern, Some(ADC_LOWERING_REGULAR_SEQUENCE_DMA))
+}
+
 fn has_usb_preserve_link_lowering(pattern: Option<&str>) -> bool {
     matches!(pattern, Some(USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK))
 }
@@ -1937,6 +2019,10 @@ fn has_counter_compare_timer_lowering(pattern: Option<&str>) -> bool {
 
 fn driver_uses_usb_preserve_link_lowering(driver: &ResolvedDriverInstance) -> bool {
     has_usb_preserve_link_lowering(driver.lowering_pattern.as_deref())
+}
+
+fn driver_uses_regular_sequence_adc_dma_lowering(driver: &ResolvedDriverInstance) -> bool {
+    has_regular_sequence_adc_dma_lowering(driver.lowering_pattern.as_deref())
 }
 
 fn driver_uses_usb_fsdev_pma_btable_lowering(driver: &ResolvedDriverInstance) -> bool {
@@ -2233,6 +2319,12 @@ impl EmbassyGenerationModel {
                 state_machines: &state_machines,
             };
             validate_driver_requirements(driver, &requirements)?;
+            validate_dma_async_bindings(
+                driver,
+                &driver_dma_channels,
+                &driver_interrupt_sources,
+                &interrupt_routes,
+            )?;
             validate_driver_lowering_pattern(driver, &init_operations)?;
 
             drivers.push(ResolvedDriverInstance {
@@ -2245,6 +2337,8 @@ impl EmbassyGenerationModel {
                 time_driver_source: driver.time_driver_source.clone(),
                 time_driver_tick_hz: driver.time_driver_tick_hz,
                 time_driver_bindings: driver.time_driver_bindings.clone(),
+                adc_dma_bindings: driver.adc_dma_bindings.clone(),
+                dma_async_bindings: driver.dma_async_bindings.clone(),
                 target,
                 clock_bindings,
                 reset_bindings,
@@ -3105,6 +3199,41 @@ fn validate_driver_resource_scope(
                     );
                 }
             }
+            for route in resources.interrupt_routes {
+                let source = resources
+                    .interrupt_sources
+                    .get(route.source_ref.as_str())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "driver {} interrupt route {} references unknown source {}",
+                            driver.id,
+                            route.id,
+                            route.source_ref
+                        )
+                    })?;
+                let channel = resources
+                    .dma_channels
+                    .get(source.source_ref.as_str())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "driver {} interrupt route {} references source {} for unknown DMA channel {}",
+                            driver.id,
+                            route.id,
+                            source.id,
+                            source.source_ref
+                        )
+                    })?;
+                if channel.controller_ref != target_ref {
+                    bail!(
+                        "driver {} interrupt route {} references DMA channel {} through controller {} instead of {}",
+                        driver.id,
+                        route.id,
+                        channel.id,
+                        channel.controller_ref,
+                        target_ref
+                    );
+                }
+            }
         }
         "rcc" => {}
         _ => {}
@@ -3540,6 +3669,12 @@ fn validate_driver_requirements(
             if requirements.dma_routes.is_empty() {
                 bail!("dma driver {} requires at least one DMA route", driver.id);
             }
+            if driver.dma_async_bindings.is_some() && requirements.interrupt_routes.is_empty() {
+                bail!(
+                    "dma driver {} requires interrupt routes for dmaAsyncBindings-backed completion futures",
+                    driver.id
+                );
+            }
         }
         "interrupt" if requirements.interrupt_routes.is_empty() => {
             bail!("interrupt driver {} requires interrupt routes", driver.id);
@@ -3559,6 +3694,7 @@ fn validate_driver_lowering_pattern(
     };
 
     match pattern {
+        ADC_LOWERING_REGULAR_SEQUENCE_DMA => validate_regular_sequence_adc_dma_lowering(driver)?,
         USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK => {
             if driver.driver_kind != "usb-device" {
                 bail!(
@@ -3587,6 +3723,140 @@ fn validate_usb_fsdev_pma_btable_lowering(driver: &EmbassyDriverInstance) -> Res
             driver.id,
             USB_LOWERING_FSDEV_PMA_BTABLE
         );
+    }
+    Ok(())
+}
+
+fn validate_regular_sequence_adc_dma_lowering(driver: &EmbassyDriverInstance) -> Result<()> {
+    if driver.driver_kind != "adc" {
+        bail!(
+            "driver {} uses loweringPattern {} but that lowering is only supported on adc drivers",
+            driver.id,
+            ADC_LOWERING_REGULAR_SEQUENCE_DMA
+        );
+    }
+    let bindings = driver.adc_dma_bindings.as_ref().ok_or_else(|| {
+        anyhow!(
+            "driver {} uses loweringPattern {} but omits required adcDmaBindings",
+            driver.id,
+            ADC_LOWERING_REGULAR_SEQUENCE_DMA
+        )
+    })?;
+    if driver.dma_route_refs.len() != 1 {
+        bail!(
+            "driver {} uses loweringPattern {} but must declare exactly one dmaRouteRef",
+            driver.id,
+            ADC_LOWERING_REGULAR_SEQUENCE_DMA
+        );
+    }
+    if bindings.regular_sequence_slot_refs.is_empty() {
+        bail!(
+            "driver {} uses loweringPattern {} but adcDmaBindings.regularSequenceSlotRefs is empty",
+            driver.id,
+            ADC_LOWERING_REGULAR_SEQUENCE_DMA
+        );
+    }
+    if bindings.channel_sample_time_refs.is_empty() {
+        bail!(
+            "driver {} uses loweringPattern {} but adcDmaBindings.channelSampleTimeRefs is empty",
+            driver.id,
+            ADC_LOWERING_REGULAR_SEQUENCE_DMA
+        );
+    }
+    if bindings.start_ref.is_none() && bindings.start_operation_refs.is_empty() {
+        bail!(
+            "driver {} uses loweringPattern {} but adcDmaBindings omits both startRef and startOperationRefs",
+            driver.id,
+            ADC_LOWERING_REGULAR_SEQUENCE_DMA
+        );
+    }
+    let mut seen_channels = BTreeSet::new();
+    for binding in &bindings.channel_sample_time_refs {
+        if !seen_channels.insert(binding.channel_index) {
+            bail!(
+                "driver {} uses loweringPattern {} but channelSampleTimeRefs repeats channelIndex {}",
+                driver.id,
+                ADC_LOWERING_REGULAR_SEQUENCE_DMA,
+                binding.channel_index
+            );
+        }
+    }
+    Ok(())
+}
+
+fn validate_dma_async_bindings(
+    driver: &EmbassyDriverInstance,
+    dma_channels: &[McuDmaChannel],
+    interrupt_sources: &[McuInterruptSource],
+    driver_interrupt_routes: &[McuInterruptRoute],
+) -> Result<()> {
+    let Some(bindings) = driver.dma_async_bindings.as_ref() else {
+        return Ok(());
+    };
+    if driver.driver_kind != "dma" {
+        bail!(
+            "driver {} declares dmaAsyncBindings but that contract is only supported on dma drivers",
+            driver.id
+        );
+    }
+    if driver_interrupt_routes.is_empty() {
+        bail!(
+            "driver {} declares dmaAsyncBindings but omits required interruptRouteRefs",
+            driver.id
+        );
+    }
+    let mut seen_channels = BTreeSet::new();
+    for binding in &bindings.channels {
+        if !seen_channels.insert(binding.channel_ref.as_str()) {
+            bail!(
+                "driver {} dmaAsyncBindings repeats channelRef {}",
+                driver.id,
+                binding.channel_ref
+            );
+        }
+        let channel = dma_channels
+            .iter()
+            .find(|channel| channel.id == binding.channel_ref)
+            .ok_or_else(|| {
+                anyhow!(
+                    "driver {} dmaAsyncBindings references unknown DMA channel {}",
+                    driver.id,
+                    binding.channel_ref
+                )
+            })?;
+        let interrupt_source = interrupt_sources
+            .iter()
+            .find(|source| source.source_ref == channel.id)
+            .ok_or_else(|| {
+                anyhow!(
+                    "driver {} dmaAsyncBindings channel {} lacks a referenced interrupt source",
+                    driver.id,
+                    binding.channel_ref
+                )
+            })?;
+        if !driver_interrupt_routes
+            .iter()
+            .any(|route| route.source_ref == interrupt_source.id)
+        {
+            bail!(
+                "driver {} dmaAsyncBindings channel {} lacks a referenced interrupt route",
+                driver.id,
+                binding.channel_ref
+            );
+        }
+        let has_any_half = binding.half_transfer_flag_ref.is_some()
+            || binding.half_transfer_clear_ref.is_some()
+            || binding.half_transfer_interrupt_enable_ref.is_some();
+        let has_all_half = binding.half_transfer_flag_ref.is_some()
+            && binding.half_transfer_clear_ref.is_some()
+            && binding.half_transfer_interrupt_enable_ref.is_some();
+        if has_any_half && !has_all_half {
+            bail!(
+                "driver {} dmaAsyncBindings channel {} must provide halfTransferFlagRef, halfTransferClearRef, and halfTransferInterruptEnableRef together",
+                driver.id,
+                binding.channel_ref
+            );
+        }
     }
     Ok(())
 }
@@ -4003,6 +4273,9 @@ fn render_driver_support_items(
     }
     if driver.driver_kind == "rtc" && driver.module_name == "rtc" {
         out.push_str(&render_rtc_support_items(model, driver)?);
+    }
+    if driver.driver_kind == "dma" {
+        out.push_str(&render_dma_support_items(model, driver)?);
     }
     if driver_uses_usb_fsdev_pma_btable_lowering(driver) {
         out.push_str(&render_usb_fsdev_support_items(driver));
@@ -4993,6 +5266,7 @@ fn render_driver_methods(
     methods.extend(render_usart_methods(model, driver)?);
     methods.extend(render_spi_methods(model, driver)?);
     methods.extend(render_adc_methods(model, driver)?);
+    methods.extend(render_dma_methods(model, driver)?);
     methods.extend(render_usb_device_methods(model, driver)?);
     methods.extend(render_rtc_methods(model, driver)?);
     methods.extend(render_rcc_methods(model, driver)?);
@@ -5157,6 +5431,18 @@ struct GeneratedWchRuntimeInputs<'a> {
     time_interrupt: &'a Interrupt,
 }
 
+#[derive(Debug, Clone)]
+struct GeneratedWchRuntimeVectorHandler {
+    vector_slot: usize,
+    irq_variant: String,
+    vector_const_name: String,
+    vector_symbol_name: String,
+    rust_handler_name: String,
+    import_line: Option<String>,
+    helper_items: String,
+    rust_handler_body: String,
+}
+
 fn generated_wch_runtime_inputs(
     model: &EmbassyGenerationModel,
 ) -> Result<Option<GeneratedWchRuntimeInputs<'_>>> {
@@ -5213,6 +5499,149 @@ fn generated_wch_runtime_inputs(
     }))
 }
 
+fn render_wch_runtime_vector_wrapper(vector_symbol_name: &str, rust_handler_name: &str) -> String {
+    format!(
+        "    .global {vector_symbol_name}\n{vector_symbol_name}:\n    addi sp, sp, -64\n    sw ra, 0(sp)\n    sw t0, 4(sp)\n    sw t1, 8(sp)\n    sw t2, 12(sp)\n    sw t3, 16(sp)\n    sw t4, 20(sp)\n    sw t5, 24(sp)\n    sw t6, 28(sp)\n    sw a0, 32(sp)\n    sw a1, 36(sp)\n    sw a2, 40(sp)\n    sw a3, 44(sp)\n    sw a4, 48(sp)\n    sw a5, 52(sp)\n    sw a6, 56(sp)\n    sw a7, 60(sp)\n    call {rust_handler_name}\n    lw ra, 0(sp)\n    lw t0, 4(sp)\n    lw t1, 8(sp)\n    lw t2, 12(sp)\n    lw t3, 16(sp)\n    lw t4, 20(sp)\n    lw t5, 24(sp)\n    lw t6, 28(sp)\n    lw a0, 32(sp)\n    lw a1, 36(sp)\n    lw a2, 40(sp)\n    lw a3, 44(sp)\n    lw a4, 48(sp)\n    lw a5, 52(sp)\n    lw a6, 56(sp)\n    lw a7, 60(sp)\n    addi sp, sp, 64\n    mret\n"
+    )
+}
+
+fn generated_wch_runtime_vector_handlers(
+    model: &EmbassyGenerationModel,
+    inputs: &GeneratedWchRuntimeInputs<'_>,
+    numbering: &InterruptControllerNumbering,
+) -> Result<Vec<GeneratedWchRuntimeVectorHandler>> {
+    let mut handlers = vec![GeneratedWchRuntimeVectorHandler {
+        vector_slot: render_wch_vector_slot(numbering, inputs.time_interrupt.number)?,
+        irq_variant: to_rust_type_name(&inputs.time_interrupt.name),
+        vector_const_name: "WCH_TIME_DRIVER_HANDLER_VECTOR".to_string(),
+        vector_symbol_name: "__hair_wch_embassy_time_driver_vector".to_string(),
+        rust_handler_name: "__hair_wch_embassy_time_driver_irq_rust".to_string(),
+        import_line: None,
+        helper_items: String::new(),
+        rust_handler_body: "    time_driver().on_time_driver_interrupt();\n".to_string(),
+    }];
+    let mut emitted_driver_helpers = BTreeSet::new();
+
+    for driver in &model.drivers {
+        let Some(bindings) = dma_async_bindings(driver) else {
+            continue;
+        };
+        for binding in &bindings.channels {
+            let channel = driver
+                .dma_channels
+                .iter()
+                .find(|candidate| candidate.id == binding.channel_ref)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "driver {} dmaAsyncBindings references unresolved DMA channel {}",
+                        driver.id,
+                        binding.channel_ref
+                    )
+                })?;
+            let interrupt_source = driver
+                .interrupt_sources
+                .iter()
+                .find(|source| source.source_ref == channel.id)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "driver {} dmaAsyncBindings channel {} lacks a referenced interrupt source",
+                        driver.id,
+                        binding.channel_ref
+                    )
+                })?;
+            let interrupt_route = driver
+                .interrupt_routes
+                .iter()
+                .find(|route| route.source_ref == interrupt_source.id)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "driver {} dmaAsyncBindings channel {} lacks a referenced interrupt route",
+                        driver.id,
+                        binding.channel_ref
+                    )
+                })?;
+            if interrupt_route.controller_ref != inputs.interrupt_driver.target.id {
+                bail!(
+                    "driver {} dmaAsyncBindings channel {} uses interrupt controller {} instead of WCH runtime controller {}",
+                    driver.id,
+                    binding.channel_ref,
+                    interrupt_route.controller_ref,
+                    inputs.interrupt_driver.target.id
+                );
+            }
+            let interrupt = model
+                .interrupts
+                .iter()
+                .find(|interrupt| interrupt.id == interrupt_route.interrupt_ref)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "driver {} dmaAsyncBindings channel {} references unknown interrupt {}",
+                        driver.id,
+                        binding.channel_ref,
+                        interrupt_route.interrupt_ref
+                    )
+                })?;
+            validate_wch_runtime_interrupt_number(numbering, interrupt)?;
+            let vector_slot = render_wch_vector_slot(numbering, interrupt.number)?;
+            let handler_slug = format!(
+                "{}_ch{}",
+                to_rust_const_name(&driver.id).to_lowercase(),
+                channel.channel_index
+            );
+            let type_name = driver.type_name.as_str();
+            let resource_type = format!("{type_name}Resources");
+            let helper_fn_name =
+                format!("generated_wch_runtime_{}", to_rust_method_name(&driver.id));
+            let helper_const_name = format!(
+                "GENERATED_WCH_RUNTIME_{}_RESOURCES",
+                to_rust_const_name(&driver.id)
+            );
+            let helper_items = if emitted_driver_helpers.insert(driver.id.clone()) {
+                format!(
+                    "const {helper_const_name}: {resource_type} = {resource_type} {{\n    clocks: &[],\n    resets: &[],\n    interrupt_sources: &[],\n    interrupts: &[],\n    dma_channels: &[],\n    dma: &[],\n    pins: &[],\n    init_operations: &[],\n    state_machines: &[],\n    lowering_pattern: None,\n    time_driver_source: None,\n    capability_tags: &[],\n}};\n\nfn {helper_fn_name}() -> {type_name} {{\n    {type_name}::new({helper_const_name}).expect(\"generated WCH runtime driver resources\")\n}}\n\n"
+                )
+            } else {
+                String::new()
+            };
+            handlers.push(GeneratedWchRuntimeVectorHandler {
+                vector_slot,
+                irq_variant: to_rust_type_name(&interrupt.name),
+                vector_const_name: format!(
+                    "WCH_RUNTIME_{}_HANDLER_VECTOR",
+                    to_rust_const_name(&handler_slug)
+                ),
+                vector_symbol_name: format!("__hair_wch_{}_vector", handler_slug),
+                rust_handler_name: format!("__hair_wch_{}_irq_rust", handler_slug),
+                import_line: Some(format!(
+                    "use crate::{}::{{{}, {}}};",
+                    driver.module_name, type_name, resource_type
+                )),
+                helper_items,
+                rust_handler_body: format!(
+                    "    let _ = {helper_fn_name}().on_interrupt({});\n",
+                    channel.channel_index
+                ),
+            });
+        }
+    }
+
+    let mut seen_slots = BTreeMap::<usize, String>::new();
+    for handler in &handlers {
+        if let Some(previous) =
+            seen_slots.insert(handler.vector_slot, handler.vector_const_name.clone())
+        {
+            bail!(
+                "WCH runtime generated conflicting vector handlers {} and {} for slot {}",
+                previous,
+                handler.vector_const_name,
+                handler.vector_slot
+            );
+        }
+    }
+
+    Ok(handlers)
+}
+
 fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<String> {
     let Some(inputs) = generated_wch_runtime_inputs(model)? else {
         bail!("WCH runtime support requested without PFIC + non-SysTick time-driver inputs");
@@ -5224,7 +5653,6 @@ fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<Strin
         "{}_RESOURCES",
         to_rust_const_name(&inputs.interrupt_driver.id)
     );
-    let irq_variant = to_rust_type_name(&inputs.time_interrupt.name);
     let controller_ref = inputs
         .time_interrupt
         .controller_ref
@@ -5242,14 +5670,76 @@ fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<Strin
                 controller_ref
             )
         })?;
-    let vector_slot = render_wch_vector_slot(numbering, inputs.time_interrupt.number)?;
-    let vector_count =
-        render_wch_vector_count(numbering, &model.interrupts, controller_ref, vector_slot)?;
+    let handlers = generated_wch_runtime_vector_handlers(model, &inputs, numbering)?;
+    let max_vector_slot = handlers
+        .iter()
+        .map(|handler| handler.vector_slot)
+        .max()
+        .ok_or_else(|| anyhow!("WCH runtime did not generate any vector handlers"))?;
+    let vector_count = render_wch_vector_count(
+        numbering,
+        &model.interrupts,
+        controller_ref,
+        max_vector_slot,
+    )?;
+    let mut import_lines = BTreeSet::new();
+    let mut extern_decls = String::new();
+    let mut vector_consts = String::new();
+    let mut table_assignments = String::new();
+    let mut asm_wrappers = String::new();
+    let mut init_enable_calls = String::new();
+    let mut helper_items = String::new();
+    let mut rust_handlers = String::new();
+    for handler in &handlers {
+        if let Some(import_line) = &handler.import_line {
+            import_lines.insert(import_line.clone());
+        }
+        extern_decls.push_str(&format!("    fn {}();\n", handler.vector_symbol_name));
+        vector_consts.push_str(&format!(
+            "const {}: WchVector = WchVector {{\n    handler: {},\n}};\n",
+            handler.vector_const_name, handler.vector_symbol_name
+        ));
+        table_assignments.push_str(&format!(
+            "    table[{}] = {};\n",
+            handler.vector_slot, handler.vector_const_name
+        ));
+        asm_wrappers.push_str(&render_wch_runtime_vector_wrapper(
+            &handler.vector_symbol_name,
+            &handler.rust_handler_name,
+        ));
+        init_enable_calls.push_str(&format!(
+            "    pfic().enable_irq(Irq::{})?;\n",
+            handler.irq_variant
+        ));
+        if !handler.helper_items.is_empty() {
+            helper_items.push_str(&handler.helper_items);
+        }
+        rust_handlers.push_str(&format!(
+            "#[unsafe(no_mangle)]\nextern \"C\" fn {}() {{\n{}}}\n\n",
+            handler.rust_handler_name, handler.rust_handler_body
+        ));
+    }
+    let extra_imports = if import_lines.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "{}\n\n",
+            import_lines.into_iter().collect::<Vec<_>>().join("\n")
+        )
+    };
 
     Ok(format!(
-        "//! Generated WCH/QingKe runtime support for {}.\n\nuse crate::interrupt::{{{interrupt_driver_resources}, Irq, {interrupt_driver_type}}};\nuse crate::metadata;\nuse crate::time::{{{time_driver_resources}, {time_driver_type}}};\nuse core::arch::{{asm, global_asm}};\n\n{}\nunsafe extern \"C\" {{\n    fn __hair_wch_hang_vector();\n    fn __hair_wch_embassy_time_driver_vector();\n}}\n\n#[derive(Clone, Copy)]\n#[repr(C)]\nunion WchVector {{\n    handler: unsafe extern \"C\" fn(),\n    reserved: usize,\n}}\n\nconst WCH_VECTOR_COUNT: usize = {vector_count};\nconst WCH_TIME_DRIVER_VECTOR_SLOT: usize = {vector_slot};\nconst WCH_RESERVED_VECTOR: WchVector = WchVector {{ reserved: 0 }};\nconst WCH_HANG_VECTOR: WchVector = WchVector {{\n    handler: __hair_wch_hang_vector,\n}};\nconst WCH_TIME_DRIVER_HANDLER_VECTOR: WchVector = WchVector {{\n    handler: __hair_wch_embassy_time_driver_vector,\n}};\n\n#[repr(C, align(64))]\nstruct WchVectorTable([WchVector; WCH_VECTOR_COUNT]);\n\nconst fn build_wch_vector_table() -> WchVectorTable {{\n    let mut table = [WCH_HANG_VECTOR; WCH_VECTOR_COUNT];\n    table[1] = WCH_RESERVED_VECTOR;\n    table[4] = WCH_RESERVED_VECTOR;\n    table[6] = WCH_RESERVED_VECTOR;\n    table[7] = WCH_RESERVED_VECTOR;\n    table[10] = WCH_RESERVED_VECTOR;\n    table[11] = WCH_RESERVED_VECTOR;\n    table[13] = WCH_RESERVED_VECTOR;\n    table[15] = WCH_RESERVED_VECTOR;\n    table[WCH_TIME_DRIVER_VECTOR_SLOT] = WCH_TIME_DRIVER_HANDLER_VECTOR;\n    WchVectorTable(table)\n}}\n\n#[unsafe(link_section = \".vector\")]\n#[used]\nstatic WCH_VECTOR_TABLE: WchVectorTable = build_wch_vector_table();\n\nglobal_asm!(\n    r#\"\n    .global __hair_wch_hang_vector\n__hair_wch_hang_vector:\n1:\n    j 1b\n\n    .global __hair_wch_embassy_time_driver_vector\n__hair_wch_embassy_time_driver_vector:\n    addi sp, sp, -64\n    sw ra, 0(sp)\n    sw t0, 4(sp)\n    sw t1, 8(sp)\n    sw t2, 12(sp)\n    sw t3, 16(sp)\n    sw t4, 20(sp)\n    sw t5, 24(sp)\n    sw t6, 28(sp)\n    sw a0, 32(sp)\n    sw a1, 36(sp)\n    sw a2, 40(sp)\n    sw a3, 44(sp)\n    sw a4, 48(sp)\n    sw a5, 52(sp)\n    sw a6, 56(sp)\n    sw a7, 60(sp)\n    call __hair_wch_embassy_time_driver_irq_rust\n    lw ra, 0(sp)\n    lw t0, 4(sp)\n    lw t1, 8(sp)\n    lw t2, 12(sp)\n    lw t3, 16(sp)\n    lw t4, 20(sp)\n    lw t5, 24(sp)\n    lw t6, 28(sp)\n    lw a0, 32(sp)\n    lw a1, 36(sp)\n    lw a2, 40(sp)\n    lw a3, 44(sp)\n    lw a4, 48(sp)\n    lw a5, 52(sp)\n    lw a6, 56(sp)\n    lw a7, 60(sp)\n    addi sp, sp, 64\n    mret\n\"#\n);\n\nfn pfic() -> {interrupt_driver_type} {{\n    {interrupt_driver_type}::new({interrupt_driver_resources}).expect(\"generated WCH PFIC resources\")\n}}\n\nfn time_driver() -> {time_driver_type} {{\n    {time_driver_type}::new({time_driver_resources}).expect(\"generated WCH time-driver resources\")\n}}\n\npub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {{\n    time_driver().init_time_driver()?;\n    unsafe {{\n        asm!(\"csrw 0x804, {{value}}\", value = in(reg) 0x3usize);\n        asm!(\n            \"csrw mtvec, {{value}}\",\n            value = in(reg) ((&WCH_VECTOR_TABLE as *const WchVectorTable as usize) | 0x3)\n        );\n    }}\n    pfic().enable_irq(Irq::{irq_variant})?;\n    unsafe {{\n        asm!(\"csrs mie, {{value}}\", value = in(reg) 0x800usize);\n        asm!(\"csrs mstatus, {{value}}\", value = in(reg) 0x88usize);\n    }}\n    Ok(())\n}}\n\n#[unsafe(no_mangle)]\nextern \"C\" fn __hair_wch_embassy_time_driver_irq_rust() {{\n    time_driver().on_time_driver_interrupt();\n}}\n",
+        "//! Generated WCH/QingKe runtime support for {}.\n\nuse crate::interrupt::{{{interrupt_driver_resources}, Irq, {interrupt_driver_type}}};\nuse crate::metadata;\nuse crate::time::{{{time_driver_resources}, {time_driver_type}}};\nuse core::arch::{{asm, global_asm}};\n{extra_imports}{module_provenance}\nunsafe extern \"C\" {{\n    fn __hair_wch_hang_vector();\n{extern_decls}}}\n\n#[derive(Clone, Copy)]\n#[repr(C)]\nunion WchVector {{\n    handler: unsafe extern \"C\" fn(),\n    reserved: usize,\n}}\n\nconst WCH_VECTOR_COUNT: usize = {vector_count};\nconst WCH_RESERVED_VECTOR: WchVector = WchVector {{ reserved: 0 }};\nconst WCH_HANG_VECTOR: WchVector = WchVector {{\n    handler: __hair_wch_hang_vector,\n}};\n{vector_consts}\n#[repr(C, align(64))]\nstruct WchVectorTable([WchVector; WCH_VECTOR_COUNT]);\n\nconst fn build_wch_vector_table() -> WchVectorTable {{\n    let mut table = [WCH_HANG_VECTOR; WCH_VECTOR_COUNT];\n    table[1] = WCH_RESERVED_VECTOR;\n    table[4] = WCH_RESERVED_VECTOR;\n    table[6] = WCH_RESERVED_VECTOR;\n    table[7] = WCH_RESERVED_VECTOR;\n    table[10] = WCH_RESERVED_VECTOR;\n    table[11] = WCH_RESERVED_VECTOR;\n    table[13] = WCH_RESERVED_VECTOR;\n    table[15] = WCH_RESERVED_VECTOR;\n{table_assignments}    WchVectorTable(table)\n}}\n\n#[unsafe(link_section = \".vector\")]\n#[used]\nstatic WCH_VECTOR_TABLE: WchVectorTable = build_wch_vector_table();\n\nglobal_asm!(\n    r#\"\n    .global __hair_wch_hang_vector\n__hair_wch_hang_vector:\n1:\n    j 1b\n\n{asm_wrappers}\"#\n);\n\nfn pfic() -> {interrupt_driver_type} {{\n    {interrupt_driver_type}::new({interrupt_driver_resources}).expect(\"generated WCH PFIC resources\")\n}}\n\nfn time_driver() -> {time_driver_type} {{\n    {time_driver_type}::new({time_driver_resources}).expect(\"generated WCH time-driver resources\")\n}}\n\n{helper_items}pub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {{\n    time_driver().init_time_driver()?;\n    unsafe {{\n        asm!(\"csrw 0x804, {{value}}\", value = in(reg) 0x3usize);\n        asm!(\n            \"csrw mtvec, {{value}}\",\n            value = in(reg) ((&WCH_VECTOR_TABLE as *const WchVectorTable as usize) | 0x3)\n        );\n    }}\n{init_enable_calls}    unsafe {{\n        asm!(\"csrs mie, {{value}}\", value = in(reg) 0x800usize);\n        asm!(\"csrs mstatus, {{value}}\", value = in(reg) 0x88usize);\n    }}\n    Ok(())\n}}\n\n{rust_handlers}",
         render_comment_text(&model.device_name),
-        render_module_provenance_const("wch"),
+        extra_imports = extra_imports,
+        module_provenance = render_module_provenance_const("wch"),
+        extern_decls = extern_decls,
+        vector_consts = vector_consts,
+        table_assignments = table_assignments,
+        asm_wrappers = asm_wrappers,
+        helper_items = helper_items,
+        init_enable_calls = init_enable_calls,
+        rust_handlers = rust_handlers,
     ))
 }
 
@@ -5863,6 +6353,94 @@ fn binding_method_name(prefix: &str, subject: &str, suffix: Option<&str>, noun: 
         Some(suffix) => format!("{prefix}_{subject}_{suffix}_{noun}"),
         None => format!("{prefix}_{subject}_{noun}"),
     }
+}
+
+fn render_clock_binding_enable_statement(
+    model: &EmbassyGenerationModel,
+    binding: &McuClockBinding,
+    indent: &str,
+) -> Result<String> {
+    let subject = model
+        .peripheral_names
+        .get(&binding.consumer_ref)
+        .cloned()
+        .unwrap_or_else(|| last_ref_segment(&binding.consumer_ref).to_string());
+    let (register, field) = resolve_control_target(
+        model,
+        &binding.control_refs,
+        "clock binding",
+        &binding.id,
+        &[
+            binding.name.clone(),
+            subject.clone(),
+            last_ref_segment(&binding.consumer_ref).to_string(),
+        ],
+    )?;
+    render_register_write_statement(register, &field, 1, indent)
+}
+
+fn render_reset_binding_release_statement(
+    model: &EmbassyGenerationModel,
+    binding: &McuResetBinding,
+    indent: &str,
+) -> Result<String> {
+    let subject = model
+        .peripheral_names
+        .get(&binding.target_ref)
+        .cloned()
+        .unwrap_or_else(|| last_ref_segment(&binding.target_ref).to_string());
+    let (register, field) = resolve_control_target(
+        model,
+        &binding.control_refs,
+        "reset binding",
+        &binding.id,
+        &[
+            binding.name.clone(),
+            subject.clone(),
+            last_ref_segment(&binding.target_ref).to_string(),
+        ],
+    )?;
+    render_register_write_statement(register, &field, 0, indent)
+}
+
+fn render_adc_dma_controller_bring_up_statements(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+    indent: &str,
+) -> Result<String> {
+    let mut seen_controllers = BTreeSet::<&str>::new();
+    let mut statements = String::new();
+    for channel in &driver.dma_channels {
+        let controller_ref = channel.controller_ref.as_str();
+        if !seen_controllers.insert(controller_ref) {
+            continue;
+        }
+        let dma_driver = model
+            .drivers
+            .iter()
+            .find(|candidate| {
+                candidate.driver_kind == "dma" && candidate.target.id.as_str() == controller_ref
+            })
+            .ok_or_else(|| {
+                anyhow!(
+                    "driver {} uses loweringPattern {} via DMA controller {} but no dma driver instance targets that controller",
+                    driver.id,
+                    ADC_LOWERING_REGULAR_SEQUENCE_DMA,
+                    controller_ref
+                )
+            })?;
+        for binding in &dma_driver.clock_bindings {
+            statements.push_str(&render_clock_binding_enable_statement(
+                model, binding, indent,
+            )?);
+        }
+        for binding in &dma_driver.reset_bindings {
+            statements.push_str(&render_reset_binding_release_statement(
+                model, binding, indent,
+            )?);
+        }
+    }
+    Ok(statements)
 }
 
 fn render_pin_route_methods(
@@ -8028,6 +8606,9 @@ fn render_adc_methods(
     if driver.driver_kind != "adc" {
         return Ok(Vec::new());
     }
+    if driver_uses_regular_sequence_adc_dma_lowering(driver) {
+        return render_regular_sequence_adc_dma_methods(model, driver);
+    }
     if driver.dma_routes.is_empty() && driver.interrupt_routes.is_empty() {
         return Ok(Vec::new());
     }
@@ -8091,6 +8672,974 @@ fn render_adc_methods(
     }
 
     Ok(methods)
+}
+
+fn render_regular_sequence_adc_dma_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    let bindings = adc_dma_bindings(driver).ok_or_else(|| {
+        anyhow!(
+            "driver {} selected loweringPattern {} without adcDmaBindings",
+            driver.id,
+            ADC_LOWERING_REGULAR_SEQUENCE_DMA
+        )
+    })?;
+    let dma_channel = driver.dma_channels.first().ok_or_else(|| {
+        anyhow!(
+            "driver {} selected loweringPattern {} without a resolved DMA channel",
+            driver.id,
+            ADC_LOWERING_REGULAR_SEQUENCE_DMA
+        )
+    })?;
+    let dma_array_index = dma_channel.channel_index.checked_sub(1).ok_or_else(|| {
+        anyhow!(
+            "driver {} resolved DMA channel {} with invalid channelIndex {}",
+            driver.id,
+            dma_channel.id,
+            dma_channel.channel_index
+        )
+    })?;
+    let adc_peripheral_ref = driver.target.target_ref.as_str();
+    let data_register = resolve_structural_register_ref(
+        model,
+        &bindings.data_register_ref,
+        Some(adc_peripheral_ref),
+        None,
+        &driver.id,
+        "ADC DMA data register",
+    )?;
+    let start_field = if let Some(start_ref) = &bindings.start_ref {
+        Some(resolve_structural_field_target(
+            model,
+            start_ref,
+            Some(adc_peripheral_ref),
+            None,
+            &driver.id,
+            "ADC DMA start control",
+        )?)
+    } else {
+        None
+    };
+    let sequence_length_field = resolve_structural_field_target(
+        model,
+        &bindings.regular_sequence_length_ref,
+        Some(adc_peripheral_ref),
+        None,
+        &driver.id,
+        "ADC DMA regular sequence length",
+    )?;
+    let sequence_length_register = resolve_structural_register_ref(
+        model,
+        &sequence_length_field.register_id,
+        Some(adc_peripheral_ref),
+        None,
+        &driver.id,
+        "ADC DMA regular sequence length",
+    )?;
+    let mut sequence_slot_writes = String::new();
+    for (index, slot_ref) in bindings.regular_sequence_slot_refs.iter().enumerate() {
+        let slot_field = resolve_structural_field_target(
+            model,
+            slot_ref,
+            Some(adc_peripheral_ref),
+            None,
+            &driver.id,
+            "ADC DMA regular sequence slot",
+        )?;
+        let slot_register = resolve_structural_register_ref(
+            model,
+            &slot_field.register_id,
+            Some(adc_peripheral_ref),
+            None,
+            &driver.id,
+            "ADC DMA regular sequence slot",
+        )?;
+        let channel_lookup = if index == 0 {
+            "channels.first()".to_string()
+        } else {
+            format!("channels.get({index})")
+        };
+        sequence_slot_writes.push_str(&format!(
+            "        if let Some(&channel) = {channel_lookup} {{\n"
+        ));
+        sequence_slot_writes.push_str("            match channel {\n");
+        for sample_time_binding in &bindings.channel_sample_time_refs {
+            let sample_time_field = resolve_structural_field_target(
+                model,
+                &sample_time_binding.sample_time_ref,
+                Some(adc_peripheral_ref),
+                None,
+                &driver.id,
+                "ADC DMA channel sample time",
+            )?;
+            let sample_time_register = resolve_structural_register_ref(
+                model,
+                &sample_time_field.register_id,
+                Some(adc_peripheral_ref),
+                None,
+                &driver.id,
+                "ADC DMA channel sample time",
+            )?;
+            sequence_slot_writes.push_str(&format!(
+                "                {channel} => {{\n{write}                }}\n",
+                channel = sample_time_binding.channel_index,
+                write = render_register_write_expression_statement(
+                    &sample_time_register,
+                    &sample_time_field.field,
+                    "u32::from(sample_time_code)",
+                    "                    ",
+                )?
+            ));
+        }
+        sequence_slot_writes.push_str(
+            "                _ => return Err(metadata::Error::InvalidReference(\"ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs\")),\n            }\n",
+        );
+        sequence_slot_writes.push_str(&render_register_write_expression_statement(
+            &slot_register,
+            &slot_field.field,
+            "u32::from(channel)",
+            "            ",
+        )?);
+        sequence_slot_writes.push_str("        }\n");
+    }
+
+    let transfer_complete_flag = resolve_structural_field_target(
+        model,
+        &bindings.dma_transfer_complete_flag_ref,
+        None,
+        Some(dma_array_index),
+        &driver.id,
+        "ADC DMA transfer-complete flag",
+    )?;
+    let transfer_complete_register = resolve_structural_register_ref(
+        model,
+        &transfer_complete_flag.register_id,
+        Some(transfer_complete_flag.peripheral_ref.as_str()),
+        Some(dma_array_index),
+        &driver.id,
+        "ADC DMA transfer-complete flag",
+    )?;
+    let transfer_complete_mask =
+        field_bit_mask(&transfer_complete_flag.field, &transfer_complete_register)?;
+    let dma_channel_enable_field = resolve_structural_field_target(
+        model,
+        &bindings.dma_channel_enable_ref,
+        None,
+        Some(dma_array_index),
+        &driver.id,
+        "ADC DMA channel enable",
+    )?;
+    let dma_channel_enable_register = resolve_structural_register_ref(
+        model,
+        &dma_channel_enable_field.register_id,
+        Some(dma_channel_enable_field.peripheral_ref.as_str()),
+        Some(dma_array_index),
+        &driver.id,
+        "ADC DMA channel enable",
+    )?;
+    let sample_time_mask = field_value_mask(
+        &resolve_structural_field_target(
+            model,
+            &bindings.channel_sample_time_refs[0].sample_time_ref,
+            Some(adc_peripheral_ref),
+            None,
+            &driver.id,
+            "ADC DMA channel sample time",
+        )?
+        .field,
+    )?;
+    let dma_controller_bring_up =
+        render_adc_dma_controller_bring_up_statements(model, driver, "        ")?;
+    let mut program_dynamic_setup = String::new();
+    program_dynamic_setup.push_str(&render_register_write_expression_statement(
+        &sequence_length_register,
+        &sequence_length_field.field,
+        "u32::try_from(channels.len() - 1).map_err(|_| metadata::Error::Unsupported(\"ADC DMA sequence length does not fit u32\"))?",
+        "        ",
+    )?);
+    program_dynamic_setup.push_str(&sequence_slot_writes);
+    program_dynamic_setup.push_str(&render_adc_dma_write_ref_expression(
+        model,
+        driver,
+        &bindings.dma_transfer_count_ref,
+        None,
+        Some(dma_array_index),
+        "transfer_count",
+        "ADC DMA transfer count",
+    )?);
+    program_dynamic_setup.push_str(&render_adc_dma_write_ref_expression(
+        model,
+        driver,
+        &bindings.dma_peripheral_address_ref,
+        None,
+        Some(dma_array_index),
+        "data_address",
+        "ADC DMA peripheral address",
+    )?);
+    program_dynamic_setup.push_str(&render_adc_dma_write_ref_expression(
+        model,
+        driver,
+        &bindings.dma_memory_address_ref,
+        None,
+        Some(dma_array_index),
+        "buffer_address",
+        "ADC DMA memory address",
+    )?);
+    if let Some(clear_half_ref) = &bindings.dma_half_transfer_clear_operation_ref {
+        program_dynamic_setup.push_str(&render_adc_dma_operation_statements(
+            model,
+            driver,
+            std::slice::from_ref(clear_half_ref),
+            Some(dma_array_index),
+            "ADC DMA half-transfer clear",
+        )?);
+    }
+    program_dynamic_setup.push_str(&render_adc_dma_operation_statements(
+        model,
+        driver,
+        std::slice::from_ref(&bindings.dma_transfer_complete_clear_operation_ref),
+        Some(dma_array_index),
+        "ADC DMA transfer-complete clear",
+    )?);
+    let mut arm_dma_and_start = String::new();
+    arm_dma_and_start.push_str(&render_register_write_statement(
+        &dma_channel_enable_register,
+        &dma_channel_enable_field.field,
+        1,
+        "        ",
+    )?);
+    if !bindings.start_operation_refs.is_empty() {
+        arm_dma_and_start.push_str(&render_adc_dma_operation_statements(
+            model,
+            driver,
+            &bindings.start_operation_refs,
+            Some(dma_array_index),
+            "ADC DMA start sequence",
+        )?);
+    } else if let Some(start_field) = &start_field {
+        arm_dma_and_start.push_str(&render_register_write_statement(
+            &resolve_structural_register_ref(
+                model,
+                &start_field.register_id,
+                Some(adc_peripheral_ref),
+                None,
+                &driver.id,
+                "ADC DMA start control",
+            )?,
+            &start_field.field,
+            1,
+            "        ",
+        )?);
+    }
+
+    let mut methods = Vec::new();
+    let mut one_shot = String::from(
+        "    pub fn start_one_shot_dma_u16(&self, channels: &[u8], sample_time_code: u8, buffer: &mut [u16]) -> Result<(), metadata::Error> {\n",
+    );
+    one_shot.push_str(&dma_controller_bring_up);
+    one_shot.push_str(&render_register_write_statement(
+        &dma_channel_enable_register,
+        &dma_channel_enable_field.field,
+        0,
+        "        ",
+    )?);
+    one_shot.push_str(
+        "        if channels.is_empty() {\n            return Err(metadata::Error::InvalidReference(\"ADC DMA sampling requires at least one channel\"));\n        }\n",
+    );
+    one_shot.push_str(&format!(
+        "        if channels.len() > {} {{\n            return Err(metadata::Error::InvalidReference(\"ADC DMA sampling sequence exceeds the bound regularSequenceSlotRefs length\"));\n        }}\n",
+        bindings.regular_sequence_slot_refs.len()
+    ));
+    one_shot.push_str(
+        "        if buffer.is_empty() {\n            return Err(metadata::Error::InvalidReference(\"ADC DMA sampling requires a non-empty destination buffer\"));\n        }\n        if !buffer.len().is_multiple_of(channels.len()) {\n            return Err(metadata::Error::InvalidReference(\"ADC DMA destination buffer length must be a whole multiple of the programmed sequence length\"));\n        }\n",
+    );
+    one_shot.push_str(&format!(
+        "        if u64::from(sample_time_code) > 0x{:X} {{\n            return Err(metadata::Error::InvalidReference(\"ADC DMA sample_time_code exceeds the bound sample-time field width\"));\n        }}\n",
+        sample_time_mask
+    ));
+    one_shot.push_str(
+        "        let transfer_count = u32::try_from(buffer.len()).map_err(|_| metadata::Error::Unsupported(\"ADC DMA transfer count does not fit u32\"))?;\n        let buffer_address = u32::try_from(buffer.as_mut_ptr() as usize)\n            .map_err(|_| metadata::Error::Unsupported(\"ADC DMA buffer address does not fit the target DMA address register\"))?;\n        let data_address = u32::try_from(0x",
+    );
+    one_shot.push_str(&format!("{:X}", data_register.absolute_address));
+    one_shot.push_str(
+        "u64).map_err(|_| metadata::Error::Unsupported(\"ADC DMA data register address does not fit the target DMA address register\"))?;\n",
+    );
+    one_shot.push_str(&render_adc_dma_operation_statements(
+        model,
+        driver,
+        &bindings.prepare_one_shot_operation_refs,
+        Some(dma_array_index),
+        "ADC DMA one-shot prepare",
+    )?);
+    one_shot.push_str(&program_dynamic_setup);
+    one_shot.push_str(&arm_dma_and_start);
+    one_shot.push_str("        Ok(())\n    }\n");
+    methods.push(GeneratedMethod {
+        name: "start_one_shot_dma_u16".to_string(),
+        code: one_shot,
+    });
+
+    if let Some(dma_driver) = model.drivers.iter().find(|candidate| {
+        candidate.driver_kind == "dma" && candidate.target.id == dma_channel.controller_ref
+    }) && dma_async_bindings(dma_driver).is_some_and(|bindings| {
+        bindings
+            .channels
+            .iter()
+            .any(|binding| binding.channel_ref == dma_channel.id)
+    }) {
+        methods.push(GeneratedMethod {
+            name: "sample_one_shot_dma_u16_async".to_string(),
+            code: format!(
+                "    pub async fn sample_one_shot_dma_u16_async(&self, dma: &crate::dma::{dma_type}, channels: &[u8], sample_time_code: u8, buffer: &mut [u16]) -> Result<(), metadata::Error> {{\n        dma.enable_clock()?;\n        let _ = dma.disable_transfer_complete_interrupt({channel_index});\n        self.start_one_shot_dma_u16(channels, sample_time_code, buffer)?;\n        dma.prepare_transfer_complete_wait({channel_index})?;\n        dma.enable_transfer_complete_interrupt({channel_index})?;\n        if dma.is_transfer_complete({channel_index})? {{\n            dma.disable_transfer_complete_interrupt({channel_index})?;\n            self.stop_dma_sampling()?;\n            return Ok(());\n        }}\n        let wait_result = dma.wait_transfer_complete({channel_index}).await;\n        let disable_result = dma.disable_transfer_complete_interrupt({channel_index});\n        if let Err(error) = wait_result {{\n            let _ = disable_result;\n            return Err(error);\n        }}\n        disable_result?;\n        self.stop_dma_sampling()?;\n        Ok(())\n    }}\n",
+                dma_type = dma_driver.type_name,
+                channel_index = dma_channel.channel_index,
+            ),
+        });
+    }
+
+    if !bindings.prepare_circular_operation_refs.is_empty() {
+        let mut circular = String::from(
+            "    pub fn start_circular_dma_u16(&self, channels: &[u8], sample_time_code: u8, buffer: &mut [u16]) -> Result<(), metadata::Error> {\n",
+        );
+        circular.push_str(&dma_controller_bring_up);
+        circular.push_str(&render_register_write_statement(
+            &dma_channel_enable_register,
+            &dma_channel_enable_field.field,
+            0,
+            "        ",
+        )?);
+        circular.push_str("        if channels.is_empty() {\n            return Err(metadata::Error::InvalidReference(\"ADC DMA sampling requires at least one channel\"));\n        }\n");
+        circular.push_str(&format!(
+            "        if channels.len() > {} {{\n            return Err(metadata::Error::InvalidReference(\"ADC DMA sampling sequence exceeds the bound regularSequenceSlotRefs length\"));\n        }}\n",
+            bindings.regular_sequence_slot_refs.len()
+        ));
+        circular.push_str("        if buffer.is_empty() {\n            return Err(metadata::Error::InvalidReference(\"ADC DMA sampling requires a non-empty destination buffer\"));\n        }\n        if buffer.len() < channels.len() {\n            return Err(metadata::Error::InvalidReference(\"ADC DMA circular buffer must hold at least one full programmed sequence\"));\n        }\n");
+        circular.push_str(&format!(
+            "        if u64::from(sample_time_code) > 0x{:X} {{\n            return Err(metadata::Error::InvalidReference(\"ADC DMA sample_time_code exceeds the bound sample-time field width\"));\n        }}\n",
+            sample_time_mask
+        ));
+        circular.push_str(
+            "        let transfer_count = u32::try_from(buffer.len()).map_err(|_| metadata::Error::Unsupported(\"ADC DMA transfer count does not fit u32\"))?;\n        let buffer_address = u32::try_from(buffer.as_mut_ptr() as usize)\n            .map_err(|_| metadata::Error::Unsupported(\"ADC DMA buffer address does not fit the target DMA address register\"))?;\n        let data_address = u32::try_from(0x",
+        );
+        circular.push_str(&format!("{:X}", data_register.absolute_address));
+        circular.push_str(
+            "u64).map_err(|_| metadata::Error::Unsupported(\"ADC DMA data register address does not fit the target DMA address register\"))?;\n",
+        );
+        circular.push_str(&render_adc_dma_operation_statements(
+            model,
+            driver,
+            &bindings.prepare_circular_operation_refs,
+            Some(dma_array_index),
+            "ADC DMA circular prepare",
+        )?);
+        circular.push_str(&program_dynamic_setup);
+        circular.push_str(&arm_dma_and_start);
+        circular.push_str("        Ok(())\n    }\n");
+        methods.push(GeneratedMethod {
+            name: "start_circular_dma_u16".to_string(),
+            code: circular,
+        });
+    }
+
+    let mut stop =
+        String::from("    pub fn stop_dma_sampling(&self) -> Result<(), metadata::Error> {\n");
+    stop.push_str(&render_register_write_statement(
+        &dma_channel_enable_register,
+        &dma_channel_enable_field.field,
+        0,
+        "        ",
+    )?);
+    stop.push_str(&render_adc_dma_operation_statements(
+        model,
+        driver,
+        &bindings.stop_operation_refs,
+        Some(dma_array_index),
+        "ADC DMA stop",
+    )?);
+    stop.push_str("        Ok(())\n    }\n");
+    methods.push(GeneratedMethod {
+        name: "stop_dma_sampling".to_string(),
+        code: stop,
+    });
+
+    methods.push(GeneratedMethod {
+        name: "is_dma_transfer_complete".to_string(),
+        code: format!(
+            "    pub fn is_dma_transfer_complete(&self) -> Result<bool, metadata::Error> {{\n        Ok((read_u32(0x{address:X}u64)? & 0x{mask:08X}u32) != 0)\n    }}\n",
+            address = transfer_complete_register.absolute_address,
+            mask = transfer_complete_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "clear_dma_transfer_complete".to_string(),
+        code: format!(
+            "    pub fn clear_dma_transfer_complete(&self) -> Result<(), metadata::Error> {{\n{}        Ok(())\n    }}\n",
+            render_adc_dma_operation_statements(
+                model,
+                driver,
+                std::slice::from_ref(&bindings.dma_transfer_complete_clear_operation_ref),
+                Some(dma_array_index),
+                "ADC DMA transfer-complete clear",
+            )?
+        ),
+    });
+
+    if let Some(interrupt_enable_ref) = &bindings.dma_transfer_complete_interrupt_enable_ref {
+        let interrupt_enable_field = resolve_structural_field_target(
+            model,
+            interrupt_enable_ref,
+            None,
+            Some(dma_array_index),
+            &driver.id,
+            "ADC DMA transfer-complete interrupt enable",
+        )?;
+        let interrupt_enable_register = resolve_structural_register_ref(
+            model,
+            &interrupt_enable_field.register_id,
+            Some(interrupt_enable_field.peripheral_ref.as_str()),
+            Some(dma_array_index),
+            &driver.id,
+            "ADC DMA transfer-complete interrupt enable",
+        )?;
+        methods.push(render_register_write_method(
+            "enable_dma_transfer_complete_interrupt".to_string(),
+            &interrupt_enable_register,
+            &interrupt_enable_field.field,
+            1,
+            &format!(
+                "Enable the {} DMA transfer-complete interrupt.",
+                driver.name
+            ),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_dma_transfer_complete_interrupt".to_string(),
+            &interrupt_enable_register,
+            &interrupt_enable_field.field,
+            0,
+            &format!(
+                "Disable the {} DMA transfer-complete interrupt.",
+                driver.name
+            ),
+        )?);
+    }
+
+    if let (Some(flag_ref), Some(clear_ref)) = (
+        bindings.dma_half_transfer_flag_ref.as_ref(),
+        bindings.dma_half_transfer_clear_operation_ref.as_ref(),
+    ) {
+        let half_flag = resolve_structural_field_target(
+            model,
+            flag_ref,
+            None,
+            Some(dma_array_index),
+            &driver.id,
+            "ADC DMA half-transfer flag",
+        )?;
+        let half_register = resolve_structural_register_ref(
+            model,
+            &half_flag.register_id,
+            Some(half_flag.peripheral_ref.as_str()),
+            Some(dma_array_index),
+            &driver.id,
+            "ADC DMA half-transfer flag",
+        )?;
+        let half_mask = field_bit_mask(&half_flag.field, &half_register)?;
+        methods.push(GeneratedMethod {
+            name: "is_dma_half_transfer".to_string(),
+            code: format!(
+                "    pub fn is_dma_half_transfer(&self) -> Result<bool, metadata::Error> {{\n        Ok((read_u32(0x{address:X}u64)? & 0x{mask:08X}u32) != 0)\n    }}\n",
+                address = half_register.absolute_address,
+                mask = half_mask
+            ),
+        });
+        methods.push(GeneratedMethod {
+            name: "clear_dma_half_transfer".to_string(),
+            code: format!(
+                "    pub fn clear_dma_half_transfer(&self) -> Result<(), metadata::Error> {{\n{}        Ok(())\n    }}\n",
+                render_adc_dma_operation_statements(
+                    model,
+                    driver,
+                    std::slice::from_ref(clear_ref),
+                    Some(dma_array_index),
+                    "ADC DMA half-transfer clear",
+                )?
+            ),
+        });
+    }
+
+    if let Some(interrupt_enable_ref) = &bindings.dma_half_transfer_interrupt_enable_ref {
+        let interrupt_enable_field = resolve_structural_field_target(
+            model,
+            interrupt_enable_ref,
+            None,
+            Some(dma_array_index),
+            &driver.id,
+            "ADC DMA half-transfer interrupt enable",
+        )?;
+        let interrupt_enable_register = resolve_structural_register_ref(
+            model,
+            &interrupt_enable_field.register_id,
+            Some(interrupt_enable_field.peripheral_ref.as_str()),
+            Some(dma_array_index),
+            &driver.id,
+            "ADC DMA half-transfer interrupt enable",
+        )?;
+        methods.push(render_register_write_method(
+            "enable_dma_half_transfer_interrupt".to_string(),
+            &interrupt_enable_register,
+            &interrupt_enable_field.field,
+            1,
+            &format!("Enable the {} DMA half-transfer interrupt.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_dma_half_transfer_interrupt".to_string(),
+            &interrupt_enable_register,
+            &interrupt_enable_field.field,
+            0,
+            &format!("Disable the {} DMA half-transfer interrupt.", driver.name),
+        )?);
+    }
+
+    Ok(methods)
+}
+
+fn render_dma_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    if driver.driver_kind != "dma" {
+        return Ok(Vec::new());
+    }
+    let Some(bindings) = dma_async_bindings(driver) else {
+        return Ok(Vec::new());
+    };
+
+    let unsupported_error =
+        "\"DMA async completion is not bound for the requested channel\"".to_string();
+    let has_half_transfer = bindings
+        .channels
+        .iter()
+        .any(|binding| binding.half_transfer_flag_ref.is_some());
+
+    let mut enable_tc_arms = String::new();
+    let mut disable_tc_arms = String::new();
+    let mut clear_tc_arms = String::new();
+    let mut is_tc_arms = String::new();
+    let mut on_interrupt_arms = String::new();
+    let mut enable_ht_arms = String::new();
+    let mut disable_ht_arms = String::new();
+    let mut clear_ht_arms = String::new();
+    let mut is_ht_arms = String::new();
+
+    for binding in &bindings.channels {
+        let channel = driver
+            .dma_channels
+            .iter()
+            .find(|candidate| candidate.id == binding.channel_ref)
+            .ok_or_else(|| {
+                anyhow!(
+                    "driver {} dmaAsyncBindings references unresolved DMA channel {}",
+                    driver.id,
+                    binding.channel_ref
+                )
+            })?;
+        let dma_array_index = channel.channel_index.checked_sub(1).ok_or_else(|| {
+            anyhow!(
+                "driver {} resolved DMA channel {} with invalid channelIndex {}",
+                driver.id,
+                channel.id,
+                channel.channel_index
+            )
+        })?;
+
+        let tc_enable_field = resolve_structural_field_target(
+            model,
+            &binding.transfer_complete_interrupt_enable_ref,
+            None,
+            Some(dma_array_index),
+            &driver.id,
+            "DMA async transfer-complete interrupt enable",
+        )?;
+        let tc_enable_register = resolve_structural_register_ref(
+            model,
+            &tc_enable_field.register_id,
+            Some(tc_enable_field.peripheral_ref.as_str()),
+            Some(dma_array_index),
+            &driver.id,
+            "DMA async transfer-complete interrupt enable",
+        )?;
+        let enable_tc_stmt = render_register_write_statement(
+            &tc_enable_register,
+            &tc_enable_field.field,
+            1,
+            "                ",
+        )?;
+        let disable_tc_stmt = render_register_write_statement(
+            &tc_enable_register,
+            &tc_enable_field.field,
+            0,
+            "                ",
+        )?;
+
+        let tc_flag_field = resolve_structural_field_target(
+            model,
+            &binding.transfer_complete_flag_ref,
+            None,
+            Some(dma_array_index),
+            &driver.id,
+            "DMA async transfer-complete flag",
+        )?;
+        let tc_flag_register = resolve_structural_register_ref(
+            model,
+            &tc_flag_field.register_id,
+            Some(tc_flag_field.peripheral_ref.as_str()),
+            Some(dma_array_index),
+            &driver.id,
+            "DMA async transfer-complete flag",
+        )?;
+        let tc_mask = field_bit_mask(&tc_flag_field.field, &tc_flag_register)?;
+
+        let tc_clear_field = resolve_structural_field_target(
+            model,
+            &binding.transfer_complete_clear_ref,
+            None,
+            Some(dma_array_index),
+            &driver.id,
+            "DMA async transfer-complete clear",
+        )?;
+        let tc_clear_register = resolve_structural_register_ref(
+            model,
+            &tc_clear_field.register_id,
+            Some(tc_clear_field.peripheral_ref.as_str()),
+            Some(dma_array_index),
+            &driver.id,
+            "DMA async transfer-complete clear",
+        )?;
+        let clear_tc_stmt = render_register_write_statement(
+            &tc_clear_register,
+            &tc_clear_field.field,
+            1,
+            "                ",
+        )?;
+
+        enable_tc_arms.push_str(&format!(
+            "            {} => {{\n{}                Ok(())\n            }}\n",
+            channel.channel_index, enable_tc_stmt
+        ));
+        disable_tc_arms.push_str(&format!(
+            "            {} => {{\n{}                Ok(())\n            }}\n",
+            channel.channel_index, disable_tc_stmt
+        ));
+        clear_tc_arms.push_str(&format!(
+            "            {} => {{\n{}                Ok(())\n            }}\n",
+            channel.channel_index, clear_tc_stmt
+        ));
+        is_tc_arms.push_str(&format!(
+            "            {} => Ok((read_u32(0x{:X}u64)? & 0x{:08X}u32) != 0),\n",
+            channel.channel_index, tc_flag_register.absolute_address, tc_mask
+        ));
+
+        let mut on_interrupt_arm = format!(
+            "            {} => {{\n                if (read_u32(0x{:X}u64)? & 0x{:08X}u32) != 0 {{\n{}                    generated_{}_signal_transfer_complete({})?;\n                }}\n",
+            channel.channel_index,
+            tc_flag_register.absolute_address,
+            tc_mask,
+            clear_tc_stmt,
+            to_rust_const_name(&driver.id).to_lowercase(),
+            channel.channel_index
+        );
+
+        if let (Some(ht_flag_ref), Some(ht_clear_ref), Some(ht_enable_ref)) = (
+            binding.half_transfer_flag_ref.as_ref(),
+            binding.half_transfer_clear_ref.as_ref(),
+            binding.half_transfer_interrupt_enable_ref.as_ref(),
+        ) {
+            let ht_enable_field = resolve_structural_field_target(
+                model,
+                ht_enable_ref,
+                None,
+                Some(dma_array_index),
+                &driver.id,
+                "DMA async half-transfer interrupt enable",
+            )?;
+            let ht_enable_register = resolve_structural_register_ref(
+                model,
+                &ht_enable_field.register_id,
+                Some(ht_enable_field.peripheral_ref.as_str()),
+                Some(dma_array_index),
+                &driver.id,
+                "DMA async half-transfer interrupt enable",
+            )?;
+            let enable_ht_stmt = render_register_write_statement(
+                &ht_enable_register,
+                &ht_enable_field.field,
+                1,
+                "                ",
+            )?;
+            let disable_ht_stmt = render_register_write_statement(
+                &ht_enable_register,
+                &ht_enable_field.field,
+                0,
+                "                ",
+            )?;
+
+            let ht_flag_field = resolve_structural_field_target(
+                model,
+                ht_flag_ref,
+                None,
+                Some(dma_array_index),
+                &driver.id,
+                "DMA async half-transfer flag",
+            )?;
+            let ht_flag_register = resolve_structural_register_ref(
+                model,
+                &ht_flag_field.register_id,
+                Some(ht_flag_field.peripheral_ref.as_str()),
+                Some(dma_array_index),
+                &driver.id,
+                "DMA async half-transfer flag",
+            )?;
+            let ht_mask = field_bit_mask(&ht_flag_field.field, &ht_flag_register)?;
+
+            let ht_clear_field = resolve_structural_field_target(
+                model,
+                ht_clear_ref,
+                None,
+                Some(dma_array_index),
+                &driver.id,
+                "DMA async half-transfer clear",
+            )?;
+            let ht_clear_register = resolve_structural_register_ref(
+                model,
+                &ht_clear_field.register_id,
+                Some(ht_clear_field.peripheral_ref.as_str()),
+                Some(dma_array_index),
+                &driver.id,
+                "DMA async half-transfer clear",
+            )?;
+            let clear_ht_stmt = render_register_write_statement(
+                &ht_clear_register,
+                &ht_clear_field.field,
+                1,
+                "                ",
+            )?;
+
+            enable_ht_arms.push_str(&format!(
+                "            {} => {{\n{}                Ok(())\n            }}\n",
+                channel.channel_index, enable_ht_stmt
+            ));
+            disable_ht_arms.push_str(&format!(
+                "            {} => {{\n{}                Ok(())\n            }}\n",
+                channel.channel_index, disable_ht_stmt
+            ));
+            clear_ht_arms.push_str(&format!(
+                "            {} => {{\n{}                Ok(())\n            }}\n",
+                channel.channel_index, clear_ht_stmt
+            ));
+            is_ht_arms.push_str(&format!(
+                "            {} => Ok((read_u32(0x{:X}u64)? & 0x{:08X}u32) != 0),\n",
+                channel.channel_index, ht_flag_register.absolute_address, ht_mask
+            ));
+
+            on_interrupt_arm.push_str(&format!(
+                "                if (read_u32(0x{:X}u64)? & 0x{:08X}u32) != 0 {{\n{}                    generated_{}_signal_half_transfer({})?;\n                }}\n",
+                ht_flag_register.absolute_address,
+                ht_mask,
+                clear_ht_stmt,
+                to_rust_const_name(&driver.id).to_lowercase(),
+                channel.channel_index
+            ));
+        }
+        on_interrupt_arm.push_str("                Ok(())\n            }\n");
+        on_interrupt_arms.push_str(&on_interrupt_arm);
+    }
+
+    let prefix = to_rust_const_name(&driver.id).to_lowercase();
+    let mut methods = vec![
+        GeneratedMethod {
+            name: "prepare_transfer_complete_wait".to_string(),
+            code: format!(
+                "    pub fn prepare_transfer_complete_wait(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        generated_{prefix}_prepare_transfer_complete_wait(channel_index)\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "wait_transfer_complete".to_string(),
+            code: format!(
+                "    pub async fn wait_transfer_complete(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        generated_{prefix}_wait_transfer_complete(channel_index).await\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "enable_transfer_complete_interrupt".to_string(),
+            code: format!(
+                "    pub fn enable_transfer_complete_interrupt(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        match channel_index {{\n{enable_tc_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "disable_transfer_complete_interrupt".to_string(),
+            code: format!(
+                "    pub fn disable_transfer_complete_interrupt(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        match channel_index {{\n{disable_tc_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "is_transfer_complete".to_string(),
+            code: format!(
+                "    pub fn is_transfer_complete(&self, channel_index: u32) -> Result<bool, metadata::Error> {{\n        match channel_index {{\n{is_tc_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "clear_transfer_complete".to_string(),
+            code: format!(
+                "    pub fn clear_transfer_complete(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        match channel_index {{\n{clear_tc_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "on_interrupt".to_string(),
+            code: format!(
+                "    pub fn on_interrupt(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        match channel_index {{\n{on_interrupt_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        },
+    ];
+
+    if has_half_transfer {
+        methods.push(GeneratedMethod {
+            name: "prepare_half_transfer_wait".to_string(),
+            code: format!(
+                "    pub fn prepare_half_transfer_wait(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        generated_{prefix}_prepare_half_transfer_wait(channel_index)\n    }}\n"
+            ),
+        });
+        methods.push(GeneratedMethod {
+            name: "wait_half_transfer".to_string(),
+            code: format!(
+                "    pub async fn wait_half_transfer(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        generated_{prefix}_wait_half_transfer(channel_index).await\n    }}\n"
+            ),
+        });
+        methods.push(GeneratedMethod {
+            name: "enable_half_transfer_interrupt".to_string(),
+            code: format!(
+                "    pub fn enable_half_transfer_interrupt(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        match channel_index {{\n{enable_ht_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        });
+        methods.push(GeneratedMethod {
+            name: "disable_half_transfer_interrupt".to_string(),
+            code: format!(
+                "    pub fn disable_half_transfer_interrupt(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        match channel_index {{\n{disable_ht_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        });
+        methods.push(GeneratedMethod {
+            name: "is_half_transfer".to_string(),
+            code: format!(
+                "    pub fn is_half_transfer(&self, channel_index: u32) -> Result<bool, metadata::Error> {{\n        match channel_index {{\n{is_ht_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        });
+        methods.push(GeneratedMethod {
+            name: "clear_half_transfer".to_string(),
+            code: format!(
+                "    pub fn clear_half_transfer(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        match channel_index {{\n{clear_ht_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        });
+    }
+
+    Ok(methods)
+}
+
+fn render_dma_support_items(
+    _model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    let Some(bindings) = dma_async_bindings(driver) else {
+        return Ok(String::new());
+    };
+    let prefix = to_rust_const_name(&driver.id).to_lowercase();
+    let state_type = format!("Generated{}DmaWaitState", driver.type_name);
+    let state_alias = format!(
+        "GENERATED_{}_DMA_WAIT_STATE",
+        to_rust_const_name(&driver.id)
+    );
+    let has_half_transfer = bindings
+        .channels
+        .iter()
+        .any(|binding| binding.half_transfer_flag_ref.is_some());
+
+    let mut state_statics = String::new();
+    let mut tc_prepare_arms = String::new();
+    let mut tc_wait_arms = String::new();
+    let mut tc_signal_arms = String::new();
+    let mut ht_prepare_arms = String::new();
+    let mut ht_wait_arms = String::new();
+    let mut ht_signal_arms = String::new();
+
+    for binding in &bindings.channels {
+        let channel = driver
+            .dma_channels
+            .iter()
+            .find(|candidate| candidate.id == binding.channel_ref)
+            .ok_or_else(|| {
+                anyhow!(
+                    "driver {} dmaAsyncBindings references unresolved DMA channel {}",
+                    driver.id,
+                    binding.channel_ref
+                )
+            })?;
+        let static_name = format!(
+            "GENERATED_{}_DMA_CH{}_WAIT_STATE",
+            to_rust_const_name(&driver.id),
+            channel.channel_index
+        );
+        state_statics.push_str(&format!(
+            "static {static_name}: critical_section::Mutex<core::cell::RefCell<{state_type}>> = critical_section::Mutex::new(core::cell::RefCell::new({state_type}::new()));\n"
+        ));
+        tc_prepare_arms.push_str(&format!(
+            "            {} => critical_section::with(|cs| {{\n                let mut state = {static_name}.borrow(cs).borrow_mut();\n                state.transfer_complete_ready = false;\n                state.transfer_complete_waker = None;\n                Ok(())\n            }}),\n",
+            channel.channel_index
+        ));
+        tc_wait_arms.push_str(&format!(
+            "            {} => {{\n                let ready = critical_section::with(|cs| {{\n                    let mut state = {static_name}.borrow(cs).borrow_mut();\n                    if state.transfer_complete_ready {{\n                        state.transfer_complete_ready = false;\n                        true\n                    }} else {{\n                        state.transfer_complete_waker = Some(cx.waker().clone());\n                        false\n                    }}\n                }});\n                if ready {{\n                    core::task::Poll::Ready(Ok(()))\n                }} else {{\n                    core::task::Poll::Pending\n                }}\n            }}\n",
+            channel.channel_index
+        ));
+        tc_signal_arms.push_str(&format!(
+            "        {} => {{\n            let waker = critical_section::with(|cs| {{\n                let mut state = {static_name}.borrow(cs).borrow_mut();\n                state.transfer_complete_ready = true;\n                state.transfer_complete_waker.take()\n            }});\n            if let Some(waker) = waker {{\n                waker.wake();\n            }}\n            Ok(())\n        }}\n",
+            channel.channel_index
+        ));
+
+        if binding.half_transfer_flag_ref.is_some() {
+            ht_prepare_arms.push_str(&format!(
+                "            {} => critical_section::with(|cs| {{\n                let mut state = {static_name}.borrow(cs).borrow_mut();\n                state.half_transfer_ready = false;\n                state.half_transfer_waker = None;\n                Ok(())\n            }}),\n",
+                channel.channel_index
+            ));
+            ht_wait_arms.push_str(&format!(
+                "            {} => {{\n                let ready = critical_section::with(|cs| {{\n                    let mut state = {static_name}.borrow(cs).borrow_mut();\n                    if state.half_transfer_ready {{\n                        state.half_transfer_ready = false;\n                        true\n                    }} else {{\n                        state.half_transfer_waker = Some(cx.waker().clone());\n                        false\n                    }}\n                }});\n                if ready {{\n                    core::task::Poll::Ready(Ok(()))\n                }} else {{\n                    core::task::Poll::Pending\n                }}\n            }}\n",
+                channel.channel_index
+            ));
+            ht_signal_arms.push_str(&format!(
+                "        {} => {{\n            let waker = critical_section::with(|cs| {{\n                let mut state = {static_name}.borrow(cs).borrow_mut();\n                state.half_transfer_ready = true;\n                state.half_transfer_waker.take()\n            }});\n            if let Some(waker) = waker {{\n                waker.wake();\n            }}\n            Ok(())\n        }}\n",
+                channel.channel_index
+            ));
+        }
+    }
+
+    let unsupported_error = "\"DMA async completion is not bound for the requested channel\"";
+    let half_fields = if has_half_transfer {
+        "    half_transfer_ready: bool,\n    half_transfer_waker: Option<core::task::Waker>,\n"
+    } else {
+        ""
+    };
+    let half_init = if has_half_transfer {
+        "            half_transfer_ready: false,\n            half_transfer_waker: None,\n"
+    } else {
+        ""
+    };
+    let half_helpers = if has_half_transfer {
+        format!(
+            "\nfn generated_{prefix}_prepare_half_transfer_wait(channel_index: u32) -> Result<(), metadata::Error> {{\n    match channel_index {{\n{ht_prepare_arms}        _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n    }}\n}}\n\nasync fn generated_{prefix}_wait_half_transfer(channel_index: u32) -> Result<(), metadata::Error> {{\n    core::future::poll_fn(|cx| {{\n        match channel_index {{\n{ht_wait_arms}            _ => core::task::Poll::Ready(Err(metadata::Error::InvalidReference({unsupported_error}))),\n        }}\n    }})\n    .await\n}}\n\nfn generated_{prefix}_signal_half_transfer(channel_index: u32) -> Result<(), metadata::Error> {{\n    match channel_index {{\n{ht_signal_arms}        _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n    }}\n}}\n"
+        )
+    } else {
+        String::new()
+    };
+
+    Ok(format!(
+        "\n#[derive(Debug)]\nstruct {state_type} {{\n    transfer_complete_ready: bool,\n    transfer_complete_waker: Option<core::task::Waker>,\n{half_fields}}}\n\nimpl {state_type} {{\n    const fn new() -> Self {{\n        Self {{\n            transfer_complete_ready: false,\n            transfer_complete_waker: None,\n{half_init}        }}\n    }}\n}}\n\nconst {state_alias}: &str = {unsupported_error};\n{state_statics}\nfn generated_{prefix}_prepare_transfer_complete_wait(channel_index: u32) -> Result<(), metadata::Error> {{\n    match channel_index {{\n{tc_prepare_arms}        _ => Err(metadata::Error::InvalidReference({state_alias})),\n    }}\n}}\n\nasync fn generated_{prefix}_wait_transfer_complete(channel_index: u32) -> Result<(), metadata::Error> {{\n    core::future::poll_fn(|cx| {{\n        match channel_index {{\n{tc_wait_arms}            _ => core::task::Poll::Ready(Err(metadata::Error::InvalidReference({state_alias}))),\n        }}\n    }})\n    .await\n}}\n\nfn generated_{prefix}_signal_transfer_complete(channel_index: u32) -> Result<(), metadata::Error> {{\n    match channel_index {{\n{tc_signal_arms}        _ => Err(metadata::Error::InvalidReference({state_alias})),\n    }}\n}}\n{half_helpers}",
+    ))
 }
 
 fn render_rtc_methods(
@@ -9058,14 +10607,6 @@ fn render_operation_methods(
             let mut code =
                 format!("    pub fn {method_name}(&self) -> Result<(), metadata::Error> {{\n");
             for step in &steps {
-                if step.action != "write" {
-                    bail!(
-                        "operation {} on driver {} uses unsupported action {}",
-                        operation.id,
-                        driver.id,
-                        step.action
-                    );
-                }
                 let target_ref = step.target_ref.as_deref().ok_or_else(|| {
                     anyhow!(
                         "operation {} step {} is missing targetRef",
@@ -9081,19 +10622,45 @@ fn render_operation_methods(
                         target_ref
                     )
                 })?;
-                let parsed = parse_field_write_expression(
-                    step.expression.as_ref(),
-                    step.value.as_ref(),
-                    &operation.id,
-                    step.index,
-                )?;
-                let field = resolve_register_field(register, &parsed.field_name)?;
-                code.push_str(&render_register_write_statement(
-                    register,
-                    &field,
-                    parsed.value,
-                    "        ",
-                )?);
+                match step.action.as_str() {
+                    "write" => {
+                        let parsed = parse_field_write_expression(
+                            step.expression.as_ref(),
+                            step.value.as_ref(),
+                            &operation.id,
+                            step.index,
+                        )?;
+                        let field = resolve_register_field(register, &parsed.field_name)?;
+                        code.push_str(&render_register_write_statement(
+                            register,
+                            &field,
+                            parsed.value,
+                            "        ",
+                        )?);
+                    }
+                    "poll" => {
+                        let parsed = parse_field_poll_expression(
+                            step.expression.as_ref(),
+                            &operation.id,
+                            step.index,
+                        )?;
+                        let field = resolve_register_field(register, &parsed.field_name)?;
+                        code.push_str(&render_register_poll_statement(
+                            register,
+                            &field,
+                            parsed.value,
+                            "        ",
+                        )?);
+                    }
+                    other => {
+                        bail!(
+                            "operation {} on driver {} uses unsupported action {}",
+                            operation.id,
+                            driver.id,
+                            other
+                        );
+                    }
+                }
             }
             code.push_str("        Ok(())\n    }\n");
             Ok(GeneratedMethod {
@@ -10463,6 +12030,391 @@ fn render_register_flag_read_method(
     })
 }
 
+fn resolve_structural_owner_peripheral<'a>(
+    model: &'a EmbassyGenerationModel,
+    structural_ref: &str,
+    preferred_peripheral_ref: Option<&str>,
+    owner_id: &str,
+    usage: &str,
+) -> Result<&'a Peripheral> {
+    let owners = model.register_owners.get(structural_ref).ok_or_else(|| {
+        anyhow!(
+            "{} {} references unknown structural ref {}",
+            owner_id,
+            usage,
+            structural_ref
+        )
+    })?;
+    let owner_ref = if let Some(preferred) = preferred_peripheral_ref {
+        owners
+            .iter()
+            .find(|owner| owner.as_str() == preferred)
+            .or_else(|| owners.first())
+    } else {
+        owners.first()
+    }
+    .ok_or_else(|| {
+        anyhow!(
+            "{} {} references structural ref {} without any owning peripheral",
+            owner_id,
+            usage,
+            structural_ref
+        )
+    })?;
+    model.peripherals.get(owner_ref.as_str()).ok_or_else(|| {
+        anyhow!(
+            "{} {} resolves {} to owner {} that is not present in the structural model",
+            owner_id,
+            usage,
+            structural_ref,
+            owner_ref
+        )
+    })
+}
+
+fn resolve_structural_register_ref(
+    model: &EmbassyGenerationModel,
+    structural_ref: &str,
+    preferred_peripheral_ref: Option<&str>,
+    array_index: Option<u32>,
+    owner_id: &str,
+    usage: &str,
+) -> Result<ResolvedRegister> {
+    let owner = resolve_structural_owner_peripheral(
+        model,
+        structural_ref,
+        preferred_peripheral_ref,
+        owner_id,
+        usage,
+    )?;
+    let base_address = owner.base_address.ok_or_else(|| {
+        anyhow!(
+            "{} {} needs baseAddress on peripheral {} to resolve {}",
+            owner_id,
+            usage,
+            owner.id,
+            structural_ref
+        )
+    })?;
+    resolve_structural_register_from_members(
+        owner.id.as_str(),
+        base_address,
+        &owner.registers,
+        structural_ref,
+        array_index,
+    )?
+    .ok_or_else(|| {
+        anyhow!(
+            "{} {} could not resolve register {} on peripheral {}",
+            owner_id,
+            usage,
+            structural_ref,
+            owner.id
+        )
+    })
+}
+
+fn resolve_structural_field_target(
+    model: &EmbassyGenerationModel,
+    structural_ref: &str,
+    preferred_peripheral_ref: Option<&str>,
+    array_index: Option<u32>,
+    owner_id: &str,
+    usage: &str,
+) -> Result<ResolvedFieldTarget> {
+    let owner = resolve_structural_owner_peripheral(
+        model,
+        structural_ref,
+        preferred_peripheral_ref,
+        owner_id,
+        usage,
+    )?;
+    let base_address = owner.base_address.ok_or_else(|| {
+        anyhow!(
+            "{} {} needs baseAddress on peripheral {} to resolve {}",
+            owner_id,
+            usage,
+            owner.id,
+            structural_ref
+        )
+    })?;
+    resolve_structural_field_from_members(
+        owner.id.as_str(),
+        base_address,
+        &owner.registers,
+        structural_ref,
+        array_index,
+    )?
+    .ok_or_else(|| {
+        anyhow!(
+            "{} {} could not resolve field {} on peripheral {}",
+            owner_id,
+            usage,
+            structural_ref,
+            owner.id
+        )
+    })
+}
+
+fn resolve_structural_register_from_members(
+    peripheral_ref: &str,
+    base_address: u64,
+    members: &[RegisterBlockMember],
+    structural_ref: &str,
+    array_index: Option<u32>,
+) -> Result<Option<ResolvedRegister>> {
+    for member in members {
+        match member {
+            RegisterBlockMember::Register(register) => {
+                if let Some(resolved) = resolve_structural_register_from_register(
+                    peripheral_ref,
+                    base_address,
+                    register,
+                    structural_ref,
+                    array_index,
+                )? {
+                    return Ok(Some(resolved));
+                }
+            }
+            RegisterBlockMember::Cluster(cluster) => {
+                if let Some(resolved) = resolve_structural_register_from_cluster(
+                    peripheral_ref,
+                    base_address,
+                    cluster,
+                    structural_ref,
+                    array_index,
+                )? {
+                    return Ok(Some(resolved));
+                }
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn resolve_structural_field_from_members(
+    peripheral_ref: &str,
+    base_address: u64,
+    members: &[RegisterBlockMember],
+    structural_ref: &str,
+    array_index: Option<u32>,
+) -> Result<Option<ResolvedFieldTarget>> {
+    for member in members {
+        match member {
+            RegisterBlockMember::Register(register) => {
+                if let Some(resolved) = resolve_structural_field_from_register(
+                    peripheral_ref,
+                    base_address,
+                    register,
+                    structural_ref,
+                    array_index,
+                )? {
+                    return Ok(Some(resolved));
+                }
+            }
+            RegisterBlockMember::Cluster(cluster) => {
+                if let Some(resolved) = resolve_structural_field_from_cluster(
+                    peripheral_ref,
+                    base_address,
+                    cluster,
+                    structural_ref,
+                    array_index,
+                )? {
+                    return Ok(Some(resolved));
+                }
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn resolve_structural_register_from_register(
+    peripheral_ref: &str,
+    parent_address: u64,
+    register: &Register,
+    structural_ref: &str,
+    array_index: Option<u32>,
+) -> Result<Option<ResolvedRegister>> {
+    if register.id != structural_ref {
+        return Ok(None);
+    }
+    let offset = checked_offset_add(parent_address, register.offset_bytes, "register address")?;
+    let absolute_address = if let Some(array) = &register.array {
+        let index = array_index.ok_or_else(|| {
+            anyhow!(
+                "register {} is arrayed but no array index was supplied for structural resolution",
+                register.id
+            )
+        })?;
+        let stride = first_array_axis_stride(array, &register.id)?;
+        checked_offset_add(
+            offset,
+            u64::from(index).checked_mul(stride).ok_or_else(|| {
+                anyhow!(
+                    "register {} array index overflows register stride math",
+                    register.id
+                )
+            })?,
+            "arrayed register address",
+        )?
+    } else {
+        offset
+    };
+    Ok(Some(ResolvedRegister {
+        id: register.id.clone(),
+        name: register.name.clone(),
+        peripheral_ref: peripheral_ref.to_string(),
+        absolute_address,
+        width_bits: register.width_bits,
+        fields: register
+            .fields
+            .iter()
+            .map(|field| ResolvedField {
+                id: field.id.clone(),
+                name: field.name.clone(),
+                description: field.description.clone(),
+                lsb: field.bit_range.lsb,
+                msb: field.bit_range.msb,
+            })
+            .collect(),
+    }))
+}
+
+fn resolve_structural_register_from_cluster(
+    peripheral_ref: &str,
+    parent_address: u64,
+    cluster: &RegisterCluster,
+    structural_ref: &str,
+    array_index: Option<u32>,
+) -> Result<Option<ResolvedRegister>> {
+    let cluster_address =
+        checked_offset_add(parent_address, cluster.offset_bytes, "cluster address")?;
+    if let Some(array) = &cluster.array {
+        let index = array_index.ok_or_else(|| {
+            anyhow!(
+                "cluster {} is arrayed but no array index was supplied for structural resolution",
+                cluster.name
+            )
+        })?;
+        let stride = first_array_axis_stride(array, cluster.name.as_str())?;
+        let indexed_address = checked_offset_add(
+            cluster_address,
+            u64::from(index).checked_mul(stride).ok_or_else(|| {
+                anyhow!(
+                    "cluster {} array index overflows cluster stride math",
+                    cluster.name
+                )
+            })?,
+            "arrayed cluster address",
+        )?;
+        return resolve_structural_register_from_members(
+            peripheral_ref,
+            indexed_address,
+            &cluster.members,
+            structural_ref,
+            None,
+        );
+    }
+    resolve_structural_register_from_members(
+        peripheral_ref,
+        cluster_address,
+        &cluster.members,
+        structural_ref,
+        array_index,
+    )
+}
+
+fn resolve_structural_field_from_register(
+    peripheral_ref: &str,
+    parent_address: u64,
+    register: &Register,
+    structural_ref: &str,
+    array_index: Option<u32>,
+) -> Result<Option<ResolvedFieldTarget>> {
+    if !register
+        .fields
+        .iter()
+        .any(|field| field.id == structural_ref)
+    {
+        return Ok(None);
+    }
+    let resolved_register = resolve_structural_register_from_register(
+        peripheral_ref,
+        parent_address,
+        register,
+        register.id.as_str(),
+        array_index,
+    )?;
+    let Some(register) = resolved_register else {
+        return Ok(None);
+    };
+    for field in &register.fields {
+        if field.id == structural_ref {
+            return Ok(Some(ResolvedFieldTarget {
+                peripheral_ref: peripheral_ref.to_string(),
+                register_id: register.id.clone(),
+                field: field.clone(),
+            }));
+        }
+    }
+    Ok(None)
+}
+
+fn resolve_structural_field_from_cluster(
+    peripheral_ref: &str,
+    parent_address: u64,
+    cluster: &RegisterCluster,
+    structural_ref: &str,
+    array_index: Option<u32>,
+) -> Result<Option<ResolvedFieldTarget>> {
+    let cluster_address =
+        checked_offset_add(parent_address, cluster.offset_bytes, "cluster address")?;
+    if let Some(array) = &cluster.array {
+        let index = array_index.ok_or_else(|| {
+            anyhow!(
+                "cluster {} is arrayed but no array index was supplied for structural resolution",
+                cluster.name
+            )
+        })?;
+        let stride = first_array_axis_stride(array, cluster.name.as_str())?;
+        let indexed_address = checked_offset_add(
+            cluster_address,
+            u64::from(index).checked_mul(stride).ok_or_else(|| {
+                anyhow!(
+                    "cluster {} array index overflows cluster stride math",
+                    cluster.name
+                )
+            })?,
+            "arrayed cluster address",
+        )?;
+        return resolve_structural_field_from_members(
+            peripheral_ref,
+            indexed_address,
+            &cluster.members,
+            structural_ref,
+            None,
+        );
+    }
+    resolve_structural_field_from_members(
+        peripheral_ref,
+        cluster_address,
+        &cluster.members,
+        structural_ref,
+        array_index,
+    )
+}
+
+fn first_array_axis_stride(array: &ArrayShape, owner: &str) -> Result<u64> {
+    let axis = array.axes.first().ok_or_else(|| {
+        anyhow!(
+            "arrayed structural member {} is missing its first axis",
+            owner
+        )
+    })?;
+    axis.stride_bytes
+        .ok_or_else(|| anyhow!("arrayed structural member {} omits strideBytes", owner))
+}
+
 fn render_register_write_statement(
     register: &ResolvedRegister,
     field: &ResolvedField,
@@ -10589,6 +12541,284 @@ fn render_register_write_statement(
         }
         _ => unreachable!("unsupported widths are rejected before mask computation"),
     }
+}
+
+fn render_register_write_expression_statement(
+    register: &ResolvedRegister,
+    field: &ResolvedField,
+    value_expr: &str,
+    indent: &str,
+) -> Result<String> {
+    let clear_mask = field_bit_mask_or_range_mask(field, register)?;
+    let value_mask = field_value_mask(field)?;
+    match register.width_bits {
+        8 => {
+            let clear_mask = u8::try_from(clear_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            let value_mask = u8::try_from(value_mask).map_err(|_| {
+                anyhow!(
+                    "field {} on register {} requires a value mask wider than u8",
+                    field.name,
+                    register.id
+                )
+            })?;
+            let masked_expr = if value_mask == u8::MAX {
+                value_expr.to_string()
+            } else {
+                format!("({value_expr}) & 0x{value_mask:02X}u8")
+            };
+            let set_expr = if field.lsb == 0 {
+                masked_expr
+            } else {
+                format!("({masked_expr}) << {}", field.lsb)
+            };
+            Ok(format!(
+                "{indent}modify_u8(0x{address:X}u64, 0x{clear_mask:02X}u8, {set_expr})?;\n",
+                address = register.absolute_address
+            ))
+        }
+        16 => {
+            let clear_mask = u16::try_from(clear_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            let value_mask = u16::try_from(value_mask).map_err(|_| {
+                anyhow!(
+                    "field {} on register {} requires a value mask wider than u16",
+                    field.name,
+                    register.id
+                )
+            })?;
+            let masked_expr = if value_mask == u16::MAX {
+                value_expr.to_string()
+            } else {
+                format!("({value_expr}) & 0x{value_mask:04X}u16")
+            };
+            let set_expr = if field.lsb == 0 {
+                masked_expr
+            } else {
+                format!("({masked_expr}) << {}", field.lsb)
+            };
+            Ok(format!(
+                "{indent}modify_u16(0x{address:X}u64, 0x{clear_mask:04X}u16, {set_expr})?;\n",
+                address = register.absolute_address
+            ))
+        }
+        32 => {
+            let value_mask = u32::try_from(value_mask).map_err(|_| {
+                anyhow!(
+                    "field {} on register {} requires a value mask wider than u32",
+                    field.name,
+                    register.id
+                )
+            })?;
+            let masked_expr = if value_mask == u32::MAX {
+                value_expr.to_string()
+            } else {
+                format!("({value_expr}) & 0x{value_mask:08X}u32")
+            };
+            let set_expr = if field.lsb == 0 {
+                masked_expr
+            } else {
+                format!("({masked_expr}) << {}", field.lsb)
+            };
+            Ok(format!(
+                "{indent}modify_u32(0x{address:X}u64, 0x{clear_mask:08X}u32, {set_expr})?;\n",
+                address = register.absolute_address
+            ))
+        }
+        other => bail!(
+            "register {} uses unsupported width {} for Embassy code generation",
+            register.id,
+            other
+        ),
+    }
+}
+
+fn render_register_poll_statement(
+    register: &ResolvedRegister,
+    field: &ResolvedField,
+    value: u64,
+    indent: &str,
+) -> Result<String> {
+    let raw_mask = field_value_mask(field)?;
+    if value > raw_mask {
+        bail!(
+            "field {} on register {} cannot hold polled value {}",
+            field.name,
+            register.id,
+            value
+        );
+    }
+    let shifted_mask = shifted_field_mask(field, register)?;
+    let expected = u32::try_from(value).map_err(|_| {
+        anyhow!(
+            "field {} on register {} requires a poll value wider than 32 bits",
+            field.name,
+            register.id
+        )
+    })?;
+    let read_expr = match register.width_bits {
+        8 => format!("u32::from(read_u8(0x{:X}u64)?)", register.absolute_address),
+        16 => format!("u32::from(read_u16(0x{:X}u64)?)", register.absolute_address),
+        32 => format!("read_u32(0x{:X}u64)?", register.absolute_address),
+        other => {
+            bail!(
+                "register {} uses unsupported width {} for Embassy poll generation",
+                register.id,
+                other
+            )
+        }
+    };
+    Ok(format!(
+        "{indent}while ((({read_expr}) & 0x{shifted_mask:08X}u32) >> {lsb}) != {expected}u32 {{\n{indent}    core::hint::spin_loop();\n{indent}}}\n",
+        lsb = field.lsb
+    ))
+}
+
+fn render_register_value_write_expression_statement(
+    register: &ResolvedRegister,
+    value_expr: &str,
+    indent: &str,
+) -> Result<String> {
+    match register.width_bits {
+        8 => Ok(format!(
+            "{indent}write_u8(0x{address:X}u64, {value_expr})?;\n",
+            address = register.absolute_address
+        )),
+        16 => Ok(format!(
+            "{indent}write_u16(0x{address:X}u64, {value_expr})?;\n",
+            address = register.absolute_address
+        )),
+        32 => Ok(format!(
+            "{indent}write_u32(0x{address:X}u64, {value_expr})?;\n",
+            address = register.absolute_address
+        )),
+        other => bail!(
+            "register {} uses unsupported width {} for Embassy code generation",
+            register.id,
+            other
+        ),
+    }
+}
+
+fn render_adc_dma_operation_statements(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+    operation_refs: &[String],
+    dma_array_index: Option<u32>,
+    usage: &str,
+) -> Result<String> {
+    let mut rendered = String::new();
+    for operation_ref in operation_refs {
+        let operation = model
+            .operations
+            .get(operation_ref.as_str())
+            .ok_or_else(|| {
+                anyhow!(
+                    "{} {} references unknown operation {}",
+                    driver.id,
+                    usage,
+                    operation_ref
+                )
+            })?;
+        for step in &operation.steps {
+            if step.action != "write" {
+                bail!(
+                    "{} {} {} step {} uses unsupported action {}",
+                    driver.id,
+                    usage,
+                    operation.id,
+                    step.index,
+                    step.action
+                );
+            }
+            let step_target_ref = step.target_ref.as_deref().ok_or_else(|| {
+                anyhow!(
+                    "{} {} {} step {} is missing targetRef",
+                    driver.id,
+                    usage,
+                    operation.id,
+                    step.index
+                )
+            })?;
+            let parsed = parse_field_write_expression(
+                step.expression.as_ref(),
+                step.value.as_ref(),
+                &operation.id,
+                step.index,
+            )?;
+            let register = resolve_structural_register_ref(
+                model,
+                step_target_ref,
+                Some(driver.target.target_ref.as_str()),
+                dma_array_index,
+                &driver.id,
+                usage,
+            )?;
+            let field = resolve_register_field(&register, &parsed.field_name)?;
+            rendered.push_str(&render_register_write_statement(
+                &register,
+                &field,
+                parsed.value,
+                "        ",
+            )?);
+        }
+    }
+    Ok(rendered)
+}
+
+fn render_adc_dma_write_ref_expression(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+    structural_ref: &str,
+    preferred_peripheral_ref: Option<&str>,
+    array_index: Option<u32>,
+    value_expr: &str,
+    usage: &str,
+) -> Result<String> {
+    if structural_ref.starts_with("reg.") {
+        let register = resolve_structural_register_ref(
+            model,
+            structural_ref,
+            preferred_peripheral_ref,
+            array_index,
+            &driver.id,
+            usage,
+        )?;
+        return render_register_value_write_expression_statement(&register, value_expr, "        ");
+    }
+    let target = resolve_structural_field_target(
+        model,
+        structural_ref,
+        preferred_peripheral_ref,
+        array_index,
+        &driver.id,
+        usage,
+    )?;
+    let register = resolve_structural_register_ref(
+        model,
+        &target.register_id,
+        Some(target.peripheral_ref.as_str()),
+        array_index,
+        &driver.id,
+        usage,
+    )?;
+    render_register_write_expression_statement(&register, &target.field, value_expr, "        ")
 }
 
 fn field_value_mask(field: &ResolvedField) -> Result<u64> {
@@ -11289,6 +13519,11 @@ struct ParsedFieldWrite {
     value: u64,
 }
 
+struct ParsedFieldPoll {
+    field_name: String,
+    value: u64,
+}
+
 fn parse_field_write_expression(
     expression: Option<&SemanticExpression>,
     _value: Option<&Value>,
@@ -11320,6 +13555,38 @@ fn parse_field_write_expression(
         operation_id,
         step_index
     )
+}
+
+fn parse_field_poll_expression(
+    expression: Option<&SemanticExpression>,
+    operation_id: &str,
+    step_index: u32,
+) -> Result<ParsedFieldPoll> {
+    let expression = expression.ok_or_else(|| {
+        anyhow!(
+            "operation {} step {} requires explicit expression text for poll lowering",
+            operation_id,
+            step_index
+        )
+    })?;
+    let language = expression.language.as_deref().ok_or_else(|| {
+        anyhow!(
+            "operation {} step {} is missing expression language required for poll lowering",
+            operation_id,
+            step_index
+        )
+    })?;
+    if language != "plain" {
+        bail!(
+            "operation {} step {} uses unsupported expression language {} for first-cut poll lowering",
+            operation_id,
+            step_index,
+            language
+        );
+    }
+    parse_field_poll_text(&expression.text).with_context(|| {
+        format!("parsing poll expression on operation {operation_id} step {step_index}")
+    })
 }
 
 fn parse_field_write_text(text: &str) -> Result<ParsedFieldWrite> {
@@ -11361,6 +13628,18 @@ fn parse_field_write_text(text: &str) -> Result<ParsedFieldWrite> {
         });
     }
     bail!("unsupported plain-text write expression {trimmed}")
+}
+
+fn parse_field_poll_text(text: &str) -> Result<ParsedFieldPoll> {
+    let trimmed = text.trim();
+    let rest = trimmed
+        .strip_prefix("Wait until ")
+        .or_else(|| trimmed.strip_prefix("Poll until "))
+        .ok_or_else(|| anyhow!("unsupported plain-text poll expression {trimmed}"))?;
+    let (field_name, value) = parse_explicit_assignment(rest)?.ok_or_else(|| {
+        anyhow!("poll expression {trimmed} must use an explicit FIELD = VALUE form")
+    })?;
+    Ok(ParsedFieldPoll { field_name, value })
 }
 
 fn parse_explicit_assignment(text: &str) -> Result<Option<(String, u64)>> {
@@ -15773,6 +18052,117 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
     }
 
     #[test]
+    fn generate_embassy_emits_adc_dma_helpers_for_ch32v203g6u6() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let input = repo_root
+            .join("evidence")
+            .join("wch")
+            .join("ch32v203g6u6")
+            .join("hair.json");
+        let document = load_validated_hair_document(&input, &repo_root)
+            .expect("reference hair document should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&document, output_dir.path()).expect("embassy generation");
+
+        let adc_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("adc.rs")).expect("adc.rs");
+        let dma_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("dma.rs")).expect("dma.rs");
+        let wch_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("wch.rs")).expect("wch.rs");
+
+        assert!(adc_rs.contains("pub fn start_one_shot_dma_u16"));
+        assert!(adc_rs.contains("pub async fn sample_one_shot_dma_u16_async"));
+        assert!(adc_rs.contains("pub fn start_circular_dma_u16"));
+        assert!(adc_rs.contains("pub fn stop_dma_sampling"));
+        assert!(adc_rs.contains("pub fn is_dma_transfer_complete"));
+        assert!(adc_rs.contains("pub fn clear_dma_transfer_complete"));
+        assert!(adc_rs.contains("pub fn enable_dma_half_transfer_interrupt"));
+        assert!(adc_rs.contains("pub fn enable_dma_transfer_complete_interrupt"));
+        assert!(adc_rs.contains("if let Some(&channel) = channels.first()"));
+        assert!(
+            adc_rs.contains("ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs")
+        );
+        assert!(!adc_rs.contains("let channel = channels[1];"));
+        assert!(
+            adc_rs.contains("while (((read_u32(0x40012408u64)?) & 0x00000008u32) >> 3) != 0u32")
+        );
+        assert!(
+            adc_rs.contains("while (((read_u32(0x40012408u64)?) & 0x00000004u32) >> 2) != 0u32")
+        );
+        assert!(adc_rs.contains("0x00100000u32, 0x00100000u32"));
+        assert!(adc_rs.contains("0x00400000u32, 0x00400000u32"));
+        assert!(adc_rs.contains("0x4001244Cu64"));
+        assert!(adc_rs.contains("modify_u32(0x40020008u64"));
+        assert!(adc_rs.contains("modify_u32(0x40021014u64, 0x00000001u32, 0x00000001u32"));
+        assert!(dma_rs.contains("pub async fn wait_transfer_complete"));
+        assert!(dma_rs.contains("pub fn on_interrupt("));
+        assert!(dma_rs.contains("pub fn enable_transfer_complete_interrupt("));
+        assert!(
+            adc_rs.contains("self.start_one_shot_dma_u16(channels, sample_time_code, buffer)?;")
+        );
+        assert!(adc_rs.contains("dma.prepare_transfer_complete_wait(1)?;"));
+        assert!(adc_rs.contains("if dma.is_transfer_complete(1)? {"));
+        assert!(wch_rs.contains("pfic().enable_irq(Irq::DMA1Channel1)?;"));
+        assert!(wch_rs.contains("generated_wch_runtime_drv_dma1().on_interrupt(1);"));
+        assert!(wch_rs.contains("const GENERATED_WCH_RUNTIME_DRV_DMA1_RESOURCES: DMA1Resources"));
+    }
+
+    #[test]
+    fn generate_embassy_skips_adc_async_helper_when_dma_channel_is_not_async_bound() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let input = repo_root
+            .join("evidence")
+            .join("wch")
+            .join("ch32v203g6u6")
+            .join("hair.json");
+        let mut document = load_json_file(&input).expect("reference hair json");
+        let driver_instances = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        let dma1 = driver_instances
+            .iter_mut()
+            .find(|driver| driver["id"] == "drv.dma1")
+            .and_then(Value::as_object_mut)
+            .expect("drv.dma1");
+        dma1.insert(
+            "interruptRouteRefs".to_string(),
+            serde_json::json!(["iroute.dma1.channel2"]),
+        );
+        dma1.insert(
+            "dmaAsyncBindings".to_string(),
+            serde_json::json!({
+                "channels": [{
+                    "channelRef": "dmach.dma1.ch2",
+                    "transferCompleteFlagRef": "field.dma_intfr.tcif2",
+                    "transferCompleteClearRef": "field.dma_intfcr.ctcif2",
+                    "transferCompleteInterruptEnableRef": "field.dma_cfgr1.tcie"
+                }]
+            }),
+        );
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("mutated hair document should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&validated, output_dir.path()).expect("embassy generation");
+
+        let adc_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("adc.rs")).expect("adc.rs");
+        assert!(!adc_rs.contains("pub async fn sample_one_shot_dma_u16_async"));
+    }
+
+    #[test]
     fn generate_embassy_injects_gpio_prelude_for_non_gpio_module_path() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let fixture = write_embassy_fixture(false);
@@ -19524,6 +21914,75 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
                 .to_string()
                 .contains("multiple registers mapped to canonical term term.register.baud-rate")
         );
+    }
+
+    #[test]
+    fn resolve_structural_field_skips_unrelated_arrayed_registers() {
+        let members = vec![
+            RegisterBlockMember::Register(Register {
+                id: "reg.arrayed".to_string(),
+                name: "ARRAYED".to_string(),
+                display_name: None,
+                description: None,
+                offset_bytes: 0,
+                width_bits: 32,
+                access: None,
+                reset_value: None,
+                reset_mask: None,
+                array: Some(ArrayShape {
+                    axes: vec![ArrayAxis {
+                        count: 2,
+                        labels: Vec::new(),
+                        stride_bytes: Some(4),
+                    }],
+                }),
+                alternate_of_ref: None,
+                fields: vec![Field {
+                    id: "field.arrayed.value".to_string(),
+                    name: "VALUE".to_string(),
+                    description: None,
+                    bit_range: BitRange { lsb: 0, msb: 0 },
+                    access: None,
+                    array: None,
+                    enumerated_sets: Vec::new(),
+                }],
+            }),
+            RegisterBlockMember::Register(Register {
+                id: "reg.target".to_string(),
+                name: "TARGET".to_string(),
+                display_name: None,
+                description: None,
+                offset_bytes: 8,
+                width_bits: 32,
+                access: None,
+                reset_value: None,
+                reset_mask: None,
+                array: None,
+                alternate_of_ref: None,
+                fields: vec![Field {
+                    id: "field.target.ready".to_string(),
+                    name: "READY".to_string(),
+                    description: None,
+                    bit_range: BitRange { lsb: 1, msb: 1 },
+                    access: None,
+                    array: None,
+                    enumerated_sets: Vec::new(),
+                }],
+            }),
+        ];
+
+        let resolved = resolve_structural_field_from_members(
+            "periph.test",
+            0,
+            &members,
+            "field.target.ready",
+            None,
+        )
+        .expect("field resolution should succeed")
+        .expect("target field should resolve");
+
+        assert_eq!(resolved.register_id, "reg.target");
+        assert_eq!(resolved.field.id, "field.target.ready");
     }
 
     fn write_embassy_fixture(use_custom_driver: bool) -> NamedTempFile {

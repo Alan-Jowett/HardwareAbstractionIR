@@ -78,6 +78,16 @@ First-cut behavior:
 - allow an `rtc` driver instance to lower to a HAL-specific RTC module for raw
   counter, prescaler, alarm, and flag/interrupt handling when the approved HAIR
   document models that RTC control path explicitly
+- allow an `adc` driver instance to lower to higher-level regular-group
+  buffered DMA sampling helpers only when the profile selects an explicit
+  `regular-sequence-adc-dma` lowering family and carries explicit
+  `adcDmaBindings` for the ADC sequence/sample-time/data roles, DMA
+  programming roles, and DMA event setup/clear operations used by that path;
+  the generated lowering may infer backing DMA controller bring-up from the
+  same driver's referenced `dmaRouteRefs`
+- allow a `dma` driver instance to lower to IRQ-driven completion futures only
+  when the profile carries explicit `dmaAsyncBindings` for the bound DMA
+  channels plus the matching interrupt routes
 - allow generated async timing support only when the profile names a unique
   `embassy-time-driver` instance plus an explicit time-driver source contract,
   preserving the existing SysTick-backed path and allowing reusable

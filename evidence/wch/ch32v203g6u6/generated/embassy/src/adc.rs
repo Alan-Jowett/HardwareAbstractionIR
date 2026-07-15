@@ -377,6 +377,17 @@ pub const DRV_ADC1_INIT_OPERATIONS: &[metadata::SemanticOperation] =
             },
             metadata::SemanticOperationStep {
                 index: 2,
+                action: "poll",
+                target_ref: Some("reg.adc1.ctlr2"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Wait until RSTCAL = 0",
+                }),
+                value: None,
+                description: Some("Wait until the calibration reset cycle completes."),
+            },
+            metadata::SemanticOperationStep {
+                index: 3,
                 action: "write",
                 target_ref: Some("reg.adc1.ctlr2"),
                 expression: Some(metadata::SemanticExpression {
@@ -385,6 +396,17 @@ pub const DRV_ADC1_INIT_OPERATIONS: &[metadata::SemanticOperation] =
                 }),
                 value: None,
                 description: Some("Start A/D calibration by setting CTLR2.CAL."),
+            },
+            metadata::SemanticOperationStep {
+                index: 4,
+                action: "poll",
+                target_ref: Some("reg.adc1.ctlr2"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Wait until CAL = 0",
+                }),
+                value: None,
+                description: Some("Wait until the A/D calibration cycle completes."),
             },
         ],
         preconditions: &[],
@@ -419,7 +441,7 @@ pub const DRV_ADC1_RESOURCES: ADC1Resources = ADC1Resources {
     pins: DRV_ADC1_PIN_ROLES,
     init_operations: DRV_ADC1_INIT_OPERATIONS,
     state_machines: DRV_ADC1_STATE_MACHINES,
-    lowering_pattern: None,
+    lowering_pattern: Some("regular-sequence-adc-dma"),
     time_driver_source: None,
     capability_tags: DRV_ADC1_CAPABILITY_TAGS,
 };
@@ -461,10 +483,2940 @@ impl ADC1 {
         Ok(())
     }
 
+    pub fn start_one_shot_dma_u16(
+        &self,
+        channels: &[u8],
+        sample_time_code: u8,
+        buffer: &mut [u16],
+    ) -> Result<(), metadata::Error> {
+        modify_u32(0x40021014u64, 0x00000001u32, 0x00000001u32)?;
+        modify_u32(0x40020008u64, 0x00000001u32, 0x00000000u32)?;
+        if channels.is_empty() {
+            return Err(metadata::Error::InvalidReference(
+                "ADC DMA sampling requires at least one channel",
+            ));
+        }
+        if channels.len() > 16 {
+            return Err(metadata::Error::InvalidReference(
+                "ADC DMA sampling sequence exceeds the bound regularSequenceSlotRefs length",
+            ));
+        }
+        if buffer.is_empty() {
+            return Err(metadata::Error::InvalidReference(
+                "ADC DMA sampling requires a non-empty destination buffer",
+            ));
+        }
+        if !buffer.len().is_multiple_of(channels.len()) {
+            return Err(metadata::Error::InvalidReference(
+                "ADC DMA destination buffer length must be a whole multiple of the programmed sequence length",
+            ));
+        }
+        if u64::from(sample_time_code) > 0x7 {
+            return Err(metadata::Error::InvalidReference(
+                "ADC DMA sample_time_code exceeds the bound sample-time field width",
+            ));
+        }
+        let transfer_count = u32::try_from(buffer.len())
+            .map_err(|_| metadata::Error::Unsupported("ADC DMA transfer count does not fit u32"))?;
+        let buffer_address = u32::try_from(buffer.as_mut_ptr() as usize).map_err(|_| {
+            metadata::Error::Unsupported(
+                "ADC DMA buffer address does not fit the target DMA address register",
+            )
+        })?;
+        let data_address = u32::try_from(0x4001244Cu64).map_err(|_| {
+            metadata::Error::Unsupported(
+                "ADC DMA data register address does not fit the target DMA address register",
+            )
+        })?;
+        modify_u32(0x40012404u64, 0x00000100u32, 0x00000100u32)?;
+        modify_u32(0x40012408u64, 0x00000002u32, 0x00000002u32)?;
+        modify_u32(0x40012408u64, 0x00000100u32, 0x00000100u32)?;
+        modify_u32(0x40020008u64, 0x00000010u32, 0x00000000u32)?;
+        modify_u32(0x40020008u64, 0x00000020u32, 0x00000000u32)?;
+        modify_u32(0x40020008u64, 0x00000040u32, 0x00000000u32)?;
+        modify_u32(0x40020008u64, 0x00000080u32, 0x00000080u32)?;
+        modify_u32(0x40020008u64, 0x00000300u32, 0x00000100u32)?;
+        modify_u32(0x40020008u64, 0x00000C00u32, 0x00000400u32)?;
+        modify_u32(0x40020008u64, 0x00000004u32, 0x00000000u32)?;
+        modify_u32(0x40020008u64, 0x00000002u32, 0x00000000u32)?;
+        modify_u32(
+            0x4001242Cu64,
+            0x00F00000u32,
+            ((u32::try_from(channels.len() - 1).map_err(|_| {
+                metadata::Error::Unsupported("ADC DMA sequence length does not fit u32")
+            })?) & 0x0000000Fu32)
+                << 20,
+        )?;
+        if let Some(&channel) = channels.first() {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012434u64,
+                0x0000001Fu32,
+                (u32::from(channel)) & 0x0000001Fu32,
+            )?;
+        }
+        if let Some(&channel) = channels.get(1) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012434u64,
+                0x000003E0u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 5,
+            )?;
+        }
+        if let Some(&channel) = channels.get(2) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012434u64,
+                0x00007C00u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 10,
+            )?;
+        }
+        if let Some(&channel) = channels.get(3) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012434u64,
+                0x000F8000u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 15,
+            )?;
+        }
+        if let Some(&channel) = channels.get(4) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012434u64,
+                0x01F00000u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 20,
+            )?;
+        }
+        if let Some(&channel) = channels.get(5) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012434u64,
+                0x3E000000u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 25,
+            )?;
+        }
+        if let Some(&channel) = channels.get(6) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012430u64,
+                0x0000001Fu32,
+                (u32::from(channel)) & 0x0000001Fu32,
+            )?;
+        }
+        if let Some(&channel) = channels.get(7) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012430u64,
+                0x000003E0u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 5,
+            )?;
+        }
+        if let Some(&channel) = channels.get(8) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012430u64,
+                0x00007C00u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 10,
+            )?;
+        }
+        if let Some(&channel) = channels.get(9) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012430u64,
+                0x000F8000u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 15,
+            )?;
+        }
+        if let Some(&channel) = channels.get(10) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012430u64,
+                0x01F00000u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 20,
+            )?;
+        }
+        if let Some(&channel) = channels.get(11) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012430u64,
+                0x3E000000u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 25,
+            )?;
+        }
+        if let Some(&channel) = channels.get(12) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x4001242Cu64,
+                0x0000001Fu32,
+                (u32::from(channel)) & 0x0000001Fu32,
+            )?;
+        }
+        if let Some(&channel) = channels.get(13) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x4001242Cu64,
+                0x000003E0u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 5,
+            )?;
+        }
+        if let Some(&channel) = channels.get(14) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x4001242Cu64,
+                0x00007C00u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 10,
+            )?;
+        }
+        if let Some(&channel) = channels.get(15) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x4001242Cu64,
+                0x000F8000u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 15,
+            )?;
+        }
+        modify_u32(
+            0x4002000Cu64,
+            0x0000FFFFu32,
+            (transfer_count) & 0x0000FFFFu32,
+        )?;
+        modify_u32(0x40020010u64, 0xFFFFFFFFu32, data_address)?;
+        modify_u32(0x40020014u64, 0xFFFFFFFFu32, buffer_address)?;
+        modify_u32(0x40020004u64, 0x00000004u32, 0x00000004u32)?;
+        modify_u32(0x40020004u64, 0x00000002u32, 0x00000002u32)?;
+        modify_u32(0x40020008u64, 0x00000001u32, 0x00000001u32)?;
+        modify_u32(0x40012408u64, 0x00100000u32, 0x00100000u32)?;
+        modify_u32(0x40012408u64, 0x00400000u32, 0x00400000u32)?;
+        Ok(())
+    }
+
+    pub async fn sample_one_shot_dma_u16_async(
+        &self,
+        dma: &crate::dma::DMA1,
+        channels: &[u8],
+        sample_time_code: u8,
+        buffer: &mut [u16],
+    ) -> Result<(), metadata::Error> {
+        dma.enable_clock()?;
+        let _ = dma.disable_transfer_complete_interrupt(1);
+        self.start_one_shot_dma_u16(channels, sample_time_code, buffer)?;
+        dma.prepare_transfer_complete_wait(1)?;
+        dma.enable_transfer_complete_interrupt(1)?;
+        if dma.is_transfer_complete(1)? {
+            dma.disable_transfer_complete_interrupt(1)?;
+            self.stop_dma_sampling()?;
+            return Ok(());
+        }
+        let wait_result = dma.wait_transfer_complete(1).await;
+        let disable_result = dma.disable_transfer_complete_interrupt(1);
+        if let Err(error) = wait_result {
+            let _ = disable_result;
+            return Err(error);
+        }
+        disable_result?;
+        self.stop_dma_sampling()?;
+        Ok(())
+    }
+
+    pub fn start_circular_dma_u16(
+        &self,
+        channels: &[u8],
+        sample_time_code: u8,
+        buffer: &mut [u16],
+    ) -> Result<(), metadata::Error> {
+        modify_u32(0x40021014u64, 0x00000001u32, 0x00000001u32)?;
+        modify_u32(0x40020008u64, 0x00000001u32, 0x00000000u32)?;
+        if channels.is_empty() {
+            return Err(metadata::Error::InvalidReference(
+                "ADC DMA sampling requires at least one channel",
+            ));
+        }
+        if channels.len() > 16 {
+            return Err(metadata::Error::InvalidReference(
+                "ADC DMA sampling sequence exceeds the bound regularSequenceSlotRefs length",
+            ));
+        }
+        if buffer.is_empty() {
+            return Err(metadata::Error::InvalidReference(
+                "ADC DMA sampling requires a non-empty destination buffer",
+            ));
+        }
+        if buffer.len() < channels.len() {
+            return Err(metadata::Error::InvalidReference(
+                "ADC DMA circular buffer must hold at least one full programmed sequence",
+            ));
+        }
+        if u64::from(sample_time_code) > 0x7 {
+            return Err(metadata::Error::InvalidReference(
+                "ADC DMA sample_time_code exceeds the bound sample-time field width",
+            ));
+        }
+        let transfer_count = u32::try_from(buffer.len())
+            .map_err(|_| metadata::Error::Unsupported("ADC DMA transfer count does not fit u32"))?;
+        let buffer_address = u32::try_from(buffer.as_mut_ptr() as usize).map_err(|_| {
+            metadata::Error::Unsupported(
+                "ADC DMA buffer address does not fit the target DMA address register",
+            )
+        })?;
+        let data_address = u32::try_from(0x4001244Cu64).map_err(|_| {
+            metadata::Error::Unsupported(
+                "ADC DMA data register address does not fit the target DMA address register",
+            )
+        })?;
+        modify_u32(0x40012404u64, 0x00000100u32, 0x00000100u32)?;
+        modify_u32(0x40012408u64, 0x00000002u32, 0x00000002u32)?;
+        modify_u32(0x40012408u64, 0x00000100u32, 0x00000100u32)?;
+        modify_u32(0x40020008u64, 0x00000010u32, 0x00000000u32)?;
+        modify_u32(0x40020008u64, 0x00000020u32, 0x00000020u32)?;
+        modify_u32(0x40020008u64, 0x00000040u32, 0x00000000u32)?;
+        modify_u32(0x40020008u64, 0x00000080u32, 0x00000080u32)?;
+        modify_u32(0x40020008u64, 0x00000300u32, 0x00000100u32)?;
+        modify_u32(0x40020008u64, 0x00000C00u32, 0x00000400u32)?;
+        modify_u32(
+            0x4001242Cu64,
+            0x00F00000u32,
+            ((u32::try_from(channels.len() - 1).map_err(|_| {
+                metadata::Error::Unsupported("ADC DMA sequence length does not fit u32")
+            })?) & 0x0000000Fu32)
+                << 20,
+        )?;
+        if let Some(&channel) = channels.first() {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012434u64,
+                0x0000001Fu32,
+                (u32::from(channel)) & 0x0000001Fu32,
+            )?;
+        }
+        if let Some(&channel) = channels.get(1) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012434u64,
+                0x000003E0u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 5,
+            )?;
+        }
+        if let Some(&channel) = channels.get(2) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012434u64,
+                0x00007C00u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 10,
+            )?;
+        }
+        if let Some(&channel) = channels.get(3) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012434u64,
+                0x000F8000u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 15,
+            )?;
+        }
+        if let Some(&channel) = channels.get(4) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012434u64,
+                0x01F00000u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 20,
+            )?;
+        }
+        if let Some(&channel) = channels.get(5) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012434u64,
+                0x3E000000u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 25,
+            )?;
+        }
+        if let Some(&channel) = channels.get(6) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012430u64,
+                0x0000001Fu32,
+                (u32::from(channel)) & 0x0000001Fu32,
+            )?;
+        }
+        if let Some(&channel) = channels.get(7) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012430u64,
+                0x000003E0u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 5,
+            )?;
+        }
+        if let Some(&channel) = channels.get(8) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012430u64,
+                0x00007C00u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 10,
+            )?;
+        }
+        if let Some(&channel) = channels.get(9) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012430u64,
+                0x000F8000u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 15,
+            )?;
+        }
+        if let Some(&channel) = channels.get(10) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012430u64,
+                0x01F00000u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 20,
+            )?;
+        }
+        if let Some(&channel) = channels.get(11) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x40012430u64,
+                0x3E000000u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 25,
+            )?;
+        }
+        if let Some(&channel) = channels.get(12) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x4001242Cu64,
+                0x0000001Fu32,
+                (u32::from(channel)) & 0x0000001Fu32,
+            )?;
+        }
+        if let Some(&channel) = channels.get(13) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x4001242Cu64,
+                0x000003E0u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 5,
+            )?;
+        }
+        if let Some(&channel) = channels.get(14) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x4001242Cu64,
+                0x00007C00u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 10,
+            )?;
+        }
+        if let Some(&channel) = channels.get(15) {
+            match channel {
+                0 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000007u32,
+                        (u32::from(sample_time_code)) & 0x00000007u32,
+                    )?;
+                }
+                1 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000038u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 3,
+                    )?;
+                }
+                2 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x000001C0u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 6,
+                    )?;
+                }
+                3 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00000E00u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 9,
+                    )?;
+                }
+                4 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00007000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 12,
+                    )?;
+                }
+                5 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00038000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 15,
+                    )?;
+                }
+                6 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x001C0000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 18,
+                    )?;
+                }
+                7 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x00E00000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 21,
+                    )?;
+                }
+                8 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x07000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 24,
+                    )?;
+                }
+                9 => {
+                    modify_u32(
+                        0x40012410u64,
+                        0x38000000u32,
+                        ((u32::from(sample_time_code)) & 0x00000007u32) << 27,
+                    )?;
+                }
+                _ => {
+                    return Err(metadata::Error::InvalidReference(
+                        "ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs",
+                    ));
+                }
+            }
+            modify_u32(
+                0x4001242Cu64,
+                0x000F8000u32,
+                ((u32::from(channel)) & 0x0000001Fu32) << 15,
+            )?;
+        }
+        modify_u32(
+            0x4002000Cu64,
+            0x0000FFFFu32,
+            (transfer_count) & 0x0000FFFFu32,
+        )?;
+        modify_u32(0x40020010u64, 0xFFFFFFFFu32, data_address)?;
+        modify_u32(0x40020014u64, 0xFFFFFFFFu32, buffer_address)?;
+        modify_u32(0x40020004u64, 0x00000004u32, 0x00000004u32)?;
+        modify_u32(0x40020004u64, 0x00000002u32, 0x00000002u32)?;
+        modify_u32(0x40020008u64, 0x00000001u32, 0x00000001u32)?;
+        modify_u32(0x40012408u64, 0x00100000u32, 0x00100000u32)?;
+        modify_u32(0x40012408u64, 0x00400000u32, 0x00400000u32)?;
+        Ok(())
+    }
+
+    pub fn stop_dma_sampling(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40020008u64, 0x00000001u32, 0x00000000u32)?;
+        modify_u32(0x40012408u64, 0x00000100u32, 0x00000000u32)?;
+        modify_u32(0x40012408u64, 0x00000002u32, 0x00000000u32)?;
+        modify_u32(0x40012408u64, 0x00100000u32, 0x00000000u32)?;
+        modify_u32(0x40012408u64, 0x00400000u32, 0x00000000u32)?;
+        modify_u32(0x40020008u64, 0x00000020u32, 0x00000000u32)?;
+        Ok(())
+    }
+
+    pub fn is_dma_transfer_complete(&self) -> Result<bool, metadata::Error> {
+        Ok((read_u32(0x40020000u64)? & 0x00000002u32) != 0)
+    }
+
+    pub fn clear_dma_transfer_complete(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40020004u64, 0x00000002u32, 0x00000002u32)?;
+        Ok(())
+    }
+
+    /// Enable the ADC1 DMA transfer-complete interrupt.
+    pub fn enable_dma_transfer_complete_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40020008u64, 0x00000002u32, 0x00000002u32)?;
+        Ok(())
+    }
+
+    /// Disable the ADC1 DMA transfer-complete interrupt.
+    pub fn disable_dma_transfer_complete_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40020008u64, 0x00000002u32, 0x00000000u32)?;
+        Ok(())
+    }
+
+    pub fn is_dma_half_transfer(&self) -> Result<bool, metadata::Error> {
+        Ok((read_u32(0x40020000u64)? & 0x00000004u32) != 0)
+    }
+
+    pub fn clear_dma_half_transfer(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40020004u64, 0x00000004u32, 0x00000004u32)?;
+        Ok(())
+    }
+
+    /// Enable the ADC1 DMA half-transfer interrupt.
+    pub fn enable_dma_half_transfer_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40020008u64, 0x00000004u32, 0x00000004u32)?;
+        Ok(())
+    }
+
+    /// Disable the ADC1 DMA half-transfer interrupt.
+    pub fn disable_dma_half_transfer_interrupt(&self) -> Result<(), metadata::Error> {
+        modify_u32(0x40020008u64, 0x00000004u32, 0x00000000u32)?;
+        Ok(())
+    }
+
     pub fn apply_calibrate(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40012408u64, 0x00000001u32, 0x00000001u32)?;
         modify_u32(0x40012408u64, 0x00000008u32, 0x00000008u32)?;
+        while (((read_u32(0x40012408u64)?) & 0x00000008u32) >> 3) != 0u32 {
+            core::hint::spin_loop();
+        }
         modify_u32(0x40012408u64, 0x00000004u32, 0x00000004u32)?;
+        while (((read_u32(0x40012408u64)?) & 0x00000004u32) >> 2) != 0u32 {
+            core::hint::spin_loop();
+        }
         Ok(())
     }
 }
@@ -729,6 +3681,17 @@ pub const DRV_ADC2_INIT_OPERATIONS: &[metadata::SemanticOperation] =
             },
             metadata::SemanticOperationStep {
                 index: 2,
+                action: "poll",
+                target_ref: Some("reg.adc2.ctlr2"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Wait until RSTCAL = 0",
+                }),
+                value: None,
+                description: Some("Wait until the calibration reset cycle completes."),
+            },
+            metadata::SemanticOperationStep {
+                index: 3,
                 action: "write",
                 target_ref: Some("reg.adc2.ctlr2"),
                 expression: Some(metadata::SemanticExpression {
@@ -737,6 +3700,17 @@ pub const DRV_ADC2_INIT_OPERATIONS: &[metadata::SemanticOperation] =
                 }),
                 value: None,
                 description: Some("Start A/D calibration by setting CTLR2.CAL."),
+            },
+            metadata::SemanticOperationStep {
+                index: 4,
+                action: "poll",
+                target_ref: Some("reg.adc2.ctlr2"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Wait until CAL = 0",
+                }),
+                value: None,
+                description: Some("Wait until the A/D calibration cycle completes."),
             },
         ],
         preconditions: &[],
@@ -816,7 +3790,13 @@ impl ADC2 {
     pub fn apply_calibrate(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40012808u64, 0x00000001u32, 0x00000001u32)?;
         modify_u32(0x40012808u64, 0x00000008u32, 0x00000008u32)?;
+        while (((read_u32(0x40012808u64)?) & 0x00000008u32) >> 3) != 0u32 {
+            core::hint::spin_loop();
+        }
         modify_u32(0x40012808u64, 0x00000004u32, 0x00000004u32)?;
+        while (((read_u32(0x40012808u64)?) & 0x00000004u32) >> 2) != 0u32 {
+            core::hint::spin_loop();
+        }
         Ok(())
     }
 }
