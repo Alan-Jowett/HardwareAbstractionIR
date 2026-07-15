@@ -1795,6 +1795,45 @@ struct EmbassyTimeDriverBindings {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct EmbassyAdcDmaChannelSampleTimeBinding {
+    channel_index: u32,
+    sample_time_ref: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EmbassyAdcDmaBindings {
+    #[serde(default)]
+    prepare_one_shot_operation_refs: Vec<String>,
+    #[serde(default)]
+    prepare_circular_operation_refs: Vec<String>,
+    #[serde(default)]
+    stop_operation_refs: Vec<String>,
+    data_register_ref: String,
+    start_ref: String,
+    regular_sequence_length_ref: String,
+    #[serde(default)]
+    regular_sequence_slot_refs: Vec<String>,
+    #[serde(default)]
+    channel_sample_time_refs: Vec<EmbassyAdcDmaChannelSampleTimeBinding>,
+    dma_transfer_count_ref: String,
+    dma_peripheral_address_ref: String,
+    dma_memory_address_ref: String,
+    dma_channel_enable_ref: String,
+    #[serde(default)]
+    dma_half_transfer_flag_ref: Option<String>,
+    dma_transfer_complete_flag_ref: String,
+    #[serde(default)]
+    dma_half_transfer_interrupt_enable_ref: Option<String>,
+    #[serde(default)]
+    dma_transfer_complete_interrupt_enable_ref: Option<String>,
+    #[serde(default)]
+    dma_half_transfer_clear_operation_ref: Option<String>,
+    dma_transfer_complete_clear_operation_ref: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct EmbassyDriverInstance {
     id: String,
     name: String,
@@ -1809,6 +1848,8 @@ struct EmbassyDriverInstance {
     time_driver_tick_hz: Option<u64>,
     #[serde(default)]
     time_driver_bindings: Option<EmbassyTimeDriverBindings>,
+    #[serde(default)]
+    adc_dma_bindings: Option<EmbassyAdcDmaBindings>,
     #[serde(default)]
     clock_binding_refs: Vec<String>,
     #[serde(default)]
@@ -1863,6 +1904,7 @@ struct ResolvedDriverInstance {
     time_driver_source: Option<String>,
     time_driver_tick_hz: Option<u64>,
     time_driver_bindings: Option<EmbassyTimeDriverBindings>,
+    adc_dma_bindings: Option<EmbassyAdcDmaBindings>,
     target: McuCanonicalBlock,
     clock_bindings: Vec<McuClockBinding>,
     reset_bindings: Vec<McuResetBinding>,
@@ -1902,6 +1944,7 @@ const EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER: &str = "hardware-timer";
 const EMBASSY_TIME_DRIVER_SOURCE_RTC: &str = "rtc";
 const EMBASSY_EXECUTOR_IDLE_STRATEGY_WFI: &str = "wfi";
 const EMBASSY_EXECUTOR_IDLE_STRATEGY_SPIN: &str = "spin";
+const ADC_LOWERING_REGULAR_SEQUENCE_DMA: &str = "regular-sequence-adc-dma";
 const TIMER_LOWERING_COUNTER_COMPARE: &str = "counter-compare-timer";
 const USB_LOWERING_FSDEV_PMA_BTABLE: &str = "fsdev-pma-btable";
 const USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK: &str = "serial-jtag-preserve-link";
@@ -1923,6 +1966,14 @@ fn time_driver_bindings(driver: &ResolvedDriverInstance) -> Option<&EmbassyTimeD
     driver.time_driver_bindings.as_ref()
 }
 
+fn adc_dma_bindings(driver: &ResolvedDriverInstance) -> Option<&EmbassyAdcDmaBindings> {
+    driver.adc_dma_bindings.as_ref()
+}
+
+fn has_regular_sequence_adc_dma_lowering(pattern: Option<&str>) -> bool {
+    matches!(pattern, Some(ADC_LOWERING_REGULAR_SEQUENCE_DMA))
+}
+
 fn has_usb_preserve_link_lowering(pattern: Option<&str>) -> bool {
     matches!(pattern, Some(USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK))
 }
@@ -1937,6 +1988,10 @@ fn has_counter_compare_timer_lowering(pattern: Option<&str>) -> bool {
 
 fn driver_uses_usb_preserve_link_lowering(driver: &ResolvedDriverInstance) -> bool {
     has_usb_preserve_link_lowering(driver.lowering_pattern.as_deref())
+}
+
+fn driver_uses_regular_sequence_adc_dma_lowering(driver: &ResolvedDriverInstance) -> bool {
+    has_regular_sequence_adc_dma_lowering(driver.lowering_pattern.as_deref())
 }
 
 fn driver_uses_usb_fsdev_pma_btable_lowering(driver: &ResolvedDriverInstance) -> bool {
@@ -2245,6 +2300,7 @@ impl EmbassyGenerationModel {
                 time_driver_source: driver.time_driver_source.clone(),
                 time_driver_tick_hz: driver.time_driver_tick_hz,
                 time_driver_bindings: driver.time_driver_bindings.clone(),
+                adc_dma_bindings: driver.adc_dma_bindings.clone(),
                 target,
                 clock_bindings,
                 reset_bindings,
@@ -3559,6 +3615,7 @@ fn validate_driver_lowering_pattern(
     };
 
     match pattern {
+        ADC_LOWERING_REGULAR_SEQUENCE_DMA => validate_regular_sequence_adc_dma_lowering(driver)?,
         USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK => {
             if driver.driver_kind != "usb-device" {
                 bail!(
@@ -3587,6 +3644,56 @@ fn validate_usb_fsdev_pma_btable_lowering(driver: &EmbassyDriverInstance) -> Res
             driver.id,
             USB_LOWERING_FSDEV_PMA_BTABLE
         );
+    }
+    Ok(())
+}
+
+fn validate_regular_sequence_adc_dma_lowering(driver: &EmbassyDriverInstance) -> Result<()> {
+    if driver.driver_kind != "adc" {
+        bail!(
+            "driver {} uses loweringPattern {} but that lowering is only supported on adc drivers",
+            driver.id,
+            ADC_LOWERING_REGULAR_SEQUENCE_DMA
+        );
+    }
+    let bindings = driver.adc_dma_bindings.as_ref().ok_or_else(|| {
+        anyhow!(
+            "driver {} uses loweringPattern {} but omits required adcDmaBindings",
+            driver.id,
+            ADC_LOWERING_REGULAR_SEQUENCE_DMA
+        )
+    })?;
+    if driver.dma_route_refs.len() != 1 {
+        bail!(
+            "driver {} uses loweringPattern {} but must declare exactly one dmaRouteRef",
+            driver.id,
+            ADC_LOWERING_REGULAR_SEQUENCE_DMA
+        );
+    }
+    if bindings.regular_sequence_slot_refs.is_empty() {
+        bail!(
+            "driver {} uses loweringPattern {} but adcDmaBindings.regularSequenceSlotRefs is empty",
+            driver.id,
+            ADC_LOWERING_REGULAR_SEQUENCE_DMA
+        );
+    }
+    if bindings.channel_sample_time_refs.is_empty() {
+        bail!(
+            "driver {} uses loweringPattern {} but adcDmaBindings.channelSampleTimeRefs is empty",
+            driver.id,
+            ADC_LOWERING_REGULAR_SEQUENCE_DMA
+        );
+    }
+    let mut seen_channels = BTreeSet::new();
+    for binding in &bindings.channel_sample_time_refs {
+        if !seen_channels.insert(binding.channel_index) {
+            bail!(
+                "driver {} uses loweringPattern {} but channelSampleTimeRefs repeats channelIndex {}",
+                driver.id,
+                ADC_LOWERING_REGULAR_SEQUENCE_DMA,
+                binding.channel_index
+            );
+        }
     }
     Ok(())
 }
@@ -8028,6 +8135,9 @@ fn render_adc_methods(
     if driver.driver_kind != "adc" {
         return Ok(Vec::new());
     }
+    if driver_uses_regular_sequence_adc_dma_lowering(driver) {
+        return render_regular_sequence_adc_dma_methods(model, driver);
+    }
     if driver.dma_routes.is_empty() && driver.interrupt_routes.is_empty() {
         return Ok(Vec::new());
     }
@@ -8087,6 +8197,492 @@ fn render_adc_methods(
             &done_ena,
             0,
             &format!("Disable the {} conversion-done interrupt.", driver.name),
+        )?);
+    }
+
+    Ok(methods)
+}
+
+fn render_regular_sequence_adc_dma_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    let bindings = adc_dma_bindings(driver).ok_or_else(|| {
+        anyhow!(
+            "driver {} selected loweringPattern {} without adcDmaBindings",
+            driver.id,
+            ADC_LOWERING_REGULAR_SEQUENCE_DMA
+        )
+    })?;
+    let dma_channel = driver.dma_channels.first().ok_or_else(|| {
+        anyhow!(
+            "driver {} selected loweringPattern {} without a resolved DMA channel",
+            driver.id,
+            ADC_LOWERING_REGULAR_SEQUENCE_DMA
+        )
+    })?;
+    let dma_array_index = dma_channel.channel_index.checked_sub(1).ok_or_else(|| {
+        anyhow!(
+            "driver {} resolved DMA channel {} with invalid channelIndex {}",
+            driver.id,
+            dma_channel.id,
+            dma_channel.channel_index
+        )
+    })?;
+    let adc_peripheral_ref = driver.target.target_ref.as_str();
+    let data_register = resolve_structural_register_ref(
+        model,
+        &bindings.data_register_ref,
+        Some(adc_peripheral_ref),
+        None,
+        &driver.id,
+        "ADC DMA data register",
+    )?;
+    let start_field = resolve_structural_field_target(
+        model,
+        &bindings.start_ref,
+        Some(adc_peripheral_ref),
+        None,
+        &driver.id,
+        "ADC DMA start control",
+    )?;
+    let sequence_length_field = resolve_structural_field_target(
+        model,
+        &bindings.regular_sequence_length_ref,
+        Some(adc_peripheral_ref),
+        None,
+        &driver.id,
+        "ADC DMA regular sequence length",
+    )?;
+    let sequence_length_register = resolve_structural_register_ref(
+        model,
+        &sequence_length_field.register_id,
+        Some(adc_peripheral_ref),
+        None,
+        &driver.id,
+        "ADC DMA regular sequence length",
+    )?;
+    let mut sequence_slot_writes = String::new();
+    for (index, slot_ref) in bindings.regular_sequence_slot_refs.iter().enumerate() {
+        let slot_field = resolve_structural_field_target(
+            model,
+            slot_ref,
+            Some(adc_peripheral_ref),
+            None,
+            &driver.id,
+            "ADC DMA regular sequence slot",
+        )?;
+        let slot_register = resolve_structural_register_ref(
+            model,
+            &slot_field.register_id,
+            Some(adc_peripheral_ref),
+            None,
+            &driver.id,
+            "ADC DMA regular sequence slot",
+        )?;
+        sequence_slot_writes.push_str(&format!("        let channel = channels[{index}];\n"));
+        sequence_slot_writes.push_str("        match channel {\n");
+        for sample_time_binding in &bindings.channel_sample_time_refs {
+            let sample_time_field = resolve_structural_field_target(
+                model,
+                &sample_time_binding.sample_time_ref,
+                Some(adc_peripheral_ref),
+                None,
+                &driver.id,
+                "ADC DMA channel sample time",
+            )?;
+            let sample_time_register = resolve_structural_register_ref(
+                model,
+                &sample_time_field.register_id,
+                Some(adc_peripheral_ref),
+                None,
+                &driver.id,
+                "ADC DMA channel sample time",
+            )?;
+            sequence_slot_writes.push_str(&format!(
+                "            {channel} => {{\n{write}            }}\n",
+                channel = sample_time_binding.channel_index,
+                write = render_register_write_expression_statement(
+                    &sample_time_register,
+                    &sample_time_field.field,
+                    "u32::from(sample_time_code)",
+                    "                ",
+                )?
+            ));
+        }
+        sequence_slot_writes.push_str(
+            "            _ => return Err(metadata::Error::InvalidReference(\"ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs\")),\n        }\n",
+        );
+        sequence_slot_writes.push_str(&render_register_write_expression_statement(
+            &slot_register,
+            &slot_field.field,
+            "u32::from(channel)",
+            "        ",
+        )?);
+    }
+
+    let transfer_complete_flag = resolve_structural_field_target(
+        model,
+        &bindings.dma_transfer_complete_flag_ref,
+        None,
+        Some(dma_array_index),
+        &driver.id,
+        "ADC DMA transfer-complete flag",
+    )?;
+    let transfer_complete_register = resolve_structural_register_ref(
+        model,
+        &transfer_complete_flag.register_id,
+        Some(transfer_complete_flag.peripheral_ref.as_str()),
+        Some(dma_array_index),
+        &driver.id,
+        "ADC DMA transfer-complete flag",
+    )?;
+    let transfer_complete_mask =
+        field_bit_mask(&transfer_complete_flag.field, &transfer_complete_register)?;
+    let dma_channel_enable_field = resolve_structural_field_target(
+        model,
+        &bindings.dma_channel_enable_ref,
+        None,
+        Some(dma_array_index),
+        &driver.id,
+        "ADC DMA channel enable",
+    )?;
+    let dma_channel_enable_register = resolve_structural_register_ref(
+        model,
+        &dma_channel_enable_field.register_id,
+        Some(dma_channel_enable_field.peripheral_ref.as_str()),
+        Some(dma_array_index),
+        &driver.id,
+        "ADC DMA channel enable",
+    )?;
+    let sample_time_mask = field_value_mask(
+        &resolve_structural_field_target(
+            model,
+            &bindings.channel_sample_time_refs[0].sample_time_ref,
+            Some(adc_peripheral_ref),
+            None,
+            &driver.id,
+            "ADC DMA channel sample time",
+        )?
+        .field,
+    )?;
+    let mut program_dynamic_setup = String::new();
+    program_dynamic_setup.push_str(&render_register_write_expression_statement(
+        &sequence_length_register,
+        &sequence_length_field.field,
+        "u32::try_from(channels.len() - 1).map_err(|_| metadata::Error::Unsupported(\"ADC DMA sequence length does not fit u32\"))?",
+        "        ",
+    )?);
+    program_dynamic_setup.push_str(&sequence_slot_writes);
+    program_dynamic_setup.push_str(&render_adc_dma_write_ref_expression(
+        model,
+        driver,
+        &bindings.dma_transfer_count_ref,
+        None,
+        Some(dma_array_index),
+        "transfer_count",
+        "ADC DMA transfer count",
+    )?);
+    program_dynamic_setup.push_str(&render_adc_dma_write_ref_expression(
+        model,
+        driver,
+        &bindings.dma_peripheral_address_ref,
+        None,
+        Some(dma_array_index),
+        "data_address",
+        "ADC DMA peripheral address",
+    )?);
+    program_dynamic_setup.push_str(&render_adc_dma_write_ref_expression(
+        model,
+        driver,
+        &bindings.dma_memory_address_ref,
+        None,
+        Some(dma_array_index),
+        "buffer_address",
+        "ADC DMA memory address",
+    )?);
+    if let Some(clear_half_ref) = &bindings.dma_half_transfer_clear_operation_ref {
+        program_dynamic_setup.push_str(&render_adc_dma_operation_statements(
+            model,
+            driver,
+            std::slice::from_ref(clear_half_ref),
+            Some(dma_array_index),
+            "ADC DMA half-transfer clear",
+        )?);
+    }
+    program_dynamic_setup.push_str(&render_adc_dma_operation_statements(
+        model,
+        driver,
+        std::slice::from_ref(&bindings.dma_transfer_complete_clear_operation_ref),
+        Some(dma_array_index),
+        "ADC DMA transfer-complete clear",
+    )?);
+    let mut arm_dma_and_start = String::new();
+    arm_dma_and_start.push_str(&render_register_write_statement(
+        &dma_channel_enable_register,
+        &dma_channel_enable_field.field,
+        1,
+        "        ",
+    )?);
+    arm_dma_and_start.push_str(&render_register_write_statement(
+        &resolve_structural_register_ref(
+            model,
+            &start_field.register_id,
+            Some(adc_peripheral_ref),
+            None,
+            &driver.id,
+            "ADC DMA start control",
+        )?,
+        &start_field.field,
+        1,
+        "        ",
+    )?);
+
+    let mut methods = Vec::new();
+    let mut one_shot = String::from(
+        "    pub fn start_one_shot_dma_u16(&self, channels: &[u8], sample_time_code: u8, buffer: &mut [u16]) -> Result<(), metadata::Error> {\n",
+    );
+    one_shot.push_str(&render_register_write_statement(
+        &dma_channel_enable_register,
+        &dma_channel_enable_field.field,
+        0,
+        "        ",
+    )?);
+    one_shot.push_str(
+        "        if channels.is_empty() {\n            return Err(metadata::Error::InvalidReference(\"ADC DMA sampling requires at least one channel\"));\n        }\n",
+    );
+    one_shot.push_str(&format!(
+        "        if channels.len() > {} {{\n            return Err(metadata::Error::InvalidReference(\"ADC DMA sampling sequence exceeds the bound regularSequenceSlotRefs length\"));\n        }}\n",
+        bindings.regular_sequence_slot_refs.len()
+    ));
+    one_shot.push_str(
+        "        if buffer.is_empty() {\n            return Err(metadata::Error::InvalidReference(\"ADC DMA sampling requires a non-empty destination buffer\"));\n        }\n        if !buffer.len().is_multiple_of(channels.len()) {\n            return Err(metadata::Error::InvalidReference(\"ADC DMA destination buffer length must be a whole multiple of the programmed sequence length\"));\n        }\n",
+    );
+    one_shot.push_str(&format!(
+        "        if u64::from(sample_time_code) > 0x{:X} {{\n            return Err(metadata::Error::InvalidReference(\"ADC DMA sample_time_code exceeds the bound sample-time field width\"));\n        }}\n",
+        sample_time_mask
+    ));
+    one_shot.push_str(
+        "        let transfer_count = u32::try_from(buffer.len()).map_err(|_| metadata::Error::Unsupported(\"ADC DMA transfer count does not fit u32\"))?;\n        let buffer_address = u32::try_from(buffer.as_mut_ptr() as usize)\n            .map_err(|_| metadata::Error::Unsupported(\"ADC DMA buffer address does not fit the target DMA address register\"))?;\n        let data_address = u32::try_from(0x",
+    );
+    one_shot.push_str(&format!("{:X}", data_register.absolute_address));
+    one_shot.push_str(
+        "u64).map_err(|_| metadata::Error::Unsupported(\"ADC DMA data register address does not fit the target DMA address register\"))?;\n",
+    );
+    one_shot.push_str(&render_adc_dma_operation_statements(
+        model,
+        driver,
+        &bindings.prepare_one_shot_operation_refs,
+        Some(dma_array_index),
+        "ADC DMA one-shot prepare",
+    )?);
+    one_shot.push_str(&program_dynamic_setup);
+    one_shot.push_str(&arm_dma_and_start);
+    one_shot.push_str("        Ok(())\n    }\n");
+    methods.push(GeneratedMethod {
+        name: "start_one_shot_dma_u16".to_string(),
+        code: one_shot,
+    });
+
+    if !bindings.prepare_circular_operation_refs.is_empty() {
+        let mut circular = String::from(
+            "    pub fn start_circular_dma_u16(&self, channels: &[u8], sample_time_code: u8, buffer: &mut [u16]) -> Result<(), metadata::Error> {\n",
+        );
+        circular.push_str(&render_register_write_statement(
+            &dma_channel_enable_register,
+            &dma_channel_enable_field.field,
+            0,
+            "        ",
+        )?);
+        circular.push_str("        if channels.is_empty() {\n            return Err(metadata::Error::InvalidReference(\"ADC DMA sampling requires at least one channel\"));\n        }\n");
+        circular.push_str(&format!(
+            "        if channels.len() > {} {{\n            return Err(metadata::Error::InvalidReference(\"ADC DMA sampling sequence exceeds the bound regularSequenceSlotRefs length\"));\n        }}\n",
+            bindings.regular_sequence_slot_refs.len()
+        ));
+        circular.push_str("        if buffer.is_empty() {\n            return Err(metadata::Error::InvalidReference(\"ADC DMA sampling requires a non-empty destination buffer\"));\n        }\n        if buffer.len() < channels.len() {\n            return Err(metadata::Error::InvalidReference(\"ADC DMA circular buffer must hold at least one full programmed sequence\"));\n        }\n");
+        circular.push_str(&format!(
+            "        if u64::from(sample_time_code) > 0x{:X} {{\n            return Err(metadata::Error::InvalidReference(\"ADC DMA sample_time_code exceeds the bound sample-time field width\"));\n        }}\n",
+            sample_time_mask
+        ));
+        circular.push_str(
+            "        let transfer_count = u32::try_from(buffer.len()).map_err(|_| metadata::Error::Unsupported(\"ADC DMA transfer count does not fit u32\"))?;\n        let buffer_address = u32::try_from(buffer.as_mut_ptr() as usize)\n            .map_err(|_| metadata::Error::Unsupported(\"ADC DMA buffer address does not fit the target DMA address register\"))?;\n        let data_address = u32::try_from(0x",
+        );
+        circular.push_str(&format!("{:X}", data_register.absolute_address));
+        circular.push_str(
+            "u64).map_err(|_| metadata::Error::Unsupported(\"ADC DMA data register address does not fit the target DMA address register\"))?;\n",
+        );
+        circular.push_str(&render_adc_dma_operation_statements(
+            model,
+            driver,
+            &bindings.prepare_circular_operation_refs,
+            Some(dma_array_index),
+            "ADC DMA circular prepare",
+        )?);
+        circular.push_str(&program_dynamic_setup);
+        circular.push_str(&arm_dma_and_start);
+        circular.push_str("        Ok(())\n    }\n");
+        methods.push(GeneratedMethod {
+            name: "start_circular_dma_u16".to_string(),
+            code: circular,
+        });
+    }
+
+    let mut stop =
+        String::from("    pub fn stop_dma_sampling(&self) -> Result<(), metadata::Error> {\n");
+    stop.push_str(&render_register_write_statement(
+        &dma_channel_enable_register,
+        &dma_channel_enable_field.field,
+        0,
+        "        ",
+    )?);
+    stop.push_str(&render_adc_dma_operation_statements(
+        model,
+        driver,
+        &bindings.stop_operation_refs,
+        Some(dma_array_index),
+        "ADC DMA stop",
+    )?);
+    stop.push_str("        Ok(())\n    }\n");
+    methods.push(GeneratedMethod {
+        name: "stop_dma_sampling".to_string(),
+        code: stop,
+    });
+
+    methods.push(GeneratedMethod {
+        name: "is_dma_transfer_complete".to_string(),
+        code: format!(
+            "    pub fn is_dma_transfer_complete(&self) -> Result<bool, metadata::Error> {{\n        Ok((read_u32(0x{address:X}u64)? & 0x{mask:08X}u32) != 0)\n    }}\n",
+            address = transfer_complete_register.absolute_address,
+            mask = transfer_complete_mask
+        ),
+    });
+    methods.push(GeneratedMethod {
+        name: "clear_dma_transfer_complete".to_string(),
+        code: format!(
+            "    pub fn clear_dma_transfer_complete(&self) -> Result<(), metadata::Error> {{\n{}        Ok(())\n    }}\n",
+            render_adc_dma_operation_statements(
+                model,
+                driver,
+                std::slice::from_ref(&bindings.dma_transfer_complete_clear_operation_ref),
+                Some(dma_array_index),
+                "ADC DMA transfer-complete clear",
+            )?
+        ),
+    });
+
+    if let Some(interrupt_enable_ref) = &bindings.dma_transfer_complete_interrupt_enable_ref {
+        let interrupt_enable_field = resolve_structural_field_target(
+            model,
+            interrupt_enable_ref,
+            None,
+            Some(dma_array_index),
+            &driver.id,
+            "ADC DMA transfer-complete interrupt enable",
+        )?;
+        let interrupt_enable_register = resolve_structural_register_ref(
+            model,
+            &interrupt_enable_field.register_id,
+            Some(interrupt_enable_field.peripheral_ref.as_str()),
+            Some(dma_array_index),
+            &driver.id,
+            "ADC DMA transfer-complete interrupt enable",
+        )?;
+        methods.push(render_register_write_method(
+            "enable_dma_transfer_complete_interrupt".to_string(),
+            &interrupt_enable_register,
+            &interrupt_enable_field.field,
+            1,
+            &format!(
+                "Enable the {} DMA transfer-complete interrupt.",
+                driver.name
+            ),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_dma_transfer_complete_interrupt".to_string(),
+            &interrupt_enable_register,
+            &interrupt_enable_field.field,
+            0,
+            &format!(
+                "Disable the {} DMA transfer-complete interrupt.",
+                driver.name
+            ),
+        )?);
+    }
+
+    if let (Some(flag_ref), Some(clear_ref)) = (
+        bindings.dma_half_transfer_flag_ref.as_ref(),
+        bindings.dma_half_transfer_clear_operation_ref.as_ref(),
+    ) {
+        let half_flag = resolve_structural_field_target(
+            model,
+            flag_ref,
+            None,
+            Some(dma_array_index),
+            &driver.id,
+            "ADC DMA half-transfer flag",
+        )?;
+        let half_register = resolve_structural_register_ref(
+            model,
+            &half_flag.register_id,
+            Some(half_flag.peripheral_ref.as_str()),
+            Some(dma_array_index),
+            &driver.id,
+            "ADC DMA half-transfer flag",
+        )?;
+        let half_mask = field_bit_mask(&half_flag.field, &half_register)?;
+        methods.push(GeneratedMethod {
+            name: "is_dma_half_transfer".to_string(),
+            code: format!(
+                "    pub fn is_dma_half_transfer(&self) -> Result<bool, metadata::Error> {{\n        Ok((read_u32(0x{address:X}u64)? & 0x{mask:08X}u32) != 0)\n    }}\n",
+                address = half_register.absolute_address,
+                mask = half_mask
+            ),
+        });
+        methods.push(GeneratedMethod {
+            name: "clear_dma_half_transfer".to_string(),
+            code: format!(
+                "    pub fn clear_dma_half_transfer(&self) -> Result<(), metadata::Error> {{\n{}        Ok(())\n    }}\n",
+                render_adc_dma_operation_statements(
+                    model,
+                    driver,
+                    std::slice::from_ref(clear_ref),
+                    Some(dma_array_index),
+                    "ADC DMA half-transfer clear",
+                )?
+            ),
+        });
+    }
+
+    if let Some(interrupt_enable_ref) = &bindings.dma_half_transfer_interrupt_enable_ref {
+        let interrupt_enable_field = resolve_structural_field_target(
+            model,
+            interrupt_enable_ref,
+            None,
+            Some(dma_array_index),
+            &driver.id,
+            "ADC DMA half-transfer interrupt enable",
+        )?;
+        let interrupt_enable_register = resolve_structural_register_ref(
+            model,
+            &interrupt_enable_field.register_id,
+            Some(interrupt_enable_field.peripheral_ref.as_str()),
+            Some(dma_array_index),
+            &driver.id,
+            "ADC DMA half-transfer interrupt enable",
+        )?;
+        methods.push(render_register_write_method(
+            "enable_dma_half_transfer_interrupt".to_string(),
+            &interrupt_enable_register,
+            &interrupt_enable_field.field,
+            1,
+            &format!("Enable the {} DMA half-transfer interrupt.", driver.name),
+        )?);
+        methods.push(render_register_write_method(
+            "disable_dma_half_transfer_interrupt".to_string(),
+            &interrupt_enable_register,
+            &interrupt_enable_field.field,
+            0,
+            &format!("Disable the {} DMA half-transfer interrupt.", driver.name),
         )?);
     }
 
@@ -10463,6 +11059,384 @@ fn render_register_flag_read_method(
     })
 }
 
+fn resolve_structural_owner_peripheral<'a>(
+    model: &'a EmbassyGenerationModel,
+    structural_ref: &str,
+    preferred_peripheral_ref: Option<&str>,
+    owner_id: &str,
+    usage: &str,
+) -> Result<&'a Peripheral> {
+    let owners = model.register_owners.get(structural_ref).ok_or_else(|| {
+        anyhow!(
+            "{} {} references unknown structural ref {}",
+            owner_id,
+            usage,
+            structural_ref
+        )
+    })?;
+    let owner_ref = if let Some(preferred) = preferred_peripheral_ref {
+        owners
+            .iter()
+            .find(|owner| owner.as_str() == preferred)
+            .or_else(|| owners.first())
+    } else {
+        owners.first()
+    }
+    .ok_or_else(|| {
+        anyhow!(
+            "{} {} references structural ref {} without any owning peripheral",
+            owner_id,
+            usage,
+            structural_ref
+        )
+    })?;
+    model.peripherals.get(owner_ref.as_str()).ok_or_else(|| {
+        anyhow!(
+            "{} {} resolves {} to owner {} that is not present in the structural model",
+            owner_id,
+            usage,
+            structural_ref,
+            owner_ref
+        )
+    })
+}
+
+fn resolve_structural_register_ref(
+    model: &EmbassyGenerationModel,
+    structural_ref: &str,
+    preferred_peripheral_ref: Option<&str>,
+    array_index: Option<u32>,
+    owner_id: &str,
+    usage: &str,
+) -> Result<ResolvedRegister> {
+    let owner = resolve_structural_owner_peripheral(
+        model,
+        structural_ref,
+        preferred_peripheral_ref,
+        owner_id,
+        usage,
+    )?;
+    let base_address = owner.base_address.ok_or_else(|| {
+        anyhow!(
+            "{} {} needs baseAddress on peripheral {} to resolve {}",
+            owner_id,
+            usage,
+            owner.id,
+            structural_ref
+        )
+    })?;
+    resolve_structural_register_from_members(
+        owner.id.as_str(),
+        base_address,
+        &owner.registers,
+        structural_ref,
+        array_index,
+    )?
+    .ok_or_else(|| {
+        anyhow!(
+            "{} {} could not resolve register {} on peripheral {}",
+            owner_id,
+            usage,
+            structural_ref,
+            owner.id
+        )
+    })
+}
+
+fn resolve_structural_field_target(
+    model: &EmbassyGenerationModel,
+    structural_ref: &str,
+    preferred_peripheral_ref: Option<&str>,
+    array_index: Option<u32>,
+    owner_id: &str,
+    usage: &str,
+) -> Result<ResolvedFieldTarget> {
+    let owner = resolve_structural_owner_peripheral(
+        model,
+        structural_ref,
+        preferred_peripheral_ref,
+        owner_id,
+        usage,
+    )?;
+    let base_address = owner.base_address.ok_or_else(|| {
+        anyhow!(
+            "{} {} needs baseAddress on peripheral {} to resolve {}",
+            owner_id,
+            usage,
+            owner.id,
+            structural_ref
+        )
+    })?;
+    resolve_structural_field_from_members(
+        owner.id.as_str(),
+        base_address,
+        &owner.registers,
+        structural_ref,
+        array_index,
+    )?
+    .ok_or_else(|| {
+        anyhow!(
+            "{} {} could not resolve field {} on peripheral {}",
+            owner_id,
+            usage,
+            structural_ref,
+            owner.id
+        )
+    })
+}
+
+fn resolve_structural_register_from_members(
+    peripheral_ref: &str,
+    base_address: u64,
+    members: &[RegisterBlockMember],
+    structural_ref: &str,
+    array_index: Option<u32>,
+) -> Result<Option<ResolvedRegister>> {
+    for member in members {
+        match member {
+            RegisterBlockMember::Register(register) => {
+                if let Some(resolved) = resolve_structural_register_from_register(
+                    peripheral_ref,
+                    base_address,
+                    register,
+                    structural_ref,
+                    array_index,
+                )? {
+                    return Ok(Some(resolved));
+                }
+            }
+            RegisterBlockMember::Cluster(cluster) => {
+                if let Some(resolved) = resolve_structural_register_from_cluster(
+                    peripheral_ref,
+                    base_address,
+                    cluster,
+                    structural_ref,
+                    array_index,
+                )? {
+                    return Ok(Some(resolved));
+                }
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn resolve_structural_field_from_members(
+    peripheral_ref: &str,
+    base_address: u64,
+    members: &[RegisterBlockMember],
+    structural_ref: &str,
+    array_index: Option<u32>,
+) -> Result<Option<ResolvedFieldTarget>> {
+    for member in members {
+        match member {
+            RegisterBlockMember::Register(register) => {
+                if let Some(resolved) = resolve_structural_field_from_register(
+                    peripheral_ref,
+                    base_address,
+                    register,
+                    structural_ref,
+                    array_index,
+                )? {
+                    return Ok(Some(resolved));
+                }
+            }
+            RegisterBlockMember::Cluster(cluster) => {
+                if let Some(resolved) = resolve_structural_field_from_cluster(
+                    peripheral_ref,
+                    base_address,
+                    cluster,
+                    structural_ref,
+                    array_index,
+                )? {
+                    return Ok(Some(resolved));
+                }
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn resolve_structural_register_from_register(
+    peripheral_ref: &str,
+    parent_address: u64,
+    register: &Register,
+    structural_ref: &str,
+    array_index: Option<u32>,
+) -> Result<Option<ResolvedRegister>> {
+    if register.id != structural_ref {
+        return Ok(None);
+    }
+    let offset = checked_offset_add(parent_address, register.offset_bytes, "register address")?;
+    let absolute_address = if let Some(array) = &register.array {
+        let index = array_index.ok_or_else(|| {
+            anyhow!(
+                "register {} is arrayed but no array index was supplied for structural resolution",
+                register.id
+            )
+        })?;
+        let stride = first_array_axis_stride(array, &register.id)?;
+        checked_offset_add(
+            offset,
+            u64::from(index).checked_mul(stride).ok_or_else(|| {
+                anyhow!(
+                    "register {} array index overflows register stride math",
+                    register.id
+                )
+            })?,
+            "arrayed register address",
+        )?
+    } else {
+        offset
+    };
+    Ok(Some(ResolvedRegister {
+        id: register.id.clone(),
+        name: register.name.clone(),
+        peripheral_ref: peripheral_ref.to_string(),
+        absolute_address,
+        width_bits: register.width_bits,
+        fields: register
+            .fields
+            .iter()
+            .map(|field| ResolvedField {
+                id: field.id.clone(),
+                name: field.name.clone(),
+                description: field.description.clone(),
+                lsb: field.bit_range.lsb,
+                msb: field.bit_range.msb,
+            })
+            .collect(),
+    }))
+}
+
+fn resolve_structural_register_from_cluster(
+    peripheral_ref: &str,
+    parent_address: u64,
+    cluster: &RegisterCluster,
+    structural_ref: &str,
+    array_index: Option<u32>,
+) -> Result<Option<ResolvedRegister>> {
+    let cluster_address =
+        checked_offset_add(parent_address, cluster.offset_bytes, "cluster address")?;
+    if let Some(array) = &cluster.array {
+        let index = array_index.ok_or_else(|| {
+            anyhow!(
+                "cluster {} is arrayed but no array index was supplied for structural resolution",
+                cluster.name
+            )
+        })?;
+        let stride = first_array_axis_stride(array, cluster.name.as_str())?;
+        let indexed_address = checked_offset_add(
+            cluster_address,
+            u64::from(index).checked_mul(stride).ok_or_else(|| {
+                anyhow!(
+                    "cluster {} array index overflows cluster stride math",
+                    cluster.name
+                )
+            })?,
+            "arrayed cluster address",
+        )?;
+        return resolve_structural_register_from_members(
+            peripheral_ref,
+            indexed_address,
+            &cluster.members,
+            structural_ref,
+            None,
+        );
+    }
+    resolve_structural_register_from_members(
+        peripheral_ref,
+        cluster_address,
+        &cluster.members,
+        structural_ref,
+        array_index,
+    )
+}
+
+fn resolve_structural_field_from_register(
+    peripheral_ref: &str,
+    parent_address: u64,
+    register: &Register,
+    structural_ref: &str,
+    array_index: Option<u32>,
+) -> Result<Option<ResolvedFieldTarget>> {
+    let resolved_register = resolve_structural_register_from_register(
+        peripheral_ref,
+        parent_address,
+        register,
+        register.id.as_str(),
+        array_index,
+    )?;
+    let Some(register) = resolved_register else {
+        return Ok(None);
+    };
+    for field in &register.fields {
+        if field.id == structural_ref {
+            return Ok(Some(ResolvedFieldTarget {
+                peripheral_ref: peripheral_ref.to_string(),
+                register_id: register.id.clone(),
+                field: field.clone(),
+            }));
+        }
+    }
+    Ok(None)
+}
+
+fn resolve_structural_field_from_cluster(
+    peripheral_ref: &str,
+    parent_address: u64,
+    cluster: &RegisterCluster,
+    structural_ref: &str,
+    array_index: Option<u32>,
+) -> Result<Option<ResolvedFieldTarget>> {
+    let cluster_address =
+        checked_offset_add(parent_address, cluster.offset_bytes, "cluster address")?;
+    if let Some(array) = &cluster.array {
+        let index = array_index.ok_or_else(|| {
+            anyhow!(
+                "cluster {} is arrayed but no array index was supplied for structural resolution",
+                cluster.name
+            )
+        })?;
+        let stride = first_array_axis_stride(array, cluster.name.as_str())?;
+        let indexed_address = checked_offset_add(
+            cluster_address,
+            u64::from(index).checked_mul(stride).ok_or_else(|| {
+                anyhow!(
+                    "cluster {} array index overflows cluster stride math",
+                    cluster.name
+                )
+            })?,
+            "arrayed cluster address",
+        )?;
+        return resolve_structural_field_from_members(
+            peripheral_ref,
+            indexed_address,
+            &cluster.members,
+            structural_ref,
+            None,
+        );
+    }
+    resolve_structural_field_from_members(
+        peripheral_ref,
+        cluster_address,
+        &cluster.members,
+        structural_ref,
+        array_index,
+    )
+}
+
+fn first_array_axis_stride(array: &ArrayShape, owner: &str) -> Result<u64> {
+    let axis = array.axes.first().ok_or_else(|| {
+        anyhow!(
+            "arrayed structural member {} is missing its first axis",
+            owner
+        )
+    })?;
+    axis.stride_bytes
+        .ok_or_else(|| anyhow!("arrayed structural member {} omits strideBytes", owner))
+}
+
 fn render_register_write_statement(
     register: &ResolvedRegister,
     field: &ResolvedField,
@@ -10589,6 +11563,243 @@ fn render_register_write_statement(
         }
         _ => unreachable!("unsupported widths are rejected before mask computation"),
     }
+}
+
+fn render_register_write_expression_statement(
+    register: &ResolvedRegister,
+    field: &ResolvedField,
+    value_expr: &str,
+    indent: &str,
+) -> Result<String> {
+    let clear_mask = field_bit_mask_or_range_mask(field, register)?;
+    let value_mask = field_value_mask(field)?;
+    match register.width_bits {
+        8 => {
+            let clear_mask = u8::try_from(clear_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            let value_mask = u8::try_from(value_mask).map_err(|_| {
+                anyhow!(
+                    "field {} on register {} requires a value mask wider than u8",
+                    field.name,
+                    register.id
+                )
+            })?;
+            let masked_expr = if value_mask == u8::MAX {
+                value_expr.to_string()
+            } else {
+                format!("({value_expr}) & 0x{value_mask:02X}u8")
+            };
+            let set_expr = if field.lsb == 0 {
+                masked_expr
+            } else {
+                format!("({masked_expr}) << {}", field.lsb)
+            };
+            Ok(format!(
+                "{indent}modify_u8(0x{address:X}u64, 0x{clear_mask:02X}u8, {set_expr})?;\n",
+                address = register.absolute_address
+            ))
+        }
+        16 => {
+            let clear_mask = u16::try_from(clear_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            let value_mask = u16::try_from(value_mask).map_err(|_| {
+                anyhow!(
+                    "field {} on register {} requires a value mask wider than u16",
+                    field.name,
+                    register.id
+                )
+            })?;
+            let masked_expr = if value_mask == u16::MAX {
+                value_expr.to_string()
+            } else {
+                format!("({value_expr}) & 0x{value_mask:04X}u16")
+            };
+            let set_expr = if field.lsb == 0 {
+                masked_expr
+            } else {
+                format!("({masked_expr}) << {}", field.lsb)
+            };
+            Ok(format!(
+                "{indent}modify_u16(0x{address:X}u64, 0x{clear_mask:04X}u16, {set_expr})?;\n",
+                address = register.absolute_address
+            ))
+        }
+        32 => {
+            let value_mask = u32::try_from(value_mask).map_err(|_| {
+                anyhow!(
+                    "field {} on register {} requires a value mask wider than u32",
+                    field.name,
+                    register.id
+                )
+            })?;
+            let masked_expr = if value_mask == u32::MAX {
+                value_expr.to_string()
+            } else {
+                format!("({value_expr}) & 0x{value_mask:08X}u32")
+            };
+            let set_expr = if field.lsb == 0 {
+                masked_expr
+            } else {
+                format!("({masked_expr}) << {}", field.lsb)
+            };
+            Ok(format!(
+                "{indent}modify_u32(0x{address:X}u64, 0x{clear_mask:08X}u32, {set_expr})?;\n",
+                address = register.absolute_address
+            ))
+        }
+        other => bail!(
+            "register {} uses unsupported width {} for Embassy code generation",
+            register.id,
+            other
+        ),
+    }
+}
+
+fn render_register_value_write_expression_statement(
+    register: &ResolvedRegister,
+    value_expr: &str,
+    indent: &str,
+) -> Result<String> {
+    match register.width_bits {
+        8 => Ok(format!(
+            "{indent}write_u8(0x{address:X}u64, {value_expr})?;\n",
+            address = register.absolute_address
+        )),
+        16 => Ok(format!(
+            "{indent}write_u16(0x{address:X}u64, {value_expr})?;\n",
+            address = register.absolute_address
+        )),
+        32 => Ok(format!(
+            "{indent}write_u32(0x{address:X}u64, {value_expr})?;\n",
+            address = register.absolute_address
+        )),
+        other => bail!(
+            "register {} uses unsupported width {} for Embassy code generation",
+            register.id,
+            other
+        ),
+    }
+}
+
+fn render_adc_dma_operation_statements(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+    operation_refs: &[String],
+    dma_array_index: Option<u32>,
+    usage: &str,
+) -> Result<String> {
+    let mut rendered = String::new();
+    for operation_ref in operation_refs {
+        let operation = model
+            .operations
+            .get(operation_ref.as_str())
+            .ok_or_else(|| {
+                anyhow!(
+                    "{} {} references unknown operation {}",
+                    driver.id,
+                    usage,
+                    operation_ref
+                )
+            })?;
+        for step in &operation.steps {
+            if step.action != "write" {
+                bail!(
+                    "{} {} {} step {} uses unsupported action {}",
+                    driver.id,
+                    usage,
+                    operation.id,
+                    step.index,
+                    step.action
+                );
+            }
+            let step_target_ref = step.target_ref.as_deref().ok_or_else(|| {
+                anyhow!(
+                    "{} {} {} step {} is missing targetRef",
+                    driver.id,
+                    usage,
+                    operation.id,
+                    step.index
+                )
+            })?;
+            let parsed = parse_field_write_expression(
+                step.expression.as_ref(),
+                step.value.as_ref(),
+                &operation.id,
+                step.index,
+            )?;
+            let register = resolve_structural_register_ref(
+                model,
+                step_target_ref,
+                Some(driver.target.target_ref.as_str()),
+                dma_array_index,
+                &driver.id,
+                usage,
+            )?;
+            let field = resolve_register_field(&register, &parsed.field_name)?;
+            rendered.push_str(&render_register_write_statement(
+                &register,
+                &field,
+                parsed.value,
+                "        ",
+            )?);
+        }
+    }
+    Ok(rendered)
+}
+
+fn render_adc_dma_write_ref_expression(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+    structural_ref: &str,
+    preferred_peripheral_ref: Option<&str>,
+    array_index: Option<u32>,
+    value_expr: &str,
+    usage: &str,
+) -> Result<String> {
+    if structural_ref.starts_with("reg.") {
+        let register = resolve_structural_register_ref(
+            model,
+            structural_ref,
+            preferred_peripheral_ref,
+            array_index,
+            &driver.id,
+            usage,
+        )?;
+        return render_register_value_write_expression_statement(&register, value_expr, "        ");
+    }
+    let target = resolve_structural_field_target(
+        model,
+        structural_ref,
+        preferred_peripheral_ref,
+        array_index,
+        &driver.id,
+        usage,
+    )?;
+    let register = resolve_structural_register_ref(
+        model,
+        &target.register_id,
+        Some(target.peripheral_ref.as_str()),
+        array_index,
+        &driver.id,
+        usage,
+    )?;
+    render_register_write_expression_statement(&register, &target.field, value_expr, "        ")
 }
 
 fn field_value_mask(field: &ResolvedField) -> Result<u64> {
@@ -15770,6 +16981,37 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             String::from_utf8_lossy(&cargo_output.stdout),
             String::from_utf8_lossy(&cargo_output.stderr)
         );
+    }
+
+    #[test]
+    fn generate_embassy_emits_adc_dma_helpers_for_ch32v203g6u6() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let input = repo_root
+            .join("evidence")
+            .join("wch")
+            .join("ch32v203g6u6")
+            .join("hair.json");
+        let document = load_validated_hair_document(&input, &repo_root)
+            .expect("reference hair document should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&document, output_dir.path()).expect("embassy generation");
+
+        let adc_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("adc.rs")).expect("adc.rs");
+
+        assert!(adc_rs.contains("pub fn start_one_shot_dma_u16"));
+        assert!(adc_rs.contains("pub fn start_circular_dma_u16"));
+        assert!(adc_rs.contains("pub fn stop_dma_sampling"));
+        assert!(adc_rs.contains("pub fn is_dma_transfer_complete"));
+        assert!(adc_rs.contains("pub fn clear_dma_transfer_complete"));
+        assert!(adc_rs.contains("pub fn enable_dma_half_transfer_interrupt"));
+        assert!(adc_rs.contains("pub fn enable_dma_transfer_complete_interrupt"));
+        assert!(
+            adc_rs.contains("ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs")
+        );
+        assert!(adc_rs.contains("0x4001244Cu64"));
+        assert!(adc_rs.contains("modify_u32(0x40020008u64"));
     }
 
     #[test]

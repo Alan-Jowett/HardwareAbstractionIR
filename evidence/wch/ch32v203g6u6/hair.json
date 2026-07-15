@@ -64281,6 +64281,340 @@
         }
       },
       {
+        "id": "op.adc1.prepare_dma_one_shot",
+        "name": "ADC1 prepare regular-group DMA one-shot sampling",
+        "kind": "configuration",
+        "targetRefs": [
+          "periph.adc1",
+          "periph.dma1"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.adc1.ctlr1",
+            "expression": {
+              "language": "plain",
+              "text": "Set SCAN = 1"
+            }
+          },
+          {
+            "index": 1,
+            "action": "write",
+            "targetRef": "reg.adc1.ctlr2",
+            "expression": {
+              "language": "plain",
+              "text": "Clear CONT"
+            }
+          },
+          {
+            "index": 2,
+            "action": "write",
+            "targetRef": "reg.adc1.ctlr2",
+            "expression": {
+              "language": "plain",
+              "text": "Set DMA = 1"
+            }
+          },
+          {
+            "index": 3,
+            "action": "write",
+            "targetRef": "reg.dma1.cfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Clear DIR"
+            }
+          },
+          {
+            "index": 4,
+            "action": "write",
+            "targetRef": "reg.dma1.cfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Clear CIRC"
+            }
+          },
+          {
+            "index": 5,
+            "action": "write",
+            "targetRef": "reg.dma1.cfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Clear PINC"
+            }
+          },
+          {
+            "index": 6,
+            "action": "write",
+            "targetRef": "reg.dma1.cfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Set MINC = 1"
+            }
+          },
+          {
+            "index": 7,
+            "action": "write",
+            "targetRef": "reg.dma1.cfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Set PSIZE = 1"
+            }
+          },
+          {
+            "index": 8,
+            "action": "write",
+            "targetRef": "reg.dma1.cfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Set MSIZE = 1"
+            }
+          },
+          {
+            "index": 9,
+            "action": "write",
+            "targetRef": "reg.dma1.cfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Clear HTIE"
+            }
+          },
+          {
+            "index": 10,
+            "action": "write",
+            "targetRef": "reg.dma1.cfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Clear TCIE"
+            }
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-sdk",
+            "openwch-ch32v20x-header"
+          ],
+          "evidenceRefs": [
+            "e_sdk_adc_dma_example",
+            "e_header_adc_enable_calibration_bits"
+          ],
+          "status": "inferred",
+          "confidence": 0.83
+        }
+      },
+      {
+        "id": "op.adc1.prepare_dma_circular",
+        "name": "ADC1 prepare regular-group DMA circular sampling",
+        "kind": "configuration",
+        "targetRefs": [
+          "periph.adc1",
+          "periph.dma1"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.adc1.ctlr1",
+            "expression": {
+              "language": "plain",
+              "text": "Set SCAN = 1"
+            }
+          },
+          {
+            "index": 1,
+            "action": "write",
+            "targetRef": "reg.adc1.ctlr2",
+            "expression": {
+              "language": "plain",
+              "text": "Set CONT = 1"
+            }
+          },
+          {
+            "index": 2,
+            "action": "write",
+            "targetRef": "reg.adc1.ctlr2",
+            "expression": {
+              "language": "plain",
+              "text": "Set DMA = 1"
+            }
+          },
+          {
+            "index": 3,
+            "action": "write",
+            "targetRef": "reg.dma1.cfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Clear DIR"
+            }
+          },
+          {
+            "index": 4,
+            "action": "write",
+            "targetRef": "reg.dma1.cfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Set CIRC = 1"
+            }
+          },
+          {
+            "index": 5,
+            "action": "write",
+            "targetRef": "reg.dma1.cfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Clear PINC"
+            }
+          },
+          {
+            "index": 6,
+            "action": "write",
+            "targetRef": "reg.dma1.cfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Set MINC = 1"
+            }
+          },
+          {
+            "index": 7,
+            "action": "write",
+            "targetRef": "reg.dma1.cfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Set PSIZE = 1"
+            }
+          },
+          {
+            "index": 8,
+            "action": "write",
+            "targetRef": "reg.dma1.cfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Set MSIZE = 1"
+            }
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-sdk",
+            "openwch-ch32v20x-header"
+          ],
+          "evidenceRefs": [
+            "e_sdk_adc_dma_example",
+            "e_header_adc_enable_calibration_bits"
+          ],
+          "status": "inferred",
+          "confidence": 0.8
+        }
+      },
+      {
+        "id": "op.adc1.stop_dma",
+        "name": "ADC1 stop regular-group DMA sampling",
+        "kind": "configuration",
+        "targetRefs": [
+          "periph.adc1",
+          "periph.dma1"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.adc1.ctlr2",
+            "expression": {
+              "language": "plain",
+              "text": "Clear DMA"
+            }
+          },
+          {
+            "index": 1,
+            "action": "write",
+            "targetRef": "reg.adc1.ctlr2",
+            "expression": {
+              "language": "plain",
+              "text": "Clear CONT"
+            }
+          },
+          {
+            "index": 2,
+            "action": "write",
+            "targetRef": "reg.dma1.cfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Clear CIRC"
+            }
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-sdk",
+            "openwch-ch32v20x-header"
+          ],
+          "evidenceRefs": [
+            "e_sdk_adc_dma_example",
+            "e_header_adc_enable_calibration_bits"
+          ],
+          "status": "inferred",
+          "confidence": 0.77
+        }
+      },
+      {
+        "id": "op.dma1.ch1.clear_transfer_complete",
+        "name": "DMA1 Channel 1 clear transfer complete flag",
+        "kind": "interrupt-service",
+        "targetRefs": [
+          "periph.dma1"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.dma1.intfcr",
+            "expression": {
+              "language": "plain",
+              "text": "Set CTCIF1 = 1"
+            }
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs"
+          ],
+          "status": "verified",
+          "confidence": 0.9
+        }
+      },
+      {
+        "id": "op.dma1.ch1.clear_half_transfer",
+        "name": "DMA1 Channel 1 clear half-transfer flag",
+        "kind": "interrupt-service",
+        "targetRefs": [
+          "periph.dma1"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.dma1.intfcr",
+            "expression": {
+              "language": "plain",
+              "text": "Set CHTIF1 = 1"
+            }
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs"
+          ],
+          "status": "verified",
+          "confidence": 0.9
+        }
+      },
+      {
         "id": "op.adc2.calibrate",
         "name": "ADC2 enable and calibrate",
         "kind": "initialization",
@@ -74744,6 +75078,7 @@
           "targetRef": "block.adc1",
           "driverKind": "adc",
           "modulePath": "adc",
+          "loweringPattern": "regular-sequence-adc-dma",
           "clockBindingRefs": [
             "clk.adc1"
           ],
@@ -74835,6 +75170,90 @@
           "initOperationRefs": [
             "op.adc1.calibrate"
           ],
+          "adcDmaBindings": {
+            "prepareOneShotOperationRefs": [
+              "op.adc1.prepare_dma_one_shot"
+            ],
+            "prepareCircularOperationRefs": [
+              "op.adc1.prepare_dma_circular"
+            ],
+            "stopOperationRefs": [
+              "op.adc1.stop_dma"
+            ],
+            "dataRegisterRef": "reg.adc1.rdatar",
+            "startRef": "field.adc_ctlr2.swstart",
+            "regularSequenceLengthRef": "field.adc_rsqr1.l",
+            "regularSequenceSlotRefs": [
+              "field.adc_rsqr3.sq1",
+              "field.adc_rsqr3.sq2",
+              "field.adc_rsqr3.sq3",
+              "field.adc_rsqr3.sq4",
+              "field.adc_rsqr3.sq5",
+              "field.adc_rsqr3.sq6",
+              "field.adc_rsqr2.sq7",
+              "field.adc_rsqr2.sq8",
+              "field.adc_rsqr2.sq9",
+              "field.adc_rsqr2.sq10",
+              "field.adc_rsqr2.sq11",
+              "field.adc_rsqr2.sq12",
+              "field.adc_rsqr1.sq13",
+              "field.adc_rsqr1.sq14",
+              "field.adc_rsqr1.sq15",
+              "field.adc_rsqr1.sq16"
+            ],
+            "channelSampleTimeRefs": [
+              {
+                "channelIndex": 0,
+                "sampleTimeRef": "field.adc1.samptr2.smp0_tkcg0"
+              },
+              {
+                "channelIndex": 1,
+                "sampleTimeRef": "field.adc1.samptr2.smp1_tkcg1"
+              },
+              {
+                "channelIndex": 2,
+                "sampleTimeRef": "field.adc1.samptr2.smp2_tkcg2"
+              },
+              {
+                "channelIndex": 3,
+                "sampleTimeRef": "field.adc1.samptr2.smp3_tkcg3"
+              },
+              {
+                "channelIndex": 4,
+                "sampleTimeRef": "field.adc1.samptr2.smp4_tkcg4"
+              },
+              {
+                "channelIndex": 5,
+                "sampleTimeRef": "field.adc1.samptr2.smp5_tkcg5"
+              },
+              {
+                "channelIndex": 6,
+                "sampleTimeRef": "field.adc1.samptr2.smp6_tkcg6"
+              },
+              {
+                "channelIndex": 7,
+                "sampleTimeRef": "field.adc1.samptr2.smp7_tkcg7"
+              },
+              {
+                "channelIndex": 8,
+                "sampleTimeRef": "field.adc1.samptr2.smp8_tkcg8"
+              },
+              {
+                "channelIndex": 9,
+                "sampleTimeRef": "field.adc1.samptr2.smp9_tkcg9"
+              }
+            ],
+            "dmaTransferCountRef": "field.dma_cntr1.ndt",
+            "dmaPeripheralAddressRef": "field.dma_paddr1.pa",
+            "dmaMemoryAddressRef": "field.dma_maddr1.ma",
+            "dmaChannelEnableRef": "field.dma_cfgr1.en",
+            "dmaHalfTransferFlagRef": "field.dma_intfr.htif1",
+            "dmaTransferCompleteFlagRef": "field.dma_intfr.tcif1",
+            "dmaHalfTransferInterruptEnableRef": "field.dma_cfgr1.htie",
+            "dmaTransferCompleteInterruptEnableRef": "field.dma_cfgr1.tcie",
+            "dmaHalfTransferClearOperationRef": "op.dma1.ch1.clear_half_transfer",
+            "dmaTransferCompleteClearOperationRef": "op.dma1.ch1.clear_transfer_complete"
+          },
           "provenance": {
             "sourceRefs": [
               "openwch-ch32v20x-header",

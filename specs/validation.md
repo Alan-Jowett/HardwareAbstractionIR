@@ -111,6 +111,13 @@ cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-
   justify both the rtc-backed `embassy-time-driver` path and any emitted
   HAL-specific raw RTC control helpers from the same explicit RTC
   control/status path.
+- If the CH32V203G6U6 reference bundle claims higher-level ADC DMA sampling,
+  generation succeeds only when the same `adc` driver instance carries an
+  explicit `regular-sequence-adc-dma` lowering selector plus `adcDmaBindings`
+  naming the ADC and DMA roles used by the generated buffered-sampling path.
+  The generated crate may expose one-shot and circular regular-group DMA
+  sampling helpers only when the approved HAIR inputs justify those exact
+  behaviors; injected and dual-ADC DMA paths must still fail explicitly.
 - When a reference document carries explicit canonical normalization mappings,
   the generator may consume them only as additive lowering hints for supported
   equivalent concepts; missing or ambiguous mappings must not mask unsupported

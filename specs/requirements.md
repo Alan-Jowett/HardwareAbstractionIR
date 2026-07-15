@@ -204,6 +204,28 @@ Embassy profile contract.
 - Async and DMA-backed generated APIs are allowed only when the document
   carries the interrupt, DMA, pin-routing, and semantic-operation/state-machine
   facts needed to lower those behaviors deterministically.
+- If an `adc` driver instance claims a higher-level regular-group buffered
+  sampling API backed by DMA, the same profile entry shall carry an explicit
+  lowering-family selector and explicit binding refs naming the ADC and DMA
+  control/data/status roles used by the generated sampling path. The generator
+  shall not infer that path from vendor register names alone. The first such
+  ADC family selector is `regular-sequence-adc-dma`, which is limited to
+  software-started regular-group buffered sampling and may expose one-shot
+  buffer fills and circular/continuous buffered capture only when the approved
+  HAIR inputs justify those exact behaviors.
+- A `regular-sequence-adc-dma` claim is allowed only when the same `adc` driver
+  instance carries explicit `adcDmaBindings` naming the regular-sequence length
+  and slot programming handles, per-channel sample-time handles, data register,
+  start control, DMA transfer-count and memory/peripheral address handles, DMA
+  channel enable handle, DMA half-transfer and transfer-complete status
+  handles, the corresponding interrupt-enable handles when interrupt-driven
+  circular sampling is claimed, and the semantic setup/clear operations needed
+  for one-shot and circular operation on that family. The generator shall fail
+  explicitly rather than recovering those roles from vendor-native names alone.
+- A `regular-sequence-adc-dma` claim must remain scoped to the regular
+  conversion group. Injected-group conversions, dual-ADC combined modes, and
+  other ADC DMA families remain out of subset unless a later approved
+  lowering-family contract names them explicitly.
 - `usb-device` lowering is allowed only when the document carries the
   clock/reset, interrupt, pin-routing, and semantic/state-machine facts needed
   to lower the claimed USB behavior deterministically. If the generated surface

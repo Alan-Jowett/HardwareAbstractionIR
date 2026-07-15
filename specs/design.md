@@ -261,6 +261,40 @@ This keeps the emitted time-driver lowering auditable and prevents the
 generator from silently re-discovering timing semantics from vendor-native
 register names that the approved HAIR profile did not explicitly bind.
 
+Higher-level ADC DMA lowering needs the same discipline. Some MCU families can
+support buffered regular-group sampling through a stable combination of ADC
+sequence programming, sample-time programming, a data register, and one linked
+DMA channel, but the exact control path is still family-specific. For that
+case, the profile uses `driverInstances[].loweringPattern` on an `adc` driver
+instance to select an approved lowering family instead of letting the generator
+probe register names heuristically. The first such family is
+`regular-sequence-adc-dma`, which is intentionally limited to software-started
+regular-group buffered sampling and does not imply injected or dual-ADC modes.
+
+When that ADC family is selected, the same driver instance must also carry an
+explicit `adcDmaBindings` map naming the direct roles the generated API needs:
+
+- the regular-sequence length field
+- the ordered regular-sequence slot fields
+- the per-channel sample-time fields
+- the ADC data register
+- the software-start control
+- the DMA transfer-count register or field
+- the DMA peripheral-address and memory-address registers or fields
+- the DMA channel-enable control
+- the DMA half-transfer and transfer-complete status flags
+- the matching DMA interrupt-enable handles when interrupt-driven circular
+  sampling is claimed
+- the semantic setup operations for one-shot and circular mode
+- the semantic clear/ack operations for DMA half-transfer and
+  transfer-complete events
+
+This keeps the CH32-style buffered ADC path auditable while still allowing the
+generated API to expose higher-level one-shot and circular sampling helpers.
+The family-specific setup operations carry the fixed register writes whose
+encoding differs across vendors, while the binding refs name the dynamic roles
+that the generated code must program per call.
+
 RTC lowering follows the same evidence-bounded rule as the other supported
 driver kinds, but aligns with the way Embassy commonly exposes RTC hardware:
 as a HAL-specific rtc module rather than a universal cross-platform trait.

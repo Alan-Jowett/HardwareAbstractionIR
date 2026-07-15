@@ -319,6 +319,9 @@ It currently carries:
 - explicit references to the clock/reset, interrupt, DMA, pin-routing, operation, and state-machine records each generated driver depends on
 - optional lowering selectors for supported families whose bring-up behavior or
   time-base architecture is materially family-specific
+- optional explicit binding maps such as `timeDriverBindings` or
+  `adcDmaBindings` when one supported lowering family needs named generator
+  handles instead of vendor-name probing
 - capability tags that are generator-facing rather than raw hardware facts
 
 The same profile can drive more than one artifact mode. In the first cut:
