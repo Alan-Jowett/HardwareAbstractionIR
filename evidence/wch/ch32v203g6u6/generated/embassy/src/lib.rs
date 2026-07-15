@@ -2,6 +2,7 @@
 
 pub mod adc;
 pub mod dma;
+pub mod flash;
 pub mod gpio;
 pub mod i2c;
 pub mod interrupt;

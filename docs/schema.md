@@ -320,7 +320,7 @@ It currently carries:
 - optional lowering selectors for supported families whose bring-up behavior or
   time-base architecture is materially family-specific
 - optional explicit binding maps such as `timeDriverBindings` or
-  `adcDmaBindings` when one supported lowering family needs named generator
+  `adcDmaBindings` / `flashBindings` when one supported lowering family needs named generator
   handles instead of vendor-name probing, while still allowing topology-backed
   dependencies such as DMA controller clock/reset bring-up to flow through
   referenced route/controller bindings

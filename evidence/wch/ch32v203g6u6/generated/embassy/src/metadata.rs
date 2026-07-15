@@ -284,6 +284,9 @@ pub const GENERATED_PROVENANCE_EVIDENCE_IDS: &[&str] = &[
     "e_header_adc_enable_calibration_bits",
     "e_adc_dma_example",
     "e_tim_dma_example",
+    "e_flash_library_api",
+    "e_flash_library_standard_sequence",
+    "e_flash_standard_program_example",
     "e_adafruit_usb_c_usage",
     "e_adafruit_usb_native_cdc",
     "e_adafruit_schematic_usb_native_not_uart",
@@ -302,6 +305,7 @@ pub const GENERATED_METADATA: GeneratedMetadata = GeneratedMetadata {
     feature_flags: &[
         "adc",
         "dma",
+        "flash",
         "i2c",
         "interrupt",
         "pwm",
@@ -821,6 +825,39 @@ pub const GENERATED_METADATA: GeneratedMetadata = GeneratedMetadata {
             extraction_method: Some("manual"),
             confidence: Some(0.95f64),
             locator: Some("fragment=EVT/EXAM/TIM/TIM_DMA/User/main.c"),
+        },
+        ProvenanceEvidence {
+            id: "e_flash_library_api",
+            name: "Vendor flash library API and flag constants",
+            source_ref: "openwch-ch32v20x-sdk",
+            normalized_claim: Some(
+                "The official CH32V20x flash library header defines FLASH_Unlock, FLASH_Lock, FLASH_ErasePage, FLASH_ProgramHalfWord, FLASH_ClearFlag, the KEY1/KEY2 unlock constants, and the BSY, EOP, and WRPRTERR status flags used by the standard internal-flash path.",
+            ),
+            extraction_method: Some("manual"),
+            confidence: Some(0.96f64),
+            locator: Some("fragment=EVT/EXAM/SRC/Peripheral/inc/ch32v20x_flash.h"),
+        },
+        ProvenanceEvidence {
+            id: "e_flash_library_standard_sequence",
+            name: "Vendor flash library standard erase/program sequence",
+            source_ref: "openwch-ch32v20x-sdk",
+            normalized_claim: Some(
+                "The official CH32V20x flash library implementation unlocks via KEYR, erases by setting CTLR.PER then ADDR then CTLR.STRT, programs with CTLR.PG plus a halfword write to mapped flash, polls BSY until completion, clears EOP/WRPRTERR by writing STATR, and re-locks by setting CTLR.LOCK.",
+            ),
+            extraction_method: Some("manual"),
+            confidence: Some(0.97f64),
+            locator: Some("fragment=EVT/EXAM/SRC/Peripheral/src/ch32v20x_flash.c"),
+        },
+        ProvenanceEvidence {
+            id: "e_flash_standard_program_example",
+            name: "Vendor standard flash programming example",
+            source_ref: "openwch-ch32v20x-sdk",
+            normalized_claim: Some(
+                "The official CH32V20x FLASH_Program example clears BSY, EOP, and WRPRTERR before use, erases standard 4096-byte pages with FLASH_ErasePage, and writes flash with FLASH_ProgramHalfWord over the normal non-fast path.",
+            ),
+            extraction_method: Some("manual"),
+            confidence: Some(0.97f64),
+            locator: Some("fragment=EVT/EXAM/FLASH/FLASH_Program/User/main.c"),
         },
         ProvenanceEvidence {
             id: "e_adafruit_usb_c_usage",

@@ -1005,8 +1005,21 @@ struct Device {
     architecture_ref: Option<String>,
     cpu: CpuModel,
     #[serde(default)]
+    memory_map: Vec<MemoryRegion>,
+    #[serde(default)]
     interrupts: Vec<Interrupt>,
     peripherals: Vec<Peripheral>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MemoryRegion {
+    id: String,
+    name: String,
+    kind: String,
+    base_address: u64,
+    size_bytes: u64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1837,6 +1850,32 @@ struct EmbassyAdcDmaBindings {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct EmbassyFlashBindings {
+    storage_region_ref: String,
+    erase_size_bytes: u64,
+    write_size_bytes: u64,
+    busy_flag_ref: String,
+    end_of_operation_flag_ref: String,
+    #[serde(default)]
+    program_error_flag_ref: Option<String>,
+    #[serde(default)]
+    write_protect_error_flag_ref: Option<String>,
+    program_enable_ref: String,
+    page_erase_enable_ref: String,
+    erase_address_ref: String,
+    erase_start_ref: String,
+    unlock_operation_refs: Vec<String>,
+    #[serde(default)]
+    lock_operation_refs: Vec<String>,
+    clear_end_of_operation_operation_ref: String,
+    #[serde(default)]
+    clear_program_error_operation_ref: Option<String>,
+    #[serde(default)]
+    clear_write_protect_error_operation_ref: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct EmbassyDmaAsyncChannelBindings {
     channel_ref: String,
     transfer_complete_flag_ref: String,
@@ -1872,6 +1911,8 @@ struct EmbassyDriverInstance {
     time_driver_tick_hz: Option<u64>,
     #[serde(default)]
     time_driver_bindings: Option<EmbassyTimeDriverBindings>,
+    #[serde(default)]
+    flash_bindings: Option<EmbassyFlashBindings>,
     #[serde(default)]
     adc_dma_bindings: Option<EmbassyAdcDmaBindings>,
     #[serde(default)]
@@ -1930,6 +1971,7 @@ struct ResolvedDriverInstance {
     time_driver_source: Option<String>,
     time_driver_tick_hz: Option<u64>,
     time_driver_bindings: Option<EmbassyTimeDriverBindings>,
+    flash_bindings: Option<EmbassyFlashBindings>,
     adc_dma_bindings: Option<EmbassyAdcDmaBindings>,
     dma_async_bindings: Option<EmbassyDmaAsyncBindings>,
     target: McuCanonicalBlock,
@@ -1972,6 +2014,7 @@ const EMBASSY_TIME_DRIVER_SOURCE_RTC: &str = "rtc";
 const EMBASSY_EXECUTOR_IDLE_STRATEGY_WFI: &str = "wfi";
 const EMBASSY_EXECUTOR_IDLE_STRATEGY_SPIN: &str = "spin";
 const ADC_LOWERING_REGULAR_SEQUENCE_DMA: &str = "regular-sequence-adc-dma";
+const FLASH_LOWERING_STM32F1_PAGE_FLASH: &str = "stm32f1-page-flash";
 const TIMER_LOWERING_COUNTER_COMPARE: &str = "counter-compare-timer";
 const USB_LOWERING_FSDEV_PMA_BTABLE: &str = "fsdev-pma-btable";
 const USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK: &str = "serial-jtag-preserve-link";
@@ -2053,6 +2096,7 @@ struct EmbassyGenerationModel {
     executor_idle_strategy: Option<String>,
     feature_flags: Vec<String>,
     interrupts: Vec<Interrupt>,
+    memory_regions: HashMap<String, MemoryRegion>,
     pins: Vec<PhysicalPin>,
     interrupt_controllers: HashMap<String, PhysicalInterruptController>,
     drivers: Vec<ResolvedDriverInstance>,
@@ -2145,6 +2189,11 @@ impl EmbassyGenerationModel {
             })
             .transpose()?
             .unwrap_or_default();
+        let memory_regions = collect_unique_map(
+            &document.structure.device.memory_map,
+            "memory region",
+            |item| item.id.as_str(),
+        )?;
         let operations = document.semantics.operations.as_slice();
         let operations = collect_unique_map(operations, "operation", |item| item.id.as_str())?;
         let state_machines = document.semantics.state_machines.as_slice();
@@ -2337,6 +2386,7 @@ impl EmbassyGenerationModel {
                 time_driver_source: driver.time_driver_source.clone(),
                 time_driver_tick_hz: driver.time_driver_tick_hz,
                 time_driver_bindings: driver.time_driver_bindings.clone(),
+                flash_bindings: driver.flash_bindings.clone(),
                 adc_dma_bindings: driver.adc_dma_bindings.clone(),
                 dma_async_bindings: driver.dma_async_bindings.clone(),
                 target,
@@ -2366,6 +2416,10 @@ impl EmbassyGenerationModel {
             executor_idle_strategy: embassy.crate_info.executor_idle_strategy.clone(),
             feature_flags: embassy.crate_info.feature_flags.clone(),
             interrupts: document.structure.device.interrupts.clone(),
+            memory_regions: memory_regions
+                .into_iter()
+                .map(|(id, region)| (id.to_string(), region))
+                .collect(),
             pins: document.physical.pins.clone(),
             interrupt_controllers: document
                 .physical
@@ -2440,7 +2494,7 @@ impl EmbassyGenerationModel {
 fn validate_supported_driver_kind(driver_kind: &str) -> Result<()> {
     match driver_kind {
         "rcc" | "gpio-port" | "uart" | "usart" | "spi" | "i2c" | "timer" | "pwm" | "adc"
-        | "dma" | "interrupt" | "usb-device" | "rtc" | "watchdog" => Ok(()),
+        | "dma" | "interrupt" | "usb-device" | "rtc" | "watchdog" | "flash" => Ok(()),
         "custom" => bail!("driver kind custom is outside the supported first-cut Embassy subset"),
         other => bail!("driver kind {other} is not supported by the first-cut Embassy generator"),
     }
@@ -3090,7 +3144,7 @@ fn validate_driver_resource_scope(
 ) -> Result<()> {
     match driver.driver_kind.as_str() {
         "uart" | "usart" | "spi" | "i2c" | "timer" | "pwm" | "adc" | "gpio-port" | "usb-device"
-        | "watchdog" => {
+        | "watchdog" | "flash" => {
             let target_ref = target.target_ref.as_str();
             for binding in resources.clock_bindings {
                 if binding.consumer_ref != target_ref {
@@ -3635,6 +3689,26 @@ fn validate_driver_requirements(
                 );
             }
         }
+        "flash" => {
+            let Some(bindings) = driver.flash_bindings.as_ref() else {
+                bail!(
+                    "flash driver {} requires flashBindings for first-cut Embassy lowering",
+                    driver.id
+                );
+            };
+            if bindings.unlock_operation_refs.is_empty() {
+                bail!(
+                    "flash driver {} requires at least one unlock operation ref",
+                    driver.id
+                );
+            }
+            if requirements.init_operations.is_empty() {
+                bail!(
+                    "flash driver {} requires semantic operations for unlock and flag clearing",
+                    driver.id
+                );
+            }
+        }
         "usb-device" => {
             let has_dp = requirements.pin_roles.iter().any(|role| {
                 role.role.eq_ignore_ascii_case("dp")
@@ -3696,6 +3770,7 @@ fn validate_driver_lowering_pattern(
 
     match pattern {
         ADC_LOWERING_REGULAR_SEQUENCE_DMA => validate_regular_sequence_adc_dma_lowering(driver)?,
+        FLASH_LOWERING_STM32F1_PAGE_FLASH => validate_stm32f1_page_flash_lowering(driver)?,
         USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK => {
             if driver.driver_kind != "usb-device" {
                 bail!(
@@ -3713,6 +3788,24 @@ fn validate_driver_lowering_pattern(
             driver.id,
             other
         ),
+    }
+    Ok(())
+}
+
+fn validate_stm32f1_page_flash_lowering(driver: &EmbassyDriverInstance) -> Result<()> {
+    if driver.driver_kind != "flash" {
+        bail!(
+            "driver {} uses loweringPattern {} but that lowering is only supported on flash drivers",
+            driver.id,
+            FLASH_LOWERING_STM32F1_PAGE_FLASH
+        );
+    }
+    if driver.flash_bindings.is_none() {
+        bail!(
+            "driver {} uses loweringPattern {} but omits required flashBindings",
+            driver.id,
+            FLASH_LOWERING_STM32F1_PAGE_FLASH
+        );
     }
     Ok(())
 }
@@ -4042,7 +4135,16 @@ fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
         .drivers
         .iter()
         .any(|driver| driver.driver_kind == "watchdog");
-    if has_time_driver || has_fsdev_usb || has_embedded_hal_1 || has_embedded_hal_02 {
+    let has_embedded_storage = model
+        .drivers
+        .iter()
+        .any(|driver| driver.driver_kind == "flash");
+    if has_time_driver
+        || has_fsdev_usb
+        || has_embedded_hal_1
+        || has_embedded_hal_02
+        || has_embedded_storage
+    {
         out.push_str("\n[dependencies]\n");
         if has_time_driver || has_fsdev_usb {
             out.push_str("critical-section = \"1.2\"\n");
@@ -4065,6 +4167,9 @@ fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
         out.push_str(
             "embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"] }\n",
         );
+    }
+    if has_embedded_storage {
+        out.push_str("embedded-storage = \"0.3\"\n");
     }
     out
 }
@@ -4283,6 +4388,9 @@ fn render_driver_support_items(
     }
     if driver.driver_kind == "watchdog" {
         out.push_str(&render_watchdog_support_items(driver));
+    }
+    if driver.driver_kind == "flash" {
+        out.push_str(&render_flash_support_items(model, driver)?);
     }
     if driver.driver_kind == "rtc" && driver.module_name == "rtc" {
         out.push_str(&render_rtc_support_items(model, driver)?);
@@ -5277,6 +5385,7 @@ fn render_driver_methods(
     methods.extend(render_pin_route_methods(model, driver)?);
     methods.extend(render_pwm_methods(model, driver)?);
     methods.extend(render_watchdog_methods(model, driver)?);
+    methods.extend(render_flash_methods(model, driver)?);
     methods.extend(render_usart_methods(model, driver)?);
     methods.extend(render_spi_methods(model, driver)?);
     methods.extend(render_adc_methods(model, driver)?);
@@ -9990,6 +10099,756 @@ fn render_watchdog_methods(
     ])
 }
 
+#[derive(Debug, Clone)]
+struct ResolvedFlashLowering {
+    storage_region: MemoryRegion,
+    erase_size_bytes: u32,
+    write_size_bytes: u32,
+    busy: ResolvedFieldTarget,
+    end_of_operation: ResolvedFieldTarget,
+    program_error: Option<ResolvedFieldTarget>,
+    write_protect_error: Option<ResolvedFieldTarget>,
+    program_enable: ResolvedFieldTarget,
+    page_erase_enable: ResolvedFieldTarget,
+    erase_address: ResolvedFieldTarget,
+    erase_start: ResolvedFieldTarget,
+    unlock_method_names: Vec<String>,
+    lock_method_names: Vec<String>,
+    clear_end_of_operation_method_name: String,
+    clear_program_error_method_name: Option<String>,
+    clear_write_protect_error_method_name: Option<String>,
+}
+
+fn resolve_flash_binding_field(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+    field_ref: &str,
+    binding_name: &str,
+) -> Result<ResolvedFieldTarget> {
+    resolve_field_target(
+        &model.fields,
+        field_ref,
+        Some(driver.target.target_ref.as_str()),
+        || {
+            anyhow!(
+                "flash driver {} binding {} references unknown field {}",
+                driver.id,
+                binding_name,
+                field_ref
+            )
+        },
+    )
+    .cloned()
+}
+
+fn resolve_flash_operation_method_names(
+    driver: &ResolvedDriverInstance,
+    operation_refs: &[String],
+    binding_name: &str,
+) -> Result<Vec<String>> {
+    operation_refs
+        .iter()
+        .map(|operation_ref| {
+            let operation = driver
+                .init_operations
+                .iter()
+                .find(|operation| operation.id == *operation_ref)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "flash driver {} binding {} references operation {} that is not listed in initOperationRefs",
+                        driver.id,
+                        binding_name,
+                        operation_ref
+                    )
+                })?;
+            Ok(format!("apply_{}", operation_method_slug(operation)))
+        })
+        .collect()
+}
+
+fn resolve_flash_optional_operation_method_name(
+    driver: &ResolvedDriverInstance,
+    operation_ref: Option<&str>,
+    binding_name: &str,
+) -> Result<Option<String>> {
+    operation_ref
+        .map(|operation_ref| {
+            resolve_flash_operation_method_names(driver, &[operation_ref.to_string()], binding_name)
+                .map(|mut names| names.remove(0))
+        })
+        .transpose()
+}
+
+fn resolve_flash_lowering(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<ResolvedFlashLowering> {
+    let bindings = driver.flash_bindings.as_ref().ok_or_else(|| {
+        anyhow!(
+            "flash driver {} requires flashBindings for first-cut Embassy lowering",
+            driver.id
+        )
+    })?;
+    let storage_region = model
+        .memory_regions
+        .get(&bindings.storage_region_ref)
+        .cloned()
+        .ok_or_else(|| {
+            anyhow!(
+                "flash driver {} references unknown storage region {}",
+                driver.id,
+                bindings.storage_region_ref
+            )
+        })?;
+    if storage_region.kind != "flash" {
+        bail!(
+            "flash driver {} storage region {} must have kind flash, found {}",
+            driver.id,
+            storage_region.id,
+            storage_region.kind
+        );
+    }
+    let erase_size_bytes = u32::try_from(bindings.erase_size_bytes).map_err(|_| {
+        anyhow!(
+            "flash driver {} eraseSizeBytes {} exceeds the supported u32 range",
+            driver.id,
+            bindings.erase_size_bytes
+        )
+    })?;
+    let write_size_bytes = u32::try_from(bindings.write_size_bytes).map_err(|_| {
+        anyhow!(
+            "flash driver {} writeSizeBytes {} exceeds the supported u32 range",
+            driver.id,
+            bindings.write_size_bytes
+        )
+    })?;
+    if erase_size_bytes == 0 || write_size_bytes == 0 {
+        bail!(
+            "flash driver {} requires non-zero eraseSizeBytes and writeSizeBytes",
+            driver.id
+        );
+    }
+    Ok(ResolvedFlashLowering {
+        storage_region,
+        erase_size_bytes,
+        write_size_bytes,
+        busy: resolve_flash_binding_field(model, driver, &bindings.busy_flag_ref, "busyFlagRef")?,
+        end_of_operation: resolve_flash_binding_field(
+            model,
+            driver,
+            &bindings.end_of_operation_flag_ref,
+            "endOfOperationFlagRef",
+        )?,
+        program_error: bindings
+            .program_error_flag_ref
+            .as_deref()
+            .map(|field_ref| {
+                resolve_flash_binding_field(model, driver, field_ref, "programErrorFlagRef")
+            })
+            .transpose()?,
+        write_protect_error: bindings
+            .write_protect_error_flag_ref
+            .as_deref()
+            .map(|field_ref| {
+                resolve_flash_binding_field(model, driver, field_ref, "writeProtectErrorFlagRef")
+            })
+            .transpose()?,
+        program_enable: resolve_flash_binding_field(
+            model,
+            driver,
+            &bindings.program_enable_ref,
+            "programEnableRef",
+        )?,
+        page_erase_enable: resolve_flash_binding_field(
+            model,
+            driver,
+            &bindings.page_erase_enable_ref,
+            "pageEraseEnableRef",
+        )?,
+        erase_address: resolve_flash_binding_field(
+            model,
+            driver,
+            &bindings.erase_address_ref,
+            "eraseAddressRef",
+        )?,
+        erase_start: resolve_flash_binding_field(
+            model,
+            driver,
+            &bindings.erase_start_ref,
+            "eraseStartRef",
+        )?,
+        unlock_method_names: resolve_flash_operation_method_names(
+            driver,
+            &bindings.unlock_operation_refs,
+            "unlockOperationRefs",
+        )?,
+        lock_method_names: resolve_flash_operation_method_names(
+            driver,
+            &bindings.lock_operation_refs,
+            "lockOperationRefs",
+        )?,
+        clear_end_of_operation_method_name: resolve_flash_optional_operation_method_name(
+            driver,
+            Some(bindings.clear_end_of_operation_operation_ref.as_str()),
+            "clearEndOfOperationOperationRef",
+        )?
+        .ok_or_else(|| {
+            anyhow!(
+                "flash driver {} omits required clearEndOfOperationOperationRef",
+                driver.id
+            )
+        })?,
+        clear_program_error_method_name: resolve_flash_optional_operation_method_name(
+            driver,
+            bindings.clear_program_error_operation_ref.as_deref(),
+            "clearProgramErrorOperationRef",
+        )?,
+        clear_write_protect_error_method_name: resolve_flash_optional_operation_method_name(
+            driver,
+            bindings.clear_write_protect_error_operation_ref.as_deref(),
+            "clearWriteProtectErrorOperationRef",
+        )?,
+    })
+}
+
+fn render_flash_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    if driver.driver_kind != "flash" {
+        return Ok(Vec::new());
+    }
+    if driver.lowering_pattern.as_deref() != Some(FLASH_LOWERING_STM32F1_PAGE_FLASH) {
+        bail!(
+            "flash driver {} requires loweringPattern {} for first-cut Embassy lowering",
+            driver.id,
+            FLASH_LOWERING_STM32F1_PAGE_FLASH
+        );
+    }
+    let lowering = resolve_flash_lowering(model, driver)?;
+    let busy_register = model
+        .registers
+        .get(&lowering.busy.register_id)
+        .cloned()
+        .ok_or_else(|| {
+            anyhow!(
+                "flash driver {} busy flag register is unavailable",
+                driver.id
+            )
+        })?;
+    let end_register = model
+        .registers
+        .get(&lowering.end_of_operation.register_id)
+        .cloned()
+        .ok_or_else(|| {
+            anyhow!(
+                "flash driver {} end-of-operation register is unavailable",
+                driver.id
+            )
+        })?;
+    let program_error_register = lowering
+        .program_error
+        .as_ref()
+        .and_then(|field| model.registers.get(&field.register_id).cloned());
+    let write_protect_error_register = lowering
+        .write_protect_error
+        .as_ref()
+        .and_then(|field| model.registers.get(&field.register_id).cloned());
+    let unlock_calls = lowering
+        .unlock_method_names
+        .iter()
+        .map(|method_name| format!("        self.{method_name}()?;\n"))
+        .collect::<String>();
+    let lock_calls = lowering
+        .lock_method_names
+        .iter()
+        .map(|method_name| format!("        self.{method_name}()?;\n"))
+        .collect::<String>();
+    let mut methods = vec![
+        GeneratedMethod {
+            name: "unlock".to_string(),
+            code: format!(
+                "    pub fn unlock(&self) -> Result<(), metadata::Error> {{\n{unlock_calls}        Ok(())\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "clear_end_of_operation_flag".to_string(),
+            code: format!(
+                "    pub fn clear_end_of_operation_flag(&self) -> Result<(), metadata::Error> {{\n        self.{}()\n    }}\n",
+                lowering.clear_end_of_operation_method_name
+            ),
+        },
+        render_register_flag_read_method(
+            "is_busy".to_string(),
+            &busy_register,
+            &lowering.busy.field,
+            "Report whether the flash controller is busy with an erase or program operation.",
+        )?,
+        render_register_flag_read_method(
+            "has_end_of_operation_flag".to_string(),
+            &end_register,
+            &lowering.end_of_operation.field,
+            "Report whether the flash controller completion flag is currently asserted.",
+        )?,
+    ];
+    if !lowering.lock_method_names.is_empty() {
+        methods.push(GeneratedMethod {
+            name: "lock".to_string(),
+            code: format!(
+                "    pub fn lock(&self) -> Result<(), metadata::Error> {{\n{lock_calls}        Ok(())\n    }}\n"
+            ),
+        });
+    }
+    if let Some(program_error) = &lowering.program_error {
+        let register = program_error_register.clone().ok_or_else(|| {
+            anyhow!(
+                "flash driver {} program error register is unavailable",
+                driver.id
+            )
+        })?;
+        methods.push(render_register_flag_read_method(
+            "has_program_error".to_string(),
+            &register,
+            &program_error.field,
+            "Report whether the flash controller program-error flag is currently asserted.",
+        )?);
+        if let Some(method_name) = &lowering.clear_program_error_method_name {
+            methods.push(GeneratedMethod {
+                name: "clear_program_error_flag".to_string(),
+                code: format!(
+                    "    pub fn clear_program_error_flag(&self) -> Result<(), metadata::Error> {{\n        self.{method_name}()\n    }}\n"
+                ),
+            });
+        }
+    }
+    if let Some(write_protect_error) = &lowering.write_protect_error {
+        let register = write_protect_error_register.clone().ok_or_else(|| {
+            anyhow!(
+                "flash driver {} write-protect error register is unavailable",
+                driver.id
+            )
+        })?;
+        methods.push(render_register_flag_read_method(
+            "has_write_protect_error".to_string(),
+            &register,
+            &write_protect_error.field,
+            "Report whether the flash controller write-protect error flag is currently asserted.",
+        )?);
+        if let Some(method_name) = &lowering.clear_write_protect_error_method_name {
+            methods.push(GeneratedMethod {
+                name: "clear_write_protect_error_flag".to_string(),
+                code: format!(
+                    "    pub fn clear_write_protect_error_flag(&self) -> Result<(), metadata::Error> {{\n        self.{method_name}()\n    }}\n"
+                ),
+            });
+        }
+    }
+    Ok(methods)
+}
+
+fn render_flash_support_items(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    let lowering = resolve_flash_lowering(model, driver)?;
+    let driver_prefix = to_rust_const_name(&driver.id);
+    let helper_prefix = to_rust_method_name(&driver.id);
+    let error_type_name = format!("{}FlashError", driver.type_name);
+    let busy_register = model
+        .registers
+        .get(&lowering.busy.register_id)
+        .cloned()
+        .ok_or_else(|| {
+            anyhow!(
+                "flash driver {} busy flag register is unavailable",
+                driver.id
+            )
+        })?;
+    let eop_register = model
+        .registers
+        .get(&lowering.end_of_operation.register_id)
+        .cloned()
+        .ok_or_else(|| {
+            anyhow!(
+                "flash driver {} end-of-operation register is unavailable",
+                driver.id
+            )
+        })?;
+    let program_enable_register = model
+        .registers
+        .get(&lowering.program_enable.register_id)
+        .cloned()
+        .ok_or_else(|| {
+            anyhow!(
+                "flash driver {} program enable register is unavailable",
+                driver.id
+            )
+        })?;
+    let page_erase_enable_register = model
+        .registers
+        .get(&lowering.page_erase_enable.register_id)
+        .cloned()
+        .ok_or_else(|| {
+            anyhow!(
+                "flash driver {} page erase register is unavailable",
+                driver.id
+            )
+        })?;
+    let erase_address_register = model
+        .registers
+        .get(&lowering.erase_address.register_id)
+        .cloned()
+        .ok_or_else(|| {
+            anyhow!(
+                "flash driver {} erase address register is unavailable",
+                driver.id
+            )
+        })?;
+    let erase_start_register = model
+        .registers
+        .get(&lowering.erase_start.register_id)
+        .cloned()
+        .ok_or_else(|| {
+            anyhow!(
+                "flash driver {} erase start register is unavailable",
+                driver.id
+            )
+        })?;
+    let storage_base = u32::try_from(lowering.storage_region.base_address).map_err(|_| {
+        anyhow!(
+            "flash driver {} storage base 0x{:X} exceeds the supported u32 range",
+            driver.id,
+            lowering.storage_region.base_address
+        )
+    })?;
+    let storage_size = usize::try_from(lowering.storage_region.size_bytes).map_err(|_| {
+        anyhow!(
+            "flash driver {} storage size {} exceeds the supported usize range",
+            driver.id,
+            lowering.storage_region.size_bytes
+        )
+    })?;
+    let busy_mask = field_bit_mask(&lowering.busy.field, &busy_register)?;
+    let eop_mask = field_bit_mask(&lowering.end_of_operation.field, &eop_register)?;
+    let program_error_mask = lowering
+        .program_error
+        .as_ref()
+        .map(|field| {
+            let register = model.registers.get(&field.register_id).ok_or_else(|| {
+                anyhow!(
+                    "flash driver {} program error register is unavailable",
+                    driver.id
+                )
+            })?;
+            field_bit_mask(&field.field, register)
+        })
+        .transpose()?;
+    let write_protect_error_mask = lowering
+        .write_protect_error
+        .as_ref()
+        .map(|field| {
+            let register = model.registers.get(&field.register_id).ok_or_else(|| {
+                anyhow!(
+                    "flash driver {} write-protect error register is unavailable",
+                    driver.id
+                )
+            })?;
+            field_bit_mask(&field.field, register)
+        })
+        .transpose()?;
+    let program_enable_set = render_register_write_literal_statement(
+        &program_enable_register,
+        &lowering.program_enable.field,
+        1,
+        "    ",
+    )?;
+    let program_enable_clear = render_register_write_literal_statement(
+        &program_enable_register,
+        &lowering.program_enable.field,
+        0,
+        "    ",
+    )?;
+    let page_erase_enable_set = render_register_write_literal_statement(
+        &page_erase_enable_register,
+        &lowering.page_erase_enable.field,
+        1,
+        "    ",
+    )?;
+    let page_erase_enable_clear = render_register_write_literal_statement(
+        &page_erase_enable_register,
+        &lowering.page_erase_enable.field,
+        0,
+        "    ",
+    )?;
+    let erase_address_write = render_register_write_expression_statement(
+        &erase_address_register,
+        &lowering.erase_address.field,
+        "page_address",
+        "    ",
+    )?;
+    let erase_start_write = render_register_write_literal_statement(
+        &erase_start_register,
+        &lowering.erase_start.field,
+        1,
+        "    ",
+    )?;
+    let lock_call = if lowering.lock_method_names.is_empty() {
+        "    Ok(())\n".to_string()
+    } else {
+        "    driver.lock().map_err(Into::into)\n".to_string()
+    };
+    let clear_program_error_stale = lowering
+        .clear_program_error_method_name
+        .as_ref()
+        .zip(program_error_mask)
+        .map(|(method_name, mask)| {
+            format!(
+                "    if (status & 0x{mask:08X}u32) != 0 {{\n        driver.{method_name}().map_err({error_type_name}::from)?;\n    }}\n"
+            )
+        })
+        .unwrap_or_default();
+    let clear_write_protect_error_stale = lowering
+        .clear_write_protect_error_method_name
+        .as_ref()
+        .zip(write_protect_error_mask)
+        .map(|(method_name, mask)| {
+            format!(
+                "    if (status & 0x{mask:08X}u32) != 0 {{\n        driver.{method_name}().map_err({error_type_name}::from)?;\n    }}\n"
+            )
+        })
+        .unwrap_or_default();
+    let program_error_finish = match (
+        program_error_mask,
+        &lowering.clear_program_error_method_name,
+    ) {
+        (Some(mask), Some(method_name)) => format!(
+            "    if (status & 0x{mask:08X}u32) != 0 {{\n        driver.{method_name}().map_err({error_type_name}::from)?;\n        return Err({error_type_name}::ProgramError);\n    }}\n"
+        ),
+        (Some(mask), None) => format!(
+            "    if (status & 0x{mask:08X}u32) != 0 {{\n        return Err({error_type_name}::ProgramError);\n    }}\n"
+        ),
+        (None, _) => String::new(),
+    };
+    let write_protect_error_finish = match (
+        write_protect_error_mask,
+        &lowering.clear_write_protect_error_method_name,
+    ) {
+        (Some(mask), Some(method_name)) => format!(
+            "    if (status & 0x{mask:08X}u32) != 0 {{\n        driver.{method_name}().map_err({error_type_name}::from)?;\n        return Err({error_type_name}::WriteProtectError);\n    }}\n"
+        ),
+        (Some(mask), None) => format!(
+            "    if (status & 0x{mask:08X}u32) != 0 {{\n        return Err({error_type_name}::WriteProtectError);\n    }}\n"
+        ),
+        (None, _) => String::new(),
+    };
+    Ok(format!(
+        r#"
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum {error_type_name} {{
+    NotAligned,
+    OutOfBounds,
+    ProgramError,
+    WriteProtectError,
+    MissingCompletionFlag,
+    Metadata(metadata::Error),
+}}
+
+impl From<metadata::Error> for {error_type_name} {{
+    fn from(value: metadata::Error) -> Self {{
+        Self::Metadata(value)
+    }}
+}}
+
+impl embedded_storage::nor_flash::NorFlashError for {error_type_name} {{
+    fn kind(&self) -> embedded_storage::nor_flash::NorFlashErrorKind {{
+        match self {{
+            Self::NotAligned => embedded_storage::nor_flash::NorFlashErrorKind::NotAligned,
+            Self::OutOfBounds => embedded_storage::nor_flash::NorFlashErrorKind::OutOfBounds,
+            Self::ProgramError
+            | Self::WriteProtectError
+            | Self::MissingCompletionFlag
+            | Self::Metadata(_) => embedded_storage::nor_flash::NorFlashErrorKind::Other,
+        }}
+    }}
+}}
+
+const {driver_prefix}_FLASH_STORAGE_BASE: u32 = 0x{storage_base:08X}u32;
+const {driver_prefix}_FLASH_STORAGE_SIZE: usize = {storage_size};
+const {driver_prefix}_FLASH_BUSY_STATUS_ADDRESS: u64 = 0x{busy_address:X}u64;
+const {driver_prefix}_FLASH_BUSY_MASK: u32 = 0x{busy_mask:08X}u32;
+const {driver_prefix}_FLASH_EOP_MASK: u32 = 0x{eop_mask:08X}u32;
+
+fn {helper_prefix}_flash_check_read(offset: u32, len: usize) -> Result<(), {error_type_name}> {{
+    let offset = usize::try_from(offset).map_err(|_| {error_type_name}::OutOfBounds)?;
+    let end = offset.checked_add(len).ok_or({error_type_name}::OutOfBounds)?;
+    if end > {driver_prefix}_FLASH_STORAGE_SIZE {{
+        return Err({error_type_name}::OutOfBounds);
+    }}
+    Ok(())
+}}
+
+fn {helper_prefix}_flash_check_write(offset: u32, len: usize) -> Result<(), {error_type_name}> {{
+    let align = {write_size}usize;
+    if !(offset as usize).is_multiple_of(align) || !len.is_multiple_of(align) {{
+        return Err({error_type_name}::NotAligned);
+    }}
+    {helper_prefix}_flash_check_read(offset, len)
+}}
+
+fn {helper_prefix}_flash_check_erase(from: u32, to: u32) -> Result<(), {error_type_name}> {{
+    let align = {erase_size}usize;
+    let from = usize::try_from(from).map_err(|_| {error_type_name}::OutOfBounds)?;
+    let to = usize::try_from(to).map_err(|_| {error_type_name}::OutOfBounds)?;
+    if from >= to || from % align != 0 || to % align != 0 || to > {driver_prefix}_FLASH_STORAGE_SIZE {{
+        return Err({error_type_name}::OutOfBounds);
+    }}
+    Ok(())
+}}
+
+fn {helper_prefix}_flash_status() -> Result<u32, {error_type_name}> {{
+    read_u32({driver_prefix}_FLASH_BUSY_STATUS_ADDRESS).map_err(Into::into)
+}}
+
+fn {helper_prefix}_flash_wait_ready() -> Result<(), {error_type_name}> {{
+    while ({helper_prefix}_flash_status()? & {driver_prefix}_FLASH_BUSY_MASK) != 0 {{
+        core::hint::spin_loop();
+    }}
+    Ok(())
+}}
+
+fn {helper_prefix}_flash_clear_stale_flags(driver: &{type_name}) -> Result<(), {error_type_name}> {{
+    let status = {helper_prefix}_flash_status()?;
+    if (status & {driver_prefix}_FLASH_EOP_MASK) != 0 {{
+        driver.clear_end_of_operation_flag().map_err({error_type_name}::from)?;
+    }}
+{clear_program_error_stale}{clear_write_protect_error_stale}    Ok(())
+}}
+
+fn {helper_prefix}_flash_begin(driver: &{type_name}) -> Result<(), {error_type_name}> {{
+    {helper_prefix}_flash_wait_ready()?;
+    {helper_prefix}_flash_clear_stale_flags(driver)?;
+    driver.unlock().map_err(Into::into)
+}}
+
+fn {helper_prefix}_flash_end(driver: &{type_name}) -> Result<(), {error_type_name}> {{
+{lock_call}}}
+
+fn {helper_prefix}_flash_finish_operation(driver: &{type_name}) -> Result<(), {error_type_name}> {{
+    {helper_prefix}_flash_wait_ready()?;
+    let status = {helper_prefix}_flash_status()?;
+{program_error_finish}{write_protect_error_finish}    if (status & {driver_prefix}_FLASH_EOP_MASK) == 0 {{
+        return Err({error_type_name}::MissingCompletionFlag);
+    }}
+    driver
+        .clear_end_of_operation_flag()
+        .map_err({error_type_name}::from)?;
+    Ok(())
+}}
+
+fn {helper_prefix}_flash_erase_page(driver: &{type_name}, page_address: u32) -> Result<(), {error_type_name}> {{
+   {helper_prefix}_flash_clear_stale_flags(driver)?;
+{page_erase_enable_set}{erase_address_write}{erase_start_write}    let result = {helper_prefix}_flash_finish_operation(driver);
+{page_erase_enable_clear}    result
+}}
+
+fn {helper_prefix}_flash_program_halfword(driver: &{type_name}, address: u32, value: u16) -> Result<(), {error_type_name}> {{
+   {helper_prefix}_flash_clear_stale_flags(driver)?;
+{program_enable_set}    write_u16(u64::from(address), value).map_err({error_type_name}::from)?;
+   let result = {helper_prefix}_flash_finish_operation(driver);
+{program_enable_clear}    result
+}}
+
+impl embedded_storage::nor_flash::ErrorType for {type_name} {{
+    type Error = {error_type_name};
+}}
+
+impl embedded_storage::nor_flash::ReadNorFlash for {type_name} {{
+    const READ_SIZE: usize = 1;
+
+    fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {{
+        {helper_prefix}_flash_check_read(offset, bytes.len())?;
+        let base = u64::from({driver_prefix}_FLASH_STORAGE_BASE) + u64::from(offset);
+        for (index, byte) in bytes.iter_mut().enumerate() {{
+            *byte = read_u8(base + index as u64).map_err({error_type_name}::from)?;
+        }}
+        Ok(())
+    }}
+
+    fn capacity(&self) -> usize {{
+        {driver_prefix}_FLASH_STORAGE_SIZE
+    }}
+}}
+
+impl embedded_storage::nor_flash::NorFlash for {type_name} {{
+    const WRITE_SIZE: usize = {write_size};
+    const ERASE_SIZE: usize = {erase_size};
+
+    fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {{
+        {helper_prefix}_flash_check_erase(from, to)?;
+        {helper_prefix}_flash_begin(self)?;
+        let result = (|| {{
+            let mut page = from;
+            while page < to {{
+                {helper_prefix}_flash_erase_page(self, {driver_prefix}_FLASH_STORAGE_BASE + page)?;
+                page = page.wrapping_add(Self::ERASE_SIZE as u32);
+            }}
+            Ok(())
+        }})();
+        let lock_result = {helper_prefix}_flash_end(self);
+        match (result, lock_result) {{
+            (Err(error), _) => Err(error),
+            (Ok(()), Err(error)) => Err(error),
+            (Ok(()), Ok(())) => Ok(()),
+        }}
+    }}
+
+    fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {{
+        {helper_prefix}_flash_check_write(offset, bytes.len())?;
+        {helper_prefix}_flash_begin(self)?;
+        let result = (|| {{
+            for (index, chunk) in bytes.chunks_exact(Self::WRITE_SIZE).enumerate() {{
+                let address = {driver_prefix}_FLASH_STORAGE_BASE
+                    .wrapping_add(offset)
+                    .wrapping_add((index * Self::WRITE_SIZE) as u32);
+                let value = u16::from_le_bytes([chunk[0], chunk[1]]);
+                {helper_prefix}_flash_program_halfword(self, address, value)?;
+            }}
+            Ok(())
+        }})();
+        let lock_result = {helper_prefix}_flash_end(self);
+        match (result, lock_result) {{
+            (Err(error), _) => Err(error),
+            (Ok(()), Err(error)) => Err(error),
+            (Ok(()), Ok(())) => Ok(()),
+        }}
+    }}
+}}
+"#,
+        type_name = driver.type_name,
+        error_type_name = error_type_name,
+        driver_prefix = driver_prefix,
+        helper_prefix = helper_prefix,
+        storage_base = storage_base,
+        storage_size = storage_size,
+        busy_address = busy_register.absolute_address,
+        busy_mask = busy_mask,
+        eop_mask = eop_mask,
+        write_size = lowering.write_size_bytes,
+        erase_size = lowering.erase_size_bytes,
+        clear_program_error_stale = clear_program_error_stale,
+        clear_write_protect_error_stale = clear_write_protect_error_stale,
+        lock_call = lock_call,
+        program_error_finish = program_error_finish,
+        write_protect_error_finish = write_protect_error_finish,
+        page_erase_enable_set = page_erase_enable_set,
+        erase_address_write = erase_address_write,
+        erase_start_write = erase_start_write,
+        page_erase_enable_clear = page_erase_enable_clear,
+        program_enable_set = program_enable_set,
+        program_enable_clear = program_enable_clear,
+    ))
+}
+
 fn render_usb_device_methods(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
@@ -12890,6 +13749,97 @@ fn render_register_write_expression_statement(
     }
 }
 
+fn render_register_write_literal_statement(
+    register: &ResolvedRegister,
+    field: &ResolvedField,
+    value: u64,
+    indent: &str,
+) -> Result<String> {
+    let raw_mask = field_value_mask(field)?;
+    if value > raw_mask {
+        bail!(
+            "field {} on register {} cannot hold literal value {}",
+            field.name,
+            register.id,
+            value
+        );
+    }
+    let clear_mask = field_bit_mask_or_range_mask(field, register)?;
+    let set_mask = value << field.lsb;
+    match register.width_bits {
+        8 => {
+            let clear_mask = u8::try_from(clear_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            let set_mask = u8::try_from(set_mask).map_err(|_| {
+                anyhow!(
+                    "field {} literal value {} exceeds register {} width {}",
+                    field.name,
+                    value,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            Ok(format!(
+                "{indent}modify_u8(0x{address:X}u64, 0x{clear_mask:02X}u8, 0x{set_mask:02X}u8)?;\n",
+                address = register.absolute_address
+            ))
+        }
+        16 => {
+            let clear_mask = u16::try_from(clear_mask).map_err(|_| {
+                anyhow!(
+                    "field {} bit range {}..={} exceeds register {} width {}",
+                    field.name,
+                    field.lsb,
+                    field.msb,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            let set_mask = u16::try_from(set_mask).map_err(|_| {
+                anyhow!(
+                    "field {} literal value {} exceeds register {} width {}",
+                    field.name,
+                    value,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            Ok(format!(
+                "{indent}modify_u16(0x{address:X}u64, 0x{clear_mask:04X}u16, 0x{set_mask:04X}u16)?;\n",
+                address = register.absolute_address
+            ))
+        }
+        32 => {
+            let set_mask = u32::try_from(set_mask).map_err(|_| {
+                anyhow!(
+                    "field {} literal value {} exceeds register {} width {}",
+                    field.name,
+                    value,
+                    register.id,
+                    register.width_bits
+                )
+            })?;
+            Ok(format!(
+                "{indent}modify_u32(0x{address:X}u64, 0x{clear_mask:08X}u32, 0x{set_mask:08X}u32)?;\n",
+                address = register.absolute_address
+            ))
+        }
+        other => bail!(
+            "register {} uses unsupported width {} for Embassy code generation",
+            register.id,
+            other
+        ),
+    }
+}
+
 fn render_register_poll_statement(
     register: &ResolvedRegister,
     field: &ResolvedField,
@@ -13389,6 +14339,20 @@ fn collect_embassy_field_scope(
                     )
                 })?;
                 collect_operation_field_refs(&mut required, operation);
+            }
+        }
+        if let Some(bindings) = &driver.flash_bindings {
+            for binding_ref in [
+                Some(bindings.busy_flag_ref.as_str()),
+                Some(bindings.end_of_operation_flag_ref.as_str()),
+                bindings.program_error_flag_ref.as_deref(),
+                bindings.write_protect_error_flag_ref.as_deref(),
+                Some(bindings.program_enable_ref.as_str()),
+                Some(bindings.page_erase_enable_ref.as_str()),
+                Some(bindings.erase_address_ref.as_str()),
+                Some(bindings.erase_start_ref.as_str()),
+            ] {
+                collect_semantic_field_ref(&mut required, binding_ref);
             }
         }
         for route_ref in &driver.interrupt_route_refs {
@@ -15278,7 +16242,11 @@ fn render_embassy_host_cargo_toml(model: &EmbassyGenerationModel) -> String {
         .drivers
         .iter()
         .any(|driver| driver.driver_kind == "watchdog");
-    if has_time_driver || has_embedded_hal_1 || has_embedded_hal_02 {
+    let has_embedded_storage = model
+        .drivers
+        .iter()
+        .any(|driver| driver.driver_kind == "flash");
+    if has_time_driver || has_embedded_hal_1 || has_embedded_hal_02 || has_embedded_storage {
         out.push_str("\n[dependencies]\n");
     }
     if has_time_driver {
@@ -15295,6 +16263,9 @@ fn render_embassy_host_cargo_toml(model: &EmbassyGenerationModel) -> String {
         out.push_str(
             "embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"] }\n",
         );
+    }
+    if has_embedded_storage {
+        out.push_str("embedded-storage = \"0.3\"\n");
     }
     out
 }
@@ -15332,7 +16303,7 @@ fn render_embassy_host_metadata_rs(model: &EmbassyGenerationModel) -> Result<Str
     out.push_str(&render_host_esp_gpio_model_slice(&esp_gpio_models));
     out.push_str(";\n\n");
     out.push_str(
-        "thread_local! {\n    static CURRENT_EMULATOR: RefCell<Option<SharedEmulatorState>> = const { RefCell::new(None) };\n}\n\npub struct CurrentEmulatorGuard {\n    previous: Option<SharedEmulatorState>,\n}\n\nimpl Drop for CurrentEmulatorGuard {\n    fn drop(&mut self) {\n        CURRENT_EMULATOR.with(|slot| {\n            *slot.borrow_mut() = self.previous.take();\n        });\n    }\n}\n\nfn lock_guard<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {\n    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())\n}\n\npub fn new_emulator_state() -> SharedEmulatorState {\n    Arc::new(GeneratedHostState::default())\n}\n\npub fn install_current_emulator(state: SharedEmulatorState) {\n    CURRENT_EMULATOR.with(|slot| {\n        *slot.borrow_mut() = Some(state);\n    });\n}\n\npub fn push_current_emulator(state: SharedEmulatorState) -> CurrentEmulatorGuard {\n    let previous = CURRENT_EMULATOR.with(|slot| slot.replace(Some(state)));\n    CurrentEmulatorGuard { previous }\n}\n\npub fn clear_current_emulator() {\n    CURRENT_EMULATOR.with(|slot| {\n        slot.borrow_mut().take();\n    });\n}\n\npub fn clear_current_emulator_if_active(state: &SharedEmulatorState) {\n    CURRENT_EMULATOR.with(|slot| {\n        let mut slot = slot.borrow_mut();\n        if slot\n            .as_ref()\n            .is_some_and(|current| Arc::ptr_eq(current, state))\n        {\n            slot.take();\n        }\n    });\n}\n\npub fn initialize_emulator_state(state: &SharedEmulatorState) {\n    let mut registers = lock_guard(&state.registers);\n    for model in SERIAL_REGISTER_MODELS {\n        registers.insert(model.sr_address, model.txe_mask | model.tc_mask);\n        registers.insert(model.dr_address, 0);\n    }\n    for model in USB_STREAM_MODELS {\n        registers.insert(model.ep1_address, 0);\n        registers.insert(model.ep1_conf_address, model.serial_in_data_free_mask);\n    }\n}\n\nfn current_emulator() -> Result<SharedEmulatorState, Error> {\n    CURRENT_EMULATOR.with(|slot| {\n        slot.borrow()\n            .clone()\n            .ok_or(Error::Unsupported(\"host emulator is not active on this thread\"))\n    })\n}\n\nfn serial_model_for_driver(driver_id: &str) -> Option<&'static SerialRegisterModel> {\n    SERIAL_REGISTER_MODELS.iter().find(|model| model.driver_id == driver_id)\n}\n\nfn serial_model_for_dr_address(address: u64) -> Option<&'static SerialRegisterModel> {\n    SERIAL_REGISTER_MODELS.iter().find(|model| model.dr_address == address)\n}\n\nfn usb_stream_model_for_driver(driver_id: &str) -> Option<&'static UsbStreamModel> {\n    USB_STREAM_MODELS.iter().find(|model| model.driver_id == driver_id)\n}\n\nfn usb_stream_model_for_ep1_address(address: u64) -> Option<&'static UsbStreamModel> {\n    USB_STREAM_MODELS.iter().find(|model| model.ep1_address == address)\n}\n\nfn usb_stream_model_for_ep1_conf_address(address: u64) -> Option<&'static UsbStreamModel> {\n    USB_STREAM_MODELS.iter().find(|model| model.ep1_conf_address == address)\n}\n\nfn indexed_gpio_model_for_bsrr(address: u64) -> Option<&'static IndexedGpioModel> {\n    INDEXED_GPIO_MODELS.iter().find(|model| model.bsrr_address == address)\n}\n\nfn esp_gpio_model_for_w1_register(address: u64) -> Option<&'static EspGpioModel> {\n    ESP_GPIO_MODELS.iter().find(|model| {\n        model.out_w1ts_address == address\n            || model.out_w1tc_address == address\n            || model.enable_w1ts_address == address\n            || model.enable_w1tc_address == address\n    })\n}\n\npub fn read_u32_for(state: &SharedEmulatorState, address: u64) -> Result<u32, Error> {\n    if let Some(model) = serial_model_for_dr_address(address) {\n        let mut serial = lock_guard(&state.serial);\n        let queues = serial.entry(model.driver_id.to_string()).or_default();\n        if let Some(byte) = queues.rx.pop_front() {\n            let mut registers = lock_guard(&state.registers);\n            let entry = registers.entry(model.sr_address).or_insert(model.txe_mask | model.tc_mask);\n            if queues.rx.is_empty() {\n                *entry &= !model.rxne_mask;\n            } else {\n                *entry |= model.rxne_mask;\n            }\n            registers.insert(model.dr_address, u32::from(byte));\n            return Ok(u32::from(byte));\n        }\n    }\n    if let Some(model) = usb_stream_model_for_ep1_address(address) {\n        let mut usb_stream = lock_guard(&state.usb_stream);\n        let queues = usb_stream.entry(model.driver_id.to_string()).or_default();\n        if let Some(byte) = queues.rx.pop_front() {\n            let mut registers = lock_guard(&state.registers);\n            let entry = registers.entry(model.ep1_conf_address).or_insert(model.serial_in_data_free_mask);\n            if queues.rx.is_empty() {\n                *entry &= !model.serial_out_data_avail_mask;\n            } else {\n                *entry |= model.serial_out_data_avail_mask;\n            }\n            registers.insert(model.ep1_address, (u32::from(byte) << model.rdwr_byte_lsb) & model.rdwr_byte_mask);\n            return Ok((u32::from(byte) << model.rdwr_byte_lsb) & model.rdwr_byte_mask);\n        }\n    }\n    Ok(*lock_guard(&state.registers).get(&address).unwrap_or(&0))\n}\n\npub fn write_u32_for(state: &SharedEmulatorState, address: u64, value: u32) -> Result<(), Error> {\n    if let Some(model) = serial_model_for_dr_address(address) {\n        let mut serial = lock_guard(&state.serial);\n        let queues = serial.entry(model.driver_id.to_string()).or_default();\n        queues.tx.push_back((value & 0xFF) as u8);\n        let mut registers = lock_guard(&state.registers);\n        registers.insert(model.dr_address, value & 0xFF);\n        let entry = registers.entry(model.sr_address).or_insert(0);\n        *entry |= model.txe_mask | model.tc_mask;\n        return Ok(());\n    }\n    if let Some(model) = usb_stream_model_for_ep1_address(address) {\n        let shifted = (value & model.rdwr_byte_mask) >> model.rdwr_byte_lsb;\n        let mut usb_stream = lock_guard(&state.usb_stream);\n        let queues = usb_stream.entry(model.driver_id.to_string()).or_default();\n        queues.tx.push_back((shifted & 0xFF) as u8);\n        let mut registers = lock_guard(&state.registers);\n        registers.insert(model.ep1_address, value & model.rdwr_byte_mask);\n        return Ok(());\n    }\n    if let Some(model) = usb_stream_model_for_ep1_conf_address(address) {\n        let mut registers = lock_guard(&state.registers);\n        let mut next = value;\n        if value & model.wr_done_mask != 0 {\n            next &= !model.serial_in_data_free_mask;\n        }\n        registers.insert(address, next);\n        return Ok(());\n    }\n    if let Some(model) = indexed_gpio_model_for_bsrr(address) {\n        let mut registers = lock_guard(&state.registers);\n        let odr = registers.entry(model.odr_address).or_insert(0);\n        let set_bits = value & 0xFFFF;\n        let reset_bits = (value >> 16) & 0xFFFF;\n        *odr |= set_bits;\n        *odr &= !reset_bits;\n        registers.insert(address, value);\n        return Ok(());\n    }\n    if let Some(model) = esp_gpio_model_for_w1_register(address) {\n        let mut registers = lock_guard(&state.registers);\n        let (target_address, updated_value) = if address == model.out_w1ts_address {\n            let out = registers.entry(model.out_address).or_insert(0);\n            *out |= value;\n            (model.out_address, *out)\n        } else if address == model.out_w1tc_address {\n            let out = registers.entry(model.out_address).or_insert(0);\n            *out &= !value;\n            (model.out_address, *out)\n        } else if address == model.enable_w1ts_address {\n            let enable = registers.entry(model.enable_address).or_insert(0);\n            *enable |= value;\n            (model.enable_address, *enable)\n        } else {\n            let enable = registers.entry(model.enable_address).or_insert(0);\n            *enable &= !value;\n            (model.enable_address, *enable)\n        };\n        registers.insert(address, value);\n        registers.insert(target_address, updated_value);\n        return Ok(());\n    }\n    lock_guard(&state.registers).insert(address, value);\n    Ok(())\n}\n\npub fn modify_u8_for(state: &SharedEmulatorState, address: u64, clear_mask: u8, set_mask: u8) -> Result<(), Error> {\n    let current = read_u32_for(state, address)? as u8;\n    write_u32_for(state, address, u32::from((current & !clear_mask) | set_mask))\n}\n\npub fn modify_u16_for(state: &SharedEmulatorState, address: u64, clear_mask: u16, set_mask: u16) -> Result<(), Error> {\n    let current = read_u32_for(state, address)? as u16;\n    write_u32_for(state, address, u32::from((current & !clear_mask) | set_mask))\n}\n\npub fn modify_u32_for(state: &SharedEmulatorState, address: u64, clear_mask: u32, set_mask: u32) -> Result<(), Error> {\n    let current = read_u32_for(state, address)?;\n    write_u32_for(state, address, (current & !clear_mask) | set_mask)\n}\n\npub fn read_u32(address: u64) -> Result<u32, Error> {\n    let state = current_emulator()?;\n    read_u32_for(&state, address)\n}\n\npub fn write_u32(address: u64, value: u32) -> Result<(), Error> {\n    let state = current_emulator()?;\n    write_u32_for(&state, address, value)\n}\n\npub fn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u8_for(&state, address, clear_mask, set_mask)\n}\n\npub fn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u16_for(&state, address, clear_mask, set_mask)\n}\n\npub fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u32_for(&state, address, clear_mask, set_mask)\n}\n\npub fn push_serial_rx_for(state: &SharedEmulatorState, driver_id: &str, bytes: &[u8]) -> Result<(), Error> {\n    let model = serial_model_for_driver(driver_id)\n        .ok_or(Error::InvalidReference(\"unknown serial driver\"))?;\n    if !model.has_rx {\n        return Err(Error::InvalidReference(\"serial driver has no RX capability\"));\n    }\n    let mut serial = lock_guard(&state.serial);\n    let queues = serial.entry(driver_id.to_string()).or_default();\n    for &byte in bytes {\n        queues.rx.push_back(byte);\n    }\n    drop(serial);\n    let mut registers = lock_guard(&state.registers);\n    let entry = registers.entry(model.sr_address).or_insert(model.txe_mask | model.tc_mask);\n    if !bytes.is_empty() {\n        *entry |= model.rxne_mask;\n    }\n    Ok(())\n}\n\npub fn take_serial_tx_for(state: &SharedEmulatorState, driver_id: &str) -> Vec<u8> {\n    let mut serial = lock_guard(&state.serial);\n    let queues = serial.entry(driver_id.to_string()).or_default();\n    queues.tx.drain(..).collect()\n}\n\npub fn push_usb_rx_for(state: &SharedEmulatorState, driver_id: &str, bytes: &[u8]) -> Result<(), Error> {\n    let model = usb_stream_model_for_driver(driver_id)\n        .ok_or(Error::InvalidReference(\"unknown usb stream driver\"))?;\n    if !model.has_rx {\n        return Err(Error::InvalidReference(\"usb stream driver has no RX capability\"));\n    }\n    let mut usb_stream = lock_guard(&state.usb_stream);\n    let queues = usb_stream.entry(driver_id.to_string()).or_default();\n    for &byte in bytes {\n        queues.rx.push_back(byte);\n    }\n    drop(usb_stream);\n    let mut registers = lock_guard(&state.registers);\n    let entry = registers.entry(model.ep1_conf_address).or_insert(model.serial_in_data_free_mask);\n    if !bytes.is_empty() {\n        *entry |= model.serial_out_data_avail_mask;\n    }\n    Ok(())\n}\n\npub fn take_usb_tx_for(state: &SharedEmulatorState, driver_id: &str) -> Vec<u8> {\n    let Some(model) = usb_stream_model_for_driver(driver_id) else {\n        return Vec::new();\n    };\n    let committed = {\n        let registers = lock_guard(&state.registers);\n        let entry = registers.get(&model.ep1_conf_address).copied().unwrap_or(model.serial_in_data_free_mask);\n        entry & model.wr_done_mask != 0\n    };\n    if !committed {\n        return Vec::new();\n    }\n    let mut usb_stream = lock_guard(&state.usb_stream);\n    let queues = usb_stream.entry(driver_id.to_string()).or_default();\n    let drained = queues.tx.drain(..).collect();\n    drop(usb_stream);\n    let mut registers = lock_guard(&state.registers);\n    let entry = registers.entry(model.ep1_conf_address).or_insert(model.serial_in_data_free_mask);\n    *entry |= model.serial_in_data_free_mask;\n    *entry &= !model.wr_done_mask;\n    drained\n}\n\npub fn mark_dma_route_complete_for(state: &SharedEmulatorState, route_id: &str) {\n    let mut dma = lock_guard(&state.dma_completions);\n    *dma.entry(route_id.to_string()).or_default() += 1;\n}\n\npub fn dma_route_completion_count_for(state: &SharedEmulatorState, route_id: &str) -> usize {\n    *lock_guard(&state.dma_completions).get(route_id).unwrap_or(&0)\n}\n\npub fn set_irq_pending_for(state: &SharedEmulatorState, irq_number: i32, pending: bool) {\n    let mut irqs = lock_guard(&state.pending_irqs);\n    if pending {\n        irqs.insert(irq_number);\n    } else {\n        irqs.remove(&irq_number);\n    }\n}\n\npub fn is_irq_pending_for(state: &SharedEmulatorState, irq_number: i32) -> bool {\n    lock_guard(&state.pending_irqs).contains(&irq_number)\n}\n",
+        "thread_local! {\n    static CURRENT_EMULATOR: RefCell<Option<SharedEmulatorState>> = const { RefCell::new(None) };\n}\n\npub struct CurrentEmulatorGuard {\n    previous: Option<SharedEmulatorState>,\n}\n\nimpl Drop for CurrentEmulatorGuard {\n    fn drop(&mut self) {\n        CURRENT_EMULATOR.with(|slot| {\n            *slot.borrow_mut() = self.previous.take();\n        });\n    }\n}\n\nfn lock_guard<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {\n    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())\n}\n\npub fn new_emulator_state() -> SharedEmulatorState {\n    Arc::new(GeneratedHostState::default())\n}\n\npub fn install_current_emulator(state: SharedEmulatorState) {\n    CURRENT_EMULATOR.with(|slot| {\n        *slot.borrow_mut() = Some(state);\n    });\n}\n\npub fn push_current_emulator(state: SharedEmulatorState) -> CurrentEmulatorGuard {\n    let previous = CURRENT_EMULATOR.with(|slot| slot.replace(Some(state)));\n    CurrentEmulatorGuard { previous }\n}\n\npub fn clear_current_emulator() {\n    CURRENT_EMULATOR.with(|slot| {\n        slot.borrow_mut().take();\n    });\n}\n\npub fn clear_current_emulator_if_active(state: &SharedEmulatorState) {\n    CURRENT_EMULATOR.with(|slot| {\n        let mut slot = slot.borrow_mut();\n        if slot\n            .as_ref()\n            .is_some_and(|current| Arc::ptr_eq(current, state))\n        {\n            slot.take();\n        }\n    });\n}\n\npub fn initialize_emulator_state(state: &SharedEmulatorState) {\n    let mut registers = lock_guard(&state.registers);\n    for model in SERIAL_REGISTER_MODELS {\n        registers.insert(model.sr_address, model.txe_mask | model.tc_mask);\n        registers.insert(model.dr_address, 0);\n    }\n    for model in USB_STREAM_MODELS {\n        registers.insert(model.ep1_address, 0);\n        registers.insert(model.ep1_conf_address, model.serial_in_data_free_mask);\n    }\n}\n\nfn current_emulator() -> Result<SharedEmulatorState, Error> {\n    CURRENT_EMULATOR.with(|slot| {\n        slot.borrow()\n            .clone()\n            .ok_or(Error::Unsupported(\"host emulator is not active on this thread\"))\n    })\n}\n\nfn serial_model_for_driver(driver_id: &str) -> Option<&'static SerialRegisterModel> {\n    SERIAL_REGISTER_MODELS.iter().find(|model| model.driver_id == driver_id)\n}\n\nfn serial_model_for_dr_address(address: u64) -> Option<&'static SerialRegisterModel> {\n    SERIAL_REGISTER_MODELS.iter().find(|model| model.dr_address == address)\n}\n\nfn usb_stream_model_for_driver(driver_id: &str) -> Option<&'static UsbStreamModel> {\n    USB_STREAM_MODELS.iter().find(|model| model.driver_id == driver_id)\n}\n\nfn usb_stream_model_for_ep1_address(address: u64) -> Option<&'static UsbStreamModel> {\n    USB_STREAM_MODELS.iter().find(|model| model.ep1_address == address)\n}\n\nfn usb_stream_model_for_ep1_conf_address(address: u64) -> Option<&'static UsbStreamModel> {\n    USB_STREAM_MODELS.iter().find(|model| model.ep1_conf_address == address)\n}\n\nfn indexed_gpio_model_for_bsrr(address: u64) -> Option<&'static IndexedGpioModel> {\n    INDEXED_GPIO_MODELS.iter().find(|model| model.bsrr_address == address)\n}\n\nfn esp_gpio_model_for_w1_register(address: u64) -> Option<&'static EspGpioModel> {\n    ESP_GPIO_MODELS.iter().find(|model| {\n        model.out_w1ts_address == address\n            || model.out_w1tc_address == address\n            || model.enable_w1ts_address == address\n            || model.enable_w1tc_address == address\n    })\n}\n\npub fn read_u32_for(state: &SharedEmulatorState, address: u64) -> Result<u32, Error> {\n    if let Some(model) = serial_model_for_dr_address(address) {\n        let mut serial = lock_guard(&state.serial);\n        let queues = serial.entry(model.driver_id.to_string()).or_default();\n        if let Some(byte) = queues.rx.pop_front() {\n            let mut registers = lock_guard(&state.registers);\n            let entry = registers.entry(model.sr_address).or_insert(model.txe_mask | model.tc_mask);\n            if queues.rx.is_empty() {\n                *entry &= !model.rxne_mask;\n            } else {\n                *entry |= model.rxne_mask;\n            }\n            registers.insert(model.dr_address, u32::from(byte));\n            return Ok(u32::from(byte));\n        }\n    }\n    if let Some(model) = usb_stream_model_for_ep1_address(address) {\n        let mut usb_stream = lock_guard(&state.usb_stream);\n        let queues = usb_stream.entry(model.driver_id.to_string()).or_default();\n        if let Some(byte) = queues.rx.pop_front() {\n            let mut registers = lock_guard(&state.registers);\n            let entry = registers.entry(model.ep1_conf_address).or_insert(model.serial_in_data_free_mask);\n            if queues.rx.is_empty() {\n                *entry &= !model.serial_out_data_avail_mask;\n            } else {\n                *entry |= model.serial_out_data_avail_mask;\n            }\n            registers.insert(model.ep1_address, (u32::from(byte) << model.rdwr_byte_lsb) & model.rdwr_byte_mask);\n            return Ok((u32::from(byte) << model.rdwr_byte_lsb) & model.rdwr_byte_mask);\n        }\n    }\n    Ok(*lock_guard(&state.registers).get(&address).unwrap_or(&0))\n}\n\npub fn write_u32_for(state: &SharedEmulatorState, address: u64, value: u32) -> Result<(), Error> {\n    if let Some(model) = serial_model_for_dr_address(address) {\n        let mut serial = lock_guard(&state.serial);\n        let queues = serial.entry(model.driver_id.to_string()).or_default();\n        queues.tx.push_back((value & 0xFF) as u8);\n        let mut registers = lock_guard(&state.registers);\n        registers.insert(model.dr_address, value & 0xFF);\n        let entry = registers.entry(model.sr_address).or_insert(0);\n        *entry |= model.txe_mask | model.tc_mask;\n        return Ok(());\n    }\n    if let Some(model) = usb_stream_model_for_ep1_address(address) {\n        let shifted = (value & model.rdwr_byte_mask) >> model.rdwr_byte_lsb;\n        let mut usb_stream = lock_guard(&state.usb_stream);\n        let queues = usb_stream.entry(model.driver_id.to_string()).or_default();\n        queues.tx.push_back((shifted & 0xFF) as u8);\n        let mut registers = lock_guard(&state.registers);\n        registers.insert(model.ep1_address, value & model.rdwr_byte_mask);\n        return Ok(());\n    }\n    if let Some(model) = usb_stream_model_for_ep1_conf_address(address) {\n        let mut registers = lock_guard(&state.registers);\n        let mut next = value;\n        if value & model.wr_done_mask != 0 {\n            next &= !model.serial_in_data_free_mask;\n        }\n        registers.insert(address, next);\n        return Ok(());\n    }\n    if let Some(model) = indexed_gpio_model_for_bsrr(address) {\n        let mut registers = lock_guard(&state.registers);\n        let odr = registers.entry(model.odr_address).or_insert(0);\n        let set_bits = value & 0xFFFF;\n        let reset_bits = (value >> 16) & 0xFFFF;\n        *odr |= set_bits;\n        *odr &= !reset_bits;\n        registers.insert(address, value);\n        return Ok(());\n    }\n    if let Some(model) = esp_gpio_model_for_w1_register(address) {\n        let mut registers = lock_guard(&state.registers);\n        let (target_address, updated_value) = if address == model.out_w1ts_address {\n            let out = registers.entry(model.out_address).or_insert(0);\n            *out |= value;\n            (model.out_address, *out)\n        } else if address == model.out_w1tc_address {\n            let out = registers.entry(model.out_address).or_insert(0);\n            *out &= !value;\n            (model.out_address, *out)\n        } else if address == model.enable_w1ts_address {\n            let enable = registers.entry(model.enable_address).or_insert(0);\n            *enable |= value;\n            (model.enable_address, *enable)\n        } else {\n            let enable = registers.entry(model.enable_address).or_insert(0);\n            *enable &= !value;\n            (model.enable_address, *enable)\n        };\n        registers.insert(address, value);\n        registers.insert(target_address, updated_value);\n        return Ok(());\n    }\n    lock_guard(&state.registers).insert(address, value);\n    Ok(())\n}\n\npub fn modify_u8_for(state: &SharedEmulatorState, address: u64, clear_mask: u8, set_mask: u8) -> Result<(), Error> {\n    let current = read_u32_for(state, address)? as u8;\n    write_u32_for(state, address, u32::from((current & !clear_mask) | set_mask))\n}\n\npub fn modify_u16_for(state: &SharedEmulatorState, address: u64, clear_mask: u16, set_mask: u16) -> Result<(), Error> {\n    let current = read_u32_for(state, address)? as u16;\n    write_u32_for(state, address, u32::from((current & !clear_mask) | set_mask))\n}\n\npub fn modify_u32_for(state: &SharedEmulatorState, address: u64, clear_mask: u32, set_mask: u32) -> Result<(), Error> {\n    let current = read_u32_for(state, address)?;\n    write_u32_for(state, address, (current & !clear_mask) | set_mask)\n}\n\npub fn read_u8(address: u64) -> Result<u8, Error> {\n    Ok(read_u32(address)? as u8)\n}\n\npub fn read_u32(address: u64) -> Result<u32, Error> {\n    let state = current_emulator()?;\n    read_u32_for(&state, address)\n}\n\npub fn write_u16(address: u64, value: u16) -> Result<(), Error> {\n    write_u32(address, u32::from(value))\n}\n\npub fn write_u32(address: u64, value: u32) -> Result<(), Error> {\n    let state = current_emulator()?;\n    write_u32_for(&state, address, value)\n}\n\npub fn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u8_for(&state, address, clear_mask, set_mask)\n}\n\npub fn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u16_for(&state, address, clear_mask, set_mask)\n}\n\npub fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u32_for(&state, address, clear_mask, set_mask)\n}\n\npub fn push_serial_rx_for(state: &SharedEmulatorState, driver_id: &str, bytes: &[u8]) -> Result<(), Error> {\n    let model = serial_model_for_driver(driver_id)\n        .ok_or(Error::InvalidReference(\"unknown serial driver\"))?;\n    if !model.has_rx {\n        return Err(Error::InvalidReference(\"serial driver has no RX capability\"));\n    }\n    let mut serial = lock_guard(&state.serial);\n    let queues = serial.entry(driver_id.to_string()).or_default();\n    for &byte in bytes {\n        queues.rx.push_back(byte);\n    }\n    drop(serial);\n    let mut registers = lock_guard(&state.registers);\n    let entry = registers.entry(model.sr_address).or_insert(model.txe_mask | model.tc_mask);\n    if !bytes.is_empty() {\n        *entry |= model.rxne_mask;\n    }\n    Ok(())\n}\n\npub fn take_serial_tx_for(state: &SharedEmulatorState, driver_id: &str) -> Vec<u8> {\n    let mut serial = lock_guard(&state.serial);\n    let queues = serial.entry(driver_id.to_string()).or_default();\n    queues.tx.drain(..).collect()\n}\n\npub fn push_usb_rx_for(state: &SharedEmulatorState, driver_id: &str, bytes: &[u8]) -> Result<(), Error> {\n    let model = usb_stream_model_for_driver(driver_id)\n        .ok_or(Error::InvalidReference(\"unknown usb stream driver\"))?;\n    if !model.has_rx {\n        return Err(Error::InvalidReference(\"usb stream driver has no RX capability\"));\n    }\n    let mut usb_stream = lock_guard(&state.usb_stream);\n    let queues = usb_stream.entry(driver_id.to_string()).or_default();\n    for &byte in bytes {\n        queues.rx.push_back(byte);\n    }\n    drop(usb_stream);\n    let mut registers = lock_guard(&state.registers);\n    let entry = registers.entry(model.ep1_conf_address).or_insert(model.serial_in_data_free_mask);\n    if !bytes.is_empty() {\n        *entry |= model.serial_out_data_avail_mask;\n    }\n    Ok(())\n}\n\npub fn take_usb_tx_for(state: &SharedEmulatorState, driver_id: &str) -> Vec<u8> {\n    let Some(model) = usb_stream_model_for_driver(driver_id) else {\n        return Vec::new();\n    };\n    let committed = {\n        let registers = lock_guard(&state.registers);\n        let entry = registers.get(&model.ep1_conf_address).copied().unwrap_or(model.serial_in_data_free_mask);\n        entry & model.wr_done_mask != 0\n    };\n    if !committed {\n        return Vec::new();\n    }\n    let mut usb_stream = lock_guard(&state.usb_stream);\n    let queues = usb_stream.entry(driver_id.to_string()).or_default();\n    let drained = queues.tx.drain(..).collect();\n    drop(usb_stream);\n    let mut registers = lock_guard(&state.registers);\n    let entry = registers.entry(model.ep1_conf_address).or_insert(model.serial_in_data_free_mask);\n    *entry |= model.serial_in_data_free_mask;\n    *entry &= !model.wr_done_mask;\n    drained\n}\n\npub fn mark_dma_route_complete_for(state: &SharedEmulatorState, route_id: &str) {\n    let mut dma = lock_guard(&state.dma_completions);\n    *dma.entry(route_id.to_string()).or_default() += 1;\n}\n\npub fn dma_route_completion_count_for(state: &SharedEmulatorState, route_id: &str) -> usize {\n    *lock_guard(&state.dma_completions).get(route_id).unwrap_or(&0)\n}\n\npub fn set_irq_pending_for(state: &SharedEmulatorState, irq_number: i32, pending: bool) {\n    let mut irqs = lock_guard(&state.pending_irqs);\n    if pending {\n        irqs.insert(irq_number);\n    } else {\n        irqs.remove(&irq_number);\n    }\n}\n\npub fn is_irq_pending_for(state: &SharedEmulatorState, irq_number: i32) -> bool {\n    lock_guard(&state.pending_irqs).contains(&irq_number)\n}\n",
     );
     Ok(out)
 }
@@ -15463,7 +16434,7 @@ fn render_embassy_host_driver_module(
 }
 
 fn render_host_mmio_helpers() -> &'static str {
-    "#[allow(dead_code)]\nfn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), metadata::Error> {\n    metadata::modify_u8(address, clear_mask, set_mask)\n}\n\n#[allow(dead_code)]\nfn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), metadata::Error> {\n    metadata::modify_u16(address, clear_mask, set_mask)\n}\n\n#[allow(dead_code)]\nfn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metadata::Error> {\n    metadata::modify_u32(address, clear_mask, set_mask)\n}\n\n#[allow(dead_code)]\nfn read_u32(address: u64) -> Result<u32, metadata::Error> {\n    metadata::read_u32(address)\n}\n\n#[allow(dead_code)]\nfn write_u32(address: u64, value: u32) -> Result<(), metadata::Error> {\n    metadata::write_u32(address, value)\n}\n"
+    "#[allow(dead_code)]\nfn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), metadata::Error> {\n    metadata::modify_u8(address, clear_mask, set_mask)\n}\n\n#[allow(dead_code)]\nfn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), metadata::Error> {\n    metadata::modify_u16(address, clear_mask, set_mask)\n}\n\n#[allow(dead_code)]\nfn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), metadata::Error> {\n    metadata::modify_u32(address, clear_mask, set_mask)\n}\n\n#[allow(dead_code)]\nfn read_u8(address: u64) -> Result<u8, metadata::Error> {\n    metadata::read_u8(address)\n}\n\n#[allow(dead_code)]\nfn read_u32(address: u64) -> Result<u32, metadata::Error> {\n    metadata::read_u32(address)\n}\n\n#[allow(dead_code)]\nfn write_u16(address: u64, value: u16) -> Result<(), metadata::Error> {\n    metadata::write_u16(address, value)\n}\n\n#[allow(dead_code)]\nfn write_u32(address: u64, value: u32) -> Result<(), metadata::Error> {\n    metadata::write_u32(address, value)\n}\n"
 }
 
 fn render_embassy_host_driver_instance(
@@ -15556,6 +16527,9 @@ fn render_embassy_host_driver_support_items(
     }
     if driver.driver_kind == "watchdog" {
         out.push_str(&render_watchdog_support_items(driver));
+    }
+    if driver.driver_kind == "flash" {
+        out.push_str(&render_flash_support_items(model, driver)?);
     }
     if has_time_driver_tag(&driver.capability_tags) {
         out.push_str(&render_host_time_driver_support_items(driver)?);
@@ -18394,6 +19368,83 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
     }
 
     #[test]
+    fn generate_embassy_emits_flash_helpers_for_ch32v203g6u6() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let input = repo_root
+            .join("evidence")
+            .join("wch")
+            .join("ch32v203g6u6")
+            .join("hair.json");
+        let document = load_validated_hair_document(&input, &repo_root)
+            .expect("reference hair document should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&document, output_dir.path()).expect("embassy generation");
+
+        let cargo_toml =
+            std::fs::read_to_string(output_dir.path().join("Cargo.toml")).expect("Cargo.toml");
+        let flash_rs = std::fs::read_to_string(output_dir.path().join("src").join("flash.rs"))
+            .expect("flash.rs");
+
+        assert!(cargo_toml.contains("embedded-storage = \"0.3\""));
+        assert!(flash_rs.contains("pub fn unlock(&self) -> Result<(), metadata::Error>"));
+        assert!(flash_rs.contains("pub fn is_busy(&self) -> Result<bool, metadata::Error>"));
+        assert!(flash_rs.contains("impl embedded_storage::nor_flash::ReadNorFlash for "));
+        assert!(flash_rs.contains("impl embedded_storage::nor_flash::NorFlash for "));
+        assert!(flash_rs.contains("const WRITE_SIZE: usize = 2;"));
+        assert!(flash_rs.contains("const ERASE_SIZE: usize = 4096;"));
+        assert!(flash_rs.contains("WriteProtectError"));
+
+        let cargo_output = Command::new("cargo")
+            .arg("check")
+            .current_dir(output_dir.path())
+            .output()
+            .expect("cargo check");
+        assert!(
+            cargo_output.status.success(),
+            "generated crate should compile:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&cargo_output.stdout),
+            String::from_utf8_lossy(&cargo_output.stderr)
+        );
+    }
+
+    #[test]
+    fn generate_embassy_host_emits_flash_helpers() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        add_fixture_flash_driver(&mut document);
+        let file = write_temp_json(&document);
+        let document = load_validated_hair_document(file.path(), &repo_root)
+            .expect("flash fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_host_crate(&document, output_dir.path()).expect("embassy-host generation");
+
+        let cargo_toml =
+            std::fs::read_to_string(output_dir.path().join("Cargo.toml")).expect("Cargo.toml");
+        let flash_rs = std::fs::read_to_string(output_dir.path().join("src").join("flash.rs"))
+            .expect("flash.rs");
+
+        assert!(cargo_toml.contains("embedded-storage = \"0.3\""));
+        assert!(flash_rs.contains("impl embedded_storage::nor_flash::ReadNorFlash for "));
+        assert!(flash_rs.contains("impl embedded_storage::nor_flash::NorFlash for "));
+        assert!(flash_rs.contains("pub fn clear_end_of_operation_flag"));
+
+        let cargo_output = Command::new("cargo")
+            .arg("check")
+            .current_dir(output_dir.path())
+            .output()
+            .expect("cargo check");
+        assert!(
+            cargo_output.status.success(),
+            "generated host crate should compile:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&cargo_output.stdout),
+            String::from_utf8_lossy(&cargo_output.stderr)
+        );
+    }
+
+    #[test]
     fn generate_embassy_emits_adc_dma_helpers_for_ch32v203g6u6() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let input = repo_root
@@ -20112,8 +21163,10 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         let time_rs = std::fs::read_to_string(output_dir.path().join("src").join("time.rs"))
             .expect("time.rs");
 
-        assert!(wch_rs.contains("    pfic().enable_irq(Irq::RTCAlarm)?;\n    unsafe {\n"));
-        assert!(!wch_rs.contains("    pfic().enable_irq(Irq::RTCAlarm)?;\n            unsafe {\n"));
+        assert!(wch_rs.contains("    pfic().enable_irq(Irq::DMA1Channel1)?;\n    unsafe {\n"));
+        assert!(
+            !wch_rs.contains("    pfic().enable_irq(Irq::DMA1Channel1)?;\n            unsafe {\n")
+        );
         assert!(time_rs.contains(
             "            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_RTCSEL_MASK,\n                GENERATED_RCC_BDCTLR_RTCSEL_LSI_MASK,\n            );\n            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_RTCEN_MASK,\n"
         ));
@@ -22303,6 +23356,176 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             "driverKind": "watchdog",
             "modulePath": "watchdog",
             "initOperationRefs": ["op.iwdg.unlock", "op.iwdg.feed", "op.iwdg.start"]
+        }));
+    }
+
+    fn add_fixture_flash_driver(document: &mut Value) {
+        let device = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object");
+        let memory_map = device
+            .entry("memoryMap")
+            .or_insert_with(|| Value::Array(Vec::new()))
+            .as_array_mut()
+            .expect("memoryMap");
+        memory_map.push(serde_json::json!({
+            "id": "mem.flash",
+            "name": "Code flash",
+            "kind": "flash",
+            "baseAddress": 134217728u64,
+            "sizeBytes": 65536
+        }));
+        let peripherals = device
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        peripherals.push(serde_json::json!({
+            "id": "periph.flash",
+            "name": "FLASH",
+            "kind": "peripheral",
+            "type": "FLASH",
+            "baseAddress": 1073881088u64,
+            "registers": [
+                { "id": "reg.flash.keyr", "name": "KEYR", "kind": "register", "offsetBytes": 4, "widthBits": 32, "fields": [
+                    { "id": "field.flash_keyr.fkeyr", "name": "FKEYR", "bitRange": { "lsb": 0, "msb": 31 } }
+                ] },
+                { "id": "reg.flash.statr", "name": "STATR", "kind": "register", "offsetBytes": 12, "widthBits": 32, "fields": [
+                    { "id": "field.flash_statr.bsy", "name": "BSY", "bitRange": { "lsb": 0, "msb": 0 } },
+                    { "id": "field.flash_statr.wrprterr", "name": "WRPRTERR", "bitRange": { "lsb": 4, "msb": 4 } },
+                    { "id": "field.flash_statr.eop", "name": "EOP", "bitRange": { "lsb": 5, "msb": 5 } }
+                ] },
+                { "id": "reg.flash.ctlr", "name": "CTLR", "kind": "register", "offsetBytes": 16, "widthBits": 32, "fields": [
+                    { "id": "field.flash_ctlr.pg", "name": "PG", "bitRange": { "lsb": 0, "msb": 0 } },
+                    { "id": "field.flash_ctlr.per", "name": "PER", "bitRange": { "lsb": 1, "msb": 1 } },
+                    { "id": "field.flash_ctlr.strt", "name": "STRT", "bitRange": { "lsb": 6, "msb": 6 } },
+                    { "id": "field.flash_ctlr.lock", "name": "LOCK", "bitRange": { "lsb": 7, "msb": 7 } }
+                ] },
+                { "id": "reg.flash.addr", "name": "ADDR", "kind": "register", "offsetBytes": 20, "widthBits": 32, "fields": [
+                    { "id": "field.flash_addr.far", "name": "FAR", "bitRange": { "lsb": 0, "msb": 31 } }
+                ] }
+            ]
+        }));
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        operations.extend([
+            serde_json::json!({
+                "id": "op.flash.unlock",
+                "name": "Unlock FLASH control",
+                "kind": "configuration",
+                "targetRefs": ["periph.flash"],
+                "steps": [
+                    { "index": 0, "action": "write", "targetRef": "reg.flash.keyr", "expression": { "language": "plain", "text": "Write FKEYR = 0x45670123" } },
+                    { "index": 1, "action": "write", "targetRef": "reg.flash.keyr", "expression": { "language": "plain", "text": "Write FKEYR = 0xCDEF89AB" } }
+                ]
+            }),
+            serde_json::json!({
+                "id": "op.flash.lock",
+                "name": "Lock FLASH control",
+                "kind": "configuration",
+                "targetRefs": ["periph.flash"],
+                "steps": [
+                    { "index": 0, "action": "write", "targetRef": "reg.flash.ctlr", "expression": { "language": "plain", "text": "Set LOCK = 1" } }
+                ]
+            }),
+            serde_json::json!({
+                "id": "op.flash.clear_eop",
+                "name": "Clear FLASH end-of-operation flag",
+                "kind": "configuration",
+                "targetRefs": ["periph.flash"],
+                "steps": [
+                    { "index": 0, "action": "write", "targetRef": "reg.flash.statr", "expression": { "language": "plain", "text": "Set EOP = 1" } }
+                ]
+            }),
+            serde_json::json!({
+                "id": "op.flash.clear_wrprterr",
+                "name": "Clear FLASH write-protect error flag",
+                "kind": "configuration",
+                "targetRefs": ["periph.flash"],
+                "steps": [
+                    { "index": 0, "action": "write", "targetRef": "reg.flash.statr", "expression": { "language": "plain", "text": "Set WRPRTERR = 1" } }
+                ]
+            })
+        ]);
+
+        let profiles = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object");
+        let canonical_blocks = profiles
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("canonicalBlocks")
+            .and_then(Value::as_array_mut)
+            .expect("canonicalBlocks");
+        canonical_blocks.push(serde_json::json!({
+            "id": "block.flash",
+            "name": "FLASH",
+            "targetRef": "periph.flash",
+            "blockClass": "flash-controller"
+        }));
+
+        let embassy = profiles
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object");
+        embassy
+            .get_mut("crate")
+            .and_then(Value::as_object_mut)
+            .expect("crate object")
+            .get_mut("featureFlags")
+            .and_then(Value::as_array_mut)
+            .expect("featureFlags")
+            .push(Value::String("flash".to_string()));
+        let driver_instances = embassy
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        driver_instances.push(serde_json::json!({
+            "id": "drv.flash",
+            "name": "FLASH",
+            "targetRef": "block.flash",
+            "driverKind": "flash",
+            "modulePath": "flash",
+            "loweringPattern": FLASH_LOWERING_STM32F1_PAGE_FLASH,
+            "initOperationRefs": [
+                "op.flash.unlock",
+                "op.flash.lock",
+                "op.flash.clear_eop",
+                "op.flash.clear_wrprterr"
+            ],
+            "flashBindings": {
+                "storageRegionRef": "mem.flash",
+                "eraseSizeBytes": 4096,
+                "writeSizeBytes": 2,
+                "busyFlagRef": "field.flash_statr.bsy",
+                "endOfOperationFlagRef": "field.flash_statr.eop",
+                "writeProtectErrorFlagRef": "field.flash_statr.wrprterr",
+                "programEnableRef": "field.flash_ctlr.pg",
+                "pageEraseEnableRef": "field.flash_ctlr.per",
+                "eraseAddressRef": "field.flash_addr.far",
+                "eraseStartRef": "field.flash_ctlr.strt",
+                "unlockOperationRefs": ["op.flash.unlock"],
+                "lockOperationRefs": ["op.flash.lock"],
+                "clearEndOfOperationOperationRef": "op.flash.clear_eop",
+                "clearWriteProtectErrorOperationRef": "op.flash.clear_wrprterr"
+            }
         }));
     }
 

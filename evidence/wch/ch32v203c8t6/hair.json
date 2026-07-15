@@ -557,6 +557,39 @@
         },
         "extractionMethod": "manual",
         "confidence": 0.95
+      },
+      {
+        "id": "e_flash_library_api",
+        "name": "Vendor flash library API and flag constants",
+        "sourceRef": "openwch-ch32v20x-sdk",
+        "normalizedClaim": "The official CH32V20x flash library header defines FLASH_Unlock, FLASH_Lock, FLASH_ErasePage, FLASH_ProgramHalfWord, FLASH_ClearFlag, the KEY1/KEY2 unlock constants, and the BSY, EOP, and WRPRTERR status flags used by the standard internal-flash path.",
+        "locator": {
+          "fragment": "EVT/EXAM/SRC/Peripheral/inc/ch32v20x_flash.h"
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.96
+      },
+      {
+        "id": "e_flash_library_standard_sequence",
+        "name": "Vendor flash library standard erase/program sequence",
+        "sourceRef": "openwch-ch32v20x-sdk",
+        "normalizedClaim": "The official CH32V20x flash library implementation unlocks via KEYR, erases by setting CTLR.PER then ADDR then CTLR.STRT, programs with CTLR.PG plus a halfword write to mapped flash, polls BSY until completion, clears EOP/WRPRTERR by writing STATR, and re-locks by setting CTLR.LOCK.",
+        "locator": {
+          "fragment": "EVT/EXAM/SRC/Peripheral/src/ch32v20x_flash.c"
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.97
+      },
+      {
+        "id": "e_flash_standard_program_example",
+        "name": "Vendor standard flash programming example",
+        "sourceRef": "openwch-ch32v20x-sdk",
+        "normalizedClaim": "The official CH32V20x FLASH_Program example clears BSY, EOP, and WRPRTERR before use, erases standard 4096-byte pages with FLASH_ErasePage, and writes flash with FLASH_ProgramHalfWord over the normal non-fast path.",
+        "locator": {
+          "fragment": "EVT/EXAM/FLASH/FLASH_Program/User/main.c"
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.97
       }
     ]
   },
@@ -14168,6 +14201,54 @@
               "kind": "register",
               "offsetBytes": 8,
               "widthBits": 16,
+              "fields": [
+                {
+                  "id": "field.usart_brr.div_mantissa",
+                  "name": "DIV_Mantissa",
+                  "bitRange": {
+                    "lsb": 4,
+                    "msb": 15
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.91
+                  },
+                  "description": "Mantissa of USARTDIV"
+                },
+                {
+                  "id": "field.usart_brr.div_fraction",
+                  "name": "DIV_Fraction",
+                  "bitRange": {
+                    "lsb": 0,
+                    "msb": 3
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.91
+                  },
+                  "description": "Fraction of USARTDIV"
+                }
+              ],
               "provenance": {
                 "sourceRefs": [
                   "openwch-ch32v20x-header",
@@ -15520,6 +15601,54 @@
               "kind": "register",
               "offsetBytes": 8,
               "widthBits": 16,
+              "fields": [
+                {
+                  "id": "field.usart_brr.div_mantissa",
+                  "name": "DIV_Mantissa",
+                  "bitRange": {
+                    "lsb": 4,
+                    "msb": 15
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.91
+                  },
+                  "description": "Mantissa of USARTDIV"
+                },
+                {
+                  "id": "field.usart_brr.div_fraction",
+                  "name": "DIV_Fraction",
+                  "bitRange": {
+                    "lsb": 0,
+                    "msb": 3
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.91
+                  },
+                  "description": "Fraction of USARTDIV"
+                }
+              ],
               "provenance": {
                 "sourceRefs": [
                   "openwch-ch32v20x-header",
@@ -16872,6 +17001,54 @@
               "kind": "register",
               "offsetBytes": 8,
               "widthBits": 16,
+              "fields": [
+                {
+                  "id": "field.usart_brr.div_mantissa",
+                  "name": "DIV_Mantissa",
+                  "bitRange": {
+                    "lsb": 4,
+                    "msb": 15
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.91
+                  },
+                  "description": "Mantissa of USARTDIV"
+                },
+                {
+                  "id": "field.usart_brr.div_fraction",
+                  "name": "DIV_Fraction",
+                  "bitRange": {
+                    "lsb": 0,
+                    "msb": 3
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.91
+                  },
+                  "description": "Fraction of USARTDIV"
+                }
+              ],
               "provenance": {
                 "sourceRefs": [
                   "openwch-ch32v20x-header",
@@ -56243,6 +56420,54 @@
               "kind": "register",
               "offsetBytes": 8,
               "widthBits": 16,
+              "fields": [
+                {
+                  "id": "field.usart_brr.div_mantissa",
+                  "name": "DIV_Mantissa",
+                  "bitRange": {
+                    "lsb": 4,
+                    "msb": 15
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.91
+                  },
+                  "description": "Mantissa of USARTDIV"
+                },
+                {
+                  "id": "field.usart_brr.div_fraction",
+                  "name": "DIV_Fraction",
+                  "bitRange": {
+                    "lsb": 0,
+                    "msb": 3
+                  },
+                  "provenance": {
+                    "sourceRefs": [
+                      "openwch-ch32v20x-header",
+                      "ch32-rs-ch32v203xx-svd",
+                      "ch32-rs-ch32v203c8t6-yaml"
+                    ],
+                    "evidenceRefs": [
+                      "e_header_register_bitdefs",
+                      "e_ch32rs_ch32v203xx_svd_metadata",
+                      "e_ch32rs_ch32v203c8t6_yaml_variant"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.91
+                  },
+                  "description": "Fraction of USARTDIV"
+                }
+              ],
               "provenance": {
                 "sourceRefs": [
                   "openwch-ch32v20x-header",
@@ -69878,6 +70103,10 @@
         "id": "ic.pfic",
         "name": "PFIC",
         "description": "Fast programmable interrupt controller integrated with the QingKe V4B core.",
+        "interruptNumbering": {
+          "vectorTableIndexing": "interrupt-number",
+          "registerIndexing": "interrupt-number"
+        },
         "targetRefs": [
           "device.ch32v203c8t6"
         ],
@@ -71752,6 +71981,142 @@
           ],
           "status": "verified",
           "confidence": 0.9
+        }
+      },
+      {
+        "id": "op.flash.unlock",
+        "name": "Unlock FLASH control",
+        "kind": "configuration",
+        "targetRefs": [
+          "periph.flash"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.flash.keyr",
+            "expression": {
+              "language": "plain",
+              "text": "Write FKEYR = 0x45670123"
+            },
+            "description": "Write FLASH_KEY1 to the key register."
+          },
+          {
+            "index": 1,
+            "action": "write",
+            "targetRef": "reg.flash.keyr",
+            "expression": {
+              "language": "plain",
+              "text": "Write FKEYR = 0xCDEF89AB"
+            },
+            "description": "Write FLASH_KEY2 to complete the standard unlock sequence."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-sdk"
+          ],
+          "evidenceRefs": [
+            "e_flash_library_api",
+            "e_flash_library_standard_sequence"
+          ],
+          "status": "verified",
+          "confidence": 0.97
+        }
+      },
+      {
+        "id": "op.flash.lock",
+        "name": "Lock FLASH control",
+        "kind": "configuration",
+        "targetRefs": [
+          "periph.flash"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.flash.ctlr",
+            "expression": {
+              "language": "plain",
+              "text": "Set LOCK = 1"
+            },
+            "description": "Restore the standard FLASH control lock."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-sdk"
+          ],
+          "evidenceRefs": [
+            "e_flash_library_api",
+            "e_flash_library_standard_sequence"
+          ],
+          "status": "verified",
+          "confidence": 0.97
+        }
+      },
+      {
+        "id": "op.flash.clear_eop",
+        "name": "Clear FLASH end-of-operation flag",
+        "kind": "configuration",
+        "targetRefs": [
+          "periph.flash"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.flash.statr",
+            "expression": {
+              "language": "plain",
+              "text": "Set EOP = 1"
+            },
+            "description": "Acknowledge the standard FLASH end-of-operation flag."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-sdk"
+          ],
+          "evidenceRefs": [
+            "e_flash_library_api",
+            "e_flash_library_standard_sequence",
+            "e_flash_standard_program_example"
+          ],
+          "status": "verified",
+          "confidence": 0.96
+        }
+      },
+      {
+        "id": "op.flash.clear_wrprterr",
+        "name": "Clear FLASH write-protect error flag",
+        "kind": "configuration",
+        "targetRefs": [
+          "periph.flash"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.flash.statr",
+            "expression": {
+              "language": "plain",
+              "text": "Set WRPRTERR = 1"
+            },
+            "description": "Acknowledge the standard FLASH write-protect error flag."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-sdk"
+          ],
+          "evidenceRefs": [
+            "e_flash_library_api",
+            "e_flash_library_standard_sequence",
+            "e_flash_standard_program_example"
+          ],
+          "status": "verified",
+          "confidence": 0.96
         }
       },
       {
@@ -75842,6 +76207,26 @@
             ],
             "status": "verified",
             "confidence": 0.88
+          }
+        },
+        {
+          "id": "block.flash",
+          "name": "FLASH",
+          "targetRef": "periph.flash",
+          "blockClass": "flash-controller",
+          "functionalDomain": "memory",
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header",
+              "openwch-ch32v20x-sdk"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses",
+              "e_flash_library_api",
+              "e_flash_library_standard_sequence"
+            ],
+            "status": "verified",
+            "confidence": 0.95
           }
         },
         {
@@ -81828,6 +82213,7 @@
         "featureFlags": [
           "adc",
           "dma",
+          "flash",
           "gpio",
           "i2c",
           "interrupt",
@@ -83505,6 +83891,54 @@
             ],
             "status": "verified",
             "confidence": 0.88
+          }
+        },
+        {
+          "id": "drv.flash",
+          "name": "FLASH",
+          "targetRef": "block.flash",
+          "driverKind": "flash",
+          "modulePath": "flash",
+          "loweringPattern": "stm32f1-page-flash",
+          "initOperationRefs": [
+            "op.flash.unlock",
+            "op.flash.lock",
+            "op.flash.clear_eop",
+            "op.flash.clear_wrprterr"
+          ],
+          "flashBindings": {
+            "storageRegionRef": "mem.flash",
+            "eraseSizeBytes": 4096,
+            "writeSizeBytes": 2,
+            "busyFlagRef": "field.flash_statr.bsy",
+            "endOfOperationFlagRef": "field.flash_statr.eop",
+            "writeProtectErrorFlagRef": "field.flash_statr.wrprterr",
+            "programEnableRef": "field.flash_ctlr.pg",
+            "pageEraseEnableRef": "field.flash_ctlr.per",
+            "eraseAddressRef": "field.flash_addr.far",
+            "eraseStartRef": "field.flash_ctlr.strt",
+            "unlockOperationRefs": [
+              "op.flash.unlock"
+            ],
+            "lockOperationRefs": [
+              "op.flash.lock"
+            ],
+            "clearEndOfOperationOperationRef": "op.flash.clear_eop",
+            "clearWriteProtectErrorOperationRef": "op.flash.clear_wrprterr"
+          },
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-sdk",
+              "wch-ch32v20x-30x-datasheet"
+            ],
+            "evidenceRefs": [
+              "e_model_table",
+              "e_flash_library_api",
+              "e_flash_library_standard_sequence",
+              "e_flash_standard_program_example"
+            ],
+            "status": "verified",
+            "confidence": 0.96
           }
         },
         {
