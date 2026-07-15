@@ -504,22 +504,18 @@ powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\emb
 - The packaging step writes a flashable `.bin` beside the release ELF.
 - When flashed to the physical device with an external signal generator driving
   `PA7` / `ADC1_IN7`, the firmware enumerates a USB CDC port and emits recurring
-  `oneshot ...` and `circular ...` lines reporting sample-count, first/last,
-  min/max, and average values from ADC DMA captures.
+  `oneshot ...` lines reporting sample-count, first/last, min/max, and average
+  values from ADC DMA captures.
 - The one-shot report exercises the generated one-shot DMA capture path and its
   transfer-complete clear/stop helpers.
-- The circular report exercises the generated circular DMA capture path and
-  reports whether half-transfer and transfer-complete events were observed
-  before shutdown.
 
 **Note**
 - This is a hardware-dependent smoke check, not a universal repository
   precondition.
-- The smoke application shall consume the generated Embassy HAL crate through
-  normal Rust package boundaries for RCC, GPIO, ADC, USB CDC, and Embassy time.
-- The current generated GPIO surface does not expose a dedicated analog-input
-  pin-mode helper, so the smoke image keeps `PA7` as a floating input while the
-  ADC path samples it via DMA.
+- The smoke application consumes the generated Embassy HAL crate for RCC, ADC,
+  DMA, USB CDC, and Embassy time bring-up, but still uses targeted direct MMIO
+  for the CH32 ADC prescaler and `PA7` analog-mode setup because the generated
+  HAL does not yet expose dedicated helpers for those controls.
 
 ## 6. Requirement-specific validation coverage
 

@@ -3788,7 +3788,7 @@ fn validate_dma_async_bindings(
     driver: &EmbassyDriverInstance,
     dma_channels: &[McuDmaChannel],
     interrupt_sources: &[McuInterruptSource],
-    interrupt_routes: &[McuInterruptRoute],
+    driver_interrupt_routes: &[McuInterruptRoute],
 ) -> Result<()> {
     let Some(bindings) = driver.dma_async_bindings.as_ref() else {
         return Ok(());
@@ -3799,7 +3799,7 @@ fn validate_dma_async_bindings(
             driver.id
         );
     }
-    if interrupt_routes.is_empty() {
+    if driver_interrupt_routes.is_empty() {
         bail!(
             "driver {} declares dmaAsyncBindings but omits required interruptRouteRefs",
             driver.id
@@ -3824,12 +3824,22 @@ fn validate_dma_async_bindings(
                     binding.channel_ref
                 )
             })?;
-        if !interrupt_sources
+        let interrupt_source = interrupt_sources
             .iter()
-            .any(|source| source.source_ref == channel.id)
+            .find(|source| source.source_ref == channel.id)
+            .ok_or_else(|| {
+                anyhow!(
+                    "driver {} dmaAsyncBindings channel {} lacks a referenced interrupt source",
+                    driver.id,
+                    binding.channel_ref
+                )
+            })?;
+        if !driver_interrupt_routes
+            .iter()
+            .any(|route| route.source_ref == interrupt_source.id)
         {
             bail!(
-                "driver {} dmaAsyncBindings channel {} lacks a referenced interrupt source/route",
+                "driver {} dmaAsyncBindings channel {} lacks a referenced interrupt route",
                 driver.id,
                 binding.channel_ref
             );
@@ -12317,6 +12327,13 @@ fn resolve_structural_field_from_register(
     structural_ref: &str,
     array_index: Option<u32>,
 ) -> Result<Option<ResolvedFieldTarget>> {
+    if !register
+        .fields
+        .iter()
+        .any(|field| field.id == structural_ref)
+    {
+        return Ok(None);
+    }
     let resolved_register = resolve_structural_register_from_register(
         peripheral_ref,
         parent_address,
@@ -21840,6 +21857,75 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
                 .to_string()
                 .contains("multiple registers mapped to canonical term term.register.baud-rate")
         );
+    }
+
+    #[test]
+    fn resolve_structural_field_skips_unrelated_arrayed_registers() {
+        let members = vec![
+            RegisterBlockMember::Register(Register {
+                id: "reg.arrayed".to_string(),
+                name: "ARRAYED".to_string(),
+                display_name: None,
+                description: None,
+                offset_bytes: 0,
+                width_bits: 32,
+                access: None,
+                reset_value: None,
+                reset_mask: None,
+                array: Some(ArrayShape {
+                    axes: vec![ArrayAxis {
+                        count: 2,
+                        labels: Vec::new(),
+                        stride_bytes: Some(4),
+                    }],
+                }),
+                alternate_of_ref: None,
+                fields: vec![Field {
+                    id: "field.arrayed.value".to_string(),
+                    name: "VALUE".to_string(),
+                    description: None,
+                    bit_range: BitRange { lsb: 0, msb: 0 },
+                    access: None,
+                    array: None,
+                    enumerated_sets: Vec::new(),
+                }],
+            }),
+            RegisterBlockMember::Register(Register {
+                id: "reg.target".to_string(),
+                name: "TARGET".to_string(),
+                display_name: None,
+                description: None,
+                offset_bytes: 8,
+                width_bits: 32,
+                access: None,
+                reset_value: None,
+                reset_mask: None,
+                array: None,
+                alternate_of_ref: None,
+                fields: vec![Field {
+                    id: "field.target.ready".to_string(),
+                    name: "READY".to_string(),
+                    description: None,
+                    bit_range: BitRange { lsb: 1, msb: 1 },
+                    access: None,
+                    array: None,
+                    enumerated_sets: Vec::new(),
+                }],
+            }),
+        ];
+
+        let resolved = resolve_structural_field_from_members(
+            "periph.test",
+            0,
+            &members,
+            "field.target.ready",
+            None,
+        )
+        .expect("field resolution should succeed")
+        .expect("target field should resolve");
+
+        assert_eq!(resolved.register_id, "reg.target");
+        assert_eq!(resolved.field.id, "field.target.ready");
     }
 
     fn write_embassy_fixture(use_custom_driver: bool) -> NamedTempFile {
