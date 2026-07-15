@@ -145,6 +145,65 @@
       ],
       "additionalProperties": false
     },
+    "dmaAsyncChannelBindings": {
+      "type": "object",
+      "description": "Explicit async-completion bindings for one DMA controller channel. These bindings name the transfer-complete and optional half-transfer handles needed to expose Embassy-aligned IRQ-driven DMA futures on a `dma` driver instance.",
+      "properties": {
+        "channelRef": {
+          "description": "Entity ref for the DMA channel whose async completion state this binding describes.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "transferCompleteFlagRef": {
+          "description": "Entity ref for the DMA transfer-complete status flag for this channel.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "transferCompleteClearRef": {
+          "description": "Entity ref for the DMA transfer-complete clear/acknowledge handle written by the generated DMA interrupt handler.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "transferCompleteInterruptEnableRef": {
+          "description": "Entity ref for the DMA transfer-complete interrupt-enable handle for this channel.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "halfTransferFlagRef": {
+          "description": "Optional entity ref for the DMA half-transfer status flag for this channel.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "halfTransferClearRef": {
+          "description": "Optional entity ref for the DMA half-transfer clear/acknowledge handle written by the generated DMA interrupt handler.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "halfTransferInterruptEnableRef": {
+          "description": "Optional entity ref for the DMA half-transfer interrupt-enable handle for this channel.",
+          "$ref": "../common.json#/$defs/entityRef"
+        }
+      },
+      "required": [
+        "channelRef",
+        "transferCompleteFlagRef",
+        "transferCompleteClearRef",
+        "transferCompleteInterruptEnableRef"
+      ],
+      "additionalProperties": false
+    },
+    "dmaAsyncBindings": {
+      "type": "object",
+      "description": "Optional explicit async-completion lowering bindings for `dma` driver instances. These bindings authorize the generator to expose IRQ-driven DMA completion futures only for the named channels and only when the same driver instance also carries the corresponding interrupt routes.",
+      "properties": {
+        "channels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dmaAsyncChannelBindings"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "channels"
+      ],
+      "additionalProperties": false
+    },
     "adcDmaBindings": {
       "type": "object",
       "description": "Optional explicit buffered-sampling lowering bindings for `adc` driver instances that select `loweringPattern = \"regular-sequence-adc-dma\"`. These bindings name the exact ADC and DMA roles the generator may use for software-started regular-group buffered sampling. They do not authorize injected-group or dual-ADC DMA behavior. Generators must fail explicitly rather than inferring these roles from vendor register names when the selected lowering family requires them.",
@@ -393,6 +452,9 @@
             "adcDmaBindings": {
               "$ref": "#/$defs/adcDmaBindings"
             },
+            "dmaAsyncBindings": {
+              "$ref": "#/$defs/dmaAsyncBindings"
+            },
             "clockBindingRefs": {
               "description": "Referenced clock bindings that may justify emitted clock-gating or bring-up helpers when those bindings and their linked structural/semantic data are sufficient for real lowering.",
               "type": "array",
@@ -450,7 +512,7 @@
               "uniqueItems": true
             },
             "capabilityTags": {
-              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support. The accompanying `timeDriverSource` selector determines whether that support is the existing SysTick-backed interrupt path, an explicitly modeled hardware-timer-backed path, or an explicitly modeled rtc-backed path; `timeDriverTickHz` fixes the Embassy tick rate for modeled non-SysTick sources; `timeDriverBindings` names the exact non-SysTick lowering handles when that path is used; and `adcDmaBindings` names the exact direct roles for `regular-sequence-adc-dma` buffered sampling when that ADC family is selected.",
+              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support. The accompanying `timeDriverSource` selector determines whether that support is the existing SysTick-backed interrupt path, an explicitly modeled hardware-timer-backed path, or an explicitly modeled rtc-backed path; `timeDriverTickHz` fixes the Embassy tick rate for modeled non-SysTick sources; `timeDriverBindings` names the exact non-SysTick lowering handles when that path is used; `adcDmaBindings` names the exact direct roles for `regular-sequence-adc-dma` buffered sampling when that ADC family is selected; and `dmaAsyncBindings` names the exact channel-local interrupt/flag handles for generated DMA completion futures.",
               "type": "array",
               "items": {
                 "type": "string"

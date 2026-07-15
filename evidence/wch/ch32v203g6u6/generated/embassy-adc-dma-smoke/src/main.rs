@@ -8,14 +8,15 @@ use core::{
 };
 
 use ch32v203g6u6_embassy_hal::{
-    adc::{ADC1, DRV_ADC1_RESOURCES},
+    adc::{ADC1, ADC1Resources},
+    dma::{DMA1, DMA1Resources},
     gpio::{DRV_GPIOA_RESOURCES, GPIOA},
     rcc::{DRV_RCC_RESOURCES, RCC},
     usb::{DRV_USBD_RESOURCES, USBD, USBDUsbDriver},
     wch,
 };
 use embassy_executor::Spawner;
-use embassy_time::{Duration, Timer};
+use embassy_time::{Duration, Timer, with_timeout};
 use embassy_usb::{
     Builder, Config, UsbDevice,
     class::cdc_acm::{CdcAcmClass, State as CdcState},
@@ -28,6 +29,7 @@ const ONE_SHOT_BUFFER_LEN: usize = 32;
 const IDLE_RETRY_MS: u64 = 100;
 const REPORT_PERIOD_MS: u64 = 1000;
 const DMA_POLL_TIMEOUT_MS: u64 = 250;
+const DMA_CHANNEL_INDEX: u32 = 1;
 
 static mut CONFIG_DESCRIPTOR: [u8; 256] = [0; 256];
 static mut BOS_DESCRIPTOR: [u8; 64] = [0; 64];
@@ -35,8 +37,40 @@ static mut MSOS_DESCRIPTOR: [u8; 64] = [0; 64];
 static mut CONTROL_BUFFER: [u8; 128] = [0; 128];
 static mut CDC_STATE: CdcState<'static> = CdcState::new();
 
+const SMOKE_ADC1_RESOURCES: ADC1Resources = ADC1Resources {
+    clocks: &[],
+    resets: &[],
+    interrupt_sources: &[],
+    interrupts: &[],
+    dma_channels: &[],
+    dma: &[],
+    pins: &[],
+    init_operations: &[],
+    state_machines: &[],
+    lowering_pattern: None,
+    time_driver_source: None,
+    capability_tags: &[],
+};
+
+const SMOKE_DMA1_RESOURCES: DMA1Resources = DMA1Resources {
+    clocks: &[],
+    resets: &[],
+    interrupt_sources: &[],
+    interrupts: &[],
+    dma_channels: &[],
+    dma: &[],
+    pins: &[],
+    init_operations: &[],
+    state_machines: &[],
+    lowering_pattern: None,
+    time_driver_source: None,
+    capability_tags: &[],
+};
+
 const RCC_CFGR0: *mut u32 = 0x4002_1004 as *mut u32;
 const GPIOA_CFGLR: *mut u32 = 0x4001_0800 as *mut u32;
+const PFIC_IENR1: *mut u32 = 0xE000_E100 as *mut u32;
+const PFIC_DMA1_CHANNEL1_IRQ_BIT: u32 = 1 << 27;
 const RCC_CFGR0_ADCPRE_MASK: u32 = 0x0000_C000;
 const RCC_CFGR0_ADCPRE_DIV8: u32 = 0x0000_C000;
 const GPIOA_CFGLR_PA7_MASK: u32 = 0xF000_0000;
@@ -61,9 +95,22 @@ fn configure_adc_path() {
     modify_u32(GPIOA_CFGLR, GPIOA_CFGLR_PA7_MASK, 0x0000_0000);
 }
 
+fn enable_dma1_channel1_irq() {
+    unsafe {
+        write_volatile(PFIC_IENR1, PFIC_DMA1_CHANNEL1_IRQ_BIT);
+    }
+}
+
 #[embassy_executor::task]
 async fn usb_task(mut device: UsbDevice<'static, USBDUsbDriver>) -> ! {
     device.run().await
+}
+
+#[allow(non_snake_case)]
+#[unsafe(no_mangle)]
+extern "C" fn DMA1_Channel1() {
+    let dma1 = DMA1::new(SMOKE_DMA1_RESOURCES).unwrap();
+    let _ = dma1.on_interrupt(DMA_CHANNEL_INDEX);
 }
 
 struct SampleStats {
@@ -105,19 +152,19 @@ async fn write_line(cdc: &mut CdcAcmClass<'static, USBDUsbDriver>, line: &str) -
 
 async fn run_one_shot(
     adc1: &ADC1,
+    dma1: &DMA1,
     cdc: &mut CdcAcmClass<'static, USBDUsbDriver>,
 ) -> Result<(), ()> {
     let mut samples = [0u16; ONE_SHOT_BUFFER_LEN];
     configure_adc_path();
     write_line(cdc, "oneshot start\r\n").await?;
-    adc1.start_one_shot_dma_u16(ADC_CHANNELS, ADC_SAMPLE_TIME_CODE, &mut samples)
-        .map_err(|_| ())?;
-
-    for elapsed_ms in 0..DMA_POLL_TIMEOUT_MS {
-        if adc1.is_dma_transfer_complete().map_err(|_| ())? {
-            adc1.clear_dma_transfer_complete().map_err(|_| ())?;
-            adc1.stop_dma_sampling().map_err(|_| ())?;
-
+    match with_timeout(
+        Duration::from_millis(DMA_POLL_TIMEOUT_MS),
+        adc1.sample_one_shot_dma_u16_async(dma1, ADC_CHANNELS, ADC_SAMPLE_TIME_CODE, &mut samples),
+    )
+    .await
+    {
+        Ok(Ok(())) => {
             let stats = sample_stats(&samples);
             let mut line: String<96> = String::new();
             let _ = write!(
@@ -130,12 +177,12 @@ async fn run_one_shot(
                 stats.max,
                 stats.avg
             );
-            return write_line(cdc, line.as_str()).await;
+            write_line(cdc, line.as_str()).await
         }
-        Timer::after(Duration::from_millis(1)).await;
-        if elapsed_ms == DMA_POLL_TIMEOUT_MS - 1 {
+        _ => {
             let half = adc1.is_dma_half_transfer().map_err(|_| ())? as u8;
-            let full = adc1.is_dma_transfer_complete().map_err(|_| ())? as u8;
+            let full = dma1.is_transfer_complete(DMA_CHANNEL_INDEX).map_err(|_| ())? as u8;
+            let _ = dma1.disable_transfer_complete_interrupt(DMA_CHANNEL_INDEX);
             let _ = adc1.stop_dma_sampling();
             let mut line: String<80> = String::new();
             let _ = write!(
@@ -147,10 +194,9 @@ async fn run_one_shot(
                 samples[samples.len() - 1]
             );
             write_line(cdc, line.as_str()).await?;
-            return Err(());
+            Err(())
         }
     }
-    Err(())
 }
 
 #[embassy_executor::main(entry = "riscv_rt::entry")]
@@ -164,10 +210,12 @@ async fn main(spawner: Spawner) -> ! {
     gpioa.release_reset().unwrap();
     configure_adc_path();
 
-    let adc1 = ADC1::new(DRV_ADC1_RESOURCES).unwrap();
+    let adc1 = ADC1::new(SMOKE_ADC1_RESOURCES).unwrap();
     adc1.enable_clock().unwrap();
     adc1.release_reset().unwrap();
     adc1.apply_calibrate().unwrap();
+    let dma1 = DMA1::new(SMOKE_DMA1_RESOURCES).unwrap();
+    enable_dma1_channel1_irq();
 
     let usbd = USBD::new(DRV_USBD_RESOURCES).unwrap();
     let driver = usbd.embassy_usb_driver();
@@ -210,7 +258,7 @@ async fn main(spawner: Spawner) -> ! {
             if !cdc.dtr() {
                 break;
             }
-            if run_one_shot(&adc1, &mut cdc).await.is_err() {
+            if run_one_shot(&adc1, &dma1, &mut cdc).await.is_err() {
                 break;
             }
             Timer::after(Duration::from_millis(REPORT_PERIOD_MS)).await;

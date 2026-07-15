@@ -297,6 +297,13 @@ route-to-controller closure keeps the ADC family explicit about
 sequence/sample/data roles while avoiding a second, drifting source of truth
 for the same DMA controller gate or reset path.
 
+IRQ-driven DMA futures sit one layer lower. Instead of letting each peripheral
+family invent its own wake/clear/interrupt bookkeeping, the `dma` driver
+instance now owns an explicit `dmaAsyncBindings` map for the DMA channels that
+may wake async tasks. Peripheral families such as
+`regular-sequence-adc-dma` compose on top of that controller-local async DMA
+surface rather than embedding a second copy of the same interrupt logic.
+
 Separately, ADC families may require init/calibration helpers to wait for
 ready-status bits to clear before software start or DMA sampling is valid. That
 wait must stay in the approved semantic operation itself as explicit field polls

@@ -1837,6 +1837,27 @@ struct EmbassyAdcDmaBindings {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct EmbassyDmaAsyncChannelBindings {
+    channel_ref: String,
+    transfer_complete_flag_ref: String,
+    transfer_complete_clear_ref: String,
+    transfer_complete_interrupt_enable_ref: String,
+    #[serde(default)]
+    half_transfer_flag_ref: Option<String>,
+    #[serde(default)]
+    half_transfer_clear_ref: Option<String>,
+    #[serde(default)]
+    half_transfer_interrupt_enable_ref: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EmbassyDmaAsyncBindings {
+    channels: Vec<EmbassyDmaAsyncChannelBindings>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct EmbassyDriverInstance {
     id: String,
     name: String,
@@ -1853,6 +1874,8 @@ struct EmbassyDriverInstance {
     time_driver_bindings: Option<EmbassyTimeDriverBindings>,
     #[serde(default)]
     adc_dma_bindings: Option<EmbassyAdcDmaBindings>,
+    #[serde(default)]
+    dma_async_bindings: Option<EmbassyDmaAsyncBindings>,
     #[serde(default)]
     clock_binding_refs: Vec<String>,
     #[serde(default)]
@@ -1908,6 +1931,7 @@ struct ResolvedDriverInstance {
     time_driver_tick_hz: Option<u64>,
     time_driver_bindings: Option<EmbassyTimeDriverBindings>,
     adc_dma_bindings: Option<EmbassyAdcDmaBindings>,
+    dma_async_bindings: Option<EmbassyDmaAsyncBindings>,
     target: McuCanonicalBlock,
     clock_bindings: Vec<McuClockBinding>,
     reset_bindings: Vec<McuResetBinding>,
@@ -1971,6 +1995,10 @@ fn time_driver_bindings(driver: &ResolvedDriverInstance) -> Option<&EmbassyTimeD
 
 fn adc_dma_bindings(driver: &ResolvedDriverInstance) -> Option<&EmbassyAdcDmaBindings> {
     driver.adc_dma_bindings.as_ref()
+}
+
+fn dma_async_bindings(driver: &ResolvedDriverInstance) -> Option<&EmbassyDmaAsyncBindings> {
+    driver.dma_async_bindings.as_ref()
 }
 
 fn has_regular_sequence_adc_dma_lowering(pattern: Option<&str>) -> bool {
@@ -2291,6 +2319,12 @@ impl EmbassyGenerationModel {
                 state_machines: &state_machines,
             };
             validate_driver_requirements(driver, &requirements)?;
+            validate_dma_async_bindings(
+                driver,
+                &driver_dma_channels,
+                &driver_interrupt_sources,
+                &interrupt_routes,
+            )?;
             validate_driver_lowering_pattern(driver, &init_operations)?;
 
             drivers.push(ResolvedDriverInstance {
@@ -2304,6 +2338,7 @@ impl EmbassyGenerationModel {
                 time_driver_tick_hz: driver.time_driver_tick_hz,
                 time_driver_bindings: driver.time_driver_bindings.clone(),
                 adc_dma_bindings: driver.adc_dma_bindings.clone(),
+                dma_async_bindings: driver.dma_async_bindings.clone(),
                 target,
                 clock_bindings,
                 reset_bindings,
@@ -3164,6 +3199,41 @@ fn validate_driver_resource_scope(
                     );
                 }
             }
+            for route in resources.interrupt_routes {
+                let source = resources
+                    .interrupt_sources
+                    .get(route.source_ref.as_str())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "driver {} interrupt route {} references unknown source {}",
+                            driver.id,
+                            route.id,
+                            route.source_ref
+                        )
+                    })?;
+                let channel = resources
+                    .dma_channels
+                    .get(source.source_ref.as_str())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "driver {} interrupt route {} references source {} for unknown DMA channel {}",
+                            driver.id,
+                            route.id,
+                            source.id,
+                            source.source_ref
+                        )
+                    })?;
+                if channel.controller_ref != target_ref {
+                    bail!(
+                        "driver {} interrupt route {} references DMA channel {} through controller {} instead of {}",
+                        driver.id,
+                        route.id,
+                        channel.id,
+                        channel.controller_ref,
+                        target_ref
+                    );
+                }
+            }
         }
         "rcc" => {}
         _ => {}
@@ -3599,6 +3669,12 @@ fn validate_driver_requirements(
             if requirements.dma_routes.is_empty() {
                 bail!("dma driver {} requires at least one DMA route", driver.id);
             }
+            if driver.dma_async_bindings.is_some() && requirements.interrupt_routes.is_empty() {
+                bail!(
+                    "dma driver {} requires interrupt routes for dmaAsyncBindings-backed completion futures",
+                    driver.id
+                );
+            }
         }
         "interrupt" if requirements.interrupt_routes.is_empty() => {
             bail!("interrupt driver {} requires interrupt routes", driver.id);
@@ -3702,6 +3778,73 @@ fn validate_regular_sequence_adc_dma_lowering(driver: &EmbassyDriverInstance) ->
                 driver.id,
                 ADC_LOWERING_REGULAR_SEQUENCE_DMA,
                 binding.channel_index
+            );
+        }
+    }
+    Ok(())
+}
+
+fn validate_dma_async_bindings(
+    driver: &EmbassyDriverInstance,
+    dma_channels: &[McuDmaChannel],
+    interrupt_sources: &[McuInterruptSource],
+    interrupt_routes: &[McuInterruptRoute],
+) -> Result<()> {
+    let Some(bindings) = driver.dma_async_bindings.as_ref() else {
+        return Ok(());
+    };
+    if driver.driver_kind != "dma" {
+        bail!(
+            "driver {} declares dmaAsyncBindings but that contract is only supported on dma drivers",
+            driver.id
+        );
+    }
+    if interrupt_routes.is_empty() {
+        bail!(
+            "driver {} declares dmaAsyncBindings but omits required interruptRouteRefs",
+            driver.id
+        );
+    }
+    let mut seen_channels = BTreeSet::new();
+    for binding in &bindings.channels {
+        if !seen_channels.insert(binding.channel_ref.as_str()) {
+            bail!(
+                "driver {} dmaAsyncBindings repeats channelRef {}",
+                driver.id,
+                binding.channel_ref
+            );
+        }
+        let channel = dma_channels
+            .iter()
+            .find(|channel| channel.id == binding.channel_ref)
+            .ok_or_else(|| {
+                anyhow!(
+                    "driver {} dmaAsyncBindings references unknown DMA channel {}",
+                    driver.id,
+                    binding.channel_ref
+                )
+            })?;
+        if !interrupt_sources
+            .iter()
+            .any(|source| source.source_ref == channel.id)
+        {
+            bail!(
+                "driver {} dmaAsyncBindings channel {} lacks a referenced interrupt source/route",
+                driver.id,
+                binding.channel_ref
+            );
+        }
+        let has_any_half = binding.half_transfer_flag_ref.is_some()
+            || binding.half_transfer_clear_ref.is_some()
+            || binding.half_transfer_interrupt_enable_ref.is_some();
+        let has_all_half = binding.half_transfer_flag_ref.is_some()
+            && binding.half_transfer_clear_ref.is_some()
+            && binding.half_transfer_interrupt_enable_ref.is_some();
+        if has_any_half && !has_all_half {
+            bail!(
+                "driver {} dmaAsyncBindings channel {} must provide halfTransferFlagRef, halfTransferClearRef, and halfTransferInterruptEnableRef together",
+                driver.id,
+                binding.channel_ref
             );
         }
     }
@@ -4120,6 +4263,9 @@ fn render_driver_support_items(
     }
     if driver.driver_kind == "rtc" && driver.module_name == "rtc" {
         out.push_str(&render_rtc_support_items(model, driver)?);
+    }
+    if driver.driver_kind == "dma" {
+        out.push_str(&render_dma_support_items(model, driver)?);
     }
     if driver_uses_usb_fsdev_pma_btable_lowering(driver) {
         out.push_str(&render_usb_fsdev_support_items(driver));
@@ -5110,6 +5256,7 @@ fn render_driver_methods(
     methods.extend(render_usart_methods(model, driver)?);
     methods.extend(render_spi_methods(model, driver)?);
     methods.extend(render_adc_methods(model, driver)?);
+    methods.extend(render_dma_methods(model, driver)?);
     methods.extend(render_usb_device_methods(model, driver)?);
     methods.extend(render_rtc_methods(model, driver)?);
     methods.extend(render_rcc_methods(model, driver)?);
@@ -8607,6 +8754,20 @@ fn render_regular_sequence_adc_dma_methods(
         code: one_shot,
     });
 
+    if let Some(dma_driver) = model.drivers.iter().find(|candidate| {
+        candidate.driver_kind == "dma" && candidate.target.id == dma_channel.controller_ref
+    }) && dma_async_bindings(dma_driver).is_some()
+    {
+        methods.push(GeneratedMethod {
+            name: "sample_one_shot_dma_u16_async".to_string(),
+            code: format!(
+                "    pub async fn sample_one_shot_dma_u16_async(&self, dma: &crate::dma::{dma_type}, channels: &[u8], sample_time_code: u8, buffer: &mut [u16]) -> Result<(), metadata::Error> {{\n        dma.enable_clock()?;\n        dma.prepare_transfer_complete_wait({channel_index})?;\n        dma.enable_transfer_complete_interrupt({channel_index})?;\n        if let Err(error) = self.start_one_shot_dma_u16(channels, sample_time_code, buffer) {{\n            let _ = dma.disable_transfer_complete_interrupt({channel_index});\n            return Err(error);\n        }}\n        let wait_result = dma.wait_transfer_complete({channel_index}).await;\n        let disable_result = dma.disable_transfer_complete_interrupt({channel_index});\n        if let Err(error) = wait_result {{\n            let _ = disable_result;\n            return Err(error);\n        }}\n        disable_result?;\n        self.stop_dma_sampling()?;\n        Ok(())\n    }}\n",
+                dma_type = dma_driver.type_name,
+                channel_index = dma_channel.channel_index,
+            ),
+        });
+    }
+
     if !bindings.prepare_circular_operation_refs.is_empty() {
         let mut circular = String::from(
             "    pub fn start_circular_dma_u16(&self, channels: &[u8], sample_time_code: u8, buffer: &mut [u16]) -> Result<(), metadata::Error> {\n",
@@ -8811,6 +8972,444 @@ fn render_regular_sequence_adc_dma_methods(
     }
 
     Ok(methods)
+}
+
+fn render_dma_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    if driver.driver_kind != "dma" {
+        return Ok(Vec::new());
+    }
+    let Some(bindings) = dma_async_bindings(driver) else {
+        return Ok(Vec::new());
+    };
+
+    let unsupported_error =
+        "\"DMA async completion is not bound for the requested channel\"".to_string();
+    let has_half_transfer = bindings
+        .channels
+        .iter()
+        .any(|binding| binding.half_transfer_flag_ref.is_some());
+
+    let mut enable_tc_arms = String::new();
+    let mut disable_tc_arms = String::new();
+    let mut clear_tc_arms = String::new();
+    let mut is_tc_arms = String::new();
+    let mut on_interrupt_arms = String::new();
+    let mut enable_ht_arms = String::new();
+    let mut disable_ht_arms = String::new();
+    let mut clear_ht_arms = String::new();
+    let mut is_ht_arms = String::new();
+
+    for binding in &bindings.channels {
+        let channel = driver
+            .dma_channels
+            .iter()
+            .find(|candidate| candidate.id == binding.channel_ref)
+            .ok_or_else(|| {
+                anyhow!(
+                    "driver {} dmaAsyncBindings references unresolved DMA channel {}",
+                    driver.id,
+                    binding.channel_ref
+                )
+            })?;
+        let dma_array_index = channel.channel_index.checked_sub(1).ok_or_else(|| {
+            anyhow!(
+                "driver {} resolved DMA channel {} with invalid channelIndex {}",
+                driver.id,
+                channel.id,
+                channel.channel_index
+            )
+        })?;
+
+        let tc_enable_field = resolve_structural_field_target(
+            model,
+            &binding.transfer_complete_interrupt_enable_ref,
+            None,
+            Some(dma_array_index),
+            &driver.id,
+            "DMA async transfer-complete interrupt enable",
+        )?;
+        let tc_enable_register = resolve_structural_register_ref(
+            model,
+            &tc_enable_field.register_id,
+            Some(tc_enable_field.peripheral_ref.as_str()),
+            Some(dma_array_index),
+            &driver.id,
+            "DMA async transfer-complete interrupt enable",
+        )?;
+        let enable_tc_stmt = render_register_write_statement(
+            &tc_enable_register,
+            &tc_enable_field.field,
+            1,
+            "                ",
+        )?;
+        let disable_tc_stmt = render_register_write_statement(
+            &tc_enable_register,
+            &tc_enable_field.field,
+            0,
+            "                ",
+        )?;
+
+        let tc_flag_field = resolve_structural_field_target(
+            model,
+            &binding.transfer_complete_flag_ref,
+            None,
+            Some(dma_array_index),
+            &driver.id,
+            "DMA async transfer-complete flag",
+        )?;
+        let tc_flag_register = resolve_structural_register_ref(
+            model,
+            &tc_flag_field.register_id,
+            Some(tc_flag_field.peripheral_ref.as_str()),
+            Some(dma_array_index),
+            &driver.id,
+            "DMA async transfer-complete flag",
+        )?;
+        let tc_mask = field_bit_mask(&tc_flag_field.field, &tc_flag_register)?;
+
+        let tc_clear_field = resolve_structural_field_target(
+            model,
+            &binding.transfer_complete_clear_ref,
+            None,
+            Some(dma_array_index),
+            &driver.id,
+            "DMA async transfer-complete clear",
+        )?;
+        let tc_clear_register = resolve_structural_register_ref(
+            model,
+            &tc_clear_field.register_id,
+            Some(tc_clear_field.peripheral_ref.as_str()),
+            Some(dma_array_index),
+            &driver.id,
+            "DMA async transfer-complete clear",
+        )?;
+        let clear_tc_stmt = render_register_write_statement(
+            &tc_clear_register,
+            &tc_clear_field.field,
+            1,
+            "                ",
+        )?;
+
+        enable_tc_arms.push_str(&format!(
+            "            {} => {{\n{}                Ok(())\n            }}\n",
+            channel.channel_index, enable_tc_stmt
+        ));
+        disable_tc_arms.push_str(&format!(
+            "            {} => {{\n{}                Ok(())\n            }}\n",
+            channel.channel_index, disable_tc_stmt
+        ));
+        clear_tc_arms.push_str(&format!(
+            "            {} => {{\n{}                Ok(())\n            }}\n",
+            channel.channel_index, clear_tc_stmt
+        ));
+        is_tc_arms.push_str(&format!(
+            "            {} => Ok((read_u32(0x{:X}u64)? & 0x{:08X}u32) != 0),\n",
+            channel.channel_index, tc_flag_register.absolute_address, tc_mask
+        ));
+
+        let mut on_interrupt_arm = format!(
+            "            {} => {{\n                if (read_u32(0x{:X}u64)? & 0x{:08X}u32) != 0 {{\n{}                    generated_{}_signal_transfer_complete({})?;\n                }}\n",
+            channel.channel_index,
+            tc_flag_register.absolute_address,
+            tc_mask,
+            clear_tc_stmt,
+            to_rust_const_name(&driver.id).to_lowercase(),
+            channel.channel_index
+        );
+
+        if let (Some(ht_flag_ref), Some(ht_clear_ref), Some(ht_enable_ref)) = (
+            binding.half_transfer_flag_ref.as_ref(),
+            binding.half_transfer_clear_ref.as_ref(),
+            binding.half_transfer_interrupt_enable_ref.as_ref(),
+        ) {
+            let ht_enable_field = resolve_structural_field_target(
+                model,
+                ht_enable_ref,
+                None,
+                Some(dma_array_index),
+                &driver.id,
+                "DMA async half-transfer interrupt enable",
+            )?;
+            let ht_enable_register = resolve_structural_register_ref(
+                model,
+                &ht_enable_field.register_id,
+                Some(ht_enable_field.peripheral_ref.as_str()),
+                Some(dma_array_index),
+                &driver.id,
+                "DMA async half-transfer interrupt enable",
+            )?;
+            let enable_ht_stmt = render_register_write_statement(
+                &ht_enable_register,
+                &ht_enable_field.field,
+                1,
+                "                ",
+            )?;
+            let disable_ht_stmt = render_register_write_statement(
+                &ht_enable_register,
+                &ht_enable_field.field,
+                0,
+                "                ",
+            )?;
+
+            let ht_flag_field = resolve_structural_field_target(
+                model,
+                ht_flag_ref,
+                None,
+                Some(dma_array_index),
+                &driver.id,
+                "DMA async half-transfer flag",
+            )?;
+            let ht_flag_register = resolve_structural_register_ref(
+                model,
+                &ht_flag_field.register_id,
+                Some(ht_flag_field.peripheral_ref.as_str()),
+                Some(dma_array_index),
+                &driver.id,
+                "DMA async half-transfer flag",
+            )?;
+            let ht_mask = field_bit_mask(&ht_flag_field.field, &ht_flag_register)?;
+
+            let ht_clear_field = resolve_structural_field_target(
+                model,
+                ht_clear_ref,
+                None,
+                Some(dma_array_index),
+                &driver.id,
+                "DMA async half-transfer clear",
+            )?;
+            let ht_clear_register = resolve_structural_register_ref(
+                model,
+                &ht_clear_field.register_id,
+                Some(ht_clear_field.peripheral_ref.as_str()),
+                Some(dma_array_index),
+                &driver.id,
+                "DMA async half-transfer clear",
+            )?;
+            let clear_ht_stmt = render_register_write_statement(
+                &ht_clear_register,
+                &ht_clear_field.field,
+                1,
+                "                ",
+            )?;
+
+            enable_ht_arms.push_str(&format!(
+                "            {} => {{\n{}                Ok(())\n            }}\n",
+                channel.channel_index, enable_ht_stmt
+            ));
+            disable_ht_arms.push_str(&format!(
+                "            {} => {{\n{}                Ok(())\n            }}\n",
+                channel.channel_index, disable_ht_stmt
+            ));
+            clear_ht_arms.push_str(&format!(
+                "            {} => {{\n{}                Ok(())\n            }}\n",
+                channel.channel_index, clear_ht_stmt
+            ));
+            is_ht_arms.push_str(&format!(
+                "            {} => Ok((read_u32(0x{:X}u64)? & 0x{:08X}u32) != 0),\n",
+                channel.channel_index, ht_flag_register.absolute_address, ht_mask
+            ));
+
+            on_interrupt_arm.push_str(&format!(
+                "                if (read_u32(0x{:X}u64)? & 0x{:08X}u32) != 0 {{\n{}                    generated_{}_signal_half_transfer({})?;\n                }}\n",
+                ht_flag_register.absolute_address,
+                ht_mask,
+                clear_ht_stmt,
+                to_rust_const_name(&driver.id).to_lowercase(),
+                channel.channel_index
+            ));
+        }
+        on_interrupt_arm.push_str("                Ok(())\n            }\n");
+        on_interrupt_arms.push_str(&on_interrupt_arm);
+    }
+
+    let prefix = to_rust_const_name(&driver.id).to_lowercase();
+    let mut methods = vec![
+        GeneratedMethod {
+            name: "prepare_transfer_complete_wait".to_string(),
+            code: format!(
+                "    pub fn prepare_transfer_complete_wait(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        generated_{prefix}_prepare_transfer_complete_wait(channel_index)\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "wait_transfer_complete".to_string(),
+            code: format!(
+                "    pub async fn wait_transfer_complete(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        generated_{prefix}_wait_transfer_complete(channel_index).await\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "enable_transfer_complete_interrupt".to_string(),
+            code: format!(
+                "    pub fn enable_transfer_complete_interrupt(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        match channel_index {{\n{enable_tc_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "disable_transfer_complete_interrupt".to_string(),
+            code: format!(
+                "    pub fn disable_transfer_complete_interrupt(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        match channel_index {{\n{disable_tc_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "is_transfer_complete".to_string(),
+            code: format!(
+                "    pub fn is_transfer_complete(&self, channel_index: u32) -> Result<bool, metadata::Error> {{\n        match channel_index {{\n{is_tc_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "clear_transfer_complete".to_string(),
+            code: format!(
+                "    pub fn clear_transfer_complete(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        match channel_index {{\n{clear_tc_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "on_interrupt".to_string(),
+            code: format!(
+                "    pub fn on_interrupt(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        match channel_index {{\n{on_interrupt_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        },
+    ];
+
+    if has_half_transfer {
+        methods.push(GeneratedMethod {
+            name: "prepare_half_transfer_wait".to_string(),
+            code: format!(
+                "    pub fn prepare_half_transfer_wait(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        generated_{prefix}_prepare_half_transfer_wait(channel_index)\n    }}\n"
+            ),
+        });
+        methods.push(GeneratedMethod {
+            name: "wait_half_transfer".to_string(),
+            code: format!(
+                "    pub async fn wait_half_transfer(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        generated_{prefix}_wait_half_transfer(channel_index).await\n    }}\n"
+            ),
+        });
+        methods.push(GeneratedMethod {
+            name: "enable_half_transfer_interrupt".to_string(),
+            code: format!(
+                "    pub fn enable_half_transfer_interrupt(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        match channel_index {{\n{enable_ht_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        });
+        methods.push(GeneratedMethod {
+            name: "disable_half_transfer_interrupt".to_string(),
+            code: format!(
+                "    pub fn disable_half_transfer_interrupt(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        match channel_index {{\n{disable_ht_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        });
+        methods.push(GeneratedMethod {
+            name: "is_half_transfer".to_string(),
+            code: format!(
+                "    pub fn is_half_transfer(&self, channel_index: u32) -> Result<bool, metadata::Error> {{\n        match channel_index {{\n{is_ht_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        });
+        methods.push(GeneratedMethod {
+            name: "clear_half_transfer".to_string(),
+            code: format!(
+                "    pub fn clear_half_transfer(&self, channel_index: u32) -> Result<(), metadata::Error> {{\n        match channel_index {{\n{clear_ht_arms}            _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n        }}\n    }}\n"
+            ),
+        });
+    }
+
+    Ok(methods)
+}
+
+fn render_dma_support_items(
+    _model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    let Some(bindings) = dma_async_bindings(driver) else {
+        return Ok(String::new());
+    };
+    let prefix = to_rust_const_name(&driver.id).to_lowercase();
+    let state_type = format!("Generated{}DmaWaitState", driver.type_name);
+    let state_alias = format!(
+        "GENERATED_{}_DMA_WAIT_STATE",
+        to_rust_const_name(&driver.id)
+    );
+    let has_half_transfer = bindings
+        .channels
+        .iter()
+        .any(|binding| binding.half_transfer_flag_ref.is_some());
+
+    let mut state_statics = String::new();
+    let mut tc_prepare_arms = String::new();
+    let mut tc_wait_arms = String::new();
+    let mut tc_signal_arms = String::new();
+    let mut ht_prepare_arms = String::new();
+    let mut ht_wait_arms = String::new();
+    let mut ht_signal_arms = String::new();
+
+    for binding in &bindings.channels {
+        let channel = driver
+            .dma_channels
+            .iter()
+            .find(|candidate| candidate.id == binding.channel_ref)
+            .ok_or_else(|| {
+                anyhow!(
+                    "driver {} dmaAsyncBindings references unresolved DMA channel {}",
+                    driver.id,
+                    binding.channel_ref
+                )
+            })?;
+        let static_name = format!(
+            "GENERATED_{}_DMA_CH{}_WAIT_STATE",
+            to_rust_const_name(&driver.id),
+            channel.channel_index
+        );
+        state_statics.push_str(&format!(
+            "static {static_name}: critical_section::Mutex<core::cell::RefCell<{state_type}>> = critical_section::Mutex::new(core::cell::RefCell::new({state_type}::new()));\n"
+        ));
+        tc_prepare_arms.push_str(&format!(
+            "            {} => critical_section::with(|cs| {{\n                let mut state = {static_name}.borrow(cs).borrow_mut();\n                state.transfer_complete_ready = false;\n                state.transfer_complete_waker = None;\n                Ok(())\n            }}),\n",
+            channel.channel_index
+        ));
+        tc_wait_arms.push_str(&format!(
+            "            {} => {{\n                let ready = critical_section::with(|cs| {{\n                    let mut state = {static_name}.borrow(cs).borrow_mut();\n                    if state.transfer_complete_ready {{\n                        state.transfer_complete_ready = false;\n                        true\n                    }} else {{\n                        state.transfer_complete_waker = Some(cx.waker().clone());\n                        false\n                    }}\n                }});\n                if ready {{\n                    core::task::Poll::Ready(Ok(()))\n                }} else {{\n                    core::task::Poll::Pending\n                }}\n            }}\n",
+            channel.channel_index
+        ));
+        tc_signal_arms.push_str(&format!(
+            "        {} => {{\n            let waker = critical_section::with(|cs| {{\n                let mut state = {static_name}.borrow(cs).borrow_mut();\n                state.transfer_complete_ready = true;\n                state.transfer_complete_waker.take()\n            }});\n            if let Some(waker) = waker {{\n                waker.wake();\n            }}\n            Ok(())\n        }}\n",
+            channel.channel_index
+        ));
+
+        if binding.half_transfer_flag_ref.is_some() {
+            ht_prepare_arms.push_str(&format!(
+                "            {} => critical_section::with(|cs| {{\n                let mut state = {static_name}.borrow(cs).borrow_mut();\n                state.half_transfer_ready = false;\n                state.half_transfer_waker = None;\n                Ok(())\n            }}),\n",
+                channel.channel_index
+            ));
+            ht_wait_arms.push_str(&format!(
+                "            {} => {{\n                let ready = critical_section::with(|cs| {{\n                    let mut state = {static_name}.borrow(cs).borrow_mut();\n                    if state.half_transfer_ready {{\n                        state.half_transfer_ready = false;\n                        true\n                    }} else {{\n                        state.half_transfer_waker = Some(cx.waker().clone());\n                        false\n                    }}\n                }});\n                if ready {{\n                    core::task::Poll::Ready(Ok(()))\n                }} else {{\n                    core::task::Poll::Pending\n                }}\n            }}\n",
+                channel.channel_index
+            ));
+            ht_signal_arms.push_str(&format!(
+                "        {} => {{\n            let waker = critical_section::with(|cs| {{\n                let mut state = {static_name}.borrow(cs).borrow_mut();\n                state.half_transfer_ready = true;\n                state.half_transfer_waker.take()\n            }});\n            if let Some(waker) = waker {{\n                waker.wake();\n            }}\n            Ok(())\n        }}\n",
+                channel.channel_index
+            ));
+        }
+    }
+
+    let unsupported_error = "\"DMA async completion is not bound for the requested channel\"";
+    let half_fields = if has_half_transfer {
+        "    half_transfer_ready: bool,\n    half_transfer_waker: Option<core::task::Waker>,\n"
+    } else {
+        ""
+    };
+    let half_init = if has_half_transfer {
+        "            half_transfer_ready: false,\n            half_transfer_waker: None,\n"
+    } else {
+        ""
+    };
+    let half_helpers = if has_half_transfer {
+        format!(
+            "\nfn generated_{prefix}_prepare_half_transfer_wait(channel_index: u32) -> Result<(), metadata::Error> {{\n    match channel_index {{\n{ht_prepare_arms}        _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n    }}\n}}\n\nasync fn generated_{prefix}_wait_half_transfer(channel_index: u32) -> Result<(), metadata::Error> {{\n    core::future::poll_fn(|cx| {{\n        match channel_index {{\n{ht_wait_arms}            _ => core::task::Poll::Ready(Err(metadata::Error::InvalidReference({unsupported_error}))),\n        }}\n    }})\n    .await\n}}\n\nfn generated_{prefix}_signal_half_transfer(channel_index: u32) -> Result<(), metadata::Error> {{\n    match channel_index {{\n{ht_signal_arms}        _ => Err(metadata::Error::InvalidReference({unsupported_error})),\n    }}\n}}\n"
+        )
+    } else {
+        String::new()
+    };
+
+    Ok(format!(
+        "\n#[derive(Debug)]\nstruct {state_type} {{\n    transfer_complete_ready: bool,\n    transfer_complete_waker: Option<core::task::Waker>,\n{half_fields}}}\n\nimpl {state_type} {{\n    const fn new() -> Self {{\n        Self {{\n            transfer_complete_ready: false,\n            transfer_complete_waker: None,\n{half_init}        }}\n    }}\n}}\n\nconst {state_alias}: &str = {unsupported_error};\n{state_statics}\nfn generated_{prefix}_prepare_transfer_complete_wait(channel_index: u32) -> Result<(), metadata::Error> {{\n    match channel_index {{\n{tc_prepare_arms}        _ => Err(metadata::Error::InvalidReference({state_alias})),\n    }}\n}}\n\nasync fn generated_{prefix}_wait_transfer_complete(channel_index: u32) -> Result<(), metadata::Error> {{\n    core::future::poll_fn(|cx| {{\n        match channel_index {{\n{tc_wait_arms}            _ => core::task::Poll::Ready(Err(metadata::Error::InvalidReference({state_alias}))),\n        }}\n    }})\n    .await\n}}\n\nfn generated_{prefix}_signal_transfer_complete(channel_index: u32) -> Result<(), metadata::Error> {{\n    match channel_index {{\n{tc_signal_arms}        _ => Err(metadata::Error::InvalidReference({state_alias})),\n    }}\n}}\n{half_helpers}",
+    ))
 }
 
 fn render_rtc_methods(
@@ -17231,8 +17830,11 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
 
         let adc_rs =
             std::fs::read_to_string(output_dir.path().join("src").join("adc.rs")).expect("adc.rs");
+        let dma_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("dma.rs")).expect("dma.rs");
 
         assert!(adc_rs.contains("pub fn start_one_shot_dma_u16"));
+        assert!(adc_rs.contains("pub async fn sample_one_shot_dma_u16_async"));
         assert!(adc_rs.contains("pub fn start_circular_dma_u16"));
         assert!(adc_rs.contains("pub fn stop_dma_sampling"));
         assert!(adc_rs.contains("pub fn is_dma_transfer_complete"));
@@ -17255,6 +17857,9 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(adc_rs.contains("0x4001244Cu64"));
         assert!(adc_rs.contains("modify_u32(0x40020008u64"));
         assert!(adc_rs.contains("modify_u32(0x40021014u64, 0x00000001u32, 0x00000001u32"));
+        assert!(dma_rs.contains("pub async fn wait_transfer_complete"));
+        assert!(dma_rs.contains("pub fn on_interrupt("));
+        assert!(dma_rs.contains("pub fn enable_transfer_complete_interrupt("));
     }
 
     #[test]

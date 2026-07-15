@@ -1906,6 +1906,31 @@ impl ADC1 {
         Ok(())
     }
 
+    pub async fn sample_one_shot_dma_u16_async(
+        &self,
+        dma: &crate::dma::DMA1,
+        channels: &[u8],
+        sample_time_code: u8,
+        buffer: &mut [u16],
+    ) -> Result<(), metadata::Error> {
+        dma.enable_clock()?;
+        dma.prepare_transfer_complete_wait(1)?;
+        dma.enable_transfer_complete_interrupt(1)?;
+        if let Err(error) = self.start_one_shot_dma_u16(channels, sample_time_code, buffer) {
+            let _ = dma.disable_transfer_complete_interrupt(1);
+            return Err(error);
+        }
+        let wait_result = dma.wait_transfer_complete(1).await;
+        let disable_result = dma.disable_transfer_complete_interrupt(1);
+        if let Err(error) = wait_result {
+            let _ = disable_result;
+            return Err(error);
+        }
+        disable_result?;
+        self.stop_dma_sampling()?;
+        Ok(())
+    }
+
     pub fn start_circular_dma_u16(
         &self,
         channels: &[u8],

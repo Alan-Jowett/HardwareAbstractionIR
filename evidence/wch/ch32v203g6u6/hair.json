@@ -75499,6 +75499,9 @@
           "clockBindingRefs": [
             "clk.dma1"
           ],
+          "interruptRouteRefs": [
+            "iroute.dma1.channel1"
+          ],
           "dmaRouteRefs": [
             "dmaroute.adc1.global",
             "dmaroute.spi1.rx",
@@ -75510,6 +75513,16 @@
             "dmaroute.i2c1.tx",
             "dmaroute.i2c1.rx"
           ],
+          "dmaAsyncBindings": {
+            "channels": [
+              {
+                "channelRef": "dmach.dma1.ch1",
+                "transferCompleteFlagRef": "field.dma_intfr.tcif1",
+                "transferCompleteClearRef": "field.dma_intfcr.ctcif1",
+                "transferCompleteInterruptEnableRef": "field.dma_cfgr1.tcie"
+              }
+            ]
+          },
           "provenance": {
             "sourceRefs": [
               "ch32-rs-ch32v203g6u6-yaml"

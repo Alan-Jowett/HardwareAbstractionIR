@@ -85,6 +85,9 @@ First-cut behavior:
   programming roles, and DMA event setup/clear operations used by that path;
   the generated lowering may infer backing DMA controller bring-up from the
   same driver's referenced `dmaRouteRefs`
+- allow a `dma` driver instance to lower to IRQ-driven completion futures only
+  when the profile carries explicit `dmaAsyncBindings` for the bound DMA
+  channels plus the matching interrupt routes
 - allow generated async timing support only when the profile names a unique
   `embassy-time-driver` instance plus an explicit time-driver source contract,
   preserving the existing SysTick-backed path and allowing reusable

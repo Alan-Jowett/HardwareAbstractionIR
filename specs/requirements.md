@@ -234,6 +234,13 @@ Embassy profile contract.
   That dependency shall be inferred from the referenced DMA route/controller
   topology plus the matching `dma` driver instance's clock/reset bindings, not
   from vendor-specific register-name guesses embedded in the ADC lowering.
+- A `dma` driver instance may claim Embassy-aligned IRQ-driven completion
+  futures only when it carries explicit `dmaAsyncBindings` plus the matching
+  `interruptRouteRefs` for the bound DMA channels. Those bindings shall name the
+  per-channel transfer-complete interrupt-enable, status, and clear handles, and
+  may additionally name half-transfer handles when the generated API exposes
+  half-buffer waits. The generator shall fail explicitly rather than inferring
+  DMA interrupt servicing from controller names alone.
 - A `regular-sequence-adc-dma` claim must remain scoped to the regular
   conversion group. Injected-group conversions, dual-ADC combined modes, and
   other ADC DMA families remain out of subset unless a later approved

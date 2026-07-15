@@ -112,8 +112,28 @@ pub const DRV_DMA1_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::Clock
     disable_operation_refs: &[],
 }];
 pub const DRV_DMA1_RESET_BINDINGS: &[metadata::ResetBinding] = &[];
-pub const DRV_DMA1_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];
-pub const DRV_DMA1_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];
+pub const DRV_DMA1_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[metadata::InterruptSource {
+    id: "isrc.dma1.channel1",
+    name: "DMA1 channel 1 interrupt source",
+    source_ref: "dmach.dma1.ch1",
+    producer_ref: None,
+    kind: "dma",
+    flag_refs: &[],
+    clear_operation_refs: &[],
+}];
+pub const DRV_DMA1_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[metadata::InterruptRoute {
+    id: "iroute.dma1.channel1",
+    name: "DMA1 channel 1 interrupt route",
+    source_ref: "isrc.dma1.channel1",
+    interrupt_ref: "int.dma1channel1",
+    controller_ref: "block.pfic",
+    cpu_target_ref: None,
+    line_index: None,
+    route_type: "hardwired",
+    control_refs: &[],
+    acknowledge_operation_refs: &[],
+    shared_group: None,
+}];
 pub const DRV_DMA1_DMA_CHANNELS: &[metadata::DmaChannel] = &[
     metadata::DmaChannel {
         id: "dmach.dma1.ch1",
@@ -330,5 +350,172 @@ impl DMA1 {
     pub fn disable_clock(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40021014u64, 0x00000001u32, 0x00000000u32)?;
         Ok(())
+    }
+
+    pub fn prepare_transfer_complete_wait(
+        &self,
+        channel_index: u32,
+    ) -> Result<(), metadata::Error> {
+        generated_drv_dma1_prepare_transfer_complete_wait(channel_index)
+    }
+
+    pub async fn wait_transfer_complete(&self, channel_index: u32) -> Result<(), metadata::Error> {
+        generated_drv_dma1_wait_transfer_complete(channel_index).await
+    }
+
+    pub fn enable_transfer_complete_interrupt(
+        &self,
+        channel_index: u32,
+    ) -> Result<(), metadata::Error> {
+        match channel_index {
+            1 => {
+                modify_u32(0x40020008u64, 0x00000002u32, 0x00000002u32)?;
+                Ok(())
+            }
+            _ => Err(metadata::Error::InvalidReference(
+                "DMA async completion is not bound for the requested channel",
+            )),
+        }
+    }
+
+    pub fn disable_transfer_complete_interrupt(
+        &self,
+        channel_index: u32,
+    ) -> Result<(), metadata::Error> {
+        match channel_index {
+            1 => {
+                modify_u32(0x40020008u64, 0x00000002u32, 0x00000000u32)?;
+                Ok(())
+            }
+            _ => Err(metadata::Error::InvalidReference(
+                "DMA async completion is not bound for the requested channel",
+            )),
+        }
+    }
+
+    pub fn is_transfer_complete(&self, channel_index: u32) -> Result<bool, metadata::Error> {
+        match channel_index {
+            1 => Ok((read_u32(0x40020000u64)? & 0x00000002u32) != 0),
+            _ => Err(metadata::Error::InvalidReference(
+                "DMA async completion is not bound for the requested channel",
+            )),
+        }
+    }
+
+    pub fn clear_transfer_complete(&self, channel_index: u32) -> Result<(), metadata::Error> {
+        match channel_index {
+            1 => {
+                modify_u32(0x40020004u64, 0x00000002u32, 0x00000002u32)?;
+                Ok(())
+            }
+            _ => Err(metadata::Error::InvalidReference(
+                "DMA async completion is not bound for the requested channel",
+            )),
+        }
+    }
+
+    pub fn on_interrupt(&self, channel_index: u32) -> Result<(), metadata::Error> {
+        match channel_index {
+            1 => {
+                if (read_u32(0x40020000u64)? & 0x00000002u32) != 0 {
+                    modify_u32(0x40020004u64, 0x00000002u32, 0x00000002u32)?;
+                    generated_drv_dma1_signal_transfer_complete(1)?;
+                }
+                Ok(())
+            }
+            _ => Err(metadata::Error::InvalidReference(
+                "DMA async completion is not bound for the requested channel",
+            )),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct GeneratedDMA1DmaWaitState {
+    transfer_complete_ready: bool,
+    transfer_complete_waker: Option<core::task::Waker>,
+}
+
+impl GeneratedDMA1DmaWaitState {
+    const fn new() -> Self {
+        Self {
+            transfer_complete_ready: false,
+            transfer_complete_waker: None,
+        }
+    }
+}
+
+const GENERATED_DRV_DMA1_DMA_WAIT_STATE: &str =
+    "DMA async completion is not bound for the requested channel";
+static GENERATED_DRV_DMA1_DMA_CH1_WAIT_STATE: critical_section::Mutex<
+    core::cell::RefCell<GeneratedDMA1DmaWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GeneratedDMA1DmaWaitState::new()));
+
+fn generated_drv_dma1_prepare_transfer_complete_wait(
+    channel_index: u32,
+) -> Result<(), metadata::Error> {
+    match channel_index {
+        1 => critical_section::with(|cs| {
+            let mut state = GENERATED_DRV_DMA1_DMA_CH1_WAIT_STATE
+                .borrow(cs)
+                .borrow_mut();
+            state.transfer_complete_ready = false;
+            state.transfer_complete_waker = None;
+            Ok(())
+        }),
+        _ => Err(metadata::Error::InvalidReference(
+            GENERATED_DRV_DMA1_DMA_WAIT_STATE,
+        )),
+    }
+}
+
+async fn generated_drv_dma1_wait_transfer_complete(
+    channel_index: u32,
+) -> Result<(), metadata::Error> {
+    core::future::poll_fn(|cx| match channel_index {
+        1 => {
+            let ready = critical_section::with(|cs| {
+                let mut state = GENERATED_DRV_DMA1_DMA_CH1_WAIT_STATE
+                    .borrow(cs)
+                    .borrow_mut();
+                if state.transfer_complete_ready {
+                    state.transfer_complete_ready = false;
+                    true
+                } else {
+                    state.transfer_complete_waker = Some(cx.waker().clone());
+                    false
+                }
+            });
+            if ready {
+                core::task::Poll::Ready(Ok(()))
+            } else {
+                core::task::Poll::Pending
+            }
+        }
+        _ => core::task::Poll::Ready(Err(metadata::Error::InvalidReference(
+            GENERATED_DRV_DMA1_DMA_WAIT_STATE,
+        ))),
+    })
+    .await
+}
+
+fn generated_drv_dma1_signal_transfer_complete(channel_index: u32) -> Result<(), metadata::Error> {
+    match channel_index {
+        1 => {
+            let waker = critical_section::with(|cs| {
+                let mut state = GENERATED_DRV_DMA1_DMA_CH1_WAIT_STATE
+                    .borrow(cs)
+                    .borrow_mut();
+                state.transfer_complete_ready = true;
+                state.transfer_complete_waker.take()
+            });
+            if let Some(waker) = waker {
+                waker.wake();
+            }
+            Ok(())
+        }
+        _ => Err(metadata::Error::InvalidReference(
+            GENERATED_DRV_DMA1_DMA_WAIT_STATE,
+        )),
     }
 }

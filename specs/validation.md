@@ -125,6 +125,11 @@ cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-
   the clock-enable and reset-release writes required by the DMA controller
   reached through the ADC driver's referenced `dmaRouteRefs`, so DMA register
   programming does not depend on an out-of-band smoke-app workaround.
+- If the reference bundle claims IRQ-driven DMA completion futures, generation
+  succeeds only when the same `dma` driver instance carries explicit
+  `dmaAsyncBindings` plus the matching DMA-channel interrupt routes, and the
+  generated HAL exposes those waits only for the channels named by that binding
+  map.
 - If a generated ADC bring-up helper depends on calibration or ready-status
   flags clearing before later sampling can succeed, generation succeeds only
   when the approved init operation models those waits explicitly and the
