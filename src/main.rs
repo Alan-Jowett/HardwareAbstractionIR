@@ -9823,7 +9823,26 @@ impl From<(u8, u16)> for {config_type_name} {{
         Self::new(value.0, value.1)
     }}
 }}
-"#
+
+impl embedded_hal_02::watchdog::Watchdog for {type_name} {{
+    fn feed(&mut self) {{
+        self.feed_watchdog().expect("generated watchdog feed")
+    }}
+}}
+
+impl embedded_hal_02::watchdog::WatchdogEnable for {type_name} {{
+    type Time = {config_type_name};
+
+    fn start<T>(&mut self, period: T)
+    where
+        T: Into<Self::Time>,
+    {{
+        self.start_with_config(period.into())
+            .expect("generated watchdog start")
+    }}
+}}
+"#,
+        type_name = driver.type_name,
     )
 }
 
@@ -9889,6 +9908,9 @@ fn render_watchdog_methods(
     let prescaler_read_expr = render_register_field_value_read_expression(&pscr, &pr)?;
     let reload_read_expr = render_register_field_value_read_expression(&rldr, &rl)?;
     let pending_read_expr = render_register_read_expression(&statr)?;
+    let wait_for_pending_clear = format!(
+        "        while (({pending_read_expr}) & 0x{pending_mask:08X}u32) != 0 {{\n            core::hint::spin_loop();\n        }}\n"
+    );
     let write_prescaler =
         render_register_write_expression_statement(&pscr, &pr, "u32::from(prescaler)", "        ")?;
     let write_reload =
@@ -9944,32 +9966,25 @@ fn render_watchdog_methods(
         GeneratedMethod {
             name: "set_prescaler".to_string(),
             code: format!(
-                "    pub fn set_prescaler(&self, prescaler: u8) -> Result<(), metadata::Error> {{\n        if prescaler > 0x{prescaler_max:02X}u8 {{\n            return Err(metadata::Error::Unsupported(\"watchdog prescaler exceeds the modeled field width\"));\n        }}\n        self.apply_unlock()?;\n{write_prescaler}        Ok(())\n    }}\n"
+                "    pub fn set_prescaler(&self, prescaler: u8) -> Result<(), metadata::Error> {{\n        if prescaler > 0x{prescaler_max:02X}u8 {{\n            return Err(metadata::Error::Unsupported(\"watchdog prescaler exceeds the modeled field width\"));\n        }}\n{wait_for_pending_clear}        self.apply_unlock()?;\n{write_prescaler}{wait_for_pending_clear}        Ok(())\n    }}\n"
             ),
         },
         GeneratedMethod {
             name: "set_reload".to_string(),
             code: format!(
-                "    pub fn set_reload(&self, reload: u16) -> Result<(), metadata::Error> {{\n        if reload > 0x{reload_max:04X}u16 {{\n            return Err(metadata::Error::Unsupported(\"watchdog reload exceeds the modeled field width\"));\n        }}\n        self.apply_unlock()?;\n{write_reload}        Ok(())\n    }}\n"
+                "    pub fn set_reload(&self, reload: u16) -> Result<(), metadata::Error> {{\n        if reload > 0x{reload_max:04X}u16 {{\n            return Err(metadata::Error::Unsupported(\"watchdog reload exceeds the modeled field width\"));\n        }}\n{wait_for_pending_clear}        self.apply_unlock()?;\n{write_reload}{wait_for_pending_clear}        Ok(())\n    }}\n"
             ),
         },
         GeneratedMethod {
             name: "configure".to_string(),
             code: format!(
-                "    pub fn configure(&self, config: {config_type_name}) -> Result<(), metadata::Error> {{\n        let prescaler = config.prescaler;\n        let reload = config.reload;\n        if prescaler > 0x{prescaler_max:02X}u8 {{\n            return Err(metadata::Error::Unsupported(\"watchdog prescaler exceeds the modeled field width\"));\n        }}\n        if reload > 0x{reload_max:04X}u16 {{\n            return Err(metadata::Error::Unsupported(\"watchdog reload exceeds the modeled field width\"));\n        }}\n        while (({pending_read_expr}) & 0x{pending_mask:08X}u32) != 0 {{\n            core::hint::spin_loop();\n        }}\n        self.apply_unlock()?;\n{write_prescaler}        while (({pending_read_expr}) & 0x{pending_mask:08X}u32) != 0 {{\n            core::hint::spin_loop();\n        }}\n        self.apply_unlock()?;\n{write_reload}        while (({pending_read_expr}) & 0x{pending_mask:08X}u32) != 0 {{\n            core::hint::spin_loop();\n        }}\n        Ok(())\n    }}\n"
+                "    pub fn configure(&self, config: {config_type_name}) -> Result<(), metadata::Error> {{\n        let prescaler = config.prescaler;\n        let reload = config.reload;\n        if prescaler > 0x{prescaler_max:02X}u8 {{\n            return Err(metadata::Error::Unsupported(\"watchdog prescaler exceeds the modeled field width\"));\n        }}\n        if reload > 0x{reload_max:04X}u16 {{\n            return Err(metadata::Error::Unsupported(\"watchdog reload exceeds the modeled field width\"));\n        }}\n{wait_for_pending_clear}        self.apply_unlock()?;\n{write_prescaler}{wait_for_pending_clear}        self.apply_unlock()?;\n{write_reload}{wait_for_pending_clear}        Ok(())\n    }}\n"
             ),
         },
         GeneratedMethod {
             name: "start_with_config".to_string(),
             code: format!(
                 "    pub fn start_with_config(&self, config: {config_type_name}) -> Result<(), metadata::Error> {{\n        self.configure(config)?;\n        self.apply_start()?;\n        Ok(())\n    }}\n"
-            ),
-        },
-        GeneratedMethod {
-            name: "__watchdog_embedded_hal_02_impls".to_string(),
-            code: format!(
-                "}}\n\nimpl embedded_hal_02::watchdog::Watchdog for {type_name} {{\n    fn feed(&mut self) {{\n        self.feed_watchdog().expect(\"generated watchdog feed\")\n    }}\n}}\n\nimpl embedded_hal_02::watchdog::WatchdogEnable for {type_name} {{\n    type Time = {config_type_name};\n\n    fn start<T>(&mut self, period: T)\n    where\n        T: Into<Self::Time>,\n    {{\n        self.start_with_config(period.into())\n            .expect(\"generated watchdog start\")\n    }}\n}}\n\nimpl {type_name} {{\n",
-                type_name = driver.type_name,
             ),
         },
     ])

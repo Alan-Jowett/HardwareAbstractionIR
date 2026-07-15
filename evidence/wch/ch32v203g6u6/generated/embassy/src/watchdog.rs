@@ -258,12 +258,18 @@ impl IWDG {
                 "watchdog prescaler exceeds the modeled field width",
             ));
         }
+        while ((read_u32(0x4000300Cu64)?) & 0x00000003u32) != 0 {
+            core::hint::spin_loop();
+        }
         self.apply_unlock()?;
         modify_u32(
             0x40003004u64,
             0x00000007u32,
             (u32::from(prescaler)) & 0x00000007u32,
         )?;
+        while ((read_u32(0x4000300Cu64)?) & 0x00000003u32) != 0 {
+            core::hint::spin_loop();
+        }
         Ok(())
     }
 
@@ -273,12 +279,18 @@ impl IWDG {
                 "watchdog reload exceeds the modeled field width",
             ));
         }
+        while ((read_u32(0x4000300Cu64)?) & 0x00000003u32) != 0 {
+            core::hint::spin_loop();
+        }
         self.apply_unlock()?;
         modify_u32(
             0x40003008u64,
             0x00000FFFu32,
             (u32::from(reload)) & 0x00000FFFu32,
         )?;
+        while ((read_u32(0x4000300Cu64)?) & 0x00000003u32) != 0 {
+            core::hint::spin_loop();
+        }
         Ok(())
     }
 
@@ -324,27 +336,7 @@ impl IWDG {
         self.apply_start()?;
         Ok(())
     }
-}
 
-impl embedded_hal_02::watchdog::Watchdog for IWDG {
-    fn feed(&mut self) {
-        self.feed_watchdog().expect("generated watchdog feed")
-    }
-}
-
-impl embedded_hal_02::watchdog::WatchdogEnable for IWDG {
-    type Time = IWDGConfig;
-
-    fn start<T>(&mut self, period: T)
-    where
-        T: Into<Self::Time>,
-    {
-        self.start_with_config(period.into())
-            .expect("generated watchdog start")
-    }
-}
-
-impl IWDG {
     pub fn apply_unlock(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40003000u64, 0x0000FFFFu32, 0x00005555u32)?;
         Ok(())
@@ -376,5 +368,23 @@ impl IWDGConfig {
 impl From<(u8, u16)> for IWDGConfig {
     fn from(value: (u8, u16)) -> Self {
         Self::new(value.0, value.1)
+    }
+}
+
+impl embedded_hal_02::watchdog::Watchdog for IWDG {
+    fn feed(&mut self) {
+        self.feed_watchdog().expect("generated watchdog feed")
+    }
+}
+
+impl embedded_hal_02::watchdog::WatchdogEnable for IWDG {
+    type Time = IWDGConfig;
+
+    fn start<T>(&mut self, period: T)
+    where
+        T: Into<Self::Time>,
+    {
+        self.start_with_config(period.into())
+            .expect("generated watchdog start")
     }
 }
