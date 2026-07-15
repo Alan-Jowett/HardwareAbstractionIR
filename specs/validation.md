@@ -111,6 +111,13 @@ cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-
   justify both the rtc-backed `embassy-time-driver` path and any emitted
   HAL-specific raw RTC control helpers from the same explicit RTC
   control/status path.
+- If the CH32V203G6U6 reference bundle claims `watchdog` lowering, generation
+  succeeds only when the approved HAIR inputs justify the portable
+  `embedded_hal_02::watchdog::{Watchdog, WatchdogEnable}` feed/start surface
+  plus any emitted raw prescaler/reload/update-status helpers from the same
+  explicit IWDG control/status path. The generator must omit or fail explicit
+  requests for `WatchdogDisable` unless the approved path models a real disable
+  sequence.
 - If the CH32V203G6U6 reference bundle claims higher-level ADC DMA sampling,
   generation succeeds only when the same `adc` driver instance carries an
   explicit `regular-sequence-adc-dma` lowering selector plus `adcDmaBindings`
@@ -516,6 +523,45 @@ powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\emb
   DMA, USB CDC, and Embassy time bring-up, but still uses targeted direct MMIO
   for the CH32 ADC prescaler and `PA7` analog-mode setup because the generated
   HAL does not yet expose dedicated helpers for those controls.
+
+### V-019 Hardware smoke packaging for the CH32V203G6U6 watchdog example
+
+**Purpose:** provide a hardware-flashable watchdog smoke image for the
+CH32V203G6U6 reference bundle that validates the generated IWDG watchdog helper
+surface and aliased portable watchdog traits under direct operator observation
+through USB CDC logging.
+
+**Command**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\embassy-watchdog-smoke\build-smoke-bin.ps1 -Release
+```
+
+**Expected result**
+- The smoke firmware builds for `riscv32imc-unknown-none-elf`.
+- The packaging step writes a flashable `.bin` beside the release ELF.
+- When flashed to the physical device, the firmware enumerates a USB CDC port
+  and remains idle until a host opens the port and asserts the active session
+  state used by the smoke application.
+- Once the host connection is active, the firmware logs the selected watchdog
+  configuration, starts the watchdog, feeds it while emitting periodic status
+  lines for approximately 10 seconds, and then intentionally stops feeding.
+- After feeding stops, the physical device resets through the IWDG path and the
+  USB CDC session drops, after which the device re-enumerates for another
+  operator-observed run.
+
+**Note**
+- This is a hardware-dependent smoke check, not a universal repository
+  precondition.
+- The smoke application shall consume the generated Embassy HAL crate through
+  normal Rust package boundaries for RCC, watchdog, USB CDC, and Embassy time
+  bring-up.
+- The watchdog run must not begin before the host connection is active, so the
+  pre-reset telemetry remains observable on the same USB CDC session that
+  witnessed the run start.
+- The intentional reset is part of the approved smoke behavior for this image;
+  it exists to prove both the feed path and the absence of feed, rather than
+  only steady-state feeding.
 
 ## 6. Requirement-specific validation coverage
 
