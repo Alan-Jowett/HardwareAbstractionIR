@@ -98,6 +98,7 @@ time-driver bundle and a composite-routing ESP32-C3 bundle.
 
 ```powershell
 cargo run -- generate embassy evidence\texas-instruments\lm3s6965\hair.json --output-dir <crate-output-dir>
+cargo run -- generate embassy evidence\wch\ch32v203c8t6\hair.json --output-dir <crate-output-dir>
 cargo run -- generate embassy evidence\wch\ch32v203g6u6\hair.json --output-dir <crate-output-dir>
 cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-dir <crate-output-dir>
 ```
@@ -111,6 +112,23 @@ cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-
   justify both the rtc-backed `embassy-time-driver` path and any emitted
   HAL-specific raw RTC control helpers from the same explicit RTC
   control/status path.
+- If either CH32V203 reference bundle claims `flash` lowering, generation
+  succeeds only when the same `flash` driver instance carries explicit
+  `flashBindings` naming one managed flash storage region, the erase/write
+  geometry, the busy/completion and optional error status handles, the
+  program/page-erase/address/start controls, and the semantic unlock/lock and
+  completion/error-clear operations required by the selected controller family.
+- The generated flash surface may implement
+  `embedded_storage::nor_flash::{ReadNorFlash, NorFlash}` only for that named
+  memory-mapped storage region, and may expose only the minimum HAL-specific
+  unlock/lock/status helpers justified by the same approved path. Option-byte,
+  mass-erase, and vendor-specific fast-program helpers must be omitted unless
+  the approved HAIR contract names them explicitly.
+- If a CH32V203 flash driver instance selects
+  `loweringPattern = "stm32f1-page-flash"`, generation succeeds only when the
+  approved path closes that family explicitly; the generator must fail
+  explicitly rather than inferring geometry or completion/error-clear behavior
+  from vendor register names alone.
 - If the CH32V203G6U6 reference bundle claims `watchdog` lowering, generation
   succeeds only when the approved HAIR inputs justify the portable
   `embedded_hal_02::watchdog::{Watchdog, WatchdogEnable}` feed/start surface
@@ -562,6 +580,45 @@ powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\emb
 - The intentional reset is part of the approved smoke behavior for this image;
   it exists to prove both the feed path and the absence of feed, rather than
   only steady-state feeding.
+
+### V-020 Hardware smoke packaging for the CH32V203G6U6 flash example
+
+**Purpose:** provide a hardware-flashable flash smoke image for the
+CH32V203G6U6 reference bundle that exercises the generated internal FLASH
+`embedded-storage` NOR-flash surface on the physical device while preserving
+the preexisting contents of the selected test page.
+
+**Command**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\embassy-flash-smoke\build-smoke-bin.ps1 -Release
+```
+
+**Expected result**
+- The smoke firmware builds for `riscv32imc-unknown-none-elf`.
+- The packaging step writes a flashable `.bin` beside the release ELF.
+- The packaging step rejects images whose binary size would overlap the reserved
+  last-page flash test region.
+- When flashed to the physical device, the firmware performs the full flash
+  smoke sequence immediately: it reads the last 4 KB internal flash page,
+  erases that page, verifies the erased state, programs a deterministic test
+  pattern through the generated NOR-flash API, verifies the programmed
+  contents, then erases the page again, restores the original bytes, and
+  verifies the restored contents.
+- On success, `PA7` enters a repeating three-short-blink pattern.
+- On failure, `PA7` enters a repeating short-blink count that identifies the
+  failing stage: `1` = capacity/layout precondition, `2` = backup read, `3` =
+  erase/erase verification, `4` = pattern write/verify, `5` = restore/restore
+  verification.
+
+**Note**
+- This is a hardware-dependent smoke check, not a universal repository
+  precondition.
+- The smoke application shall consume the generated Embassy HAL crate through
+  normal Rust package boundaries for FLASH and GPIO.
+- The destructive test scope is intentionally bounded to the last 4 KB flash
+  page, and the firmware shall restore the original contents before reporting
+  success.
 
 ## 6. Requirement-specific validation coverage
 

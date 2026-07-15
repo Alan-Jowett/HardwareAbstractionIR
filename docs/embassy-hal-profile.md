@@ -302,6 +302,7 @@ The first Embassy generator cut is expected to support this driver subset:
 | `uart` / `usart` | supported | Requires explicit pin-routing data. Interrupt and DMA routes are required for async DMA-backed transfers and may be omitted for pure polling-mode instances. |
 | `spi` | supported | Requires explicit pin-routing data and any claimed DMA bindings. |
 | `i2c` | supported | Requires explicit pin-routing data and any claimed interrupt/DMA bindings. |
+| `flash` | supported | Requires one explicit managed flash region plus a controller-local erase/program contract. Portable lowering is limited to memory-mapped internal NOR arrays that can justify `embedded_storage::nor_flash::{ReadNorFlash, NorFlash}` from explicit geometry, unlock, busy/error, erase, and completion-flag bindings. Families with materially different sequencers must use an explicit `loweringPattern`; the first such family is `stm32f1-page-flash`. |
 | `watchdog` | supported | Requires explicit control/status structure for feed/start/configure semantics. Because `embedded-hal` 1.0 does not ship watchdog traits, portable lowering may implement aliased `embedded-hal` 0.2 watchdog traits such as `embedded_hal_02::watchdog::Watchdog` and `WatchdogEnable`; `WatchdogDisable` is allowed only when the approved path justifies a real disable sequence. HAL-specific helpers may expose only modeled configuration/status controls such as prescaler/reload programming and update-state queries. |
 | `rtc` | supported | Requires explicit RTC control/status structure plus interrupt and semantic evidence for any claimed raw counter/prescaler/alarm helpers. An rtc driver instance may also serve as the generated Embassy async time-base provider when `timeDriverSource = "rtc"` and the approved path includes the full counter/alarm/interrupt closure plus explicit `timeDriverBindings` when the lowering depends on direct role bindings. |
 | `timer` / `pwm` | supported | Requires state-machine and route data for the supported operating modes being generated. A timer block may also serve as the generated Embassy async time-base provider when `timeDriverSource = "hardware-timer"` and the approved path includes the full counter/alarm/interrupt closure plus explicit `timeDriverBindings` for the generated counter/alarm/interrupt accesses. If the selected timer architecture still has materially different supported lowering families, the driver instance must also carry an explicit `loweringPattern` such as `counter-compare-timer`. |
@@ -337,6 +338,7 @@ hoc name matching.
 | `uart` / `usart` | `pinTopology.routes` always; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted enable/configure/read/write path; `interruptTopology.routes` and `dmaTopology.routes` only for emitted interrupt-driven or DMA-backed APIs |
 | `spi` | `pinTopology.routes`; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted configuration or transfer path; interrupt/DMA routes only when the emitted API claims them |
 | `i2c` | `pinTopology.routes`; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted bus transaction path; interrupt/DMA routes only when the emitted API claims them |
+| `flash` | one explicit managed flash storage region; portable erase/program geometry in `flashBindings`; explicit `semantics.operations` for unlock/lock and any required completion/error-flag clearing; structural register/field data for the reachable busy, completion, error, program-enable, page-erase-enable, erase-address, and erase-start path; and `driverInstances[].loweringPattern` whenever the supported flash sequencer family is materially distinct. For `loweringPattern = "stm32f1-page-flash"`, the first cut is limited to a memory-mapped page-erase/program path over that named storage region rather than inferred option-byte, mass-erase, or vendor-specific fast-program helpers |
 | `watchdog` | clock/reset support for emitted bring-up helpers when claimed; explicit `semantics.operations` and/or `semantics.stateMachines` for any composite unlock, start, feed, or status-poll path that cannot be lowered as one direct structural write or read; and structural register/field data for the reachable watchdog feed, start, configuration, and update-status path |
 | `rtc` | clock/reset support for emitted bring-up helpers when claimed; explicit `interruptTopology.routes` for any emitted interrupt-driven or wakeup behavior; explicit `semantics.operations` and/or `semantics.stateMachines` for claimed raw counter/prescaler/alarm setup or flag/interrupt handling; structural register/field data for the reachable RTC counter, prescaler, alarm, enable, pending, and clear/ack path; and, when the same driver instance also claims `embassy-time-driver`, the explicit tick-rate and binding facts needed for the selected rtc-backed time-base path |
 | `timer` / `pwm` | `pinTopology.routes` for exposed channels; target-local `semantics.stateMachines` and `semantics.operations` for mode transitions; state-machine transitions with exactly one supported effect targeting a field for first-cut lowering; structural register/field data for emitted enable/disable/channel/duty behavior; and, if the driver instance also claims blocking delay helpers or `embassy-time-driver`, the explicit interrupt routes plus semantic/structural counter, alarm, clear/ack, reload, and tick-rate facts needed for that timing path. Shared-vector timers must still narrow the generated time base to one explicit route/source/clear path. For `loweringPattern = "counter-compare-timer"`, that reachable structure includes the timer-enable path plus prescaler, reload, counter, alarm/compare, event/update, interrupt-enable, and interrupt-status/clear registers or canonical equivalents. |
@@ -358,6 +360,7 @@ exact naming contract:
 | `uart` / `usart` | Bring-up helpers and only those polling / interrupt / DMA TX/RX methods whose control/data paths are explicitly modeled |
 | `spi` | Bring-up helpers and only those transfer/control methods whose clocking, enable, and data paths are explicitly modeled |
 | `i2c` | Bring-up helpers and only those bus transaction methods whose start/address/data/stop behavior is explicitly modeled |
+| `flash` | `embedded_storage::nor_flash::{ReadNorFlash, NorFlash}` on the named managed flash region only when the approved controller path explicitly models unlock, page erase, programming, busy/completion/error handling, and the required erase/write geometry. HAL-specific helpers may expose only the minimum modeled unlock/lock/status path needed to realize that portable surface. Option-byte, mass-erase, and vendor-specific fast-program helpers remain out of subset unless a later approved contract names them explicitly |
 | `watchdog` | Bring-up helpers plus portable watchdog feed/start support only when the approved control/status path is explicitly modeled. Because `embedded-hal` 1.0 has no watchdog module, that portable surface is the aliased `embedded_hal_02::watchdog::{Watchdog, WatchdogEnable}` contract unless the governing spec says otherwise. HAL-specific raw configuration/status helpers such as prescaler/reload programming and update-state queries may be emitted from that same approved path. `WatchdogDisable` is allowed only when the approved HAIR inputs justify a real disable sequence; otherwise the generator must omit it rather than invent one. |
 | `rtc` | Bring-up helpers plus HAL-specific raw counter/prescaler/alarm/flag methods whose control and status paths are explicitly modeled; and, when selected as `timeDriverSource = "rtc"`, generated Embassy async time-base support only when the approved RTC counter/alarm/interrupt path is explicitly modeled and the emitted raw RTC helpers remain traceable to that same approved path |
 | `timer` / `pwm` | Enable/disable/mode/channel helpers derived from state machines, operations, route controls, and structural register data; plus blocking delay/timebase helpers and, when selected as `timeDriverSource = "hardware-timer"`, generated Embassy async time-base support only when the approved timer counter/alarm path is explicitly modeled. That async support must preserve a runtime-agnostic wake-handler hook, the unique interrupt-route metadata needed by a downstream runtime layer, and the explicit Embassy tick rate used by the timer source. When `loweringPattern = "counter-compare-timer"`, the generated time-base path is specifically the approved counter/compare/event/interrupt closure rather than an inferred generic timer API. |
@@ -432,13 +435,23 @@ companion emulator/state handles and their observation/control methods.
     binding map names the transfer-complete interrupt-enable, status, and clear
     handles, and may additionally name half-transfer handles. Generated DMA
     futures are limited to the explicitly bound channels.
-16. If a driver instance claims `embassy-time-driver`, `timeDriverSource`
+16. If a `flash` driver instance names `loweringPattern = "stm32f1-page-flash"`,
+    the same driver instance must also carry explicit `flashBindings` naming
+    the managed storage region, portable erase/write geometry, busy/completion
+    and optional error status handles, the program/page-erase/address/start
+    controls, and the semantic unlock/lock/flag-clear operations required by
+    that sequencer. The resulting portable surface is limited to
+    memory-mapped `embedded_storage::nor_flash::{ReadNorFlash, NorFlash}` over
+    that named region; option-byte, mass-erase, and unrelated fast-program
+    helpers remain out of subset unless a later approved contract names them
+    explicitly.
+17. If a driver instance claims `embassy-time-driver`, `timeDriverSource`
     becomes part of the executable lowering contract. `systick` preserves the
     existing SysTick-backed interrupt path. `hardware-timer` selects an
     explicitly modeled timer-backed time base. `rtc` selects an explicitly
     modeled rtc-backed time base. None of those choices may be inferred from
     `driverKind` or capability tags alone.
-16. A `hardware-timer` time-driver claim must remain rooted in a `timer`
+18. A `hardware-timer` time-driver claim must remain rooted in a `timer`
     driver instance whose approved HAIR inputs justify timer start, running
     state, compare/alarm or wrap behavior, interrupt acknowledgement, and the
     counter facts needed for any emitted blocking delay helpers. An `rtc`
@@ -446,19 +459,19 @@ companion emulator/state handles and their observation/control methods.
     approved HAIR inputs justify rtc counter reads, alarm behavior, interrupt
     acknowledgement, and any emitted raw RTC helpers. Both non-SysTick paths
     must declare `timeDriverTickHz`.
-17. If a hardware-timer time-driver claim uses a timer family whose supported
+19. If a hardware-timer time-driver claim uses a timer family whose supported
     lowering shape is materially distinct from other supported timer families,
     that driver instance must also declare `loweringPattern`. The first such
     timer-family selector is `counter-compare-timer`.
-18. A non-SysTick time-driver claim must narrow the generated time base to one
+20. A non-SysTick time-driver claim must narrow the generated time base to one
     explicit interrupt route/source pair and one explicit clear operation, even
     when the underlying peripheral exposes multiple causes or shares one device
     vector across several events.
-19. A `systick` time-driver claim must remain rooted in an `interrupt` driver
+21. A `systick` time-driver claim must remain rooted in an `interrupt` driver
     instance whose approved route inventory explicitly targets SysTick.
-20. A `systick` time-driver claim must not declare `timeDriverTickHz`; that
+22. A `systick` time-driver claim must not declare `timeDriverTickHz`; that
     rate is defined by the SysTick lowering path itself.
-21. A generated non-SysTick time-driver path must preserve the approved
+23. A generated non-SysTick time-driver path must preserve the approved
     interrupt-route identity in generated metadata and expose a
     runtime-agnostic wake-handler hook that a board/runtime layer can call from
     the concrete interrupt binding. The generated crate metadata must also
@@ -574,21 +587,25 @@ For Embassy generation, the following cases must fail explicitly:
 10. a `watchdog` API would require inferred disable semantics or unmodeled
    unlock, feed, configuration, or update-status behavior beyond the approved
    control/status path
-11. a selected `loweringPattern` requires semantic or structural bring-up
+11. a `flash` API would require inferred erase/program geometry, implicit
+   unlock/lock or completion/error-flag clearing, or controller-local
+   option-byte / mass-erase / fast-program behavior beyond the explicit
+   `flashBindings`, referenced operations, and reachable structural data
+12. a selected `loweringPattern` requires semantic or structural bring-up
    inputs that are absent, contradictory, or would force the generator to
    invent a different attach/reset sequence
-12. an `adc` buffered-sampling API would require inferred regular-sequence,
+13. an `adc` buffered-sampling API would require inferred regular-sequence,
    sample-time, start sequencing, DMA programming, or DMA event-clear behavior
    beyond the explicit `adcDmaBindings`, referenced operations, and reachable
    structural data
-13. a non-SysTick time-driver claim relies on an implicit choice among multiple
+14. a non-SysTick time-driver claim relies on an implicit choice among multiple
    interrupt causes, shared vectors, or clear paths instead of naming one
    approved route/source/clear sequence explicitly
-14. host-emulated generation would expose a HAL-visible device without a paired
+15. host-emulated generation would expose a HAL-visible device without a paired
    emulator/state handle
-15. a requested host-only observation or control surface would require
+16. a requested host-only observation or control surface would require
    unsupported inference beyond the approved lowering inputs
-16. host-emulated execution would depend on background wall-clock progression
+17. host-emulated execution would depend on background wall-clock progression
    rather than explicit deterministic test control in the first cut
 
 Generators may emit a smaller API surface than another document of the

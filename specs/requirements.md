@@ -311,6 +311,22 @@ Embassy profile contract.
   `embedded-hal` 0.2, and may expose HAL-specific configuration/status helpers
   from that same approved path, but it shall not emit `WatchdogDisable` unless
   the approved HAIR inputs justify a real disable sequence.
+- `flash` lowering is allowed only when the document carries a `flash`
+  driver instance rooted in a `flash-controller` canonical block plus explicit
+  `flashBindings` naming one managed storage region, the erase/write geometry,
+  the busy/completion and optional error status handles, the
+  program/page-erase/address/start controls, and the semantic unlock/lock and
+  completion/error-clear operations required by the selected controller family.
+  Portable lowering is limited to
+  `embedded_storage::nor_flash::{ReadNorFlash, NorFlash}` on memory-mapped
+  internal NOR arrays; option-byte, mass-erase, and vendor-specific fast-program
+  helpers remain out of subset unless a later approved lowering family names
+  them explicitly.
+- When a `flash` driver instance selects
+  `loweringPattern = "stm32f1-page-flash"`, that selector becomes part of the
+  executable lowering contract. The generator shall fail explicitly rather than
+  inferring unlock sequencing, erase/program geometry, or completion/error-flag
+  clearing from vendor register names alone.
 - Unsupported driver kinds, unresolved references, missing lowering inputs,
   and out-of-subset requests fail explicitly.
 

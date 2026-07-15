@@ -52,6 +52,7 @@
         "usart",
         "spi",
         "i2c",
+        "flash",
         "watchdog",
         "rtc",
         "timer",
@@ -65,12 +66,13 @@
     },
     "loweringPattern": {
       "type": "string",
-      "description": "Optional generator-facing lowering selector for cases where one supported driver kind has more than one approved evidence-backed lowering family with materially different bring-up behavior. Reserved values currently include `serial-jtag-preserve-link`, which selects a USB Serial/JTAG-style lowering that preserves an already boot-established link instead of synthesizing a reset-and-reattach sequence; `fsdev-pma-btable`, which selects a controller-level full-speed USB device family built around PMA/BTABLE-style endpoint state and attach/reset servicing; `counter-compare-timer`, which selects a timer-backed Embassy async timing family built around an explicitly modeled free-running counter plus compare/alarm path; and `regular-sequence-adc-dma`, which selects a software-started regular-group buffered ADC sampling family backed by one explicit DMA path. Generators must fail explicitly if a selected lowering pattern lacks the referenced semantic inputs it requires.",
+      "description": "Optional generator-facing lowering selector for cases where one supported driver kind has more than one approved evidence-backed lowering family with materially different bring-up behavior. Reserved values currently include `serial-jtag-preserve-link`, which selects a USB Serial/JTAG-style lowering that preserves an already boot-established link instead of synthesizing a reset-and-reattach sequence; `fsdev-pma-btable`, which selects a controller-level full-speed USB device family built around PMA/BTABLE-style endpoint state and attach/reset servicing; `counter-compare-timer`, which selects a timer-backed Embassy async timing family built around an explicitly modeled free-running counter plus compare/alarm path; `regular-sequence-adc-dma`, which selects a software-started regular-group buffered ADC sampling family backed by one explicit DMA path; and `stm32f1-page-flash`, which selects an STM32F1-class memory-mapped internal flash sequencer with explicit unlock, page-erase, program, busy/error, and flag-clear bindings. Generators must fail explicitly if a selected lowering pattern lacks the referenced semantic inputs it requires.",
       "enum": [
         "serial-jtag-preserve-link",
         "fsdev-pma-btable",
         "counter-compare-timer",
-        "regular-sequence-adc-dma"
+        "regular-sequence-adc-dma",
+        "stm32f1-page-flash"
       ]
     },
     "timeDriverSource": {
@@ -202,6 +204,99 @@
       },
       "required": [
         "channels"
+      ],
+      "additionalProperties": false
+    },
+    "flashBindings": {
+      "type": "object",
+      "description": "Optional explicit internal-flash lowering bindings for `flash` driver instances. These bindings name the managed memory region, the portable erase/program geometry, the controller-local status and control handles, and the semantic unlock/lock/flag-clear operations required to expose a real `embedded-storage` NOR surface. They do not authorize option-byte, mass-erase, or vendor-specific fast-program helpers unless a later approved lowering family names those paths explicitly.",
+      "properties": {
+        "storageRegionRef": {
+          "description": "Entity ref for the structure memory region managed by this flash driver and exposed through the portable NOR surface.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "eraseSizeBytes": {
+          "description": "Portable erase granularity in bytes for the managed flash region.",
+          "$ref": "../common.json#/$defs/positiveInteger"
+        },
+        "writeSizeBytes": {
+          "description": "Portable program/write granularity in bytes for the managed flash region.",
+          "$ref": "../common.json#/$defs/positiveInteger"
+        },
+        "busyFlagRef": {
+          "description": "Entity ref for the controller status bit that remains asserted while an erase or program operation is in progress.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "endOfOperationFlagRef": {
+          "description": "Entity ref for the controller status bit that signals successful completion of an erase or program operation when the selected family requires an explicit completion flag.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "programErrorFlagRef": {
+          "description": "Optional entity ref for the controller status bit that reports a program/sequence error on the selected flash family.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "writeProtectErrorFlagRef": {
+          "description": "Optional entity ref for the controller status bit that reports a write-protect or access-protection error on the selected flash family.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "programEnableRef": {
+          "description": "Entity ref for the control field that places the controller into program mode for memory-mapped writes.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "pageEraseEnableRef": {
+          "description": "Entity ref for the control field that selects page erase mode for the managed storage region.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "eraseAddressRef": {
+          "description": "Entity ref for the register or field programmed with the target page address before launching an erase.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "eraseStartRef": {
+          "description": "Entity ref for the control field written to launch an erase after the address and erase mode have been prepared.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "unlockOperationRefs": {
+          "description": "Semantic operations that perform the controller-specific unlock or access-enable sequence required before erase/program control writes are legal.",
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "lockOperationRefs": {
+          "description": "Optional semantic operations that restore the controller's locked state after a portable write or erase operation completes.",
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "clearEndOfOperationOperationRef": {
+          "description": "Entity ref for the semantic operation that acknowledges or clears the end-of-operation flag when the selected family requires explicit completion-flag clearing.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "clearProgramErrorOperationRef": {
+          "description": "Optional entity ref for the semantic operation that acknowledges or clears the program/sequence error condition on the selected flash family.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "clearWriteProtectErrorOperationRef": {
+          "description": "Optional entity ref for the semantic operation that acknowledges or clears the write-protect or access-protection error condition on the selected flash family.",
+          "$ref": "../common.json#/$defs/entityRef"
+        }
+      },
+      "required": [
+        "storageRegionRef",
+        "eraseSizeBytes",
+        "writeSizeBytes",
+        "busyFlagRef",
+        "endOfOperationFlagRef",
+        "programEnableRef",
+        "pageEraseEnableRef",
+        "eraseAddressRef",
+        "eraseStartRef",
+        "unlockOperationRefs",
+        "clearEndOfOperationOperationRef"
       ],
       "additionalProperties": false
     },
@@ -456,6 +551,9 @@
             "dmaAsyncBindings": {
               "$ref": "#/$defs/dmaAsyncBindings"
             },
+            "flashBindings": {
+              "$ref": "#/$defs/flashBindings"
+            },
             "clockBindingRefs": {
               "description": "Referenced clock bindings that may justify emitted clock-gating or bring-up helpers when those bindings and their linked structural/semantic data are sufficient for real lowering.",
               "type": "array",
@@ -513,7 +611,7 @@
               "uniqueItems": true
             },
             "capabilityTags": {
-              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support. The accompanying `timeDriverSource` selector determines whether that support is the existing SysTick-backed interrupt path, an explicitly modeled hardware-timer-backed path, or an explicitly modeled rtc-backed path; `timeDriverTickHz` fixes the Embassy tick rate for modeled non-SysTick sources; `timeDriverBindings` names the exact non-SysTick lowering handles when that path is used; `adcDmaBindings` names the exact direct roles for `regular-sequence-adc-dma` buffered sampling when that ADC family is selected; and `dmaAsyncBindings` names the exact channel-local interrupt/flag handles for generated DMA completion futures.",
+              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support. The accompanying `timeDriverSource` selector determines whether that support is the existing SysTick-backed interrupt path, an explicitly modeled hardware-timer-backed path, or an explicitly modeled rtc-backed path; `timeDriverTickHz` fixes the Embassy tick rate for modeled non-SysTick sources; `timeDriverBindings` names the exact non-SysTick lowering handles when that path is used; `adcDmaBindings` names the exact direct roles for `regular-sequence-adc-dma` buffered sampling when that ADC family is selected; `dmaAsyncBindings` names the exact channel-local interrupt/flag handles for generated DMA completion futures; and `flashBindings` names the managed region, geometry, control/status bindings, and required semantic operations for a portable internal-flash NOR surface.",
               "type": "array",
               "items": {
                 "type": "string"

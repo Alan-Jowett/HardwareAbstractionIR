@@ -166,7 +166,7 @@ The table below summarizes the checked-in device bundles that currently include 
 | Vendor | Device | HAIR JSON | Supported peripherals | QEMU-tested today |
 | --- | --- | --- | --- | --- |
 | ST | `stm32f405rgt6` | `evidence/st/stm32f405rgt6/hair.json` | `gpio-port`, `i2c`, `spi`, `uart`, `usart`, `interrupt` | CI runs the checked-in Embassy smoke with `qemu-system-arm -M netduinoplus2 -nographic -semihosting -kernel "$SMOKE_BINARY"`; the smoke source exercises GPIOA APIs, USART1, and Embassy time, but does not assert GPIO state transitions because QEMU readback is unreliable |
-| WCH | `ch32v203c8t6` | `evidence/wch/ch32v203c8t6/hair.json` | `rcc`, `gpio-port`, `uart`, `usart`, `spi`, `i2c`, `timer`, `pwm`, `adc`, `dma`, `interrupt` | None documented |
+| WCH | `ch32v203c8t6` | `evidence/wch/ch32v203c8t6/hair.json` | `rcc`, `gpio-port`, `uart`, `usart`, `spi`, `i2c`, `timer`, `pwm`, `adc`, `dma`, `flash`, `interrupt` | None documented |
 | Espressif | `esp32-c3fn4` | `evidence/espressif/esp32-c3fn4/hair.json` | `rcc`, `gpio-port`, `interrupt`, `uart`, `i2c`, `spi`, `adc` | Manual `run-qemu-smoke.ps1` uses the pinned containerized `esp32c3` QEMU path and checks boot/UART/interrupt smoke plus `PASS`; the current smoke firmware does not exercise GPIO |
 | Texas Instruments | `lm3s6965` | `evidence/texas-instruments/lm3s6965/hair.json` | `rcc`, `gpio-port`, `uart`, `spi`, `i2c`, `timer`, `interrupt` | CI runs the checked-in Embassy smoke with `qemu-system-arm -M lm3s6965evb -display none -monitor none -serial stdio -semihosting-config enable=on,target=native -kernel "$SMOKE_BINARY"`; the harness prints to UART0 stdio and exercises RCC, GPIO, SSI, I2C, timers, watchdog, flash, NVIC/SysTick, and Embassy time |
 

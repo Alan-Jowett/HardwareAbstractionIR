@@ -337,6 +337,21 @@ watchdog families such as CH32 IWDG whose approved path does not justify a
 real disable sequence, the generator must omit `WatchdogDisable` rather than
 synthesizing disable behavior.
 
+Flash lowering follows the same evidence-bounded rule, but uses the portable
+`embedded-storage` NOR traits rather than a device-family-specific HAL trait.
+A `flash` driver instance stays rooted in a `flash-controller` canonical block
+and a named managed storage region. The corresponding `flashBindings` map names
+the controller-local erase/program geometry, busy/completion and optional error
+status handles, program/page-erase/address/start controls, and the semantic
+unlock/lock/flag-clear operations required by the selected sequencer family.
+This keeps the generated `ReadNorFlash` / `NorFlash` surface traceable to one
+approved memory-mapped flash path without inventing option-byte, mass-erase, or
+fast-program behavior. Because internal flash controllers vary materially across
+families, that family choice must stay explicit when needed; the first such
+selector is `loweringPattern = "stm32f1-page-flash"` for STM32F1-class
+page-erase/program controllers, which also covers CH32V203's compatible FLASH
+control block when the approved bindings close the full path explicitly.
+
 When a document also carries explicit normalization canonical mappings, Embassy
 lowering may use those mappings as secondary resolution hints for supported
 register, field, or peripheral concepts that recur across vendors. This is a
