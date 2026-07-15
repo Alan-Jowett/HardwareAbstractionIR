@@ -180,8 +180,17 @@
           "$ref": "../common.json#/$defs/entityRef"
         },
         "startRef": {
-          "description": "Entity ref for the software-start control used to begin a regular-group conversion sequence.",
+          "description": "Entity ref for a single software-start control used to begin a regular-group conversion sequence when one direct structural write is sufficient for the selected family.",
           "$ref": "../common.json#/$defs/entityRef"
+        },
+        "startOperationRefs": {
+          "description": "Semantic operations used to begin a regular-group conversion sequence when the selected family requires a composite start sequence such as arming an enable gate plus asserting software-start.",
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "minItems": 1,
+          "uniqueItems": true
         },
         "regularSequenceLengthRef": {
           "description": "Entity ref for the regular-sequence length field programmed by the generated sampling helpers.",
@@ -249,7 +258,6 @@
       "required": [
         "prepareOneShotOperationRefs",
         "dataRegisterRef",
-        "startRef",
         "regularSequenceLengthRef",
         "regularSequenceSlotRefs",
         "channelSampleTimeRefs",
@@ -259,6 +267,18 @@
         "dmaChannelEnableRef",
         "dmaTransferCompleteFlagRef",
         "dmaTransferCompleteClearOperationRef"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "startRef"
+          ]
+        },
+        {
+          "required": [
+            "startOperationRefs"
+          ]
+        }
       ],
       "additionalProperties": false
     },

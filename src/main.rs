@@ -1810,7 +1810,10 @@ struct EmbassyAdcDmaBindings {
     #[serde(default)]
     stop_operation_refs: Vec<String>,
     data_register_ref: String,
-    start_ref: String,
+    #[serde(default)]
+    start_ref: Option<String>,
+    #[serde(default)]
+    start_operation_refs: Vec<String>,
     regular_sequence_length_ref: String,
     #[serde(default)]
     regular_sequence_slot_refs: Vec<String>,
@@ -3680,6 +3683,13 @@ fn validate_regular_sequence_adc_dma_lowering(driver: &EmbassyDriverInstance) ->
     if bindings.channel_sample_time_refs.is_empty() {
         bail!(
             "driver {} uses loweringPattern {} but adcDmaBindings.channelSampleTimeRefs is empty",
+            driver.id,
+            ADC_LOWERING_REGULAR_SEQUENCE_DMA
+        );
+    }
+    if bindings.start_ref.is_none() && bindings.start_operation_refs.is_empty() {
+        bail!(
+            "driver {} uses loweringPattern {} but adcDmaBindings omits both startRef and startOperationRefs",
             driver.id,
             ADC_LOWERING_REGULAR_SEQUENCE_DMA
         );
@@ -5972,6 +5982,94 @@ fn binding_method_name(prefix: &str, subject: &str, suffix: Option<&str>, noun: 
     }
 }
 
+fn render_clock_binding_enable_statement(
+    model: &EmbassyGenerationModel,
+    binding: &McuClockBinding,
+    indent: &str,
+) -> Result<String> {
+    let subject = model
+        .peripheral_names
+        .get(&binding.consumer_ref)
+        .cloned()
+        .unwrap_or_else(|| last_ref_segment(&binding.consumer_ref).to_string());
+    let (register, field) = resolve_control_target(
+        model,
+        &binding.control_refs,
+        "clock binding",
+        &binding.id,
+        &[
+            binding.name.clone(),
+            subject.clone(),
+            last_ref_segment(&binding.consumer_ref).to_string(),
+        ],
+    )?;
+    render_register_write_statement(register, &field, 1, indent)
+}
+
+fn render_reset_binding_release_statement(
+    model: &EmbassyGenerationModel,
+    binding: &McuResetBinding,
+    indent: &str,
+) -> Result<String> {
+    let subject = model
+        .peripheral_names
+        .get(&binding.target_ref)
+        .cloned()
+        .unwrap_or_else(|| last_ref_segment(&binding.target_ref).to_string());
+    let (register, field) = resolve_control_target(
+        model,
+        &binding.control_refs,
+        "reset binding",
+        &binding.id,
+        &[
+            binding.name.clone(),
+            subject.clone(),
+            last_ref_segment(&binding.target_ref).to_string(),
+        ],
+    )?;
+    render_register_write_statement(register, &field, 0, indent)
+}
+
+fn render_adc_dma_controller_bring_up_statements(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+    indent: &str,
+) -> Result<String> {
+    let mut seen_controllers = BTreeSet::<&str>::new();
+    let mut statements = String::new();
+    for channel in &driver.dma_channels {
+        let controller_ref = channel.controller_ref.as_str();
+        if !seen_controllers.insert(controller_ref) {
+            continue;
+        }
+        let dma_driver = model
+            .drivers
+            .iter()
+            .find(|candidate| {
+                candidate.driver_kind == "dma" && candidate.target.id.as_str() == controller_ref
+            })
+            .ok_or_else(|| {
+                anyhow!(
+                    "driver {} uses loweringPattern {} via DMA controller {} but no dma driver instance targets that controller",
+                    driver.id,
+                    ADC_LOWERING_REGULAR_SEQUENCE_DMA,
+                    controller_ref
+                )
+            })?;
+        for binding in &dma_driver.clock_bindings {
+            statements.push_str(&render_clock_binding_enable_statement(
+                model, binding, indent,
+            )?);
+        }
+        for binding in &dma_driver.reset_bindings {
+            statements.push_str(&render_reset_binding_release_statement(
+                model, binding, indent,
+            )?);
+        }
+    }
+    Ok(statements)
+}
+
 fn render_pin_route_methods(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
@@ -8238,14 +8336,18 @@ fn render_regular_sequence_adc_dma_methods(
         &driver.id,
         "ADC DMA data register",
     )?;
-    let start_field = resolve_structural_field_target(
-        model,
-        &bindings.start_ref,
-        Some(adc_peripheral_ref),
-        None,
-        &driver.id,
-        "ADC DMA start control",
-    )?;
+    let start_field = if let Some(start_ref) = &bindings.start_ref {
+        Some(resolve_structural_field_target(
+            model,
+            start_ref,
+            Some(adc_peripheral_ref),
+            None,
+            &driver.id,
+            "ADC DMA start control",
+        )?)
+    } else {
+        None
+    };
     let sequence_length_field = resolve_structural_field_target(
         model,
         &bindings.regular_sequence_length_ref,
@@ -8280,8 +8382,15 @@ fn render_regular_sequence_adc_dma_methods(
             &driver.id,
             "ADC DMA regular sequence slot",
         )?;
-        sequence_slot_writes.push_str(&format!("        let channel = channels[{index}];\n"));
-        sequence_slot_writes.push_str("        match channel {\n");
+        let channel_lookup = if index == 0 {
+            "channels.first()".to_string()
+        } else {
+            format!("channels.get({index})")
+        };
+        sequence_slot_writes.push_str(&format!(
+            "        if let Some(&channel) = {channel_lookup} {{\n"
+        ));
+        sequence_slot_writes.push_str("            match channel {\n");
         for sample_time_binding in &bindings.channel_sample_time_refs {
             let sample_time_field = resolve_structural_field_target(
                 model,
@@ -8300,25 +8409,26 @@ fn render_regular_sequence_adc_dma_methods(
                 "ADC DMA channel sample time",
             )?;
             sequence_slot_writes.push_str(&format!(
-                "            {channel} => {{\n{write}            }}\n",
+                "                {channel} => {{\n{write}                }}\n",
                 channel = sample_time_binding.channel_index,
                 write = render_register_write_expression_statement(
                     &sample_time_register,
                     &sample_time_field.field,
                     "u32::from(sample_time_code)",
-                    "                ",
+                    "                    ",
                 )?
             ));
         }
         sequence_slot_writes.push_str(
-            "            _ => return Err(metadata::Error::InvalidReference(\"ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs\")),\n        }\n",
+            "                _ => return Err(metadata::Error::InvalidReference(\"ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs\")),\n            }\n",
         );
         sequence_slot_writes.push_str(&render_register_write_expression_statement(
             &slot_register,
             &slot_field.field,
             "u32::from(channel)",
-            "        ",
+            "            ",
         )?);
+        sequence_slot_writes.push_str("        }\n");
     }
 
     let transfer_complete_flag = resolve_structural_field_target(
@@ -8366,6 +8476,8 @@ fn render_regular_sequence_adc_dma_methods(
         )?
         .field,
     )?;
+    let dma_controller_bring_up =
+        render_adc_dma_controller_bring_up_statements(model, driver, "        ")?;
     let mut program_dynamic_setup = String::new();
     program_dynamic_setup.push_str(&render_register_write_expression_statement(
         &sequence_length_register,
@@ -8424,24 +8536,35 @@ fn render_regular_sequence_adc_dma_methods(
         1,
         "        ",
     )?);
-    arm_dma_and_start.push_str(&render_register_write_statement(
-        &resolve_structural_register_ref(
+    if !bindings.start_operation_refs.is_empty() {
+        arm_dma_and_start.push_str(&render_adc_dma_operation_statements(
             model,
-            &start_field.register_id,
-            Some(adc_peripheral_ref),
-            None,
-            &driver.id,
-            "ADC DMA start control",
-        )?,
-        &start_field.field,
-        1,
-        "        ",
-    )?);
+            driver,
+            &bindings.start_operation_refs,
+            Some(dma_array_index),
+            "ADC DMA start sequence",
+        )?);
+    } else if let Some(start_field) = &start_field {
+        arm_dma_and_start.push_str(&render_register_write_statement(
+            &resolve_structural_register_ref(
+                model,
+                &start_field.register_id,
+                Some(adc_peripheral_ref),
+                None,
+                &driver.id,
+                "ADC DMA start control",
+            )?,
+            &start_field.field,
+            1,
+            "        ",
+        )?);
+    }
 
     let mut methods = Vec::new();
     let mut one_shot = String::from(
         "    pub fn start_one_shot_dma_u16(&self, channels: &[u8], sample_time_code: u8, buffer: &mut [u16]) -> Result<(), metadata::Error> {\n",
     );
+    one_shot.push_str(&dma_controller_bring_up);
     one_shot.push_str(&render_register_write_statement(
         &dma_channel_enable_register,
         &dma_channel_enable_field.field,
@@ -8488,6 +8611,7 @@ fn render_regular_sequence_adc_dma_methods(
         let mut circular = String::from(
             "    pub fn start_circular_dma_u16(&self, channels: &[u8], sample_time_code: u8, buffer: &mut [u16]) -> Result<(), metadata::Error> {\n",
         );
+        circular.push_str(&dma_controller_bring_up);
         circular.push_str(&render_register_write_statement(
             &dma_channel_enable_register,
             &dma_channel_enable_field.field,
@@ -9654,14 +9778,6 @@ fn render_operation_methods(
             let mut code =
                 format!("    pub fn {method_name}(&self) -> Result<(), metadata::Error> {{\n");
             for step in &steps {
-                if step.action != "write" {
-                    bail!(
-                        "operation {} on driver {} uses unsupported action {}",
-                        operation.id,
-                        driver.id,
-                        step.action
-                    );
-                }
                 let target_ref = step.target_ref.as_deref().ok_or_else(|| {
                     anyhow!(
                         "operation {} step {} is missing targetRef",
@@ -9677,19 +9793,45 @@ fn render_operation_methods(
                         target_ref
                     )
                 })?;
-                let parsed = parse_field_write_expression(
-                    step.expression.as_ref(),
-                    step.value.as_ref(),
-                    &operation.id,
-                    step.index,
-                )?;
-                let field = resolve_register_field(register, &parsed.field_name)?;
-                code.push_str(&render_register_write_statement(
-                    register,
-                    &field,
-                    parsed.value,
-                    "        ",
-                )?);
+                match step.action.as_str() {
+                    "write" => {
+                        let parsed = parse_field_write_expression(
+                            step.expression.as_ref(),
+                            step.value.as_ref(),
+                            &operation.id,
+                            step.index,
+                        )?;
+                        let field = resolve_register_field(register, &parsed.field_name)?;
+                        code.push_str(&render_register_write_statement(
+                            register,
+                            &field,
+                            parsed.value,
+                            "        ",
+                        )?);
+                    }
+                    "poll" => {
+                        let parsed = parse_field_poll_expression(
+                            step.expression.as_ref(),
+                            &operation.id,
+                            step.index,
+                        )?;
+                        let field = resolve_register_field(register, &parsed.field_name)?;
+                        code.push_str(&render_register_poll_statement(
+                            register,
+                            &field,
+                            parsed.value,
+                            "        ",
+                        )?);
+                    }
+                    other => {
+                        bail!(
+                            "operation {} on driver {} uses unsupported action {}",
+                            operation.id,
+                            driver.id,
+                            other
+                        );
+                    }
+                }
             }
             code.push_str("        Ok(())\n    }\n");
             Ok(GeneratedMethod {
@@ -11671,6 +11813,47 @@ fn render_register_write_expression_statement(
     }
 }
 
+fn render_register_poll_statement(
+    register: &ResolvedRegister,
+    field: &ResolvedField,
+    value: u64,
+    indent: &str,
+) -> Result<String> {
+    let raw_mask = field_value_mask(field)?;
+    if value > raw_mask {
+        bail!(
+            "field {} on register {} cannot hold polled value {}",
+            field.name,
+            register.id,
+            value
+        );
+    }
+    let shifted_mask = shifted_field_mask(field, register)?;
+    let expected = u32::try_from(value).map_err(|_| {
+        anyhow!(
+            "field {} on register {} requires a poll value wider than 32 bits",
+            field.name,
+            register.id
+        )
+    })?;
+    let read_expr = match register.width_bits {
+        8 => format!("u32::from(read_u8(0x{:X}u64)?)", register.absolute_address),
+        16 => format!("u32::from(read_u16(0x{:X}u64)?)", register.absolute_address),
+        32 => format!("read_u32(0x{:X}u64)?", register.absolute_address),
+        other => {
+            bail!(
+                "register {} uses unsupported width {} for Embassy poll generation",
+                register.id,
+                other
+            )
+        }
+    };
+    Ok(format!(
+        "{indent}while ((({read_expr}) & 0x{shifted_mask:08X}u32) >> {lsb}) != {expected}u32 {{\n{indent}    core::hint::spin_loop();\n{indent}}}\n",
+        lsb = field.lsb
+    ))
+}
+
 fn render_register_value_write_expression_statement(
     register: &ResolvedRegister,
     value_expr: &str,
@@ -12500,6 +12683,11 @@ struct ParsedFieldWrite {
     value: u64,
 }
 
+struct ParsedFieldPoll {
+    field_name: String,
+    value: u64,
+}
+
 fn parse_field_write_expression(
     expression: Option<&SemanticExpression>,
     _value: Option<&Value>,
@@ -12531,6 +12719,38 @@ fn parse_field_write_expression(
         operation_id,
         step_index
     )
+}
+
+fn parse_field_poll_expression(
+    expression: Option<&SemanticExpression>,
+    operation_id: &str,
+    step_index: u32,
+) -> Result<ParsedFieldPoll> {
+    let expression = expression.ok_or_else(|| {
+        anyhow!(
+            "operation {} step {} requires explicit expression text for poll lowering",
+            operation_id,
+            step_index
+        )
+    })?;
+    let language = expression.language.as_deref().ok_or_else(|| {
+        anyhow!(
+            "operation {} step {} is missing expression language required for poll lowering",
+            operation_id,
+            step_index
+        )
+    })?;
+    if language != "plain" {
+        bail!(
+            "operation {} step {} uses unsupported expression language {} for first-cut poll lowering",
+            operation_id,
+            step_index,
+            language
+        );
+    }
+    parse_field_poll_text(&expression.text).with_context(|| {
+        format!("parsing poll expression on operation {operation_id} step {step_index}")
+    })
 }
 
 fn parse_field_write_text(text: &str) -> Result<ParsedFieldWrite> {
@@ -12572,6 +12792,18 @@ fn parse_field_write_text(text: &str) -> Result<ParsedFieldWrite> {
         });
     }
     bail!("unsupported plain-text write expression {trimmed}")
+}
+
+fn parse_field_poll_text(text: &str) -> Result<ParsedFieldPoll> {
+    let trimmed = text.trim();
+    let rest = trimmed
+        .strip_prefix("Wait until ")
+        .or_else(|| trimmed.strip_prefix("Poll until "))
+        .ok_or_else(|| anyhow!("unsupported plain-text poll expression {trimmed}"))?;
+    let (field_name, value) = parse_explicit_assignment(rest)?.ok_or_else(|| {
+        anyhow!("poll expression {trimmed} must use an explicit FIELD = VALUE form")
+    })?;
+    Ok(ParsedFieldPoll { field_name, value })
 }
 
 fn parse_explicit_assignment(text: &str) -> Result<Option<(String, u64)>> {
@@ -17007,11 +17239,22 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(adc_rs.contains("pub fn clear_dma_transfer_complete"));
         assert!(adc_rs.contains("pub fn enable_dma_half_transfer_interrupt"));
         assert!(adc_rs.contains("pub fn enable_dma_transfer_complete_interrupt"));
+        assert!(adc_rs.contains("if let Some(&channel) = channels.first()"));
         assert!(
             adc_rs.contains("ADC DMA channel is not bound in adcDmaBindings.channelSampleTimeRefs")
         );
+        assert!(!adc_rs.contains("let channel = channels[1];"));
+        assert!(
+            adc_rs.contains("while (((read_u32(0x40012408u64)?) & 0x00000008u32) >> 3) != 0u32")
+        );
+        assert!(
+            adc_rs.contains("while (((read_u32(0x40012408u64)?) & 0x00000004u32) >> 2) != 0u32")
+        );
+        assert!(adc_rs.contains("0x00100000u32, 0x00100000u32"));
+        assert!(adc_rs.contains("0x00400000u32, 0x00400000u32"));
         assert!(adc_rs.contains("0x4001244Cu64"));
         assert!(adc_rs.contains("modify_u32(0x40020008u64"));
+        assert!(adc_rs.contains("modify_u32(0x40021014u64, 0x00000001u32, 0x00000001u32"));
     }
 
     #[test]

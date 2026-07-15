@@ -321,7 +321,9 @@ It currently carries:
   time-base architecture is materially family-specific
 - optional explicit binding maps such as `timeDriverBindings` or
   `adcDmaBindings` when one supported lowering family needs named generator
-  handles instead of vendor-name probing
+  handles instead of vendor-name probing, while still allowing topology-backed
+  dependencies such as DMA controller clock/reset bring-up to flow through
+  referenced route/controller bindings
 - capability tags that are generator-facing rather than raw hardware facts
 
 The same profile can drive more than one artifact mode. In the first cut:

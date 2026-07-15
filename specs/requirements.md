@@ -204,6 +204,11 @@ Embassy profile contract.
 - Async and DMA-backed generated APIs are allowed only when the document
   carries the interrupt, DMA, pin-routing, and semantic-operation/state-machine
   facts needed to lower those behaviors deterministically.
+- When a generated bring-up or calibration helper depends on hardware status
+  reaching a ready state before later writes or sampling can succeed, the
+  approved semantic operation shall model that requirement explicitly with
+  status-poll steps rather than relying on undocumented timing gaps or
+  generator-specific hidden waits.
 - If an `adc` driver instance claims a higher-level regular-group buffered
   sampling API backed by DMA, the same profile entry shall carry an explicit
   lowering-family selector and explicit binding refs naming the ADC and DMA
@@ -216,12 +221,19 @@ Embassy profile contract.
 - A `regular-sequence-adc-dma` claim is allowed only when the same `adc` driver
   instance carries explicit `adcDmaBindings` naming the regular-sequence length
   and slot programming handles, per-channel sample-time handles, data register,
-  start control, DMA transfer-count and memory/peripheral address handles, DMA
+  either one direct software-start control or an explicit semantic start
+  sequence, DMA transfer-count and memory/peripheral address handles, DMA
   channel enable handle, DMA half-transfer and transfer-complete status
   handles, the corresponding interrupt-enable handles when interrupt-driven
   circular sampling is claimed, and the semantic setup/clear operations needed
   for one-shot and circular operation on that family. The generator shall fail
   explicitly rather than recovering those roles from vendor-native names alone.
+- When a `regular-sequence-adc-dma` lowering claims DMA-backed sampling, the
+  generator shall also bring up the backing DMA controller path named by the
+  same driver instance's `dmaRouteRefs` before touching DMA channel registers.
+  That dependency shall be inferred from the referenced DMA route/controller
+  topology plus the matching `dma` driver instance's clock/reset bindings, not
+  from vendor-specific register-name guesses embedded in the ADC lowering.
 - A `regular-sequence-adc-dma` claim must remain scoped to the regular
   conversion group. Injected-group conversions, dual-ADC combined modes, and
   other ADC DMA families remain out of subset unless a later approved

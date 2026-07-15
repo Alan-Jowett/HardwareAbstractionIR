@@ -278,7 +278,7 @@ explicit `adcDmaBindings` map naming the direct roles the generated API needs:
 - the ordered regular-sequence slot fields
 - the per-channel sample-time fields
 - the ADC data register
-- the software-start control
+- either one direct software-start control or an explicit semantic start sequence
 - the DMA transfer-count register or field
 - the DMA peripheral-address and memory-address registers or fields
 - the DMA channel-enable control
@@ -288,6 +288,19 @@ explicit `adcDmaBindings` map naming the direct roles the generated API needs:
 - the semantic setup operations for one-shot and circular mode
 - the semantic clear/ack operations for DMA half-transfer and
   transfer-complete events
+
+The DMA controller bring-up for this family is intentionally not repeated in
+`adcDmaBindings`. The ADC lowering already names its DMA path through
+`dmaRouteRefs`, and the matching `dma` driver instance already owns the
+controller-local clock/reset bindings for that path. Reusing that
+route-to-controller closure keeps the ADC family explicit about
+sequence/sample/data roles while avoiding a second, drifting source of truth
+for the same DMA controller gate or reset path.
+
+Separately, ADC families may require init/calibration helpers to wait for
+ready-status bits to clear before software start or DMA sampling is valid. That
+wait must stay in the approved semantic operation itself as explicit field polls
+rather than as an undocumented generator-side delay or ad hoc busy loop.
 
 This keeps the CH32-style buffered ADC path auditable while still allowing the
 generated API to expose higher-level one-shot and circular sampling helpers.

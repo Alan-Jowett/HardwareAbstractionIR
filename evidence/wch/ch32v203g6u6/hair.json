@@ -64260,6 +64260,16 @@
           },
           {
             "index": 2,
+            "action": "poll",
+            "targetRef": "reg.adc1.ctlr2",
+            "expression": {
+              "language": "plain",
+              "text": "Wait until RSTCAL = 0"
+            },
+            "description": "Wait until the calibration reset cycle completes."
+          },
+          {
+            "index": 3,
             "action": "write",
             "targetRef": "reg.adc1.ctlr2",
             "expression": {
@@ -64267,17 +64277,29 @@
               "text": "Set CAL = 1"
             },
             "description": "Start A/D calibration by setting CTLR2.CAL."
+          },
+          {
+            "index": 4,
+            "action": "poll",
+            "targetRef": "reg.adc1.ctlr2",
+            "expression": {
+              "language": "plain",
+              "text": "Wait until CAL = 0"
+            },
+            "description": "Wait until the A/D calibration cycle completes."
           }
         ],
         "provenance": {
           "sourceRefs": [
-            "openwch-ch32v20x-header"
+            "openwch-ch32v20x-header",
+            "openwch-ch32v20x-sdk"
           ],
           "evidenceRefs": [
-            "e_header_adc_enable_calibration_bits"
+            "e_header_adc_enable_calibration_bits",
+            "e_sdk_adc_dma_example"
           ],
           "status": "verified",
-          "confidence": 0.9
+          "confidence": 0.94
         }
       },
       {
@@ -64304,7 +64326,7 @@
             "targetRef": "reg.adc1.ctlr2",
             "expression": {
               "language": "plain",
-              "text": "Clear CONT"
+              "text": "Set CONT = 1"
             }
           },
           {
@@ -64507,6 +64529,46 @@
         }
       },
       {
+        "id": "op.adc1.start_dma_regular",
+        "name": "ADC1 start regular-group DMA sampling",
+        "kind": "configuration",
+        "targetRefs": [
+          "periph.adc1"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.adc1.ctlr2",
+            "expression": {
+              "language": "plain",
+              "text": "Set EXTTRIG = 1"
+            }
+          },
+          {
+            "index": 1,
+            "action": "write",
+            "targetRef": "reg.adc1.ctlr2",
+            "expression": {
+              "language": "plain",
+              "text": "Set SWSTART = 1"
+            }
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-sdk",
+            "openwch-ch32v20x-header"
+          ],
+          "evidenceRefs": [
+            "e_sdk_adc_dma_example",
+            "e_header_register_bitdefs"
+          ],
+          "status": "verified",
+          "confidence": 0.91
+        }
+      },
+      {
         "id": "op.adc1.stop_dma",
         "name": "ADC1 stop regular-group DMA sampling",
         "kind": "configuration",
@@ -64535,6 +64597,24 @@
           },
           {
             "index": 2,
+            "action": "write",
+            "targetRef": "reg.adc1.ctlr2",
+            "expression": {
+              "language": "plain",
+              "text": "Clear EXTTRIG"
+            }
+          },
+          {
+            "index": 3,
+            "action": "write",
+            "targetRef": "reg.adc1.ctlr2",
+            "expression": {
+              "language": "plain",
+              "text": "Clear SWSTART"
+            }
+          },
+          {
+            "index": 4,
             "action": "write",
             "targetRef": "reg.dma1.cfgr",
             "expression": {
@@ -64644,6 +64724,16 @@
           },
           {
             "index": 2,
+            "action": "poll",
+            "targetRef": "reg.adc2.ctlr2",
+            "expression": {
+              "language": "plain",
+              "text": "Wait until RSTCAL = 0"
+            },
+            "description": "Wait until the calibration reset cycle completes."
+          },
+          {
+            "index": 3,
             "action": "write",
             "targetRef": "reg.adc2.ctlr2",
             "expression": {
@@ -64651,17 +64741,29 @@
               "text": "Set CAL = 1"
             },
             "description": "Start A/D calibration by setting CTLR2.CAL."
+          },
+          {
+            "index": 4,
+            "action": "poll",
+            "targetRef": "reg.adc2.ctlr2",
+            "expression": {
+              "language": "plain",
+              "text": "Wait until CAL = 0"
+            },
+            "description": "Wait until the A/D calibration cycle completes."
           }
         ],
         "provenance": {
           "sourceRefs": [
-            "openwch-ch32v20x-header"
+            "openwch-ch32v20x-header",
+            "openwch-ch32v20x-sdk"
           ],
           "evidenceRefs": [
-            "e_header_adc_enable_calibration_bits"
+            "e_header_adc_enable_calibration_bits",
+            "e_sdk_adc_dma_example"
           ],
           "status": "verified",
-          "confidence": 0.9
+          "confidence": 0.94
         }
       }
     ],
@@ -75181,7 +75283,9 @@
               "op.adc1.stop_dma"
             ],
             "dataRegisterRef": "reg.adc1.rdatar",
-            "startRef": "field.adc_ctlr2.swstart",
+            "startOperationRefs": [
+              "op.adc1.start_dma_regular"
+            ],
             "regularSequenceLengthRef": "field.adc_rsqr1.l",
             "regularSequenceSlotRefs": [
               "field.adc_rsqr3.sq1",

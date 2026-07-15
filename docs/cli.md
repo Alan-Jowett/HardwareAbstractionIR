@@ -82,7 +82,9 @@ First-cut behavior:
   buffered DMA sampling helpers only when the profile selects an explicit
   `regular-sequence-adc-dma` lowering family and carries explicit
   `adcDmaBindings` for the ADC sequence/sample-time/data roles, DMA
-  programming roles, and DMA event setup/clear operations used by that path
+  programming roles, and DMA event setup/clear operations used by that path;
+  the generated lowering may infer backing DMA controller bring-up from the
+  same driver's referenced `dmaRouteRefs`
 - allow generated async timing support only when the profile names a unique
   `embassy-time-driver` instance plus an explicit time-driver source contract,
   preserving the existing SysTick-backed path and allowing reusable

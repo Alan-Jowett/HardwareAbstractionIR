@@ -203,7 +203,10 @@ Normative consequences:
    `regular-sequence-adc-dma`, which is limited to software-started
    regular-group buffered sampling and may expose one-shot and/or circular
    buffered helpers only when the approved HAIR inputs justify those exact
-   behaviors
+   behaviors. When this family also names `dmaRouteRefs`, generators may infer
+   the backing DMA controller bring-up from the referenced DMA controller's own
+   clock/reset bindings rather than duplicating those gates inside
+   `adcDmaBindings`
 11. the generated core contract for a non-SysTick path must stay
    runtime-agnostic: the generated crate may emit source-specific init
    helpers, blocking delay helpers when justified, the wake-handler
@@ -329,7 +332,7 @@ hoc name matching.
 | `i2c` | `pinTopology.routes`; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted bus transaction path; interrupt/DMA routes only when the emitted API claims them |
 | `rtc` | clock/reset support for emitted bring-up helpers when claimed; explicit `interruptTopology.routes` for any emitted interrupt-driven or wakeup behavior; explicit `semantics.operations` and/or `semantics.stateMachines` for claimed raw counter/prescaler/alarm setup or flag/interrupt handling; structural register/field data for the reachable RTC counter, prescaler, alarm, enable, pending, and clear/ack path; and, when the same driver instance also claims `embassy-time-driver`, the explicit tick-rate and binding facts needed for the selected rtc-backed time-base path |
 | `timer` / `pwm` | `pinTopology.routes` for exposed channels; target-local `semantics.stateMachines` and `semantics.operations` for mode transitions; state-machine transitions with exactly one supported effect targeting a field for first-cut lowering; structural register/field data for emitted enable/disable/channel/duty behavior; and, if the driver instance also claims blocking delay helpers or `embassy-time-driver`, the explicit interrupt routes plus semantic/structural counter, alarm, clear/ack, reload, and tick-rate facts needed for that timing path. Shared-vector timers must still narrow the generated time base to one explicit route/source/clear path. For `loweringPattern = "counter-compare-timer"`, that reachable structure includes the timer-enable path plus prescaler, reload, counter, alarm/compare, event/update, interrupt-enable, and interrupt-status/clear registers or canonical equivalents. |
-| `adc` | `semantics.operations` for calibration/init/enable; structural register/field data for any emitted conversion or sample path; pin/electrical data for exposed analog inputs; `dmaTopology.routes` only when the emitted API claims DMA-backed sampling; and explicit `adcDmaBindings` when `loweringPattern = "regular-sequence-adc-dma"` claims higher-level regular-group buffered DMA helpers |
+| `adc` | `semantics.operations` for calibration/init/enable, including any explicit status-poll steps needed before conversion can begin; structural register/field data for any emitted conversion or sample path; pin/electrical data for exposed analog inputs; `dmaTopology.routes` only when the emitted API claims DMA-backed sampling; and explicit `adcDmaBindings` when `loweringPattern = "regular-sequence-adc-dma"` claims higher-level regular-group buffered DMA helpers. The generated family may also reuse the referenced DMA controller driver's clock/reset bindings to bring that DMA path up before channel programming |
 | `dma` | `profiles.mcuSoc.dmaTopology.routes` and the referenced `dmaTopology.channels`; any referenced route `controlRefs`; and structural register/field data for emitted channel enable/launch/status helpers |
 | `interrupt` | `structure.device.interrupts`, `profiles.mcuSoc.interruptTopology.routes`, and the referenced `interruptTopology.sources`; plus any clear/ack operations or control refs required by emitted helper methods |
 | `usb-device` | `pinTopology.routes` for D+ and D-; clock/reset support for emitted bring-up helpers; `interruptTopology.routes` for any emitted interrupt-driven behavior; explicit `semantics.operations` and/or `semantics.stateMachines` for claimed bus-reset, attach, endpoint/FIFO, or other controller-level helpers; structural register/field data for the reachable USB control/data path being lowered; and `driverInstances[].loweringPattern` whenever the chosen USB lowering family has materially distinct bring-up behavior that the generator must not infer |
@@ -349,7 +352,7 @@ exact naming contract:
 | `i2c` | Bring-up helpers and only those bus transaction methods whose start/address/data/stop behavior is explicitly modeled |
 | `rtc` | Bring-up helpers plus HAL-specific raw counter/prescaler/alarm/flag methods whose control and status paths are explicitly modeled; and, when selected as `timeDriverSource = "rtc"`, generated Embassy async time-base support only when the approved RTC counter/alarm/interrupt path is explicitly modeled and the emitted raw RTC helpers remain traceable to that same approved path |
 | `timer` / `pwm` | Enable/disable/mode/channel helpers derived from state machines, operations, route controls, and structural register data; plus blocking delay/timebase helpers and, when selected as `timeDriverSource = "hardware-timer"`, generated Embassy async time-base support only when the approved timer counter/alarm path is explicitly modeled. That async support must preserve a runtime-agnostic wake-handler hook, the unique interrupt-route metadata needed by a downstream runtime layer, and the explicit Embassy tick rate used by the timer source. When `loweringPattern = "counter-compare-timer"`, the generated time-base path is specifically the approved counter/compare/event/interrupt closure rather than an inferred generic timer API. |
-| `adc` | Calibration/enable helpers plus only those conversion/sample methods whose trigger/start/complete/data path is explicitly modeled. When `loweringPattern = "regular-sequence-adc-dma"`, the generated API may additionally expose one-shot and circular regular-group buffered DMA sampling helpers only for the exact path named by `adcDmaBindings` |
+| `adc` | Calibration/enable helpers plus only those conversion/sample methods whose trigger/start/complete/data path is explicitly modeled. When `loweringPattern = "regular-sequence-adc-dma"`, the generated API may additionally expose one-shot and circular regular-group buffered DMA sampling helpers only for the exact path named by `adcDmaBindings`, with DMA controller bring-up inferred from the same driver's referenced `dmaRouteRefs` |
 | `dma` | Channel-oriented enable/configure/launch/status helpers derived from DMA topology and any referenced controls |
 | `interrupt` | IRQ enums plus bind/clear/ack helpers justified by the interrupt inventory, routes, and source-level operations; and, when tagged `embassy-time-driver` with `timeDriverSource = "systick"`, the generated SysTick-backed async time-base support module |
 | `usb-device` | Bring-up helpers plus only those controller-level USB methods whose attach, reset, interrupt, and data paths are explicitly modeled; device-specific helpers are allowed when they remain traceable to the approved USB lowering path rather than to inferred generic USB behavior. Standard USB classes such as CDC ACM are expected to come from Embassy USB libraries layered on top of the generated controller module. When `loweringPattern = "serial-jtag-preserve-link"`, the emitted bring-up sequence must preserve the boot-established USB Serial/JTAG link instead of synthesizing an unconditional reset-and-reattach sequence |
@@ -375,13 +378,14 @@ companion emulator/state handles and their observation/control methods.
 4. A driver may omit `dmaRouteRefs` only when the generated first-cut implementation does not claim DMA-backed operation for that path.
 5. Unsupported optional hardware must produce an explicit generator error, not a stub or silently degraded driver.
 6. `initOperationRefs` and `stateMachineRefs` should be treated as executable lowering inputs, not as documentation-only labels.
-7. A driver instance should not be interpreted as claiming every imaginable operation for its `driverKind`; it only claims the subset that the referenced topology and semantics can justify.
-8. A `gpio-port` driver instance may still lower to a per-pin generated API surface; the HAIR contract stays rooted at the port block while each emitted pin helper must remain traceable to explicit `pinRoles`, routes, and reachable structural controls for that pin.
-9. Capability tag `embassy-time-driver` reserves that driver instance as the crate's generated async timing provider in the first cut. At most one driver instance may claim it, and it must also declare `timeDriverSource`.
-10. Host-emulated output derives its package/crate naming from `crate.packageName`
+7. First-cut generated bring-up helpers may lower explicit semantic `poll` steps as blocking MMIO status waits when the approved operation names the exact register field and expected ready value; generators must not invent hidden waits that are absent from the approved operation.
+8. A driver instance should not be interpreted as claiming every imaginable operation for its `driverKind`; it only claims the subset that the referenced topology and semantics can justify.
+9. A `gpio-port` driver instance may still lower to a per-pin generated API surface; the HAIR contract stays rooted at the port block while each emitted pin helper must remain traceable to explicit `pinRoles`, routes, and reachable structural controls for that pin.
+10. Capability tag `embassy-time-driver` reserves that driver instance as the crate's generated async timing provider in the first cut. At most one driver instance may claim it, and it must also declare `timeDriverSource`.
+11. Host-emulated output derives its package/crate naming from `crate.packageName`
     and `crate.crateName`; the profile does not grow separate host naming
     fields for the first cut.
-11. Async or DMA-backed UART/I2C/SPI/ADC surfaces are supported only when the
+12. Async or DMA-backed UART/I2C/SPI/ADC surfaces are supported only when the
     driver instance names the full interrupt, DMA, pin-routing, and semantic
     lowering inputs needed for that behavior; otherwise the generator must emit
     only the supported polling subset or fail explicitly if the requested
@@ -404,12 +408,16 @@ companion emulator/state handles and their observation/control methods.
     that selector becomes part of the executable lowering contract. The same
     driver instance must also carry explicit `adcDmaBindings` naming the
     regular-sequence length and slot fields, per-channel sample-time fields,
-    data register, software-start control, DMA transfer-count and address
-    programming handles, DMA channel-enable handle, DMA half-transfer and
+    data register, either one direct software-start control or an explicit
+    semantic start sequence, DMA transfer-count and address programming
+    handles, DMA channel-enable handle, DMA half-transfer and
     transfer-complete status/interrupt handles, and the semantic setup/clear
     operations the generator may use for one-shot and circular buffered
-    sampling. This family does not authorize injected-group or dual-ADC DMA
-    helpers.
+    sampling. The family still relies on `dmaRouteRefs` for the backing DMA
+    controller path, and generators may reuse the matching `dma` driver
+    instance's clock/reset bindings to ensure that controller is live before DMA
+    register access. This family does not authorize injected-group or dual-ADC
+    DMA helpers.
 15. If a driver instance claims `embassy-time-driver`, `timeDriverSource`
     becomes part of the executable lowering contract. `systick` preserves the
     existing SysTick-backed interrupt path. `hardware-timer` selects an
@@ -553,9 +561,9 @@ For Embassy generation, the following cases must fail explicitly:
    inputs that are absent, contradictory, or would force the generator to
    invent a different attach/reset sequence
 11. an `adc` buffered-sampling API would require inferred regular-sequence,
-   sample-time, DMA programming, or DMA event-clear behavior beyond the
-   explicit `adcDmaBindings`, referenced operations, and reachable structural
-   data
+   sample-time, start sequencing, DMA programming, or DMA event-clear behavior
+   beyond the explicit `adcDmaBindings`, referenced operations, and reachable
+   structural data
 12. a non-SysTick time-driver claim relies on an implicit choice among multiple
    interrupt causes, shared vectors, or clear paths instead of naming one
    approved route/source/clear sequence explicitly

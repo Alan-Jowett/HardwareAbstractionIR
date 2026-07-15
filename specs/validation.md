@@ -115,9 +115,21 @@ cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-
   generation succeeds only when the same `adc` driver instance carries an
   explicit `regular-sequence-adc-dma` lowering selector plus `adcDmaBindings`
   naming the ADC and DMA roles used by the generated buffered-sampling path.
-  The generated crate may expose one-shot and circular regular-group DMA
-  sampling helpers only when the approved HAIR inputs justify those exact
-  behaviors; injected and dual-ADC DMA paths must still fail explicitly.
+  Those bindings must name either one direct software-start control or an
+  explicit semantic start sequence when the family needs more than one control
+  write to launch conversions. The generated crate may expose one-shot and
+  circular regular-group DMA sampling helpers only when the approved HAIR
+  inputs justify those exact behaviors; injected and dual-ADC DMA paths must
+  still fail explicitly.
+- The same generated ADC DMA helpers succeed only when the lowering also emits
+  the clock-enable and reset-release writes required by the DMA controller
+  reached through the ADC driver's referenced `dmaRouteRefs`, so DMA register
+  programming does not depend on an out-of-band smoke-app workaround.
+- If a generated ADC bring-up helper depends on calibration or ready-status
+  flags clearing before later sampling can succeed, generation succeeds only
+  when the approved init operation models those waits explicitly and the
+  generated helper lowers them as blocking MMIO polls of the named field/value
+  pair instead of relying on hidden timing assumptions.
 - When a reference document carries explicit canonical normalization mappings,
   the generator may consume them only as additive lowering hints for supported
   equivalent concepts; missing or ambiguous mappings must not mask unsupported
@@ -468,6 +480,41 @@ powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\emb
   that the generated Embassy wake path can service repeated `Timer::after(...)`
   waits once the lower-level RTC alarm route is known-good, without replacing
   the direct IRQ-path observability needed for debugging.
+
+### V-018 Hardware smoke packaging for the CH32V203G6U6 ADC DMA example
+
+**Purpose:** provide a hardware-flashable ADC DMA smoke image for the
+CH32V203G6U6 reference bundle that exercises the generated higher-level ADC1
+regular-group DMA helpers against a real analog signal on `PA7`, while
+reporting captured sample summaries over USB CDC.
+
+**Command**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\embassy-adc-dma-smoke\build-smoke-bin.ps1 -Release
+```
+
+**Expected result**
+- The smoke firmware builds for `riscv32imc-unknown-none-elf`.
+- The packaging step writes a flashable `.bin` beside the release ELF.
+- When flashed to the physical device with an external signal generator driving
+  `PA7` / `ADC1_IN7`, the firmware enumerates a USB CDC port and emits recurring
+  `oneshot ...` and `circular ...` lines reporting sample-count, first/last,
+  min/max, and average values from ADC DMA captures.
+- The one-shot report exercises the generated one-shot DMA capture path and its
+  transfer-complete clear/stop helpers.
+- The circular report exercises the generated circular DMA capture path and
+  reports whether half-transfer and transfer-complete events were observed
+  before shutdown.
+
+**Note**
+- This is a hardware-dependent smoke check, not a universal repository
+  precondition.
+- The smoke application shall consume the generated Embassy HAL crate through
+  normal Rust package boundaries for RCC, GPIO, ADC, USB CDC, and Embassy time.
+- The current generated GPIO surface does not expose a dedicated analog-input
+  pin-mode helper, so the smoke image keeps `PA7` as a floating input while the
+  ADC path samples it via DMA.
 
 ## 6. Requirement-specific validation coverage
 
