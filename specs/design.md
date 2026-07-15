@@ -327,6 +327,16 @@ distinct roles from the same approved control path:
 2. expose HAL-specific raw RTC helpers for counter, prescaler, alarm, and
    flag/interrupt handling that do not fit the generic `embassy-time` contract
 
+Watchdog lowering follows the same explicit-contract rule. Because
+`embedded-hal` 1.0 does not ship watchdog traits, a `watchdog` driver instance
+may expose portable feed/start support through an aliased `embedded-hal` 0.2
+dependency such as `embedded_hal_02::watchdog::{Watchdog, WatchdogEnable}`,
+plus HAL-specific raw configuration/status helpers, only when the approved
+HAIR inputs justify that same watchdog control/status path explicitly. For
+watchdog families such as CH32 IWDG whose approved path does not justify a
+real disable sequence, the generator must omit `WatchdogDisable` rather than
+synthesizing disable behavior.
+
 When a document also carries explicit normalization canonical mappings, Embassy
 lowering may use those mappings as secondary resolution hints for supported
 register, field, or peripheral concepts that recur across vendors. This is a

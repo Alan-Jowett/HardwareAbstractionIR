@@ -64231,6 +64231,108 @@
         }
       },
       {
+        "id": "op.iwdg.unlock",
+        "name": "Unlock IWDG configuration",
+        "kind": "configuration",
+        "targetRefs": [
+          "periph.iwdg"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.iwdg.ctlr",
+            "expression": {
+              "language": "plain",
+              "text": "Write KEY = 0x5555"
+            },
+            "description": "Write the IWDG unlock key so prescaler and reload updates are accepted."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "openwch-ch32v20x-sdk",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_sdk_iwdg_register_sequence",
+            "e_rm_iwdg_register_model"
+          ],
+          "status": "verified",
+          "confidence": 0.9
+        }
+      },
+      {
+        "id": "op.iwdg.feed",
+        "name": "Reload IWDG counter",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.iwdg"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.iwdg.ctlr",
+            "expression": {
+              "language": "plain",
+              "text": "Write KEY = 0xAAAA"
+            },
+            "description": "Write the IWDG reload key to refresh the watchdog counter."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "openwch-ch32v20x-sdk",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_sdk_iwdg_register_sequence",
+            "e_rm_iwdg_register_model"
+          ],
+          "status": "verified",
+          "confidence": 0.9
+        }
+      },
+      {
+        "id": "op.iwdg.start",
+        "name": "Start IWDG",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.iwdg"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.iwdg.ctlr",
+            "expression": {
+              "language": "plain",
+              "text": "Write KEY = 0xCCCC"
+            },
+            "description": "Write the IWDG start key to enable the watchdog."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "openwch-ch32v20x-sdk",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_sdk_iwdg_register_sequence",
+            "e_rm_iwdg_register_model"
+          ],
+          "status": "verified",
+          "confidence": 0.9
+        }
+      },
+      {
         "id": "op.adc1.calibrate",
         "name": "ADC1 enable and calibrate",
         "kind": "initialization",
@@ -68651,6 +68753,25 @@
             "evidenceRefs": [
               "e_header_base_addresses",
               "e_rm_rtc_register_model"
+            ],
+            "status": "verified",
+            "confidence": 0.9
+          }
+        },
+        {
+          "id": "block.iwdg",
+          "name": "IWDG",
+          "targetRef": "periph.iwdg",
+          "blockClass": "watchdog",
+          "functionalDomain": "security",
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header",
+              "wch-ch32fv2x-v3x-rm"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses",
+              "e_rm_iwdg_register_model"
             ],
             "status": "verified",
             "confidence": 0.9
@@ -75172,6 +75293,32 @@
             ],
             "status": "verified",
             "confidence": 0.88
+          }
+        },
+        {
+          "id": "drv.iwdg",
+          "name": "IWDG",
+          "targetRef": "block.iwdg",
+          "driverKind": "watchdog",
+          "modulePath": "watchdog",
+          "initOperationRefs": [
+            "op.iwdg.unlock",
+            "op.iwdg.feed",
+            "op.iwdg.start"
+          ],
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-header",
+              "openwch-ch32v20x-sdk",
+              "wch-ch32fv2x-v3x-rm"
+            ],
+            "evidenceRefs": [
+              "e_header_base_addresses",
+              "e_sdk_iwdg_register_sequence",
+              "e_rm_iwdg_register_model"
+            ],
+            "status": "verified",
+            "confidence": 0.9
           }
         },
         {

@@ -2440,7 +2440,7 @@ impl EmbassyGenerationModel {
 fn validate_supported_driver_kind(driver_kind: &str) -> Result<()> {
     match driver_kind {
         "rcc" | "gpio-port" | "uart" | "usart" | "spi" | "i2c" | "timer" | "pwm" | "adc"
-        | "dma" | "interrupt" | "usb-device" | "rtc" => Ok(()),
+        | "dma" | "interrupt" | "usb-device" | "rtc" | "watchdog" => Ok(()),
         "custom" => bail!("driver kind custom is outside the supported first-cut Embassy subset"),
         other => bail!("driver kind {other} is not supported by the first-cut Embassy generator"),
     }
@@ -3089,7 +3089,8 @@ fn validate_driver_resource_scope(
     resources: &DriverResourceScopeInputs<'_>,
 ) -> Result<()> {
     match driver.driver_kind.as_str() {
-        "uart" | "usart" | "spi" | "i2c" | "timer" | "pwm" | "adc" | "gpio-port" | "usb-device" => {
+        "uart" | "usart" | "spi" | "i2c" | "timer" | "pwm" | "adc" | "gpio-port" | "usb-device"
+        | "watchdog" => {
             let target_ref = target.target_ref.as_str();
             for binding in resources.clock_bindings {
                 if binding.consumer_ref != target_ref {
@@ -4033,11 +4034,15 @@ fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
         .drivers
         .iter()
         .any(driver_uses_usb_fsdev_pma_btable_lowering);
-    let has_pwm = model
+    let has_embedded_hal_1 = model
         .drivers
         .iter()
         .any(|driver| driver.driver_kind == "pwm");
-    if has_time_driver || has_fsdev_usb || has_pwm {
+    let has_embedded_hal_02 = model
+        .drivers
+        .iter()
+        .any(|driver| driver.driver_kind == "watchdog");
+    if has_time_driver || has_fsdev_usb || has_embedded_hal_1 || has_embedded_hal_02 {
         out.push_str("\n[dependencies]\n");
         if has_time_driver || has_fsdev_usb {
             out.push_str("critical-section = \"1.2\"\n");
@@ -4053,8 +4058,13 @@ fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
     if has_fsdev_usb {
         out.push_str("embassy-usb-driver = \"0.2.2\"\n");
     }
-    if has_pwm {
+    if has_embedded_hal_1 {
         out.push_str("embedded-hal = \"1.0\"\n");
+    }
+    if has_embedded_hal_02 {
+        out.push_str(
+            "embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"] }\n",
+        );
     }
     out
 }
@@ -4270,6 +4280,9 @@ fn render_driver_support_items(
     }
     if driver.driver_kind == "pwm" {
         out.push_str(&render_pwm_support_items(model, driver)?);
+    }
+    if driver.driver_kind == "watchdog" {
+        out.push_str(&render_watchdog_support_items(driver));
     }
     if driver.driver_kind == "rtc" && driver.module_name == "rtc" {
         out.push_str(&render_rtc_support_items(model, driver)?);
@@ -5263,6 +5276,7 @@ fn render_driver_methods(
     methods.extend(render_gpio_methods(model, driver)?);
     methods.extend(render_pin_route_methods(model, driver)?);
     methods.extend(render_pwm_methods(model, driver)?);
+    methods.extend(render_watchdog_methods(model, driver)?);
     methods.extend(render_usart_methods(model, driver)?);
     methods.extend(render_spi_methods(model, driver)?);
     methods.extend(render_adc_methods(model, driver)?);
@@ -9784,6 +9798,183 @@ fn render_rtc_methods(
     ])
 }
 
+fn watchdog_config_type_name(driver: &ResolvedDriverInstance) -> String {
+    format!("{}Config", driver.type_name)
+}
+
+fn render_watchdog_support_items(driver: &ResolvedDriverInstance) -> String {
+    let config_type_name = watchdog_config_type_name(driver);
+    format!(
+        r#"
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct {config_type_name} {{
+    pub prescaler: u8,
+    pub reload: u16,
+}}
+
+impl {config_type_name} {{
+    pub const fn new(prescaler: u8, reload: u16) -> Self {{
+        Self {{ prescaler, reload }}
+    }}
+}}
+
+impl From<(u8, u16)> for {config_type_name} {{
+    fn from(value: (u8, u16)) -> Self {{
+        Self::new(value.0, value.1)
+    }}
+}}
+"#
+    )
+}
+
+fn render_watchdog_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    if driver.driver_kind != "watchdog" {
+        return Ok(Vec::new());
+    }
+
+    let has_unlock = driver
+        .init_operations
+        .iter()
+        .any(|operation| operation_method_slug(operation) == "unlock");
+    let has_feed = driver
+        .init_operations
+        .iter()
+        .any(|operation| operation_method_slug(operation) == "feed");
+    let has_start = driver
+        .init_operations
+        .iter()
+        .any(|operation| operation_method_slug(operation) == "start");
+    if !has_unlock {
+        bail!(
+            "watchdog driver {} requires an init operation whose id ends in .unlock",
+            driver.id
+        );
+    }
+    if !has_feed {
+        bail!(
+            "watchdog driver {} requires an init operation whose id ends in .feed",
+            driver.id
+        );
+    }
+    if !has_start {
+        bail!(
+            "watchdog driver {} requires an init operation whose id ends in .start",
+            driver.id
+        );
+    }
+
+    let pscr = resolve_target_register_by_name(model, &driver.target.target_ref, "PSCR")?;
+    let rldr = resolve_target_register_by_name(model, &driver.target.target_ref, "RLDR")?;
+    let statr = resolve_target_register_by_name(model, &driver.target.target_ref, "STATR")?;
+    let pr = resolve_register_field(&pscr, "PR")?;
+    let rl = resolve_register_field(&rldr, "RL")?;
+    let pvu = resolve_register_field(&statr, "PVU")?;
+    let rvu = resolve_register_field(&statr, "RVU")?;
+    let prescaler_max = u8::try_from(field_value_mask(&pr)?).map_err(|_| {
+        anyhow!(
+            "watchdog prescaler field {} exceeds the supported u8 configuration width",
+            pr.id
+        )
+    })?;
+    let reload_max = u16::try_from(field_value_mask(&rl)?).map_err(|_| {
+        anyhow!(
+            "watchdog reload field {} exceeds the supported u16 configuration width",
+            rl.id
+        )
+    })?;
+    let pending_mask = shifted_field_mask(&pvu, &statr)? | shifted_field_mask(&rvu, &statr)?;
+    let prescaler_read_expr = render_register_field_value_read_expression(&pscr, &pr)?;
+    let reload_read_expr = render_register_field_value_read_expression(&rldr, &rl)?;
+    let pending_read_expr = render_register_read_expression(&statr)?;
+    let write_prescaler =
+        render_register_write_expression_statement(&pscr, &pr, "u32::from(prescaler)", "        ")?;
+    let write_reload =
+        render_register_write_expression_statement(&rldr, &rl, "u32::from(reload)", "        ")?;
+    let config_type_name = watchdog_config_type_name(driver);
+
+    Ok(vec![
+        GeneratedMethod {
+            name: "unlock".to_string(),
+            code: "    pub fn unlock(&self) -> Result<(), metadata::Error> {\n        self.apply_unlock()\n    }\n"
+                .to_string(),
+        },
+        GeneratedMethod {
+            name: "feed_watchdog".to_string(),
+            code: "    pub fn feed_watchdog(&self) -> Result<(), metadata::Error> {\n        self.apply_feed()\n    }\n"
+                .to_string(),
+        },
+        GeneratedMethod {
+            name: "start_watchdog".to_string(),
+            code: "    pub fn start_watchdog(&self) -> Result<(), metadata::Error> {\n        self.apply_start()\n    }\n"
+                .to_string(),
+        },
+        render_register_flag_read_method(
+            "is_prescaler_update_pending".to_string(),
+            &statr,
+            &pvu,
+            "Report whether the watchdog prescaler update is still pending.",
+        )?,
+        render_register_flag_read_method(
+            "is_reload_update_pending".to_string(),
+            &statr,
+            &rvu,
+            "Report whether the watchdog reload update is still pending.",
+        )?,
+        GeneratedMethod {
+            name: "is_configuration_update_pending".to_string(),
+            code: format!(
+                "    pub fn is_configuration_update_pending(&self) -> Result<bool, metadata::Error> {{\n        Ok((({pending_read_expr}) & 0x{pending_mask:08X}u32) != 0)\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "read_prescaler".to_string(),
+            code: format!(
+                "    pub fn read_prescaler(&self) -> Result<u8, metadata::Error> {{\n        Ok(({prescaler_read_expr}) as u8)\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "read_reload".to_string(),
+            code: format!(
+                "    pub fn read_reload(&self) -> Result<u16, metadata::Error> {{\n        Ok(({reload_read_expr}) as u16)\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "set_prescaler".to_string(),
+            code: format!(
+                "    pub fn set_prescaler(&self, prescaler: u8) -> Result<(), metadata::Error> {{\n        if prescaler > 0x{prescaler_max:02X}u8 {{\n            return Err(metadata::Error::Unsupported(\"watchdog prescaler exceeds the modeled field width\"));\n        }}\n        self.apply_unlock()?;\n{write_prescaler}        Ok(())\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "set_reload".to_string(),
+            code: format!(
+                "    pub fn set_reload(&self, reload: u16) -> Result<(), metadata::Error> {{\n        if reload > 0x{reload_max:04X}u16 {{\n            return Err(metadata::Error::Unsupported(\"watchdog reload exceeds the modeled field width\"));\n        }}\n        self.apply_unlock()?;\n{write_reload}        Ok(())\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "configure".to_string(),
+            code: format!(
+                "    pub fn configure(&self, config: {config_type_name}) -> Result<(), metadata::Error> {{\n        let prescaler = config.prescaler;\n        let reload = config.reload;\n        if prescaler > 0x{prescaler_max:02X}u8 {{\n            return Err(metadata::Error::Unsupported(\"watchdog prescaler exceeds the modeled field width\"));\n        }}\n        if reload > 0x{reload_max:04X}u16 {{\n            return Err(metadata::Error::Unsupported(\"watchdog reload exceeds the modeled field width\"));\n        }}\n        while (({pending_read_expr}) & 0x{pending_mask:08X}u32) != 0 {{\n            core::hint::spin_loop();\n        }}\n        self.apply_unlock()?;\n{write_prescaler}        while (({pending_read_expr}) & 0x{pending_mask:08X}u32) != 0 {{\n            core::hint::spin_loop();\n        }}\n        self.apply_unlock()?;\n{write_reload}        while (({pending_read_expr}) & 0x{pending_mask:08X}u32) != 0 {{\n            core::hint::spin_loop();\n        }}\n        Ok(())\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "start_with_config".to_string(),
+            code: format!(
+                "    pub fn start_with_config(&self, config: {config_type_name}) -> Result<(), metadata::Error> {{\n        self.configure(config)?;\n        self.apply_start()?;\n        Ok(())\n    }}\n"
+            ),
+        },
+        GeneratedMethod {
+            name: "__watchdog_embedded_hal_02_impls".to_string(),
+            code: format!(
+                "}}\n\nimpl embedded_hal_02::watchdog::Watchdog for {type_name} {{\n    fn feed(&mut self) {{\n        self.feed_watchdog().expect(\"generated watchdog feed\")\n    }}\n}}\n\nimpl embedded_hal_02::watchdog::WatchdogEnable for {type_name} {{\n    type Time = {config_type_name};\n\n    fn start<T>(&mut self, period: T)\n    where\n        T: Into<Self::Time>,\n    {{\n        self.start_with_config(period.into())\n            .expect(\"generated watchdog start\")\n    }}\n}}\n\nimpl {type_name} {{\n",
+                type_name = driver.type_name,
+            ),
+        },
+    ])
+}
+
 fn render_usb_device_methods(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
@@ -12028,6 +12219,41 @@ fn render_register_flag_read_method(
         name: method_name,
         code,
     })
+}
+
+fn render_register_read_expression(register: &ResolvedRegister) -> Result<String> {
+    match register.width_bits {
+        8 => Ok(format!(
+            "u32::from(read_u8(0x{:X}u64)?)",
+            register.absolute_address
+        )),
+        16 => Ok(format!(
+            "u32::from(read_u16(0x{:X}u64)?)",
+            register.absolute_address
+        )),
+        32 => Ok(format!("read_u32(0x{:X}u64)?", register.absolute_address)),
+        other => bail!(
+            "register {} uses unsupported width {} for Embassy read generation",
+            register.id,
+            other
+        ),
+    }
+}
+
+fn render_register_field_value_read_expression(
+    register: &ResolvedRegister,
+    field: &ResolvedField,
+) -> Result<String> {
+    let read_expr = render_register_read_expression(register)?;
+    let mask = shifted_field_mask(field, register)?;
+    if field.lsb == 0 {
+        Ok(format!("(({read_expr}) & 0x{mask:08X}u32)"))
+    } else {
+        Ok(format!(
+            "((({read_expr}) & 0x{mask:08X}u32) >> {})",
+            field.lsb
+        ))
+    }
 }
 
 fn resolve_structural_owner_peripheral<'a>(
@@ -15025,17 +15251,35 @@ fn render_embassy_host_cargo_toml(model: &EmbassyGenerationModel) -> String {
         render_rust_string(&host_package_name(&model.crate_info.package_name)),
         render_rust_string(&host_crate_name(&model.crate_info.crate_name))
     );
-    if model
+    let has_time_driver = model
         .drivers
         .iter()
-        .any(|driver| has_time_driver_tag(&driver.capability_tags))
-    {
+        .any(|driver| has_time_driver_tag(&driver.capability_tags));
+    let has_embedded_hal_1 = model
+        .drivers
+        .iter()
+        .any(|driver| driver.driver_kind == "pwm");
+    let has_embedded_hal_02 = model
+        .drivers
+        .iter()
+        .any(|driver| driver.driver_kind == "watchdog");
+    if has_time_driver || has_embedded_hal_1 || has_embedded_hal_02 {
         out.push_str("\n[dependencies]\n");
+    }
+    if has_time_driver {
         out.push_str(&format!(
             "{}\n",
             render_embassy_time_driver_dependency(&model.drivers)
         ));
         out.push_str("embassy-time-queue-utils = { version = \"0.3.2\", features = [\"generic-queue-8\"] }\n");
+    }
+    if has_embedded_hal_1 {
+        out.push_str("embedded-hal = \"1.0\"\n");
+    }
+    if has_embedded_hal_02 {
+        out.push_str(
+            "embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"] }\n",
+        );
     }
     out
 }
@@ -15294,6 +15538,9 @@ fn render_embassy_host_driver_support_items(
     }
     if driver.driver_kind == "gpio-port" {
         out.push_str(&render_gpio_support_items(model, driver)?);
+    }
+    if driver.driver_kind == "watchdog" {
+        out.push_str(&render_watchdog_support_items(driver));
     }
     if has_time_driver_tag(&driver.capability_tags) {
         out.push_str(&render_host_time_driver_support_items(driver)?);
@@ -18046,6 +18293,86 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(
             cargo_output.status.success(),
             "generated crate should compile:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&cargo_output.stdout),
+            String::from_utf8_lossy(&cargo_output.stderr)
+        );
+    }
+
+    #[test]
+    fn generate_embassy_emits_watchdog_helpers_for_ch32v203g6u6() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let input = repo_root
+            .join("evidence")
+            .join("wch")
+            .join("ch32v203g6u6")
+            .join("hair.json");
+        let document = load_validated_hair_document(&input, &repo_root)
+            .expect("reference hair document should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&document, output_dir.path()).expect("embassy generation");
+
+        let cargo_toml =
+            std::fs::read_to_string(output_dir.path().join("Cargo.toml")).expect("Cargo.toml");
+        let watchdog_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("watchdog.rs"))
+                .expect("watchdog.rs");
+
+        assert!(cargo_toml.contains("embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"] }"));
+        assert!(watchdog_rs.contains("pub struct"));
+        assert!(watchdog_rs.contains("Config {"));
+        assert!(watchdog_rs.contains("pub fn configure(&self, config:"));
+        assert!(watchdog_rs.contains("pub fn start_with_config(&self, config:"));
+        assert!(watchdog_rs.contains("pub fn feed_watchdog(&self) -> Result<(), metadata::Error>"));
+        assert!(watchdog_rs.contains("impl embedded_hal_02::watchdog::Watchdog for "));
+        assert!(watchdog_rs.contains("impl embedded_hal_02::watchdog::WatchdogEnable for "));
+        assert!(!watchdog_rs.contains("WatchdogDisable"));
+
+        let cargo_output = Command::new("cargo")
+            .arg("check")
+            .current_dir(output_dir.path())
+            .output()
+            .expect("cargo check");
+        assert!(
+            cargo_output.status.success(),
+            "generated crate should compile:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&cargo_output.stdout),
+            String::from_utf8_lossy(&cargo_output.stderr)
+        );
+    }
+
+    #[test]
+    fn generate_embassy_host_emits_watchdog_helpers_for_ch32v203g6u6() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        add_fixture_watchdog_driver(&mut document);
+        let file = write_temp_json(&document);
+        let document = load_validated_hair_document(file.path(), &repo_root)
+            .expect("watchdog fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_host_crate(&document, output_dir.path()).expect("embassy-host generation");
+
+        let cargo_toml =
+            std::fs::read_to_string(output_dir.path().join("Cargo.toml")).expect("Cargo.toml");
+        let watchdog_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("watchdog.rs"))
+                .expect("watchdog.rs");
+
+        assert!(cargo_toml.contains("embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"] }"));
+        assert!(watchdog_rs.contains("pub fn start_with_config(&self, config:"));
+        assert!(watchdog_rs.contains("impl embedded_hal_02::watchdog::Watchdog for "));
+        assert!(watchdog_rs.contains("impl embedded_hal_02::watchdog::WatchdogEnable for "));
+
+        let cargo_output = Command::new("cargo")
+            .arg("check")
+            .current_dir(output_dir.path())
+            .output()
+            .expect("cargo check");
+        assert!(
+            cargo_output.status.success(),
+            "generated host crate should compile:\nstdout:\n{}\nstderr:\n{}",
             String::from_utf8_lossy(&cargo_output.stdout),
             String::from_utf8_lossy(&cargo_output.stderr)
         );
@@ -21847,6 +22174,121 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             .find(|peripheral| peripheral["id"] == peripheral_id)
             .and_then(Value::as_object_mut)
             .unwrap_or_else(|| panic!("missing fixture peripheral {peripheral_id}"))
+    }
+
+    fn add_fixture_watchdog_driver(document: &mut Value) {
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        peripherals.push(serde_json::json!({
+            "id": "periph.iwdg",
+            "name": "IWDG",
+            "kind": "peripheral",
+            "type": "IWDG",
+            "baseAddress": 1073754112u64,
+            "registers": [
+                { "id": "reg.iwdg.ctlr", "name": "CTLR", "kind": "register", "offsetBytes": 0, "widthBits": 32, "fields": [
+                    { "id": "field.iwdg.ctlr.key", "name": "KEY", "bitRange": { "lsb": 0, "msb": 15 } }
+                ] },
+                { "id": "reg.iwdg.pscr", "name": "PSCR", "kind": "register", "offsetBytes": 4, "widthBits": 32, "fields": [
+                    { "id": "field.iwdg.pscr.pr", "name": "PR", "bitRange": { "lsb": 0, "msb": 2 } }
+                ] },
+                { "id": "reg.iwdg.rldr", "name": "RLDR", "kind": "register", "offsetBytes": 8, "widthBits": 32, "fields": [
+                    { "id": "field.iwdg.rldr.rl", "name": "RL", "bitRange": { "lsb": 0, "msb": 11 } }
+                ] },
+                { "id": "reg.iwdg.statr", "name": "STATR", "kind": "register", "offsetBytes": 12, "widthBits": 32, "fields": [
+                    { "id": "field.iwdg.statr.pvu", "name": "PVU", "bitRange": { "lsb": 0, "msb": 0 } },
+                    { "id": "field.iwdg.statr.rvu", "name": "RVU", "bitRange": { "lsb": 1, "msb": 1 } }
+                ] }
+            ]
+        }));
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        operations.push(serde_json::json!({
+            "id": "op.iwdg.unlock",
+            "name": "Unlock IWDG configuration",
+            "kind": "configuration",
+            "targetRefs": ["periph.iwdg"],
+            "steps": [
+                { "index": 0, "action": "write", "targetRef": "reg.iwdg.ctlr", "expression": { "language": "plain", "text": "Write KEY = 0x5555" } }
+            ]
+        }));
+        operations.push(serde_json::json!({
+            "id": "op.iwdg.feed",
+            "name": "Reload IWDG counter",
+            "kind": "mode-transition",
+            "targetRefs": ["periph.iwdg"],
+            "steps": [
+                { "index": 0, "action": "write", "targetRef": "reg.iwdg.ctlr", "expression": { "language": "plain", "text": "Write KEY = 0xAAAA" } }
+            ]
+        }));
+        operations.push(serde_json::json!({
+            "id": "op.iwdg.start",
+            "name": "Start IWDG",
+            "kind": "mode-transition",
+            "targetRefs": ["periph.iwdg"],
+            "steps": [
+                { "index": 0, "action": "write", "targetRef": "reg.iwdg.ctlr", "expression": { "language": "plain", "text": "Write KEY = 0xCCCC" } }
+            ]
+        }));
+
+        let canonical_blocks = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("canonicalBlocks")
+            .and_then(Value::as_array_mut)
+            .expect("canonicalBlocks");
+        canonical_blocks.push(serde_json::json!({
+            "id": "block.iwdg",
+            "name": "IWDG block",
+            "targetRef": "periph.iwdg",
+            "blockClass": "watchdog",
+            "functionalDomain": "security"
+        }));
+
+        let driver_instances = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        driver_instances.push(serde_json::json!({
+            "id": "drv.iwdg",
+            "name": "IWDG",
+            "targetRef": "block.iwdg",
+            "driverKind": "watchdog",
+            "modulePath": "watchdog",
+            "initOperationRefs": ["op.iwdg.unlock", "op.iwdg.feed", "op.iwdg.start"]
+        }));
     }
 
     #[test]

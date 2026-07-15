@@ -302,6 +302,15 @@ Embassy profile contract.
   deterministically. A generated rtc module may expose HAL-specific helpers for
   RTC behavior that does not fit the generic `embassy-time` contract, but those
   helpers must remain traceable to the approved RTC control and status path.
+- `watchdog` lowering is allowed only when the document carries the clock/reset
+  facts, when needed, plus the structural and semantic facts needed to lower
+  watchdog feed, start, configuration, and any claimed status helpers
+  deterministically. Because `embedded-hal` 1.0 does not ship watchdog traits,
+  generated portable watchdog support may implement the aliased
+  `embedded_hal_02::watchdog::Watchdog` and `WatchdogEnable` traits from
+  `embedded-hal` 0.2, and may expose HAL-specific configuration/status helpers
+  from that same approved path, but it shall not emit `WatchdogDisable` unless
+  the approved HAIR inputs justify a real disable sequence.
 - Unsupported driver kinds, unresolved references, missing lowering inputs,
   and out-of-subset requests fail explicitly.
 

@@ -52,6 +52,7 @@
         "usart",
         "spi",
         "i2c",
+        "watchdog",
         "rtc",
         "timer",
         "pwm",
