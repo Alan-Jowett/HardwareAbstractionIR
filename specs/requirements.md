@@ -225,6 +225,20 @@ Embassy profile contract.
   optional async/IRQ-backed capabilities. The generated crate's default
   feature set shall remain empty so consumer firmware must select the families
   it actually uses explicitly.
+- A generated embedded Embassy HAL crate shall also separate its
+  lowering-essential runtime resources from any richer descriptive metadata
+  surface. Constructors, runtime handles, and normal peripheral operations
+  shall depend only on lean runtime resource records and shall not require
+  transitive references to descriptive IDs, names, route inventories, semantic
+  operation descriptions, or similar metadata that is not needed to execute
+  the approved lowering.
+- When the generator emits a richer metadata-inspection surface for downstream
+  tooling, audit helpers, or reference smokes, that surface shall be exposed
+  through distinct API entry points and constants rather than through the same
+  runtime constructor inputs and handle fields used by production firmware. A
+  consumer that uses only the lean runtime API shall be able to avoid retaining
+  the richer metadata in the linked image without depending on an additional
+  feature flag for correctness.
 - When a generated bring-up or calibration helper depends on hardware status
   reaching a ready state before later writes or sampling can succeed, the
   approved semantic operation shall model that requirement explicitly with

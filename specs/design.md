@@ -174,7 +174,9 @@ machines.
 
 The design intent is explicit: generated APIs are derived from approved
 lowering inputs, not from a fixed placeholder method list per `driverKind`.
-The profile also preserves a structured metadata surface for downstream use.
+The profile also preserves a structured metadata surface for downstream use,
+but that metadata surface is not required to be the same API shape used by
+runtime constructors and normal peripheral operations.
 The same contract must accommodate more than one hardware-lowering family for a
 given driver kind. In particular, GPIO lowering may come either from a classic
 single-block register layout or from a composite route/control path such as
@@ -481,6 +483,17 @@ into GPIO async wait, DMA async completion, USB support, or another generated
 family/capability must not pay flash for the corresponding helper tables,
 vector handlers, or runtime wiring merely because some other generated module
 exists in the same crate.
+
+The generated embedded crate's public Rust API is part of that same size and
+traceability contract. Driver constructors and runtime handles must use lean
+resource records that contain only the data needed to execute the approved
+lowering. Richer metadata records may still be emitted for inspection,
+downstream tooling, or metadata-aware smokes, but they must be exposed through
+separate constants, accessors, or wrapper types so firmware that stays on the
+lean API does not retain the full metadata graph accidentally. In other words,
+the generated crate must not require a consumer to enable or disable a
+secondary metadata feature flag just to avoid pulling descriptive metadata into
+normal embedded runtime paths.
 
 The generator enforces driver-kind support, scope checks, reference
 resolution, and profile-specific failure contracts before writing output. Its

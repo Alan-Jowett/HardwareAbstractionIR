@@ -6,10 +6,10 @@ use core::panic::PanicInfo;
 use core::{fmt::Write as _, ptr::addr_of_mut};
 
 use ch32v203g6u6_embassy_hal::{
-    gpio::{DRV_GPIOA_RESOURCES, GPIOA, GPIOAOutput, Level},
-    rcc::{DRV_RCC_RESOURCES, RCC},
-    usb::{DRV_USBD_RESOURCES, USBD, USBDUsbDriver},
-    watchdog::{DRV_IWDG_RESOURCES, IWDG, IWDGConfig},
+    gpio::{DRV_GPIOA_RUNTIME_RESOURCES, GPIOA, GPIOAOutput, Level},
+    rcc::{DRV_RCC_RUNTIME_RESOURCES, RCC},
+    usb::{DRV_USBD_RUNTIME_RESOURCES, USBD, USBDUsbDriver},
+    watchdog::{DRV_IWDG_RUNTIME_RESOURCES, IWDG, IWDGConfig},
     wch,
 };
 use embassy_executor::Spawner;
@@ -73,7 +73,7 @@ async fn run_watchdog_sequence(
     cdc: &mut CdcAcmClass<'static, USBDUsbDriver>,
     heartbeat: &GPIOAOutput,
 ) -> ! {
-    let watchdog = &mut IWDG::new(DRV_IWDG_RESOURCES).unwrap();
+    let watchdog = &mut IWDG::new(DRV_IWDG_RUNTIME_RESOURCES).unwrap();
     let config = IWDGConfig::new(WATCHDOG_PRESCALER, WATCHDOG_RELOAD);
 
     let mut line: String<128> = String::new();
@@ -134,10 +134,10 @@ async fn run_watchdog_sequence(
 
 #[embassy_executor::main(entry = "riscv_rt::entry")]
 async fn main(spawner: Spawner) -> ! {
-    let rcc = RCC::new(DRV_RCC_RESOURCES).unwrap();
+    let rcc = RCC::new(DRV_RCC_RUNTIME_RESOURCES).unwrap();
     rcc.configure_usb_fsdev_clock_48mhz().unwrap();
 
-    let gpioa = GPIOA::new(DRV_GPIOA_RESOURCES).unwrap();
+    let gpioa = GPIOA::new(DRV_GPIOA_RUNTIME_RESOURCES).unwrap();
     gpioa.enable_clock().unwrap();
     gpioa.release_reset().unwrap();
     let heartbeat = gpioa.pa7().into_output(Level::Low).unwrap();
@@ -145,7 +145,7 @@ async fn main(spawner: Spawner) -> ! {
 
     wch::init_embassy_time_runtime().unwrap();
 
-    let usbd = USBD::new(DRV_USBD_RESOURCES).unwrap();
+    let usbd = USBD::new(DRV_USBD_RUNTIME_RESOURCES).unwrap();
     let driver = usbd.embassy_usb_driver();
 
     let mut config = Config::new(0xCAFE, 0x4006);

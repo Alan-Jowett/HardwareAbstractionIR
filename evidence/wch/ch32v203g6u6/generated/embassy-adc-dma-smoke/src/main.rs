@@ -8,11 +8,11 @@ use core::{
 };
 
 use ch32v203g6u6_embassy_hal::{
-    adc::{ADC1, ADC1Resources},
-    dma::{DMA1, DMA1Resources},
-    gpio::{DRV_GPIOA_RESOURCES, GPIOA},
-    rcc::{DRV_RCC_RESOURCES, RCC},
-    usb::{DRV_USBD_RESOURCES, USBD, USBDUsbDriver},
+    adc::{ADC1, DRV_ADC1_RUNTIME_RESOURCES},
+    dma::{DMA1, DRV_DMA1_RUNTIME_RESOURCES},
+    gpio::{DRV_GPIOA_RUNTIME_RESOURCES, GPIOA},
+    rcc::{DRV_RCC_RUNTIME_RESOURCES, RCC},
+    usb::{DRV_USBD_RUNTIME_RESOURCES, USBD, USBDUsbDriver},
     wch,
 };
 use embassy_executor::Spawner;
@@ -36,36 +36,6 @@ static mut BOS_DESCRIPTOR: [u8; 64] = [0; 64];
 static mut MSOS_DESCRIPTOR: [u8; 64] = [0; 64];
 static mut CONTROL_BUFFER: [u8; 128] = [0; 128];
 static mut CDC_STATE: CdcState<'static> = CdcState::new();
-
-const SMOKE_ADC1_RESOURCES: ADC1Resources = ADC1Resources {
-    clocks: &[],
-    resets: &[],
-    interrupt_sources: &[],
-    interrupts: &[],
-    dma_channels: &[],
-    dma: &[],
-    pins: &[],
-    init_operations: &[],
-    state_machines: &[],
-    lowering_pattern: None,
-    time_driver_source: None,
-    capability_tags: &[],
-};
-
-const SMOKE_DMA1_RESOURCES: DMA1Resources = DMA1Resources {
-    clocks: &[],
-    resets: &[],
-    interrupt_sources: &[],
-    interrupts: &[],
-    dma_channels: &[],
-    dma: &[],
-    pins: &[],
-    init_operations: &[],
-    state_machines: &[],
-    lowering_pattern: None,
-    time_driver_source: None,
-    capability_tags: &[],
-};
 
 const RCC_CFGR0: *mut u32 = 0x4002_1004 as *mut u32;
 const GPIOA_CFGLR: *mut u32 = 0x4001_0800 as *mut u32;
@@ -186,22 +156,22 @@ async fn run_one_shot(
 
 #[embassy_executor::main(entry = "riscv_rt::entry")]
 async fn main(spawner: Spawner) -> ! {
-    let rcc = RCC::new(DRV_RCC_RESOURCES).unwrap();
+    let rcc = RCC::new(DRV_RCC_RUNTIME_RESOURCES).unwrap();
     rcc.configure_usb_fsdev_clock_48mhz().unwrap();
     wch::init_embassy_time_runtime().unwrap();
 
-    let gpioa = GPIOA::new(DRV_GPIOA_RESOURCES).unwrap();
+    let gpioa = GPIOA::new(DRV_GPIOA_RUNTIME_RESOURCES).unwrap();
     gpioa.enable_clock().unwrap();
     gpioa.release_reset().unwrap();
     configure_adc_path();
 
-    let adc1 = ADC1::new(SMOKE_ADC1_RESOURCES).unwrap();
+    let adc1 = ADC1::new(DRV_ADC1_RUNTIME_RESOURCES).unwrap();
     adc1.enable_clock().unwrap();
     adc1.release_reset().unwrap();
     adc1.apply_calibrate().unwrap();
-    let dma1 = DMA1::new(SMOKE_DMA1_RESOURCES).unwrap();
+    let dma1 = DMA1::new(DRV_DMA1_RUNTIME_RESOURCES).unwrap();
 
-    let usbd = USBD::new(DRV_USBD_RESOURCES).unwrap();
+    let usbd = USBD::new(DRV_USBD_RUNTIME_RESOURCES).unwrap();
     let driver = usbd.embassy_usb_driver();
 
     let mut config = Config::new(0xCAFE, 0x4006);

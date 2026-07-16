@@ -464,7 +464,12 @@ pub const DRV_PWM_TIM1_STATE_MACHINES: &[metadata::SemanticStateMachine] =
 pub const DRV_PWM_TIM1_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct TIM1PWMResources {
+pub struct TIM1PWMRuntimeResources {}
+
+pub const DRV_PWM_TIM1_RUNTIME_RESOURCES: TIM1PWMRuntimeResources = TIM1PWMRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM1PWMMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -479,7 +484,7 @@ pub struct TIM1PWMResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_PWM_TIM1_RESOURCES: TIM1PWMResources = TIM1PWMResources {
+pub const DRV_PWM_TIM1_METADATA_RESOURCES: TIM1PWMMetadataResources = TIM1PWMMetadataResources {
     clocks: DRV_PWM_TIM1_CLOCK_BINDINGS,
     resets: DRV_PWM_TIM1_RESET_BINDINGS,
     interrupt_sources: DRV_PWM_TIM1_INTERRUPT_SOURCES,
@@ -495,17 +500,16 @@ pub const DRV_PWM_TIM1_RESOURCES: TIM1PWMResources = TIM1PWMResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct TIM1PWM {
-    resources: TIM1PWMResources,
-}
+pub struct TIM1PWM;
 
 impl TIM1PWM {
-    pub fn new(resources: TIM1PWMResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: TIM1PWMRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> TIM1PWMResources {
-        self.resources
+    pub fn metadata_resources() -> TIM1PWMMetadataResources {
+        DRV_PWM_TIM1_METADATA_RESOURCES
     }
     /// Enable the TIM1 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -1141,7 +1145,12 @@ pub const DRV_PWM_TIM2_STATE_MACHINES: &[metadata::SemanticStateMachine] =
 pub const DRV_PWM_TIM2_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct TIM2PWMResources {
+pub struct TIM2PWMRuntimeResources {}
+
+pub const DRV_PWM_TIM2_RUNTIME_RESOURCES: TIM2PWMRuntimeResources = TIM2PWMRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM2PWMMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -1156,7 +1165,7 @@ pub struct TIM2PWMResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_PWM_TIM2_RESOURCES: TIM2PWMResources = TIM2PWMResources {
+pub const DRV_PWM_TIM2_METADATA_RESOURCES: TIM2PWMMetadataResources = TIM2PWMMetadataResources {
     clocks: DRV_PWM_TIM2_CLOCK_BINDINGS,
     resets: DRV_PWM_TIM2_RESET_BINDINGS,
     interrupt_sources: DRV_PWM_TIM2_INTERRUPT_SOURCES,
@@ -1172,17 +1181,16 @@ pub const DRV_PWM_TIM2_RESOURCES: TIM2PWMResources = TIM2PWMResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct TIM2PWM {
-    resources: TIM2PWMResources,
-}
+pub struct TIM2PWM;
 
 impl TIM2PWM {
-    pub fn new(resources: TIM2PWMResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: TIM2PWMRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> TIM2PWMResources {
-        self.resources
+    pub fn metadata_resources() -> TIM2PWMMetadataResources {
+        DRV_PWM_TIM2_METADATA_RESOURCES
     }
     /// Enable the TIM2 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -1830,7 +1838,12 @@ pub const DRV_PWM_TIM3_STATE_MACHINES: &[metadata::SemanticStateMachine] =
 pub const DRV_PWM_TIM3_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct TIM3PWMResources {
+pub struct TIM3PWMRuntimeResources {}
+
+pub const DRV_PWM_TIM3_RUNTIME_RESOURCES: TIM3PWMRuntimeResources = TIM3PWMRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM3PWMMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -1845,7 +1858,7 @@ pub struct TIM3PWMResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_PWM_TIM3_RESOURCES: TIM3PWMResources = TIM3PWMResources {
+pub const DRV_PWM_TIM3_METADATA_RESOURCES: TIM3PWMMetadataResources = TIM3PWMMetadataResources {
     clocks: DRV_PWM_TIM3_CLOCK_BINDINGS,
     resets: DRV_PWM_TIM3_RESET_BINDINGS,
     interrupt_sources: DRV_PWM_TIM3_INTERRUPT_SOURCES,
@@ -1861,17 +1874,16 @@ pub const DRV_PWM_TIM3_RESOURCES: TIM3PWMResources = TIM3PWMResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct TIM3PWM {
-    resources: TIM3PWMResources,
-}
+pub struct TIM3PWM;
 
 impl TIM3PWM {
-    pub fn new(resources: TIM3PWMResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: TIM3PWMRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> TIM3PWMResources {
-        self.resources
+    pub fn metadata_resources() -> TIM3PWMMetadataResources {
+        DRV_PWM_TIM3_METADATA_RESOURCES
     }
     /// Enable the TIM3 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -2427,7 +2439,12 @@ pub const DRV_PWM_TIM4_STATE_MACHINES: &[metadata::SemanticStateMachine] =
 pub const DRV_PWM_TIM4_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct TIM4PWMResources {
+pub struct TIM4PWMRuntimeResources {}
+
+pub const DRV_PWM_TIM4_RUNTIME_RESOURCES: TIM4PWMRuntimeResources = TIM4PWMRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM4PWMMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -2442,7 +2459,7 @@ pub struct TIM4PWMResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_PWM_TIM4_RESOURCES: TIM4PWMResources = TIM4PWMResources {
+pub const DRV_PWM_TIM4_METADATA_RESOURCES: TIM4PWMMetadataResources = TIM4PWMMetadataResources {
     clocks: DRV_PWM_TIM4_CLOCK_BINDINGS,
     resets: DRV_PWM_TIM4_RESET_BINDINGS,
     interrupt_sources: DRV_PWM_TIM4_INTERRUPT_SOURCES,
@@ -2458,17 +2475,16 @@ pub const DRV_PWM_TIM4_RESOURCES: TIM4PWMResources = TIM4PWMResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct TIM4PWM {
-    resources: TIM4PWMResources,
-}
+pub struct TIM4PWM;
 
 impl TIM4PWM {
-    pub fn new(resources: TIM4PWMResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: TIM4PWMRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> TIM4PWMResources {
-        self.resources
+    pub fn metadata_resources() -> TIM4PWMMetadataResources {
+        DRV_PWM_TIM4_METADATA_RESOURCES
     }
     /// Enable the TIM4 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {

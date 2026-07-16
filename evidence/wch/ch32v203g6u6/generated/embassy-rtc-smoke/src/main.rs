@@ -4,10 +4,10 @@
 use core::{fmt::Write as _, panic::PanicInfo, ptr::addr_of_mut};
 
 use ch32v203g6u6_embassy_hal::{
-    gpio::{DRV_GPIOA_RESOURCES, GPIOA, GPIOAOutput, Level},
-    rcc::{DRV_RCC_RESOURCES, RCC},
-    rtc::{DRV_RTC_RESOURCES, RTC},
-    usb::{DRV_USBD_RESOURCES, USBD, USBDUsbDriver},
+    gpio::{DRV_GPIOA_RUNTIME_RESOURCES, GPIOA, GPIOAOutput, Level},
+    rcc::{DRV_RCC_RUNTIME_RESOURCES, RCC},
+    rtc::{DRV_RTC_RUNTIME_RESOURCES, RTC},
+    usb::{DRV_USBD_RUNTIME_RESOURCES, USBD, USBDUsbDriver},
     wch,
 };
 use embassy_executor::Spawner;
@@ -63,7 +63,7 @@ async fn heartbeat_task(output: GPIOAOutput) -> ! {
 
 #[embassy_executor::task]
 async fn usb_logger_task(mut cdc: CdcAcmClass<'static, USBDUsbDriver>) -> ! {
-    let rtc = RTC::new(DRV_RTC_RESOURCES).unwrap();
+    let rtc = RTC::new(DRV_RTC_RUNTIME_RESOURCES).unwrap();
     let mut await_count: u32 = 0;
     loop {
         cdc.wait_connection().await;
@@ -82,10 +82,10 @@ async fn usb_logger_task(mut cdc: CdcAcmClass<'static, USBDUsbDriver>) -> ! {
 
 #[embassy_executor::main(entry = "riscv_rt::entry")]
 async fn main(spawner: Spawner) -> ! {
-    let rcc = RCC::new(DRV_RCC_RESOURCES).unwrap();
+    let rcc = RCC::new(DRV_RCC_RUNTIME_RESOURCES).unwrap();
     rcc.configure_usb_fsdev_clock_48mhz().unwrap();
 
-    let gpioa = GPIOA::new(DRV_GPIOA_RESOURCES).unwrap();
+    let gpioa = GPIOA::new(DRV_GPIOA_RUNTIME_RESOURCES).unwrap();
     gpioa.enable_clock().unwrap();
     gpioa.release_reset().unwrap();
     let heartbeat = gpioa.pa7().into_output(Level::Low).unwrap();
@@ -96,12 +96,12 @@ async fn main(spawner: Spawner) -> ! {
 
     wch::init_embassy_time_runtime().unwrap();
 
-    let rtc = RTC::new(DRV_RTC_RESOURCES).unwrap();
+    let rtc = RTC::new(DRV_RTC_RUNTIME_RESOURCES).unwrap();
     if rtc.read_prescaler().unwrap() != RTC_EXPECTED_PRESCALER {
         report_failure(&heartbeat);
     }
 
-    let usbd = USBD::new(DRV_USBD_RESOURCES).unwrap();
+    let usbd = USBD::new(DRV_USBD_RUNTIME_RESOURCES).unwrap();
     let driver = usbd.embassy_usb_driver();
 
     let mut config = Config::new(0xCAFE, 0x4005);

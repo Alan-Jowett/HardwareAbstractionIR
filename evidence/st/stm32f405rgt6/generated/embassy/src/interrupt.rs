@@ -4310,7 +4310,12 @@ pub const DRV_NVIC_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_NVIC_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct InterruptsResources {
+pub struct InterruptsRuntimeResources {}
+
+pub const DRV_NVIC_RUNTIME_RESOURCES: InterruptsRuntimeResources = InterruptsRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct InterruptsMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -4325,7 +4330,7 @@ pub struct InterruptsResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_NVIC_RESOURCES: InterruptsResources = InterruptsResources {
+pub const DRV_NVIC_METADATA_RESOURCES: InterruptsMetadataResources = InterruptsMetadataResources {
     clocks: DRV_NVIC_CLOCK_BINDINGS,
     resets: DRV_NVIC_RESET_BINDINGS,
     interrupt_sources: DRV_NVIC_INTERRUPT_SOURCES,
@@ -4341,19 +4346,18 @@ pub const DRV_NVIC_RESOURCES: InterruptsResources = InterruptsResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct Interrupts {
-    resources: InterruptsResources,
-}
+pub struct Interrupts;
 
 impl Interrupts {
-    pub fn new(resources: InterruptsResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: InterruptsRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> InterruptsResources {
-        self.resources
+    pub fn metadata_resources() -> InterruptsMetadataResources {
+        DRV_NVIC_METADATA_RESOURCES
     }
-    pub fn bind(&self) -> &'static [metadata::InterruptRoute] {
-        self.resources.interrupts
+    pub fn interrupt_routes() -> &'static [metadata::InterruptRoute] {
+        Self::metadata_resources().interrupts
     }
 }

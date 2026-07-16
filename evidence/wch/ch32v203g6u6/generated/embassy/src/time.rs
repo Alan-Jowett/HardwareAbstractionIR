@@ -157,7 +157,13 @@ pub const DRV_TIME_RTC_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_TIME_RTC_CAPABILITY_TAGS: &[&str] = &["embassy-time-driver"];
 
 #[derive(Debug, Clone, Copy)]
-pub struct RTCEmbassyTimeDriverResources {
+pub struct RTCEmbassyTimeDriverRuntimeResources {}
+
+pub const DRV_TIME_RTC_RUNTIME_RESOURCES: RTCEmbassyTimeDriverRuntimeResources =
+    RTCEmbassyTimeDriverRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct RTCEmbassyTimeDriverMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -172,33 +178,33 @@ pub struct RTCEmbassyTimeDriverResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_TIME_RTC_RESOURCES: RTCEmbassyTimeDriverResources = RTCEmbassyTimeDriverResources {
-    clocks: DRV_TIME_RTC_CLOCK_BINDINGS,
-    resets: DRV_TIME_RTC_RESET_BINDINGS,
-    interrupt_sources: DRV_TIME_RTC_INTERRUPT_SOURCES,
-    interrupts: DRV_TIME_RTC_INTERRUPT_ROUTES,
-    dma_channels: DRV_TIME_RTC_DMA_CHANNELS,
-    dma: DRV_TIME_RTC_DMA_ROUTES,
-    pins: DRV_TIME_RTC_PIN_ROLES,
-    init_operations: DRV_TIME_RTC_INIT_OPERATIONS,
-    state_machines: DRV_TIME_RTC_STATE_MACHINES,
-    lowering_pattern: None,
-    time_driver_source: Some("rtc"),
-    capability_tags: DRV_TIME_RTC_CAPABILITY_TAGS,
-};
+pub const DRV_TIME_RTC_METADATA_RESOURCES: RTCEmbassyTimeDriverMetadataResources =
+    RTCEmbassyTimeDriverMetadataResources {
+        clocks: DRV_TIME_RTC_CLOCK_BINDINGS,
+        resets: DRV_TIME_RTC_RESET_BINDINGS,
+        interrupt_sources: DRV_TIME_RTC_INTERRUPT_SOURCES,
+        interrupts: DRV_TIME_RTC_INTERRUPT_ROUTES,
+        dma_channels: DRV_TIME_RTC_DMA_CHANNELS,
+        dma: DRV_TIME_RTC_DMA_ROUTES,
+        pins: DRV_TIME_RTC_PIN_ROLES,
+        init_operations: DRV_TIME_RTC_INIT_OPERATIONS,
+        state_machines: DRV_TIME_RTC_STATE_MACHINES,
+        lowering_pattern: None,
+        time_driver_source: Some("rtc"),
+        capability_tags: DRV_TIME_RTC_CAPABILITY_TAGS,
+    };
 
 #[derive(Debug, Clone, Copy)]
-pub struct RTCEmbassyTimeDriver {
-    resources: RTCEmbassyTimeDriverResources,
-}
+pub struct RTCEmbassyTimeDriver;
 
 impl RTCEmbassyTimeDriver {
-    pub fn new(resources: RTCEmbassyTimeDriverResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: RTCEmbassyTimeDriverRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> RTCEmbassyTimeDriverResources {
-        self.resources
+    pub fn metadata_resources() -> RTCEmbassyTimeDriverMetadataResources {
+        DRV_TIME_RTC_METADATA_RESOURCES
     }
     /// Enable the PWR clock gate.
     pub fn enable_pwr_clock(&self) -> Result<(), metadata::Error> {

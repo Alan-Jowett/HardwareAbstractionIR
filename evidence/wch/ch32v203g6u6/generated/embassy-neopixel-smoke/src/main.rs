@@ -3,7 +3,7 @@
 
 use core::{arch::asm, panic::PanicInfo};
 
-use ch32v203g6u6_embassy_hal::gpio::{DRV_GPIOA_RESOURCES, GPIOA, Level};
+use ch32v203g6u6_embassy_hal::gpio::{DRV_GPIOA_RUNTIME_RESOURCES, GPIOA, Level};
 use riscv::{asm::delay, interrupt::machine};
 
 const GPIOA_BSHR: usize = 0x4001_0810;
@@ -159,7 +159,7 @@ fn configure_sysclk_24mhz_from_hsi() {
 fn main() -> ! {
     configure_sysclk_24mhz_from_hsi();
 
-    let gpioa = GPIOA::new(DRV_GPIOA_RESOURCES).unwrap();
+    let gpioa = GPIOA::new(DRV_GPIOA_RUNTIME_RESOURCES).unwrap();
     gpioa.enable_clock().unwrap();
     gpioa.release_reset().unwrap();
     let _neopixel = gpioa.pa4().into_output(Level::Low).unwrap();

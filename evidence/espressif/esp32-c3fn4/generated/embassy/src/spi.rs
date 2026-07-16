@@ -418,7 +418,12 @@ pub const DRV_SPI2_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_SPI2_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct Spi2Resources {
+pub struct Spi2RuntimeResources {}
+
+pub const DRV_SPI2_RUNTIME_RESOURCES: Spi2RuntimeResources = Spi2RuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct Spi2MetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -433,7 +438,7 @@ pub struct Spi2Resources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_SPI2_RESOURCES: Spi2Resources = Spi2Resources {
+pub const DRV_SPI2_METADATA_RESOURCES: Spi2MetadataResources = Spi2MetadataResources {
     clocks: DRV_SPI2_CLOCK_BINDINGS,
     resets: DRV_SPI2_RESET_BINDINGS,
     interrupt_sources: DRV_SPI2_INTERRUPT_SOURCES,
@@ -449,17 +454,16 @@ pub const DRV_SPI2_RESOURCES: Spi2Resources = Spi2Resources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct Spi2 {
-    resources: Spi2Resources,
-}
+pub struct Spi2;
 
 impl Spi2 {
-    pub fn new(resources: Spi2Resources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: Spi2RuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> Spi2Resources {
-        self.resources
+    pub fn metadata_resources() -> Spi2MetadataResources {
+        DRV_SPI2_METADATA_RESOURCES
     }
     /// Enable the SPI2 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {

@@ -7,8 +7,8 @@ use core::ptr::addr_of_mut;
 use core::panic::PanicInfo;
 
 use ch32v203g6u6_embassy_hal::{
-    flash::{DRV_FLASH_RESOURCES, FLASH},
-    gpio::{DRV_GPIOA_RESOURCES, GPIOA, GPIOAOutput, Level},
+    flash::{DRV_FLASH_RUNTIME_RESOURCES, FLASH},
+    gpio::{DRV_GPIOA_RUNTIME_RESOURCES, GPIOA, GPIOAOutput, Level},
 };
 use embedded_storage::nor_flash::{NorFlash, ReadNorFlash};
 
@@ -210,13 +210,13 @@ fn loop_failure_pattern(output: &GPIOAOutput, code: u8) -> ! {
 
 #[riscv_rt::entry]
 fn main() -> ! {
-    let gpioa = GPIOA::new(DRV_GPIOA_RESOURCES).unwrap();
+    let gpioa = GPIOA::new(DRV_GPIOA_RUNTIME_RESOURCES).unwrap();
     gpioa.enable_clock().unwrap();
     gpioa.release_reset().unwrap();
     let indicator = gpioa.pa7().into_output(Level::Low).unwrap();
     indicator.set_low().unwrap();
 
-    let mut flash = FLASH::new(DRV_FLASH_RESOURCES).unwrap();
+    let mut flash = FLASH::new(DRV_FLASH_RUNTIME_RESOURCES).unwrap();
 
     pulse(
         &indicator,

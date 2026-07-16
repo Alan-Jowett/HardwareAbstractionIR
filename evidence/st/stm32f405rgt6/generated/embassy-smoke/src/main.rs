@@ -9,9 +9,9 @@ use cortex_m_semihosting::hprintln;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Ticker, Timer};
 use panic_halt as _;
-use stm32_h405_generated::gpio::{DRV_GPIOA_RESOURCES, GpioA, Level, Pull};
-use stm32_h405_generated::time::{DRV_TIME_RESOURCES, Time};
-use stm32_h405_generated::usart::{DRV_USART1_RESOURCES, Usart1};
+use stm32_h405_generated::gpio::{DRV_GPIOA_RUNTIME_RESOURCES, GpioA, Level, Pull};
+use stm32_h405_generated::time::{DRV_TIME_RUNTIME_RESOURCES, Time};
+use stm32_h405_generated::usart::{DRV_USART1_RUNTIME_RESOURCES, Usart1};
 
 const BRR_MANTISSA_115200_AT_16MHZ: u16 = 8;
 const BRR_FRACTION_115200_AT_16MHZ: u8 = 11;
@@ -54,7 +54,7 @@ fn pass() -> ! {
 
 fn smoke_gpioa() {
     note("smoke_gpioa:start");
-    let gpioa = GpioA::new(DRV_GPIOA_RESOURCES).unwrap();
+    let gpioa = GpioA::new(DRV_GPIOA_RUNTIME_RESOURCES).unwrap();
     gpioa.enable_clock().unwrap();
     expect(
         "FAIL: gpioa clock enable bit not set",
@@ -87,7 +87,7 @@ fn smoke_gpioa() {
 
 fn smoke_usart1() {
     note("smoke_usart1:start");
-    let usart1 = Usart1::new(DRV_USART1_RESOURCES).unwrap();
+    let usart1 = Usart1::new(DRV_USART1_RUNTIME_RESOURCES).unwrap();
     usart1.enable_clock().unwrap();
     usart1.assert_reset().unwrap();
     usart1.release_reset().unwrap();
@@ -106,10 +106,10 @@ fn smoke_usart1() {
 
 async fn smoke_embassy_time() {
     note("smoke_embassy_time:start");
-    let time = Time::new(DRV_TIME_RESOURCES).unwrap();
+    let time = Time::new(DRV_TIME_RUNTIME_RESOURCES).unwrap();
     expect(
         "FAIL: embassy time binding count mismatch",
-        time.bind().len() == 1,
+        Time::interrupt_routes().len() == 1,
     );
     time.init_time_driver().unwrap();
 

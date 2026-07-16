@@ -1644,7 +1644,6 @@ struct GeneratedMethod {
 
 #[derive(Debug, Clone)]
 struct ResolvedIndexedFieldGpioPinLowering {
-    role_index: usize,
     pin_name: String,
     accessor_name: String,
     moder_clear_mask: u32,
@@ -1660,7 +1659,6 @@ struct ResolvedIndexedFieldGpioPinLowering {
 
 #[derive(Debug, Clone)]
 struct ResolvedWchCfgGpioPinLowering {
-    role_index: usize,
     pin_name: String,
     pin_ref: String,
     accessor_name: String,
@@ -1693,7 +1691,6 @@ struct ResolvedGpioExtiWaitLineLowering {
 
 #[derive(Debug, Clone)]
 struct ResolvedBitmaskGpioPinLowering {
-    role_index: usize,
     pin_name: String,
     accessor_name: String,
     bit_mask: u32,
@@ -1702,7 +1699,6 @@ struct ResolvedBitmaskGpioPinLowering {
 
 #[derive(Debug, Clone)]
 struct ResolvedEspGpioPinLowering {
-    role_index: usize,
     pin_name: String,
     accessor_name: String,
     bit_mask: u32,
@@ -4892,7 +4888,7 @@ fn render_driver_instance(
         ));
     }
     out.push_str(&format!(
-        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub lowering_pattern: Option<&'static str>,\n    pub time_driver_source: Option<&'static str>,\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    lowering_pattern: {lowering_pattern},\n    time_driver_source: {time_driver_source},\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n{support_items}",
+        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}RuntimeResources {{}}\n\npub const {const_prefix}_RUNTIME_RESOURCES: {type_name}RuntimeResources = {type_name}RuntimeResources {{}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name}MetadataResources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub lowering_pattern: Option<&'static str>,\n    pub time_driver_source: Option<&'static str>,\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_METADATA_RESOURCES: {type_name}MetadataResources = {type_name}MetadataResources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    lowering_pattern: {lowering_pattern},\n    time_driver_source: {time_driver_source},\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name};\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}RuntimeResources) -> Result<Self, metadata::Error> {{\n        let _ = resources;\n        Ok(Self)\n    }}\n\n    pub fn metadata_resources() -> {type_name}MetadataResources {{\n        {const_prefix}_METADATA_RESOURCES\n    }}\n{methods}\n}}\n\n{support_items}",
         type_name = driver.type_name,
         const_prefix = const_prefix,
         lowering_pattern = render_optional_rust_string(driver.lowering_pattern.as_deref()),
@@ -5107,7 +5103,7 @@ pub struct {type_name}UsbDriver {{
 }}
 
 impl {type_name}UsbDriver {{
-    fn new(resources: {type_name}Resources) -> Self {{
+    fn new(resources: {type_name}RuntimeResources) -> Self {{
         let _ = resources;
         Self {{
             pairs: [FsdevEndpointPair::new(); 8],
@@ -5891,8 +5887,8 @@ fn render_driver_methods(
     let mut methods = Vec::new();
     if driver.driver_kind == "interrupt" {
         methods.push(GeneratedMethod {
-            name: "bind".to_string(),
-            code: "    pub fn bind(&self) -> &'static [metadata::InterruptRoute] {\n        self.resources.interrupts\n    }\n"
+            name: "interrupt_routes".to_string(),
+            code: "    pub fn interrupt_routes() -> &'static [metadata::InterruptRoute] {\n        Self::metadata_resources().interrupts\n    }\n"
                 .to_string(),
         });
         if driver_uses_pfic_runtime_support(driver) {
@@ -6248,16 +6244,16 @@ fn generated_wch_runtime_vector_handlers(
                 channel.channel_index
             );
             let type_name = driver.type_name.as_str();
-            let resource_type = format!("{type_name}Resources");
+            let resource_type = format!("{type_name}RuntimeResources");
             let helper_fn_name =
                 format!("generated_wch_runtime_{}", to_rust_method_name(&driver.id));
             let helper_const_name = format!(
-                "GENERATED_WCH_RUNTIME_{}_RESOURCES",
+                "GENERATED_WCH_RUNTIME_{}_RUNTIME_RESOURCES",
                 to_rust_const_name(&driver.id)
             );
             let helper_items = if emitted_driver_helpers.insert(driver.id.clone()) {
                 format!(
-                    "#[cfg(feature = \"{EMBASSY_FEATURE_DMA_ASYNC}\")]\nconst {helper_const_name}: {resource_type} = {resource_type} {{\n    clocks: &[],\n    resets: &[],\n    interrupt_sources: &[],\n    interrupts: &[],\n    dma_channels: &[],\n    dma: &[],\n    pins: &[],\n    init_operations: &[],\n    state_machines: &[],\n    lowering_pattern: None,\n    time_driver_source: None,\n    capability_tags: &[],\n}};\n\n#[cfg(feature = \"{EMBASSY_FEATURE_DMA_ASYNC}\")]\nfn {helper_fn_name}() -> {type_name} {{\n    {type_name}::new({helper_const_name}).expect(\"generated WCH runtime driver resources\")\n}}\n\n"
+                    "#[cfg(feature = \"{EMBASSY_FEATURE_DMA_ASYNC}\")]\nconst {helper_const_name}: {resource_type} = {resource_type} {{}};\n\n#[cfg(feature = \"{EMBASSY_FEATURE_DMA_ASYNC}\")]\nfn {helper_fn_name}() -> {type_name} {{\n    {type_name}::new({helper_const_name}).expect(\"generated WCH runtime driver resources\")\n}}\n\n"
                 )
             } else {
                 String::new()
@@ -6431,10 +6427,13 @@ fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<Strin
         bail!("WCH runtime support requested without PFIC + non-SysTick time-driver inputs");
     };
     let time_driver_type = &inputs.time_driver.type_name;
-    let time_driver_resources = format!("{}_RESOURCES", to_rust_const_name(&inputs.time_driver.id));
+    let time_driver_resources = format!(
+        "{}_RUNTIME_RESOURCES",
+        to_rust_const_name(&inputs.time_driver.id)
+    );
     let interrupt_driver_type = &inputs.interrupt_driver.type_name;
     let interrupt_driver_resources = format!(
-        "{}_RESOURCES",
+        "{}_RUNTIME_RESOURCES",
         to_rust_const_name(&inputs.interrupt_driver.id)
     );
     let controller_ref = inputs
@@ -7986,9 +7985,8 @@ fn render_gpio_methods(
                     pin.accessor_name, flex_type
                 ));
                 code.push_str(&format!(
-                    "        {} {{\n            resources: self.resources,\n            role: &self.resources.pins[{}],\n            pin_name: {},\n            moder_addr: 0x{:X}u64,\n            moder_clear_mask: 0x{:08X}u32,\n            moder_output_mask: 0x{:08X}u32,\n            pupdr_addr: 0x{:X}u64,\n            pupdr_clear_mask: 0x{:08X}u32,\n            pupdr_up_mask: 0x{:08X}u32,\n            pupdr_down_mask: 0x{:08X}u32,\n            idr_addr: 0x{:X}u64,\n            idr_mask: 0x{:08X}u32,\n            odr_addr: 0x{:X}u64,\n            odr_mask: 0x{:08X}u32,\n            bsrr_addr: 0x{:X}u64,\n            bsrr_set_mask: 0x{:08X}u32,\n            bsrr_reset_mask: 0x{:08X}u32,\n        }}\n",
+                    "        {} {{\n            pin_name: {},\n            moder_addr: 0x{:X}u64,\n            moder_clear_mask: 0x{:08X}u32,\n            moder_output_mask: 0x{:08X}u32,\n            pupdr_addr: 0x{:X}u64,\n            pupdr_clear_mask: 0x{:08X}u32,\n            pupdr_up_mask: 0x{:08X}u32,\n            pupdr_down_mask: 0x{:08X}u32,\n            idr_addr: 0x{:X}u64,\n            idr_mask: 0x{:08X}u32,\n            odr_addr: 0x{:X}u64,\n            odr_mask: 0x{:08X}u32,\n            bsrr_addr: 0x{:X}u64,\n            bsrr_set_mask: 0x{:08X}u32,\n            bsrr_reset_mask: 0x{:08X}u32,\n        }}\n",
                     flex_type,
-                    pin.role_index,
                     render_rust_string(&pin.pin_name),
                     moder.absolute_address,
                     pin.moder_clear_mask,
@@ -8025,9 +8023,8 @@ fn render_gpio_methods(
                     pin.accessor_name, flex_type
                 ));
                 code.push_str(&format!(
-                    "        {} {{\n            resources: self.resources,\n            role: &self.resources.pins[{}],\n            pin_name: {},\n            cfg_addr: 0x{:X}u64,\n            cfg_clear_mask: 0x{:08X}u32,\n            cfg_input_float_mask: 0x{:08X}u32,\n            cfg_input_pull_mask: 0x{:08X}u32,\n            cfg_output_mask: 0x{:08X}u32,\n            idr_addr: 0x{:X}u64,\n            idr_mask: 0x{:08X}u32,\n            odr_addr: 0x{:X}u64,\n            odr_mask: 0x{:08X}u32,\n",
+                    "        {} {{\n            pin_name: {},\n            cfg_addr: 0x{:X}u64,\n            cfg_clear_mask: 0x{:08X}u32,\n            cfg_input_float_mask: 0x{:08X}u32,\n            cfg_input_pull_mask: 0x{:08X}u32,\n            cfg_output_mask: 0x{:08X}u32,\n            idr_addr: 0x{:X}u64,\n            idr_mask: 0x{:08X}u32,\n            odr_addr: 0x{:X}u64,\n            odr_mask: 0x{:08X}u32,\n",
                     flex_type,
-                    pin.role_index,
                     render_rust_string(&pin.pin_name),
                     pin.cfg_addr,
                     pin.cfg_clear_mask,
@@ -8072,9 +8069,8 @@ fn render_gpio_methods(
                     pin.accessor_name, flex_type
                 ));
                 code.push_str(&format!(
-                    "        {} {{\n            resources: self.resources,\n            role: &self.resources.pins[{}],\n            pin_name: {},\n            dir_addr: 0x{:X}u64,\n            afsel_addr: 0x{:X}u64,\n            den_addr: 0x{:X}u64,\n            pur_addr: 0x{:X}u64,\n            pdr_addr: 0x{:X}u64,\n            data_alias_addr: 0x{:X}u64,\n            bit_mask: 0x{:08X}u32,\n        }}\n",
+                    "        {} {{\n            pin_name: {},\n            dir_addr: 0x{:X}u64,\n            afsel_addr: 0x{:X}u64,\n            den_addr: 0x{:X}u64,\n            pur_addr: 0x{:X}u64,\n            pdr_addr: 0x{:X}u64,\n            data_alias_addr: 0x{:X}u64,\n            bit_mask: 0x{:08X}u32,\n        }}\n",
                     flex_type,
-                    pin.role_index,
                     render_rust_string(&pin.pin_name),
                     dir.absolute_address,
                     afsel.absolute_address,
@@ -8112,9 +8108,8 @@ fn render_gpio_methods(
                     pin.accessor_name, flex_type
                 ));
                 code.push_str(&format!(
-                    "        {} {{\n            resources: self.resources,\n            role: &self.resources.pins[{}],\n            pin_name: {},\n            out_addr: 0x{:X}u64,\n            out_w1ts_addr: 0x{:X}u64,\n            out_w1tc_addr: 0x{:X}u64,\n            enable_w1ts_addr: 0x{:X}u64,\n            enable_w1tc_addr: 0x{:X}u64,\n            input_addr: 0x{:X}u64,\n            out_sel_cfg_addr: 0x{:X}u64,\n            out_sel_clear_mask: 0x{:08X}u32,\n            out_sel_gpio_mask: 0x{:08X}u32,\n            inv_sel_mask: 0x{:08X}u32,\n            oen_sel_mask: 0x{:08X}u32,\n            oen_inv_sel_mask: 0x{:08X}u32,\n            io_mux_addr: 0x{:X}u64,\n            mcu_sel_mask: 0x{:08X}u32,\n            bit_mask: 0x{:08X}u32,\n            fun_wpd_mask: 0x{:08X}u32,\n            fun_wpu_mask: 0x{:08X}u32,\n            fun_ie_mask: 0x{:08X}u32,\n        }}\n",
+                    "        {} {{\n            pin_name: {},\n            out_addr: 0x{:X}u64,\n            out_w1ts_addr: 0x{:X}u64,\n            out_w1tc_addr: 0x{:X}u64,\n            enable_w1ts_addr: 0x{:X}u64,\n            enable_w1tc_addr: 0x{:X}u64,\n            input_addr: 0x{:X}u64,\n            out_sel_cfg_addr: 0x{:X}u64,\n            out_sel_clear_mask: 0x{:08X}u32,\n            out_sel_gpio_mask: 0x{:08X}u32,\n            inv_sel_mask: 0x{:08X}u32,\n            oen_sel_mask: 0x{:08X}u32,\n            oen_inv_sel_mask: 0x{:08X}u32,\n            io_mux_addr: 0x{:X}u64,\n            mcu_sel_mask: 0x{:08X}u32,\n            bit_mask: 0x{:08X}u32,\n            fun_wpd_mask: 0x{:08X}u32,\n            fun_wpu_mask: 0x{:08X}u32,\n            fun_ie_mask: 0x{:08X}u32,\n        }}\n",
                     flex_type,
-                    pin.role_index,
                     render_rust_string(&pin.pin_name),
                     out.absolute_address,
                     out_w1ts.absolute_address,
@@ -8336,8 +8331,6 @@ fn render_gpio_support_items(
 
     out.push_str("#[derive(Debug, Clone)]\n");
     out.push_str(&format!("pub struct {flex_type} {{\n"));
-    out.push_str(&format!("    resources: {}Resources,\n", driver.type_name));
-    out.push_str("    role: &'static metadata::PinRole,\n");
     out.push_str("    pin_name: &'static str,\n");
     match &lowering {
         ResolvedGpioPortLowering::IndexedFields { .. } => {
@@ -8413,13 +8406,6 @@ fn render_gpio_support_items(
     out.push_str("}\n\n");
 
     out.push_str(&format!("impl {flex_type} {{\n"));
-    out.push_str(&format!(
-        "    pub fn resources(&self) -> {}Resources {{\n",
-        driver.type_name
-    ));
-    out.push_str("        self.resources\n    }\n\n");
-    out.push_str("    pub fn role(&self) -> &'static metadata::PinRole {\n");
-    out.push_str("        self.role\n    }\n\n");
     out.push_str("    pub fn pin_name(&self) -> &'static str {\n");
     out.push_str("        self.pin_name\n    }\n\n");
     out.push_str(&format!(
@@ -8731,8 +8717,6 @@ fn render_gpio_support_items(
     out.push_str("        self.pin\n    }\n\n");
     out.push_str("    pub fn pin_name(&self) -> &'static str {\n");
     out.push_str("        self.pin.pin_name()\n    }\n\n");
-    out.push_str("    pub fn role(&self) -> &'static metadata::PinRole {\n");
-    out.push_str("        self.pin.role()\n    }\n\n");
     out.push_str("    pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {\n");
     out.push_str("        self.pin.set_pull(pull)\n    }\n\n");
     out.push_str("    pub fn is_high(&self) -> Result<bool, metadata::Error> {\n");
@@ -8752,8 +8736,6 @@ fn render_gpio_support_items(
     out.push_str("        self.pin\n    }\n\n");
     out.push_str("    pub fn pin_name(&self) -> &'static str {\n");
     out.push_str("        self.pin.pin_name()\n    }\n\n");
-    out.push_str("    pub fn role(&self) -> &'static metadata::PinRole {\n");
-    out.push_str("        self.pin.role()\n    }\n\n");
     out.push_str("    pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {\n");
     out.push_str("        self.pin.set_pull(pull)\n    }\n\n");
     out.push_str("    pub fn set_high(&self) -> Result<(), metadata::Error> {\n");
@@ -8891,7 +8873,7 @@ fn resolve_indexed_field_gpio_port_lowering(
     let mut pins = Vec::with_capacity(driver.pin_roles.len());
     let mut seen_accessors = BTreeSet::new();
 
-    for (role_index, pin_role) in driver.pin_roles.iter().enumerate() {
+    for pin_role in &driver.pin_roles {
         let [route] = pin_role.routes.as_slice() else {
             bail!(
                 "gpio-port driver {} pin role {} requires exactly one route for first-cut per-pin lowering, found {}",
@@ -8951,7 +8933,6 @@ fn resolve_indexed_field_gpio_port_lowering(
         let pupdr_shift = pupdr_field.lsb;
 
         pins.push(ResolvedIndexedFieldGpioPinLowering {
-            role_index,
             pin_name: pin.name.clone(),
             accessor_name,
             moder_clear_mask: shifted_field_mask(&moder_field, &moder)?,
@@ -8990,7 +8971,7 @@ fn resolve_bitmask_gpio_port_lowering(
     let mut pins = Vec::with_capacity(driver.pin_roles.len());
     let mut seen_accessors = BTreeSet::new();
 
-    for (role_index, pin_role) in driver.pin_roles.iter().enumerate() {
+    for pin_role in &driver.pin_roles {
         let [route] = pin_role.routes.as_slice() else {
             bail!(
                 "gpio-port driver {} pin role {} requires exactly one route for first-cut per-pin lowering, found {}",
@@ -9072,7 +9053,6 @@ fn resolve_bitmask_gpio_port_lowering(
         let data_alias_address = resolve_bitmask_gpio_data_alias_address(&data, bit_mask, driver)?;
 
         pins.push(ResolvedBitmaskGpioPinLowering {
-            role_index,
             pin_name: pin.name.clone(),
             accessor_name,
             bit_mask,
@@ -9102,7 +9082,7 @@ fn resolve_wch_cfg_gpio_port_lowering(
     let mut pins = Vec::with_capacity(driver.pin_roles.len());
     let mut seen_accessors = BTreeSet::new();
 
-    for (role_index, pin_role) in driver.pin_roles.iter().enumerate() {
+    for pin_role in &driver.pin_roles {
         let [route] = pin_role.routes.as_slice() else {
             bail!(
                 "gpio-port driver {} pin role {} requires exactly one route for first-cut per-pin lowering, found {}",
@@ -9157,7 +9137,6 @@ fn resolve_wch_cfg_gpio_port_lowering(
         let odr_field = resolve_register_field(&odr, &format!("ODR{pin_index}"))?;
 
         pins.push(ResolvedWchCfgGpioPinLowering {
-            role_index,
             pin_name: pin.name.clone(),
             pin_ref: pin.id.clone(),
             accessor_name,
@@ -9190,7 +9169,7 @@ fn resolve_esp_gpio_port_lowering(
     let mut pins = Vec::with_capacity(driver.pin_roles.len());
     let mut seen_accessors = BTreeSet::new();
 
-    for (role_index, pin_role) in driver.pin_roles.iter().enumerate() {
+    for pin_role in &driver.pin_roles {
         let [route] = pin_role.routes.as_slice() else {
             bail!(
                 "gpio-port driver {} pin role {} requires exactly one route for first-cut per-pin lowering, found {}",
@@ -9290,7 +9269,6 @@ fn resolve_esp_gpio_port_lowering(
         }
 
         pins.push(ResolvedEspGpioPinLowering {
-            role_index,
             pin_name: pin.name.clone(),
             accessor_name,
             bit_mask,
@@ -11861,7 +11839,7 @@ fn render_usb_device_methods(
         return Ok(vec![GeneratedMethod {
             name: "embassy_usb_driver".to_string(),
             code: format!(
-                "    pub fn embassy_usb_driver(&self) -> {type_name}UsbDriver {{\n        {type_name}UsbDriver::new(self.resources)\n    }}\n",
+                "    pub fn embassy_usb_driver(&self) -> {type_name}UsbDriver {{\n        {type_name}UsbDriver::new({type_name}RuntimeResources {{}})\n    }}\n",
                 type_name = driver.type_name
             ),
         }]);
@@ -17456,7 +17434,7 @@ fn render_embassy_host_root_rs(model: &EmbassyGenerationModel) -> String {
         let accessor = to_rust_method_name(&driver.name);
         let emulator_accessor = format!("{accessor}_emulator");
         out.push_str(&format!(
-            "\n    pub fn {accessor}(&self) -> Result<crate::{module}::{type_name}, metadata::Error> {{\n        self.activate();\n        crate::{module}::{type_name}::new(crate::{module}::{const_prefix}_RESOURCES)\n    }}\n\n    pub fn {emulator_accessor}(&self) -> crate::{module}::{type_name}Emulator {{\n        self.activate();\n        crate::{module}::{type_name}Emulator::new(self.state.clone())\n    }}\n",
+            "\n    pub fn {accessor}(&self) -> Result<crate::{module}::{type_name}, metadata::Error> {{\n        self.activate();\n        crate::{module}::{type_name}::new(crate::{module}::{const_prefix}_RUNTIME_RESOURCES)\n    }}\n\n    pub fn {emulator_accessor}(&self) -> crate::{module}::{type_name}Emulator {{\n        self.activate();\n        crate::{module}::{type_name}Emulator::new(self.state.clone())\n    }}\n",
             module = driver.module_name,
             type_name = driver.type_name,
             const_prefix = to_rust_const_name(&driver.id),
@@ -17566,7 +17544,7 @@ fn render_embassy_host_driver_instance(
         render_named_entity_slice(&driver.capability_tags)
     ));
     out.push_str(&format!(
-        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub lowering_pattern: Option<&'static str>,\n    pub time_driver_source: Option<&'static str>,\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    lowering_pattern: {lowering_pattern},\n    time_driver_source: {time_driver_source},\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n{support_items}\n{emulator_items}",
+        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}RuntimeResources {{}}\n\npub const {const_prefix}_RUNTIME_RESOURCES: {type_name}RuntimeResources = {type_name}RuntimeResources {{}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name}MetadataResources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub lowering_pattern: Option<&'static str>,\n    pub time_driver_source: Option<&'static str>,\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_METADATA_RESOURCES: {type_name}MetadataResources = {type_name}MetadataResources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    lowering_pattern: {lowering_pattern},\n    time_driver_source: {time_driver_source},\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name};\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}RuntimeResources) -> Result<Self, metadata::Error> {{\n        let _ = resources;\n        Ok(Self)\n    }}\n\n    pub fn metadata_resources() -> {type_name}MetadataResources {{\n        {const_prefix}_METADATA_RESOURCES\n    }}\n{methods}\n}}\n\n{support_items}\n{emulator_items}",
         type_name = driver.type_name,
         const_prefix = const_prefix,
         lowering_pattern = render_optional_rust_string(driver.lowering_pattern.as_deref()),
@@ -20696,7 +20674,9 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(wch_rs.contains("fn __hair_enable_wch_runtime_drv_dma1_ch1_handler_vector()"));
         assert!(wch_rs.contains("pfic().enable_irq(Irq::DMA1Channel1)?;"));
         assert!(wch_rs.contains("generated_wch_runtime_drv_dma1().on_interrupt(1);"));
-        assert!(wch_rs.contains("const GENERATED_WCH_RUNTIME_DRV_DMA1_RESOURCES: DMA1Resources"));
+        assert!(wch_rs.contains(
+            "const GENERATED_WCH_RUNTIME_DRV_DMA1_RUNTIME_RESOURCES: DMA1RuntimeResources"
+        ));
     }
 
     #[test]

@@ -101,6 +101,10 @@ First-cut behavior:
   runtime-agnostic interrupt hook and explicit tick-rate contract for wake
   delivery
 - preserve the generator-relevant structured subset of referenced topology and semantic inputs in the emitted Rust metadata so downstream code does not lose control refs, remap data, or executable semantic structure that the approved HAIR document already provides
+- separate the executable runtime API from the richer metadata-inspection API so
+  constructors and normal peripheral operations depend only on lean runtime
+  resources, while downstream tooling or metadata-aware tests can opt into the
+  richer constants and accessors explicitly
 - make that feature surface behaviorally meaningful: disabling one generated
   peripheral-family feature must also suppress any helper modules, interrupt
   handlers, and runtime wiring that exist only to serve that disabled family or

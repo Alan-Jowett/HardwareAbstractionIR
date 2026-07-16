@@ -840,7 +840,12 @@ pub const DRV_PFIC_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_PFIC_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct PFICResources {
+pub struct PFICRuntimeResources {}
+
+pub const DRV_PFIC_RUNTIME_RESOURCES: PFICRuntimeResources = PFICRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct PFICMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -855,7 +860,7 @@ pub struct PFICResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_PFIC_RESOURCES: PFICResources = PFICResources {
+pub const DRV_PFIC_METADATA_RESOURCES: PFICMetadataResources = PFICMetadataResources {
     clocks: DRV_PFIC_CLOCK_BINDINGS,
     resets: DRV_PFIC_RESET_BINDINGS,
     interrupt_sources: DRV_PFIC_INTERRUPT_SOURCES,
@@ -871,20 +876,19 @@ pub const DRV_PFIC_RESOURCES: PFICResources = PFICResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct PFIC {
-    resources: PFICResources,
-}
+pub struct PFIC;
 
 impl PFIC {
-    pub fn new(resources: PFICResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: PFICRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> PFICResources {
-        self.resources
+    pub fn metadata_resources() -> PFICMetadataResources {
+        DRV_PFIC_METADATA_RESOURCES
     }
-    pub fn bind(&self) -> &'static [metadata::InterruptRoute] {
-        self.resources.interrupts
+    pub fn interrupt_routes() -> &'static [metadata::InterruptRoute] {
+        Self::metadata_resources().interrupts
     }
 
     pub fn enable_irq(&self, irq: Irq) -> Result<(), metadata::Error> {

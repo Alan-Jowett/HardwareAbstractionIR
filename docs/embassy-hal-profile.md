@@ -105,6 +105,14 @@ Normative consequences:
    those approved inputs, the richer metadata should remain available to
    that module in structured form instead of being re-derived by ad hoc
    name matching
+5. the richer metadata surface does not need to be the same API shape used by
+   runtime constructors and normal peripheral handles; embedded-target
+   generation may and should expose lean runtime resource types separately so
+   normal firmware paths do not retain descriptive metadata transitively
+6. a consumer that uses only the lean runtime API should be able to avoid
+   linking the richer metadata graph without relying on a separate feature flag;
+   a feature flag may still further reduce exported inspection APIs, but it is
+   not the primary size boundary
 
 ## Host-emulated generation contract
 
@@ -396,6 +404,13 @@ unrelated runtime code into every image, the generator may add extra
 non-default support features for that capability as long as those features
 remain derived from the approved HAIR contract rather than from ad hoc
 manual source edits.
+
+Separately from the Cargo feature surface, the generated embedded HAL should
+use API-shape partitioning as a size boundary. Lean constructor inputs and
+runtime handles should carry only the data needed for executable lowering,
+while richer metadata access should flow through distinct constants, accessors,
+or wrapper types. That split keeps production firmware small even when the
+crate still emits metadata for testing, audit, or downstream tooling.
 
 For host-emulated generation, the same traceability rule applies to the
 companion emulator/state handles and their observation/control methods.

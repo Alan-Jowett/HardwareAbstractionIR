@@ -1,16 +1,16 @@
 //! Generated WCH/QingKe runtime support for CH32V203G6U6.
 
 #[cfg(feature = "dma-async")]
-use crate::dma::{DMA1, DMA1Resources};
+use crate::dma::{DMA1, DMA1RuntimeResources};
 #[cfg(feature = "gpio-async-wait")]
 use crate::gpio::generated_drv_gpioa_signal_gpio_wait;
 #[cfg(feature = "gpio-async-wait")]
 use crate::gpio::generated_drv_gpiob_signal_gpio_wait;
 #[cfg(feature = "gpio-async-wait")]
 use crate::gpio::generated_drv_gpiod_signal_gpio_wait;
-use crate::interrupt::{DRV_PFIC_RESOURCES, Irq, PFIC};
+use crate::interrupt::{DRV_PFIC_RUNTIME_RESOURCES, Irq, PFIC};
 use crate::metadata;
-use crate::time::{DRV_TIME_RTC_RESOURCES, RTCEmbassyTimeDriver};
+use crate::time::{DRV_TIME_RTC_RUNTIME_RESOURCES, RTCEmbassyTimeDriver};
 use core::arch::{asm, global_asm};
 
 pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProvenance {
@@ -639,11 +639,12 @@ __hair_wch_embassy_time_driver_vector:
 );
 
 fn pfic() -> PFIC {
-    PFIC::new(DRV_PFIC_RESOURCES).expect("generated WCH PFIC resources")
+    PFIC::new(DRV_PFIC_RUNTIME_RESOURCES).expect("generated WCH PFIC resources")
 }
 
 fn time_driver() -> RTCEmbassyTimeDriver {
-    RTCEmbassyTimeDriver::new(DRV_TIME_RTC_RESOURCES).expect("generated WCH time-driver resources")
+    RTCEmbassyTimeDriver::new(DRV_TIME_RTC_RUNTIME_RESOURCES)
+        .expect("generated WCH time-driver resources")
 }
 
 #[cfg(feature = "gpio-async-wait")]
@@ -750,24 +751,12 @@ fn __hair_enable_wch_time_driver_handler_vector() -> Result<(), metadata::Error>
 }
 
 #[cfg(feature = "dma-async")]
-const GENERATED_WCH_RUNTIME_DRV_DMA1_RESOURCES: DMA1Resources = DMA1Resources {
-    clocks: &[],
-    resets: &[],
-    interrupt_sources: &[],
-    interrupts: &[],
-    dma_channels: &[],
-    dma: &[],
-    pins: &[],
-    init_operations: &[],
-    state_machines: &[],
-    lowering_pattern: None,
-    time_driver_source: None,
-    capability_tags: &[],
-};
+const GENERATED_WCH_RUNTIME_DRV_DMA1_RUNTIME_RESOURCES: DMA1RuntimeResources =
+    DMA1RuntimeResources {};
 
 #[cfg(feature = "dma-async")]
 fn generated_wch_runtime_drv_dma1() -> DMA1 {
-    DMA1::new(GENERATED_WCH_RUNTIME_DRV_DMA1_RESOURCES)
+    DMA1::new(GENERATED_WCH_RUNTIME_DRV_DMA1_RUNTIME_RESOURCES)
         .expect("generated WCH runtime driver resources")
 }
 

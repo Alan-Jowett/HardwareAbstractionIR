@@ -113,6 +113,11 @@ cargo run -- generate embassy-host evidence\wch\ch32v203c8t6\hair.json --output-
   features with an empty default set, and disabling a generated family feature
   suppresses the corresponding public module export plus any family-specific
   runtime or interrupt glue that would otherwise be retained in the image.
+- The emitted embedded crate separates lean runtime constructor inputs from any
+  richer metadata-inspection surface. A consumer that instantiates generated
+  drivers through the lean runtime API only must not retain the same
+  descriptive metadata tables solely because those metadata constants also
+  exist in the crate.
 - The CH32V203G6U6 reference bundle succeeds only when the approved HAIR inputs
   justify both the rtc-backed `embassy-time-driver` path and any emitted
   HAL-specific raw RTC control helpers from the same explicit RTC

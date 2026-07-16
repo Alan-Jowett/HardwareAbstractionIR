@@ -466,7 +466,13 @@ pub const DRV_IRQ_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_IRQ_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct InterruptMatrixResources {
+pub struct InterruptMatrixRuntimeResources {}
+
+pub const DRV_IRQ_RUNTIME_RESOURCES: InterruptMatrixRuntimeResources =
+    InterruptMatrixRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct InterruptMatrixMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -481,35 +487,35 @@ pub struct InterruptMatrixResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_IRQ_RESOURCES: InterruptMatrixResources = InterruptMatrixResources {
-    clocks: DRV_IRQ_CLOCK_BINDINGS,
-    resets: DRV_IRQ_RESET_BINDINGS,
-    interrupt_sources: DRV_IRQ_INTERRUPT_SOURCES,
-    interrupts: DRV_IRQ_INTERRUPT_ROUTES,
-    dma_channels: DRV_IRQ_DMA_CHANNELS,
-    dma: DRV_IRQ_DMA_ROUTES,
-    pins: DRV_IRQ_PIN_ROLES,
-    init_operations: DRV_IRQ_INIT_OPERATIONS,
-    state_machines: DRV_IRQ_STATE_MACHINES,
-    lowering_pattern: None,
-    time_driver_source: None,
-    capability_tags: DRV_IRQ_CAPABILITY_TAGS,
-};
+pub const DRV_IRQ_METADATA_RESOURCES: InterruptMatrixMetadataResources =
+    InterruptMatrixMetadataResources {
+        clocks: DRV_IRQ_CLOCK_BINDINGS,
+        resets: DRV_IRQ_RESET_BINDINGS,
+        interrupt_sources: DRV_IRQ_INTERRUPT_SOURCES,
+        interrupts: DRV_IRQ_INTERRUPT_ROUTES,
+        dma_channels: DRV_IRQ_DMA_CHANNELS,
+        dma: DRV_IRQ_DMA_ROUTES,
+        pins: DRV_IRQ_PIN_ROLES,
+        init_operations: DRV_IRQ_INIT_OPERATIONS,
+        state_machines: DRV_IRQ_STATE_MACHINES,
+        lowering_pattern: None,
+        time_driver_source: None,
+        capability_tags: DRV_IRQ_CAPABILITY_TAGS,
+    };
 
 #[derive(Debug, Clone, Copy)]
-pub struct InterruptMatrix {
-    resources: InterruptMatrixResources,
-}
+pub struct InterruptMatrix;
 
 impl InterruptMatrix {
-    pub fn new(resources: InterruptMatrixResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: InterruptMatrixRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> InterruptMatrixResources {
-        self.resources
+    pub fn metadata_resources() -> InterruptMatrixMetadataResources {
+        DRV_IRQ_METADATA_RESOURCES
     }
-    pub fn bind(&self) -> &'static [metadata::InterruptRoute] {
-        self.resources.interrupts
+    pub fn interrupt_routes() -> &'static [metadata::InterruptRoute] {
+        Self::metadata_resources().interrupts
     }
 }

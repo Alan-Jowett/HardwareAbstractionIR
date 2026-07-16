@@ -757,7 +757,12 @@ pub const DRV_GPIOA_CAPABILITY_TAGS: &[&str] = &["embedded-hal-async-wait"];
 pub const DRV_GPIOA_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct GPIOAResources {
+pub struct GPIOARuntimeResources {}
+
+pub const DRV_GPIOA_RUNTIME_RESOURCES: GPIOARuntimeResources = GPIOARuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct GPIOAMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -772,7 +777,7 @@ pub struct GPIOAResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_GPIOA_RESOURCES: GPIOAResources = GPIOAResources {
+pub const DRV_GPIOA_METADATA_RESOURCES: GPIOAMetadataResources = GPIOAMetadataResources {
     clocks: DRV_GPIOA_CLOCK_BINDINGS,
     resets: DRV_GPIOA_RESET_BINDINGS,
     interrupt_sources: DRV_GPIOA_INTERRUPT_SOURCES,
@@ -788,17 +793,16 @@ pub const DRV_GPIOA_RESOURCES: GPIOAResources = GPIOAResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct GPIOA {
-    resources: GPIOAResources,
-}
+pub struct GPIOA;
 
 impl GPIOA {
-    pub fn new(resources: GPIOAResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: GPIOARuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> GPIOAResources {
-        self.resources
+    pub fn metadata_resources() -> GPIOAMetadataResources {
+        DRV_GPIOA_METADATA_RESOURCES
     }
     /// Enable the GPIOA clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -827,8 +831,6 @@ impl GPIOA {
     /// Access the PA0 pin on GPIOA.
     pub fn pa0(&self) -> GPIOAFlex {
         GPIOAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[0],
             pin_name: "PA0",
             cfg_addr: 0x40010800u64,
             cfg_clear_mask: 0x0000000Fu32,
@@ -846,8 +848,6 @@ impl GPIOA {
     /// Access the PA1 pin on GPIOA.
     pub fn pa1(&self) -> GPIOAFlex {
         GPIOAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[1],
             pin_name: "PA1",
             cfg_addr: 0x40010800u64,
             cfg_clear_mask: 0x000000F0u32,
@@ -865,8 +865,6 @@ impl GPIOA {
     /// Access the PA10 pin on GPIOA.
     pub fn pa10(&self) -> GPIOAFlex {
         GPIOAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[2],
             pin_name: "PA10",
             cfg_addr: 0x40010804u64,
             cfg_clear_mask: 0x00000F00u32,
@@ -884,8 +882,6 @@ impl GPIOA {
     /// Access the PA11 pin on GPIOA.
     pub fn pa11(&self) -> GPIOAFlex {
         GPIOAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[3],
             pin_name: "PA11",
             cfg_addr: 0x40010804u64,
             cfg_clear_mask: 0x0000F000u32,
@@ -903,8 +899,6 @@ impl GPIOA {
     /// Access the PA12 pin on GPIOA.
     pub fn pa12(&self) -> GPIOAFlex {
         GPIOAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[4],
             pin_name: "PA12",
             cfg_addr: 0x40010804u64,
             cfg_clear_mask: 0x000F0000u32,
@@ -922,8 +916,6 @@ impl GPIOA {
     /// Access the PA13 pin on GPIOA.
     pub fn pa13(&self) -> GPIOAFlex {
         GPIOAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[5],
             pin_name: "PA13",
             cfg_addr: 0x40010804u64,
             cfg_clear_mask: 0x00F00000u32,
@@ -941,8 +933,6 @@ impl GPIOA {
     /// Access the PA14 pin on GPIOA.
     pub fn pa14(&self) -> GPIOAFlex {
         GPIOAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[6],
             pin_name: "PA14",
             cfg_addr: 0x40010804u64,
             cfg_clear_mask: 0x0F000000u32,
@@ -960,8 +950,6 @@ impl GPIOA {
     /// Access the PA15 pin on GPIOA.
     pub fn pa15(&self) -> GPIOAFlex {
         GPIOAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[7],
             pin_name: "PA15",
             cfg_addr: 0x40010804u64,
             cfg_clear_mask: 0xF0000000u32,
@@ -979,8 +967,6 @@ impl GPIOA {
     /// Access the PA2 pin on GPIOA.
     pub fn pa2(&self) -> GPIOAFlex {
         GPIOAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[8],
             pin_name: "PA2",
             cfg_addr: 0x40010800u64,
             cfg_clear_mask: 0x00000F00u32,
@@ -998,8 +984,6 @@ impl GPIOA {
     /// Access the PA3 pin on GPIOA.
     pub fn pa3(&self) -> GPIOAFlex {
         GPIOAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[9],
             pin_name: "PA3",
             cfg_addr: 0x40010800u64,
             cfg_clear_mask: 0x0000F000u32,
@@ -1017,8 +1001,6 @@ impl GPIOA {
     /// Access the PA4 pin on GPIOA.
     pub fn pa4(&self) -> GPIOAFlex {
         GPIOAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[10],
             pin_name: "PA4",
             cfg_addr: 0x40010800u64,
             cfg_clear_mask: 0x000F0000u32,
@@ -1036,8 +1018,6 @@ impl GPIOA {
     /// Access the PA5 pin on GPIOA.
     pub fn pa5(&self) -> GPIOAFlex {
         GPIOAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[11],
             pin_name: "PA5",
             cfg_addr: 0x40010800u64,
             cfg_clear_mask: 0x00F00000u32,
@@ -1055,8 +1035,6 @@ impl GPIOA {
     /// Access the PA6 pin on GPIOA.
     pub fn pa6(&self) -> GPIOAFlex {
         GPIOAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[12],
             pin_name: "PA6",
             cfg_addr: 0x40010800u64,
             cfg_clear_mask: 0x0F000000u32,
@@ -1074,8 +1052,6 @@ impl GPIOA {
     /// Access the PA7 pin on GPIOA.
     pub fn pa7(&self) -> GPIOAFlex {
         GPIOAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[13],
             pin_name: "PA7",
             cfg_addr: 0x40010800u64,
             cfg_clear_mask: 0xF0000000u32,
@@ -1093,8 +1069,6 @@ impl GPIOA {
     /// Access the PA9 pin on GPIOA.
     pub fn pa9(&self) -> GPIOAFlex {
         GPIOAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[14],
             pin_name: "PA9",
             cfg_addr: 0x40010804u64,
             cfg_clear_mask: 0x000000F0u32,
@@ -1112,8 +1086,6 @@ impl GPIOA {
 
 #[derive(Debug, Clone)]
 pub struct GPIOAFlex {
-    resources: GPIOAResources,
-    role: &'static metadata::PinRole,
     pin_name: &'static str,
     cfg_addr: u64,
     cfg_clear_mask: u32,
@@ -1138,14 +1110,6 @@ pub struct GPIOAOutput {
 }
 
 impl GPIOAFlex {
-    pub fn resources(&self) -> GPIOAResources {
-        self.resources
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.role
-    }
-
     pub fn pin_name(&self) -> &'static str {
         self.pin_name
     }
@@ -1250,10 +1214,6 @@ impl GPIOAInput {
         self.pin.pin_name()
     }
 
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
-    }
-
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {
         self.pin.set_pull(pull)
     }
@@ -1281,10 +1241,6 @@ impl GPIOAOutput {
 
     pub fn pin_name(&self) -> &'static str {
         self.pin.pin_name()
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
     }
 
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {
@@ -2171,7 +2127,12 @@ pub const DRV_GPIOB_CAPABILITY_TAGS: &[&str] = &["embedded-hal-async-wait"];
 pub const DRV_GPIOB_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct GPIOBResources {
+pub struct GPIOBRuntimeResources {}
+
+pub const DRV_GPIOB_RUNTIME_RESOURCES: GPIOBRuntimeResources = GPIOBRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct GPIOBMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -2186,7 +2147,7 @@ pub struct GPIOBResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_GPIOB_RESOURCES: GPIOBResources = GPIOBResources {
+pub const DRV_GPIOB_METADATA_RESOURCES: GPIOBMetadataResources = GPIOBMetadataResources {
     clocks: DRV_GPIOB_CLOCK_BINDINGS,
     resets: DRV_GPIOB_RESET_BINDINGS,
     interrupt_sources: DRV_GPIOB_INTERRUPT_SOURCES,
@@ -2202,17 +2163,16 @@ pub const DRV_GPIOB_RESOURCES: GPIOBResources = GPIOBResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct GPIOB {
-    resources: GPIOBResources,
-}
+pub struct GPIOB;
 
 impl GPIOB {
-    pub fn new(resources: GPIOBResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: GPIOBRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> GPIOBResources {
-        self.resources
+    pub fn metadata_resources() -> GPIOBMetadataResources {
+        DRV_GPIOB_METADATA_RESOURCES
     }
     /// Enable the GPIOB clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -2241,8 +2201,6 @@ impl GPIOB {
     /// Access the PB0 pin on GPIOB.
     pub fn pb0(&self) -> GPIOBFlex {
         GPIOBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[0],
             pin_name: "PB0",
             cfg_addr: 0x40010C00u64,
             cfg_clear_mask: 0x0000000Fu32,
@@ -2260,8 +2218,6 @@ impl GPIOB {
     /// Access the PB1 pin on GPIOB.
     pub fn pb1(&self) -> GPIOBFlex {
         GPIOBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[1],
             pin_name: "PB1",
             cfg_addr: 0x40010C00u64,
             cfg_clear_mask: 0x000000F0u32,
@@ -2279,8 +2235,6 @@ impl GPIOB {
     /// Access the PB3 pin on GPIOB.
     pub fn pb3(&self) -> GPIOBFlex {
         GPIOBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[2],
             pin_name: "PB3",
             cfg_addr: 0x40010C00u64,
             cfg_clear_mask: 0x0000F000u32,
@@ -2298,8 +2252,6 @@ impl GPIOB {
     /// Access the PB4 pin on GPIOB.
     pub fn pb4(&self) -> GPIOBFlex {
         GPIOBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[3],
             pin_name: "PB4",
             cfg_addr: 0x40010C00u64,
             cfg_clear_mask: 0x000F0000u32,
@@ -2317,8 +2269,6 @@ impl GPIOB {
     /// Access the PB5 pin on GPIOB.
     pub fn pb5(&self) -> GPIOBFlex {
         GPIOBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[4],
             pin_name: "PB5",
             cfg_addr: 0x40010C00u64,
             cfg_clear_mask: 0x00F00000u32,
@@ -2336,8 +2286,6 @@ impl GPIOB {
     /// Access the PB6 pin on GPIOB.
     pub fn pb6(&self) -> GPIOBFlex {
         GPIOBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[5],
             pin_name: "PB6",
             cfg_addr: 0x40010C00u64,
             cfg_clear_mask: 0x0F000000u32,
@@ -2355,8 +2303,6 @@ impl GPIOB {
     /// Access the PB7 pin on GPIOB.
     pub fn pb7(&self) -> GPIOBFlex {
         GPIOBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[6],
             pin_name: "PB7",
             cfg_addr: 0x40010C00u64,
             cfg_clear_mask: 0xF0000000u32,
@@ -2374,8 +2320,6 @@ impl GPIOB {
 
 #[derive(Debug, Clone)]
 pub struct GPIOBFlex {
-    resources: GPIOBResources,
-    role: &'static metadata::PinRole,
     pin_name: &'static str,
     cfg_addr: u64,
     cfg_clear_mask: u32,
@@ -2400,14 +2344,6 @@ pub struct GPIOBOutput {
 }
 
 impl GPIOBFlex {
-    pub fn resources(&self) -> GPIOBResources {
-        self.resources
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.role
-    }
-
     pub fn pin_name(&self) -> &'static str {
         self.pin_name
     }
@@ -2512,10 +2448,6 @@ impl GPIOBInput {
         self.pin.pin_name()
     }
 
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
-    }
-
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {
         self.pin.set_pull(pull)
     }
@@ -2543,10 +2475,6 @@ impl GPIOBOutput {
 
     pub fn pin_name(&self) -> &'static str {
         self.pin.pin_name()
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
     }
 
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {
@@ -3081,7 +3009,12 @@ pub const DRV_GPIOD_CAPABILITY_TAGS: &[&str] = &["embedded-hal-async-wait"];
 pub const DRV_GPIOD_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct GPIODResources {
+pub struct GPIODRuntimeResources {}
+
+pub const DRV_GPIOD_RUNTIME_RESOURCES: GPIODRuntimeResources = GPIODRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct GPIODMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -3096,7 +3029,7 @@ pub struct GPIODResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_GPIOD_RESOURCES: GPIODResources = GPIODResources {
+pub const DRV_GPIOD_METADATA_RESOURCES: GPIODMetadataResources = GPIODMetadataResources {
     clocks: DRV_GPIOD_CLOCK_BINDINGS,
     resets: DRV_GPIOD_RESET_BINDINGS,
     interrupt_sources: DRV_GPIOD_INTERRUPT_SOURCES,
@@ -3112,17 +3045,16 @@ pub const DRV_GPIOD_RESOURCES: GPIODResources = GPIODResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct GPIOD {
-    resources: GPIODResources,
-}
+pub struct GPIOD;
 
 impl GPIOD {
-    pub fn new(resources: GPIODResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: GPIODRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> GPIODResources {
-        self.resources
+    pub fn metadata_resources() -> GPIODMetadataResources {
+        DRV_GPIOD_METADATA_RESOURCES
     }
     /// Enable the GPIOD clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -3151,8 +3083,6 @@ impl GPIOD {
     /// Access the PD0 pin on GPIOD.
     pub fn pd0(&self) -> GPIODFlex {
         GPIODFlex {
-            resources: self.resources,
-            role: &self.resources.pins[0],
             pin_name: "PD0",
             cfg_addr: 0x40011400u64,
             cfg_clear_mask: 0x0000000Fu32,
@@ -3170,8 +3100,6 @@ impl GPIOD {
     /// Access the PD1 pin on GPIOD.
     pub fn pd1(&self) -> GPIODFlex {
         GPIODFlex {
-            resources: self.resources,
-            role: &self.resources.pins[1],
             pin_name: "PD1",
             cfg_addr: 0x40011400u64,
             cfg_clear_mask: 0x000000F0u32,
@@ -3189,8 +3117,6 @@ impl GPIOD {
 
 #[derive(Debug, Clone)]
 pub struct GPIODFlex {
-    resources: GPIODResources,
-    role: &'static metadata::PinRole,
     pin_name: &'static str,
     cfg_addr: u64,
     cfg_clear_mask: u32,
@@ -3215,14 +3141,6 @@ pub struct GPIODOutput {
 }
 
 impl GPIODFlex {
-    pub fn resources(&self) -> GPIODResources {
-        self.resources
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.role
-    }
-
     pub fn pin_name(&self) -> &'static str {
         self.pin_name
     }
@@ -3327,10 +3245,6 @@ impl GPIODInput {
         self.pin.pin_name()
     }
 
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
-    }
-
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {
         self.pin.set_pull(pull)
     }
@@ -3358,10 +3272,6 @@ impl GPIODOutput {
 
     pub fn pin_name(&self) -> &'static str {
         self.pin.pin_name()
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
     }
 
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {

@@ -237,7 +237,12 @@ pub const DRV_USBD_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_USBD_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct USBDResources {
+pub struct USBDRuntimeResources {}
+
+pub const DRV_USBD_RUNTIME_RESOURCES: USBDRuntimeResources = USBDRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct USBDMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -252,7 +257,7 @@ pub struct USBDResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_USBD_RESOURCES: USBDResources = USBDResources {
+pub const DRV_USBD_METADATA_RESOURCES: USBDMetadataResources = USBDMetadataResources {
     clocks: DRV_USBD_CLOCK_BINDINGS,
     resets: DRV_USBD_RESET_BINDINGS,
     interrupt_sources: DRV_USBD_INTERRUPT_SOURCES,
@@ -268,17 +273,16 @@ pub const DRV_USBD_RESOURCES: USBDResources = USBDResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct USBD {
-    resources: USBDResources,
-}
+pub struct USBD;
 
 impl USBD {
-    pub fn new(resources: USBDResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: USBDRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> USBDResources {
-        self.resources
+    pub fn metadata_resources() -> USBDMetadataResources {
+        DRV_USBD_METADATA_RESOURCES
     }
     /// Enable the USBD clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -305,7 +309,7 @@ impl USBD {
     }
 
     pub fn embassy_usb_driver(&self) -> USBDUsbDriver {
-        USBDUsbDriver::new(self.resources)
+        USBDUsbDriver::new(USBDRuntimeResources {})
     }
 }
 
@@ -475,7 +479,7 @@ pub struct USBDUsbDriver {
 }
 
 impl USBDUsbDriver {
-    fn new(resources: USBDResources) -> Self {
+    fn new(resources: USBDRuntimeResources) -> Self {
         let _ = resources;
         Self {
             pairs: [FsdevEndpointPair::new(); 8],

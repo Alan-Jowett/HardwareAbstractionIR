@@ -190,7 +190,12 @@ pub const DRV_UART0_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_UART0_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct Uart0Resources {
+pub struct Uart0RuntimeResources {}
+
+pub const DRV_UART0_RUNTIME_RESOURCES: Uart0RuntimeResources = Uart0RuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct Uart0MetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -205,7 +210,7 @@ pub struct Uart0Resources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_UART0_RESOURCES: Uart0Resources = Uart0Resources {
+pub const DRV_UART0_METADATA_RESOURCES: Uart0MetadataResources = Uart0MetadataResources {
     clocks: DRV_UART0_CLOCK_BINDINGS,
     resets: DRV_UART0_RESET_BINDINGS,
     interrupt_sources: DRV_UART0_INTERRUPT_SOURCES,
@@ -221,17 +226,16 @@ pub const DRV_UART0_RESOURCES: Uart0Resources = Uart0Resources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct Uart0 {
-    resources: Uart0Resources,
-}
+pub struct Uart0;
 
 impl Uart0 {
-    pub fn new(resources: Uart0Resources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: Uart0RuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> Uart0Resources {
-        self.resources
+    pub fn metadata_resources() -> Uart0MetadataResources {
+        DRV_UART0_METADATA_RESOURCES
     }
     /// Enable the UART0 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {

@@ -4,7 +4,7 @@
 use core::panic::PanicInfo;
 
 use ch32v203g6u6_embassy_hal::{
-    gpio::{DRV_GPIOA_RESOURCES, GPIOA, Level},
+    gpio::{DRV_GPIOA_RUNTIME_RESOURCES, GPIOA, Level},
     wch,
 };
 use embassy_executor::Spawner;
@@ -19,7 +19,7 @@ fn panic(_info: &PanicInfo<'_>) -> ! {
 
 #[embassy_executor::main(entry = "riscv_rt::entry")]
 async fn main(_spawner: Spawner) -> ! {
-    let gpioa = GPIOA::new(DRV_GPIOA_RESOURCES).unwrap();
+    let gpioa = GPIOA::new(DRV_GPIOA_RUNTIME_RESOURCES).unwrap();
     gpioa.enable_clock().unwrap();
     gpioa.release_reset().unwrap();
     let led = gpioa.pa7().into_output(Level::Low).unwrap();

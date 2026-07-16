@@ -433,7 +433,12 @@ pub const DRV_RCC_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_RCC_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct SYSCTLResources {
+pub struct SYSCTLRuntimeResources {}
+
+pub const DRV_RCC_RUNTIME_RESOURCES: SYSCTLRuntimeResources = SYSCTLRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct SYSCTLMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -448,7 +453,7 @@ pub struct SYSCTLResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_RCC_RESOURCES: SYSCTLResources = SYSCTLResources {
+pub const DRV_RCC_METADATA_RESOURCES: SYSCTLMetadataResources = SYSCTLMetadataResources {
     clocks: DRV_RCC_CLOCK_BINDINGS,
     resets: DRV_RCC_RESET_BINDINGS,
     interrupt_sources: DRV_RCC_INTERRUPT_SOURCES,
@@ -464,17 +469,16 @@ pub const DRV_RCC_RESOURCES: SYSCTLResources = SYSCTLResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct SYSCTL {
-    resources: SYSCTLResources,
-}
+pub struct SYSCTL;
 
 impl SYSCTL {
-    pub fn new(resources: SYSCTLResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: SYSCTLRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> SYSCTLResources {
-        self.resources
+    pub fn metadata_resources() -> SYSCTLMetadataResources {
+        DRV_RCC_METADATA_RESOURCES
     }
     /// Enable the GPIOA clock gate.
     pub fn enable_gpioa_clock(&self) -> Result<(), metadata::Error> {

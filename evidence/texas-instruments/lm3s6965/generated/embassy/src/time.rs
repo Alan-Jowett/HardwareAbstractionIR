@@ -132,7 +132,12 @@ pub const DRV_TIME_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_TIME_CAPABILITY_TAGS: &[&str] = &["embassy-time-driver"];
 
 #[derive(Debug, Clone, Copy)]
-pub struct TimeResources {
+pub struct TimeRuntimeResources {}
+
+pub const DRV_TIME_RUNTIME_RESOURCES: TimeRuntimeResources = TimeRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct TimeMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -147,7 +152,7 @@ pub struct TimeResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_TIME_RESOURCES: TimeResources = TimeResources {
+pub const DRV_TIME_METADATA_RESOURCES: TimeMetadataResources = TimeMetadataResources {
     clocks: DRV_TIME_CLOCK_BINDINGS,
     resets: DRV_TIME_RESET_BINDINGS,
     interrupt_sources: DRV_TIME_INTERRUPT_SOURCES,
@@ -163,20 +168,19 @@ pub const DRV_TIME_RESOURCES: TimeResources = TimeResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct Time {
-    resources: TimeResources,
-}
+pub struct Time;
 
 impl Time {
-    pub fn new(resources: TimeResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: TimeRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> TimeResources {
-        self.resources
+    pub fn metadata_resources() -> TimeMetadataResources {
+        DRV_TIME_METADATA_RESOURCES
     }
-    pub fn bind(&self) -> &'static [metadata::InterruptRoute] {
-        self.resources.interrupts
+    pub fn interrupt_routes() -> &'static [metadata::InterruptRoute] {
+        Self::metadata_resources().interrupts
     }
 
     pub fn init_time_driver(&self) -> Result<(), metadata::Error> {

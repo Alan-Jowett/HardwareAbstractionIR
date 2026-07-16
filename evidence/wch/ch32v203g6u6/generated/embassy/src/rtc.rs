@@ -181,7 +181,12 @@ pub const DRV_RTC_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_RTC_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct RTCResources {
+pub struct RTCRuntimeResources {}
+
+pub const DRV_RTC_RUNTIME_RESOURCES: RTCRuntimeResources = RTCRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct RTCMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -196,7 +201,7 @@ pub struct RTCResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_RTC_RESOURCES: RTCResources = RTCResources {
+pub const DRV_RTC_METADATA_RESOURCES: RTCMetadataResources = RTCMetadataResources {
     clocks: DRV_RTC_CLOCK_BINDINGS,
     resets: DRV_RTC_RESET_BINDINGS,
     interrupt_sources: DRV_RTC_INTERRUPT_SOURCES,
@@ -212,17 +217,16 @@ pub const DRV_RTC_RESOURCES: RTCResources = RTCResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct RTC {
-    resources: RTCResources,
-}
+pub struct RTC;
 
 impl RTC {
-    pub fn new(resources: RTCResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: RTCRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> RTCResources {
-        self.resources
+    pub fn metadata_resources() -> RTCMetadataResources {
+        DRV_RTC_METADATA_RESOURCES
     }
     /// Enable the PWR clock gate.
     pub fn enable_pwr_clock(&self) -> Result<(), metadata::Error> {
