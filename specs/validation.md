@@ -177,6 +177,38 @@ cargo run -- generate embassy-host evidence\wch\ch32v203c8t6\hair.json --output-
   `embedded_hal_async::i2c::I2c<embedded_hal::i2c::SevenBitAddress>` for the
   same approved master path; 10-bit, slave, SMBus, and other unmodeled
   transaction families must remain explicit failures.
+- If a CH32V203 reference bundle claims
+  `loweringPattern = "legacy-event-i2c-slave"` on an `i2c` driver instance,
+  generation succeeds only when the same driver instance also carries explicit
+  `i2cSlaveBindings` naming the direct own-address programming, direction, packet-boundary,
+  control/status/data roles, and required address/packet-boundary clear operations for
+  that family. The generated embedded crate may implement only the approved
+  HAL-specific 7-bit single-own-address slave packet path and must fail
+  explicitly rather than inferring legacy slave sequencing from vendor register
+  names alone.
+- If the same I2C driver instance claims capability tag
+  `embassy-async-i2c-slave`, generation succeeds only when the approved
+  HAIR inputs also name the matching event/error interrupt routes and any
+  interrupt-enable handles required by that family's async packet wake path.
+  The generated async slave surface remains HAL-specific and may implement only
+  the same approved packet-bounded 7-bit slave contract; general-call,
+  dual-address, SMBus, 10-bit, and byte-level callback families must remain
+  explicit failures.
+- If the same I2C driver instance additionally claims capability tag
+  `embassy-i2c-slave-isr-dispatch`, generation succeeds only when the approved
+  async slave path also justifies an ISR-level completed RX-packet callback
+  surface with a user-supplied static buffer that can preempt normal task flow
+  for mode-switch or recovery behavior. Acceptance for that path requires a checked-in two-device CH32V203
+  smoke flow in which one generated master image drives command/response packet
+  exchanges and reports results over USB CDC while one generated slave image
+  demonstrates both normal packet handling and the ISR-level dispatch path.
+- The checked-in build flows for that two-device CH32V203 slave acceptance are
+  `powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\embassy-i2c-slave-master-smoke\build-smoke-bin.ps1 -Release`
+  and
+  `powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\embassy-i2c-slave-slave-smoke\build-smoke-bin.ps1 -Release`.
+  The master image shall log both the normal request/response exchange and the
+  completed-RX ISR callback path over USB CDC after the host asserts DTR before
+  reporting PASS.
 - If the reference bundle claims IRQ-driven DMA completion futures, generation
   succeeds only when the same `dma` driver instance carries explicit
   `dmaAsyncBindings` plus the matching DMA-channel interrupt routes, and the

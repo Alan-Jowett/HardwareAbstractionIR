@@ -10,6 +10,8 @@ use crate::gpio::generated_drv_gpiob_signal_gpio_wait;
 use crate::gpio::generated_drv_gpiod_signal_gpio_wait;
 #[cfg(feature = "i2c-async")]
 use crate::i2c::generated_drv_i2c1_signal_i2c_async;
+#[cfg(feature = "i2c-async")]
+use crate::i2c::generated_drv_i2c1_slave_on_i2c_slave_interrupt;
 use crate::interrupt::{DRV_PFIC_RUNTIME_RESOURCES, Irq, PFIC};
 use crate::metadata;
 use crate::time::{DRV_TIME_RTC_RUNTIME_RESOURCES, RTCEmbassyTimeDriver};
@@ -997,12 +999,14 @@ extern "C" fn __hair_wch_drv_gpioa_exti_exti9_5_irq_rust() {
 #[unsafe(no_mangle)]
 extern "C" fn __hair_wch_drv_i2c1_i2c1_ev_irq_rust() {
     let _ = generated_drv_i2c1_signal_i2c_async();
+    let _ = generated_drv_i2c1_slave_on_i2c_slave_interrupt();
 }
 
 #[cfg(feature = "i2c-async")]
 #[unsafe(no_mangle)]
 extern "C" fn __hair_wch_drv_i2c1_i2c1_er_irq_rust() {
     let _ = generated_drv_i2c1_signal_i2c_async();
+    let _ = generated_drv_i2c1_slave_on_i2c_slave_interrupt();
 }
 
 #[cfg(feature = "gpio-async-wait")]

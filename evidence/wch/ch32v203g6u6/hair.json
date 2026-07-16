@@ -65275,6 +65275,276 @@
         }
       },
       {
+        "id": "op.i2c1.init_slave",
+        "name": "I2C1 initialize fixed slave packet path",
+        "kind": "initialization",
+        "targetRefs": [
+          "periph.i2c1"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.i2c1.ctlr1",
+            "expression": {
+              "language": "plain",
+              "text": "Clear PE"
+            },
+            "description": "Disable the peripheral before loading the fixed slave-side control profile."
+          },
+          {
+            "index": 1,
+            "action": "write",
+            "targetRef": "reg.i2c1.ctlr1",
+            "expression": {
+              "language": "plain",
+              "text": "Set SWRST = 1"
+            },
+            "description": "Assert the documented software reset bit before slave reinitialization."
+          },
+          {
+            "index": 2,
+            "action": "write",
+            "targetRef": "reg.i2c1.ctlr1",
+            "expression": {
+              "language": "plain",
+              "text": "Clear SWRST"
+            },
+            "description": "Release the software reset bit."
+          },
+          {
+            "index": 3,
+            "action": "write",
+            "targetRef": "reg.i2c1.ctlr2",
+            "expression": {
+              "language": "plain",
+              "text": "Write FREQ = 36"
+            },
+            "description": "Model the same fixed APB1 = 36 MHz kernel clock used by the checked-in CH32V203 Embassy output."
+          },
+          {
+            "index": 4,
+            "action": "write",
+            "targetRef": "reg.i2c1.oaddr1",
+            "expression": {
+              "language": "plain",
+              "text": "Set ADD0 = 1"
+            },
+            "description": "Force the 7-bit own-address layout's fixed low-order mode bit before runtime address programming."
+          },
+          {
+            "index": 5,
+            "action": "write",
+            "targetRef": "reg.i2c1.oaddr1",
+            "expression": {
+              "language": "plain",
+              "text": "Clear ADD8"
+            },
+            "description": "Keep the unused 10-bit upper-address bit clear for the first-cut 7-bit slave subset."
+          },
+          {
+            "index": 6,
+            "action": "write",
+            "targetRef": "reg.i2c1.oaddr1",
+            "expression": {
+              "language": "plain",
+              "text": "Clear ADD9"
+            },
+            "description": "Keep the second unused 10-bit upper-address bit clear for the same 7-bit subset."
+          },
+          {
+            "index": 7,
+            "action": "write",
+            "targetRef": "reg.i2c1.oaddr1",
+            "expression": {
+              "language": "plain",
+              "text": "Clear ADDMODE"
+            },
+            "description": "Select 7-bit own-address mode rather than 10-bit slave matching."
+          },
+          {
+            "index": 8,
+            "action": "write",
+            "targetRef": "reg.i2c1.oaddr2",
+            "expression": {
+              "language": "plain",
+              "text": "Clear ENDUAL"
+            },
+            "description": "Disable the second own-address comparator for the single-address first-cut slave subset."
+          },
+          {
+            "index": 9,
+            "action": "write",
+            "targetRef": "reg.i2c1.ctlr1",
+            "expression": {
+              "language": "plain",
+              "text": "Set ACK = 1"
+            },
+            "description": "Enable address/data acknowledge for the generated slave packet path."
+          },
+          {
+            "index": 10,
+            "action": "write",
+            "targetRef": "reg.i2c1.ctlr1",
+            "expression": {
+              "language": "plain",
+              "text": "Set PE = 1"
+            },
+            "description": "Re-enable the peripheral after the fixed slave-side control profile is loaded."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs"
+          ],
+          "status": "verified",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.i2c1.apply_slave_own_address_7bit",
+        "name": "I2C1 apply 7-bit own-address mode bits",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.i2c1"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.i2c1.oaddr1",
+            "expression": {
+              "language": "plain",
+              "text": "Set ADD0 = 1"
+            },
+            "description": "Force the fixed low-order mode bit used by the approved 7-bit own-address layout."
+          },
+          {
+            "index": 1,
+            "action": "write",
+            "targetRef": "reg.i2c1.oaddr1",
+            "expression": {
+              "language": "plain",
+              "text": "Clear ADD8"
+            },
+            "description": "Keep the unused 10-bit upper-address bit clear during runtime own-address updates."
+          },
+          {
+            "index": 2,
+            "action": "write",
+            "targetRef": "reg.i2c1.oaddr1",
+            "expression": {
+              "language": "plain",
+              "text": "Clear ADD9"
+            },
+            "description": "Keep the second unused 10-bit upper-address bit clear during runtime own-address updates."
+          },
+          {
+            "index": 3,
+            "action": "write",
+            "targetRef": "reg.i2c1.oaddr1",
+            "expression": {
+              "language": "plain",
+              "text": "Clear ADDMODE"
+            },
+            "description": "Preserve 7-bit slave addressing after programming the explicit own-address bits."
+          },
+          {
+            "index": 4,
+            "action": "write",
+            "targetRef": "reg.i2c1.oaddr2",
+            "expression": {
+              "language": "plain",
+              "text": "Clear ENDUAL"
+            },
+            "description": "Preserve the single-address subset after runtime own-address reconfiguration."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs"
+          ],
+          "status": "verified",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.i2c1.clear_stopf",
+        "name": "I2C1 clear completed-packet boundary",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.i2c1"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "read",
+            "targetRef": "reg.i2c1.star1",
+            "description": "Read STAR1 as the first half of the documented STOPF-clear sequence."
+          },
+          {
+            "index": 1,
+            "action": "write",
+            "targetRef": "reg.i2c1.ctlr1",
+            "expression": {
+              "language": "plain",
+              "text": "Set PE = 1"
+            },
+            "description": "Complete the documented STOPF-clear sequence by writing CTLR1 without changing the enabled state."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs"
+          ],
+          "status": "verified",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.i2c1.clear_ovr",
+        "name": "I2C1 clear overrun status",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.i2c1"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.i2c1.star1",
+            "expression": {
+              "language": "plain",
+              "text": "Clear OVR"
+            },
+            "description": "Clear the overrun / underrun status bit on the shared slave packet path."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs"
+          ],
+          "status": "verified",
+          "confidence": 0.86
+        }
+      },
+      {
         "id": "op.exti.clear_line0_pending",
         "name": "Clear EXTI line 0 pending flag",
         "kind": "mode-transition",
@@ -76563,6 +76833,102 @@
           "dmaRouteRefs": [
             "dmaroute.i2c1.tx",
             "dmaroute.i2c1.rx"
+          ]
+        },
+        {
+          "id": "drv.i2c1_slave",
+          "name": "I2C1Slave",
+          "targetRef": "block.i2c1",
+          "driverKind": "i2c",
+          "modulePath": "i2c",
+          "loweringPattern": "legacy-event-i2c-slave",
+          "clockBindingRefs": [
+            "clk.i2c1"
+          ],
+          "resetBindingRefs": [
+            "rst.i2c1"
+          ],
+          "i2cSlaveBindings": {
+            "ownAddressBitRefs": [
+              "field.i2c_oaddr1.add1",
+              "field.i2c_oaddr1.add2",
+              "field.i2c_oaddr1.add3",
+              "field.i2c_oaddr1.add4",
+              "field.i2c_oaddr1.add5",
+              "field.i2c_oaddr1.add6",
+              "field.i2c_oaddr1.add7"
+            ],
+            "ownAddressApplyOperationRefs": [
+              "op.i2c1.apply_slave_own_address_7bit"
+            ],
+            "dataRegisterRef": "field.i2c_datar.dr_datar",
+            "addressMatchedFlagRef": "field.i2c_star1.addr",
+            "transferDirectionFlagRef": "field.i2c_star2.tra",
+            "receiveBufferNotEmptyFlagRef": "field.i2c_star1.rxne",
+            "transmitBufferEmptyFlagRef": "field.i2c_star1.txe",
+            "byteTransferFinishedFlagRef": "field.i2c_star1.btf",
+            "packetBoundaryFlagRef": "field.i2c_star1.stopf",
+            "acknowledgeFailureFlagRef": "field.i2c_star1.af",
+            "overrunFlagRef": "field.i2c_star1.ovr",
+            "busErrorFlagRef": "field.i2c_star1.berr",
+            "clearAddressOperationRefs": [
+              "op.i2c1.clear_addr"
+            ],
+            "clearPacketBoundaryOperationRef": "op.i2c1.clear_stopf",
+            "clearAcknowledgeFailureOperationRef": "op.i2c1.clear_af",
+            "clearOverrunOperationRef": "op.i2c1.clear_ovr",
+            "clearBusErrorOperationRef": "op.i2c1.clear_berr",
+            "eventInterruptEnableRef": "field.i2c_ctlr2.itevten",
+            "bufferInterruptEnableRef": "field.i2c_ctlr2.itbufen",
+            "errorInterruptEnableRef": "field.i2c_ctlr2.iterren"
+          },
+          "pinRoles": [
+            {
+              "role": "scl",
+              "signal": "SCL",
+              "routeRefs": [
+                "pinroute.i2c1.scl.pb6.r0"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "sda",
+              "signal": "SDA",
+              "routeRefs": [
+                "pinroute.i2c1.sda.pb7.r0"
+              ],
+              "requirement": "required"
+            },
+            {
+              "role": "smba",
+              "signal": "SMBA",
+              "routeRefs": [
+                "pinroute.i2c1.smba.pb5"
+              ],
+              "requirement": "optional"
+            }
+          ],
+          "provenance": {
+            "sourceRefs": [
+              "ch32-rs-ch32v203g6u6-yaml"
+            ],
+            "evidenceRefs": [
+              "e_ch32rs_ch32v203g6u6_yaml_variant",
+              "e_ch32rs_ch32v203g6u6_yaml_pin_topology"
+            ],
+            "status": "verified",
+            "confidence": 0.86
+          },
+          "initOperationRefs": [
+            "op.i2c1.init_slave"
+          ],
+          "capabilityTags": [
+            "embassy-async-i2c-slave",
+            "embassy-i2c-slave-isr-dispatch"
+          ],
+          "interruptRouteRefs": [
+            "iroute.i2c1.er",
+            "iroute.i2c1.ev"
           ]
         },
         {

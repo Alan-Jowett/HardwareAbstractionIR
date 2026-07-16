@@ -230,6 +230,34 @@ Embassy profile contract.
   async wake path. The generated async I2C surface remains limited to the same
   approved 7-bit controller-master contract and must fail explicitly for slave,
   SMBus, 10-bit addressing, or other unmodeled transaction families.
+- If an `i2c` driver instance selects
+  `loweringPattern = "legacy-event-i2c-slave"`, the same profile entry shall
+  carry explicit `i2cSlaveBindings` naming the own-address programming, direction,
+  packet-boundary, control, status, data, and clear roles used by the generated
+  7-bit slave packet path. The first such surface is limited to one configured
+  7-bit own address and packet-bounded addressed transactions with RX-from-master
+  and TX-to-master behavior; the generator shall not infer address-match,
+  direction, packet-boundary, transmit-ready, receive-ready, or clear sequencing
+  from vendor register names alone.
+- The same first-cut slave contract shall support both fixed evidence-backed
+  slave initialization and generated runtime own-address reconfiguration, but
+  runtime reconfiguration must remain limited to the same approved 7-bit
+  own-address programming sequence plus any explicit apply operations named by
+  `i2cSlaveBindings`.
+- If the same `i2c` driver instance claims capability tag
+  `embassy-async-i2c-slave`, it shall also carry the interrupt-route
+  closure and any interrupt-enable handles required by the selected I2C family's
+  async packet wake path. That async slave surface remains HAL-specific rather
+  than an `embedded-hal` trait and stays limited to the same approved 7-bit
+  packet-bounded slave contract.
+- If the same `i2c` driver instance additionally claims capability tag
+  `embassy-i2c-slave-isr-dispatch`, it shall also claim
+  `embassy-async-i2c-slave`, and the approved interrupt/packet-boundary
+  closure shall justify an ISR-level completed RX-packet callback path with a
+  user-supplied static buffer that can preempt normal task flow for mode-switch
+  or recovery behavior tied to packets written by the controller/master. That
+  opt-in does not authorize byte-level callback APIs, general-call,
+  SMBus, dual-address, or 10-bit slave behavior.
 - A generated embedded Embassy HAL crate shall expose opt-in Cargo features
   for the emitted peripheral families rather than forcing every generated
   family and runtime hook into every consumer image. Those features shall be
