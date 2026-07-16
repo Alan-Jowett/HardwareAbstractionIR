@@ -11,12 +11,31 @@ pub enum ResourceRequirement {
 pub enum Error {
     Unsupported(&'static str),
     InvalidReference(&'static str),
+    Bus,
+    ArbitrationLoss,
+    NoAcknowledge,
+    Overrun,
 }
 
 #[cfg(any(feature = "pwm", feature = "gpio-async-wait"))]
 impl embedded_hal::digital::Error for Error {
     fn kind(&self) -> embedded_hal::digital::ErrorKind {
         embedded_hal::digital::ErrorKind::Other
+    }
+}
+
+#[cfg(feature = "i2c")]
+impl embedded_hal::i2c::Error for Error {
+    fn kind(&self) -> embedded_hal::i2c::ErrorKind {
+        match self {
+            Error::NoAcknowledge => embedded_hal::i2c::ErrorKind::NoAcknowledge(
+                embedded_hal::i2c::NoAcknowledgeSource::Unknown,
+            ),
+            Error::ArbitrationLoss => embedded_hal::i2c::ErrorKind::ArbitrationLoss,
+            Error::Bus => embedded_hal::i2c::ErrorKind::Bus,
+            Error::Overrun => embedded_hal::i2c::ErrorKind::Overrun,
+            _ => embedded_hal::i2c::ErrorKind::Other,
+        }
     }
 }
 

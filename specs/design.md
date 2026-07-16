@@ -198,6 +198,33 @@ pin. That binding map is also where shared-vector families stay auditable: when
 several lines share one IRQ, the contract still binds one route per line so the
 generator and host runtime never guess which pending source woke a future.
 
+I2C master lowering follows the same explicit-contract rule. A generated
+portable master surface may not appear merely because a document names an
+`i2c` driver instance and some pin routes. When the selected controller family
+has materially distinct transaction semantics, that family must stay explicit in
+`profiles.embassyHal` through `driverInstances[].loweringPattern`. The first
+such family is `legacy-event-i2c-master`, which models a legacy event/status
+flag driven controller-master path and is intentionally limited to 7-bit master
+transactions.
+
+When that family is selected, the same driver instance must also carry an
+explicit `i2cMasterBindings` map naming the direct roles the generated portable
+surface needs: START/STOP request fields, ACK and optional ACK-position
+controls, the shared data register, BUSY/SB/ADDR/TXE/RXNE/BTF-style status
+flags, the semantic operation sequence that clears the completed address phase,
+and any explicit error-clear operations required by the family. This keeps the
+generated blocking path auditable and prevents the generator from silently
+rediscovering legacy I2C sequencing from vendor-native register names.
+
+Async I2C master lowering sits on top of that same explicit transaction
+contract. A driver instance may expose `embedded_hal_async::i2c::I2c` only when
+it additionally claims capability tag `embedded-hal-async-i2c-master` and names
+the exact event/error interrupt-route closure plus any controller-local
+interrupt-enable handles needed to wake progress on the same approved master
+transaction state machine. That async surface does not authorize slave mode,
+SMBus behavior, 10-bit addressing, or unrelated vendor-specific transaction
+helpers.
+
 USB device lowering follows the same evidence-bounded rule. A `usb-device`
 driver instance may expose endpoint-oriented helpers, serial-style byte-stream
 helpers, or both, but only for the subset whose control and data paths are

@@ -160,6 +160,23 @@ cargo run -- generate embassy-host evidence\wch\ch32v203c8t6\hair.json --output-
   the clock-enable and reset-release writes required by the DMA controller
   reached through the ADC driver's referenced `dmaRouteRefs`, so DMA register
   programming does not depend on an out-of-band smoke-app workaround.
+- If a CH32V203 reference bundle claims
+  `loweringPattern = "legacy-event-i2c-master"` on an `i2c` driver instance,
+  generation succeeds only when the same driver instance also carries explicit
+  `i2cMasterBindings` naming the direct control/status/data roles and the
+  required address-clear semantic operation for that family. The generated
+  embedded crate may implement
+  `embedded_hal::i2c::I2c<embedded_hal::i2c::SevenBitAddress>` only for that
+  approved 7-bit controller-master path, and must fail explicitly rather than
+  inferring legacy I2C sequencing from vendor register names alone.
+- If the same I2C driver instance claims capability tag
+  `embedded-hal-async-i2c-master`, generation succeeds only when the approved
+  HAIR inputs also name the matching event/error interrupt routes and any
+  interrupt-enable handles required by that family's async wake path. The
+  generated async surface may implement only
+  `embedded_hal_async::i2c::I2c<embedded_hal::i2c::SevenBitAddress>` for the
+  same approved master path; 10-bit, slave, SMBus, and other unmodeled
+  transaction families must remain explicit failures.
 - If the reference bundle claims IRQ-driven DMA completion futures, generation
   succeeds only when the same `dma` driver instance carries explicit
   `dmaAsyncBindings` plus the matching DMA-channel interrupt routes, and the
@@ -683,6 +700,45 @@ powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\emb
   and USB CDC support.
 - The host-gated start is required so an operator can connect a serial monitor
   before the edge-driven sequence begins.
+
+### V-022 Hardware smoke packaging for the CH32V203G6U6 SHT40 I2C example
+
+**Purpose:** provide a hardware-flashable I2C smoke image for the
+CH32V203G6U6 reference bundle that exercises both the generated blocking and
+async Embassy I2C master traits against an SHT40 sensor on the Adafruit QT Py
+board's STEMMA QT connector (`PB6 = SCL`, `PB7 = SDA`), then decodes and logs
+the returned temperature/humidity sample over USB CDC.
+
+**Command**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\embassy-i2c-sht40-smoke\build-smoke-bin.ps1 -Release
+```
+
+**Expected result**
+- The smoke firmware builds for `riscv32imc-unknown-none-elf`.
+- The packaging step writes a flashable `.bin` beside the release ELF.
+- When flashed to the physical device, the firmware enumerates USB CDC, waits
+  for a host connection plus DTR assertion, and only then starts the smoke
+  sequence.
+- With an SHT40 sensor attached to the board's STEMMA QT connector, the
+  firmware completes one blocking measurement and one async measurement through
+  the generated `embedded_hal::i2c::I2c<SevenBitAddress>` and
+  `embedded_hal_async::i2c::I2c<SevenBitAddress>` surfaces respectively.
+- The firmware validates the SHT40 CRC bytes and logs decoded temperature and
+  humidity values over USB CDC for both measurements.
+- If the sensor NACKs, the async path times out, or the CRC bytes do not
+  validate, the firmware logs a clear failure message over USB CDC instead of
+  silently hanging.
+
+**Note**
+- This is a hardware-dependent smoke check, not a universal repository
+  precondition.
+- The smoke application shall consume the generated Embassy HAL crate through
+  normal Rust package boundaries for I2C, Embassy time, generated WCH runtime,
+  and USB CDC support.
+- The host-gated start is required so an operator can connect a serial monitor
+  before the measurement sequence begins.
 
 ## 6. Requirement-specific validation coverage
 

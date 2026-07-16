@@ -249,11 +249,11 @@ impl IWDG {
     }
 
     pub fn read_prescaler(&self) -> Result<u8, metadata::Error> {
-        Ok(((read_u32(0x40003004u64)?) & 0x00000007u32) as u8)
+        Ok((read_u32(0x40003004u64)? & 0x00000007u32) as u8)
     }
 
     pub fn read_reload(&self) -> Result<u16, metadata::Error> {
-        Ok(((read_u32(0x40003008u64)?) & 0x00000FFFu32) as u16)
+        Ok((read_u32(0x40003008u64)? & 0x00000FFFu32) as u16)
     }
 
     pub fn set_prescaler(&self, prescaler: u8) -> Result<(), metadata::Error> {

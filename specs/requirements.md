@@ -216,6 +216,20 @@ Embassy profile contract.
   profile is lowered through `hair generate embassy-host`, the host-emulated
   crate shall preserve that same wait contract deterministically rather than
   widening it with host-only wake behavior.
+- If an `i2c` driver instance selects
+  `loweringPattern = "legacy-event-i2c-master"`, the same profile entry shall
+  carry explicit `i2cMasterBindings` naming the control, status, data, and
+  address-clear roles used by the generated master transaction path. The first
+  such portable surface is limited to 7-bit controller-master transactions; the
+  generator shall not infer START/STOP, address-phase, transmit-ready,
+  receive-ready, byte-transfer-finished, ACK-control, or address-clear behavior
+  from vendor register names alone.
+- If the same `i2c` driver instance claims capability tag
+  `embedded-hal-async-i2c-master`, it shall also carry the interrupt-route
+  closure and any interrupt-enable handles required by the selected I2C family's
+  async wake path. The generated async I2C surface remains limited to the same
+  approved 7-bit controller-master contract and must fail explicitly for slave,
+  SMBus, 10-bit addressing, or other unmodeled transaction families.
 - A generated embedded Embassy HAL crate shall expose opt-in Cargo features
   for the emitted peripheral families rather than forcing every generated
   family and runtime hook into every consumer image. Those features shall be
