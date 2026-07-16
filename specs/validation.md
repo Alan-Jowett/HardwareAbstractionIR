@@ -109,6 +109,10 @@ cargo run -- generate embassy-host evidence\wch\ch32v203c8t6\hair.json --output-
 - The emitted crate contains `Cargo.toml`, `src\lib.rs`, `src\metadata.rs`,
   and generated driver modules justified by the reference document's profile
   scope.
+- The emitted embedded crate's `Cargo.toml` exposes opt-in peripheral-family
+  features with an empty default set, and disabling a generated family feature
+  suppresses the corresponding public module export plus any family-specific
+  runtime or interrupt glue that would otherwise be retained in the image.
 - The CH32V203G6U6 reference bundle succeeds only when the approved HAIR inputs
   justify both the rtc-backed `embassy-time-driver` path and any emitted
   HAL-specific raw RTC control helpers from the same explicit RTC

@@ -1,19 +1,35 @@
 #![no_std]
 
+#[cfg(feature = "adc")]
 pub mod adc;
+#[cfg(feature = "dma")]
 pub mod dma;
+#[cfg(feature = "flash")]
 pub mod flash;
+#[cfg(feature = "gpio")]
 pub mod gpio;
+#[cfg(feature = "i2c")]
 pub mod i2c;
+#[cfg(feature = "interrupt")]
 pub mod interrupt;
 pub mod metadata;
+#[cfg(feature = "pwm")]
 pub mod pwm;
+#[cfg(feature = "rcc")]
 pub mod rcc;
+#[cfg(feature = "rtc")]
 pub mod rtc;
+#[cfg(feature = "spi")]
 pub mod spi;
+#[cfg(feature = "time")]
 pub mod time;
+#[cfg(feature = "timer")]
 pub mod timer;
+#[cfg(feature = "uart")]
 pub mod uart;
+#[cfg(feature = "usb")]
 pub mod usb;
+#[cfg(feature = "watchdog")]
 pub mod watchdog;
+#[cfg(feature = "wch-runtime")]
 pub mod wch;

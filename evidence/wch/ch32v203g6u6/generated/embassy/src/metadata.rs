@@ -13,6 +13,7 @@ pub enum Error {
     InvalidReference(&'static str),
 }
 
+#[cfg(any(feature = "pwm", feature = "gpio-async-wait"))]
 impl embedded_hal::digital::Error for Error {
     fn kind(&self) -> embedded_hal::digital::ErrorKind {
         embedded_hal::digital::ErrorKind::Other

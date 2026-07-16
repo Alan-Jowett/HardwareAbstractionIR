@@ -1,8 +1,12 @@
 //! Generated WCH/QingKe runtime support for CH32V203G6U6.
 
+#[cfg(feature = "dma-async")]
 use crate::dma::{DMA1, DMA1Resources};
+#[cfg(feature = "gpio-async-wait")]
 use crate::gpio::generated_drv_gpioa_signal_gpio_wait;
+#[cfg(feature = "gpio-async-wait")]
 use crate::gpio::generated_drv_gpiob_signal_gpio_wait;
+#[cfg(feature = "gpio-async-wait")]
 use crate::gpio::generated_drv_gpiod_signal_gpio_wait;
 use crate::interrupt::{DRV_PFIC_RESOURCES, Irq, PFIC};
 use crate::metadata;
@@ -19,14 +23,23 @@ pub const MODULE_PROVENANCE: metadata::ModuleProvenance = metadata::ModuleProven
 
 unsafe extern "C" {
     fn __hair_wch_hang_vector();
+    #[cfg(feature = "gpio-async-wait")]
     fn __hair_wch_drv_gpioa_exti_exti0_vector();
+    #[cfg(feature = "gpio-async-wait")]
     fn __hair_wch_drv_gpioa_exti_exti1_vector();
+    #[cfg(feature = "gpio-async-wait")]
     fn __hair_wch_drv_gpioa_exti_exti2_vector();
+    #[cfg(feature = "gpio-async-wait")]
     fn __hair_wch_drv_gpioa_exti_exti3_vector();
+    #[cfg(feature = "gpio-async-wait")]
     fn __hair_wch_drv_gpioa_exti_exti4_vector();
+    #[cfg(feature = "dma-async")]
     fn __hair_wch_drv_dma1_ch1_vector();
+    #[cfg(feature = "gpio-async-wait")]
     fn __hair_wch_drv_gpioa_exti_exti9_5_vector();
+    #[cfg(feature = "gpio-async-wait")]
     fn __hair_wch_drv_gpioa_exti_exti15_10_vector();
+    #[cfg(feature = "wch-runtime")]
     fn __hair_wch_embassy_time_driver_vector();
 }
 
@@ -42,36 +55,157 @@ const WCH_RESERVED_VECTOR: WchVector = WchVector { reserved: 0 };
 const WCH_HANG_VECTOR: WchVector = WchVector {
     handler: __hair_wch_hang_vector,
 };
+#[cfg(feature = "gpio-async-wait")]
 const WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI0_HANDLER_VECTOR: WchVector = WchVector {
     handler: __hair_wch_drv_gpioa_exti_exti0_vector,
 };
+#[cfg(feature = "gpio-async-wait")]
 const WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI1_HANDLER_VECTOR: WchVector = WchVector {
     handler: __hair_wch_drv_gpioa_exti_exti1_vector,
 };
+#[cfg(feature = "gpio-async-wait")]
 const WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI2_HANDLER_VECTOR: WchVector = WchVector {
     handler: __hair_wch_drv_gpioa_exti_exti2_vector,
 };
+#[cfg(feature = "gpio-async-wait")]
 const WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI3_HANDLER_VECTOR: WchVector = WchVector {
     handler: __hair_wch_drv_gpioa_exti_exti3_vector,
 };
+#[cfg(feature = "gpio-async-wait")]
 const WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI4_HANDLER_VECTOR: WchVector = WchVector {
     handler: __hair_wch_drv_gpioa_exti_exti4_vector,
 };
+#[cfg(feature = "dma-async")]
 const WCH_RUNTIME_DRV_DMA1_CH1_HANDLER_VECTOR: WchVector = WchVector {
     handler: __hair_wch_drv_dma1_ch1_vector,
 };
+#[cfg(feature = "gpio-async-wait")]
 const WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI9_5_HANDLER_VECTOR: WchVector = WchVector {
     handler: __hair_wch_drv_gpioa_exti_exti9_5_vector,
 };
+#[cfg(feature = "gpio-async-wait")]
 const WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI15_10_HANDLER_VECTOR: WchVector = WchVector {
     handler: __hair_wch_drv_gpioa_exti_exti15_10_vector,
 };
+#[cfg(feature = "wch-runtime")]
 const WCH_TIME_DRIVER_HANDLER_VECTOR: WchVector = WchVector {
     handler: __hair_wch_embassy_time_driver_vector,
 };
 
 #[repr(C, align(64))]
 struct WchVectorTable([WchVector; WCH_VECTOR_COUNT]);
+
+#[cfg(feature = "gpio-async-wait")]
+const fn __hair_assign_wch_runtime_drv_gpioa_exti_exti0_handler_vector(
+    table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+    table[22] = WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI0_HANDLER_VECTOR;
+}
+
+#[cfg(not(feature = "gpio-async-wait"))]
+const fn __hair_assign_wch_runtime_drv_gpioa_exti_exti0_handler_vector(
+    _table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+}
+
+#[cfg(feature = "gpio-async-wait")]
+const fn __hair_assign_wch_runtime_drv_gpioa_exti_exti1_handler_vector(
+    table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+    table[23] = WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI1_HANDLER_VECTOR;
+}
+
+#[cfg(not(feature = "gpio-async-wait"))]
+const fn __hair_assign_wch_runtime_drv_gpioa_exti_exti1_handler_vector(
+    _table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+}
+
+#[cfg(feature = "gpio-async-wait")]
+const fn __hair_assign_wch_runtime_drv_gpioa_exti_exti2_handler_vector(
+    table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+    table[24] = WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI2_HANDLER_VECTOR;
+}
+
+#[cfg(not(feature = "gpio-async-wait"))]
+const fn __hair_assign_wch_runtime_drv_gpioa_exti_exti2_handler_vector(
+    _table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+}
+
+#[cfg(feature = "gpio-async-wait")]
+const fn __hair_assign_wch_runtime_drv_gpioa_exti_exti3_handler_vector(
+    table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+    table[25] = WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI3_HANDLER_VECTOR;
+}
+
+#[cfg(not(feature = "gpio-async-wait"))]
+const fn __hair_assign_wch_runtime_drv_gpioa_exti_exti3_handler_vector(
+    _table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+}
+
+#[cfg(feature = "gpio-async-wait")]
+const fn __hair_assign_wch_runtime_drv_gpioa_exti_exti4_handler_vector(
+    table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+    table[26] = WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI4_HANDLER_VECTOR;
+}
+
+#[cfg(not(feature = "gpio-async-wait"))]
+const fn __hair_assign_wch_runtime_drv_gpioa_exti_exti4_handler_vector(
+    _table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+}
+
+#[cfg(feature = "dma-async")]
+const fn __hair_assign_wch_runtime_drv_dma1_ch1_handler_vector(
+    table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+    table[27] = WCH_RUNTIME_DRV_DMA1_CH1_HANDLER_VECTOR;
+}
+
+#[cfg(not(feature = "dma-async"))]
+const fn __hair_assign_wch_runtime_drv_dma1_ch1_handler_vector(
+    _table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+}
+
+#[cfg(feature = "gpio-async-wait")]
+const fn __hair_assign_wch_runtime_drv_gpioa_exti_exti9_5_handler_vector(
+    table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+    table[39] = WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI9_5_HANDLER_VECTOR;
+}
+
+#[cfg(not(feature = "gpio-async-wait"))]
+const fn __hair_assign_wch_runtime_drv_gpioa_exti_exti9_5_handler_vector(
+    _table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+}
+
+#[cfg(feature = "gpio-async-wait")]
+const fn __hair_assign_wch_runtime_drv_gpioa_exti_exti15_10_handler_vector(
+    table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+    table[56] = WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI15_10_HANDLER_VECTOR;
+}
+
+#[cfg(not(feature = "gpio-async-wait"))]
+const fn __hair_assign_wch_runtime_drv_gpioa_exti_exti15_10_handler_vector(
+    _table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+}
+
+#[cfg(feature = "wch-runtime")]
+const fn __hair_assign_wch_time_driver_handler_vector(table: &mut [WchVector; WCH_VECTOR_COUNT]) {
+    table[57] = WCH_TIME_DRIVER_HANDLER_VECTOR;
+}
+
+#[cfg(not(feature = "wch-runtime"))]
+const fn __hair_assign_wch_time_driver_handler_vector(_table: &mut [WchVector; WCH_VECTOR_COUNT]) {}
 
 const fn build_wch_vector_table() -> WchVectorTable {
     let mut table = [WCH_HANG_VECTOR; WCH_VECTOR_COUNT];
@@ -83,15 +217,15 @@ const fn build_wch_vector_table() -> WchVectorTable {
     table[11] = WCH_RESERVED_VECTOR;
     table[13] = WCH_RESERVED_VECTOR;
     table[15] = WCH_RESERVED_VECTOR;
-    table[22] = WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI0_HANDLER_VECTOR;
-    table[23] = WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI1_HANDLER_VECTOR;
-    table[24] = WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI2_HANDLER_VECTOR;
-    table[25] = WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI3_HANDLER_VECTOR;
-    table[26] = WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI4_HANDLER_VECTOR;
-    table[27] = WCH_RUNTIME_DRV_DMA1_CH1_HANDLER_VECTOR;
-    table[39] = WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI9_5_HANDLER_VECTOR;
-    table[56] = WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI15_10_HANDLER_VECTOR;
-    table[57] = WCH_TIME_DRIVER_HANDLER_VECTOR;
+    __hair_assign_wch_runtime_drv_gpioa_exti_exti0_handler_vector(&mut table);
+    __hair_assign_wch_runtime_drv_gpioa_exti_exti1_handler_vector(&mut table);
+    __hair_assign_wch_runtime_drv_gpioa_exti_exti2_handler_vector(&mut table);
+    __hair_assign_wch_runtime_drv_gpioa_exti_exti3_handler_vector(&mut table);
+    __hair_assign_wch_runtime_drv_gpioa_exti_exti4_handler_vector(&mut table);
+    __hair_assign_wch_runtime_drv_dma1_ch1_handler_vector(&mut table);
+    __hair_assign_wch_runtime_drv_gpioa_exti_exti9_5_handler_vector(&mut table);
+    __hair_assign_wch_runtime_drv_gpioa_exti_exti15_10_handler_vector(&mut table);
+    __hair_assign_wch_time_driver_handler_vector(&mut table);
     WchVectorTable(table)
 }
 
@@ -105,7 +239,12 @@ global_asm!(
 __hair_wch_hang_vector:
 1:
     j 1b
+"#
+);
 
+#[cfg(feature = "gpio-async-wait")]
+global_asm!(
+    r#"
     .global __hair_wch_drv_gpioa_exti_exti0_vector
 __hair_wch_drv_gpioa_exti_exti0_vector:
     addi sp, sp, -64
@@ -144,6 +283,12 @@ __hair_wch_drv_gpioa_exti_exti0_vector:
     lw a7, 60(sp)
     addi sp, sp, 64
     mret
+"#
+);
+
+#[cfg(feature = "gpio-async-wait")]
+global_asm!(
+    r#"
     .global __hair_wch_drv_gpioa_exti_exti1_vector
 __hair_wch_drv_gpioa_exti_exti1_vector:
     addi sp, sp, -64
@@ -182,6 +327,12 @@ __hair_wch_drv_gpioa_exti_exti1_vector:
     lw a7, 60(sp)
     addi sp, sp, 64
     mret
+"#
+);
+
+#[cfg(feature = "gpio-async-wait")]
+global_asm!(
+    r#"
     .global __hair_wch_drv_gpioa_exti_exti2_vector
 __hair_wch_drv_gpioa_exti_exti2_vector:
     addi sp, sp, -64
@@ -220,6 +371,12 @@ __hair_wch_drv_gpioa_exti_exti2_vector:
     lw a7, 60(sp)
     addi sp, sp, 64
     mret
+"#
+);
+
+#[cfg(feature = "gpio-async-wait")]
+global_asm!(
+    r#"
     .global __hair_wch_drv_gpioa_exti_exti3_vector
 __hair_wch_drv_gpioa_exti_exti3_vector:
     addi sp, sp, -64
@@ -258,6 +415,12 @@ __hair_wch_drv_gpioa_exti_exti3_vector:
     lw a7, 60(sp)
     addi sp, sp, 64
     mret
+"#
+);
+
+#[cfg(feature = "gpio-async-wait")]
+global_asm!(
+    r#"
     .global __hair_wch_drv_gpioa_exti_exti4_vector
 __hair_wch_drv_gpioa_exti_exti4_vector:
     addi sp, sp, -64
@@ -296,6 +459,12 @@ __hair_wch_drv_gpioa_exti_exti4_vector:
     lw a7, 60(sp)
     addi sp, sp, 64
     mret
+"#
+);
+
+#[cfg(feature = "dma-async")]
+global_asm!(
+    r#"
     .global __hair_wch_drv_dma1_ch1_vector
 __hair_wch_drv_dma1_ch1_vector:
     addi sp, sp, -64
@@ -334,6 +503,12 @@ __hair_wch_drv_dma1_ch1_vector:
     lw a7, 60(sp)
     addi sp, sp, 64
     mret
+"#
+);
+
+#[cfg(feature = "gpio-async-wait")]
+global_asm!(
+    r#"
     .global __hair_wch_drv_gpioa_exti_exti9_5_vector
 __hair_wch_drv_gpioa_exti_exti9_5_vector:
     addi sp, sp, -64
@@ -372,6 +547,12 @@ __hair_wch_drv_gpioa_exti_exti9_5_vector:
     lw a7, 60(sp)
     addi sp, sp, 64
     mret
+"#
+);
+
+#[cfg(feature = "gpio-async-wait")]
+global_asm!(
+    r#"
     .global __hair_wch_drv_gpioa_exti_exti15_10_vector
 __hair_wch_drv_gpioa_exti_exti15_10_vector:
     addi sp, sp, -64
@@ -410,6 +591,12 @@ __hair_wch_drv_gpioa_exti_exti15_10_vector:
     lw a7, 60(sp)
     addi sp, sp, 64
     mret
+"#
+);
+
+#[cfg(feature = "wch-runtime")]
+global_asm!(
+    r#"
     .global __hair_wch_embassy_time_driver_vector
 __hair_wch_embassy_time_driver_vector:
     addi sp, sp, -64
@@ -459,6 +646,110 @@ fn time_driver() -> RTCEmbassyTimeDriver {
     RTCEmbassyTimeDriver::new(DRV_TIME_RTC_RESOURCES).expect("generated WCH time-driver resources")
 }
 
+#[cfg(feature = "gpio-async-wait")]
+fn __hair_enable_wch_runtime_drv_gpioa_exti_exti0_handler_vector() -> Result<(), metadata::Error> {
+    pfic().enable_irq(Irq::EXTI0)?;
+    Ok(())
+}
+
+#[cfg(not(feature = "gpio-async-wait"))]
+fn __hair_enable_wch_runtime_drv_gpioa_exti_exti0_handler_vector() -> Result<(), metadata::Error> {
+    Ok(())
+}
+
+#[cfg(feature = "gpio-async-wait")]
+fn __hair_enable_wch_runtime_drv_gpioa_exti_exti1_handler_vector() -> Result<(), metadata::Error> {
+    pfic().enable_irq(Irq::EXTI1)?;
+    Ok(())
+}
+
+#[cfg(not(feature = "gpio-async-wait"))]
+fn __hair_enable_wch_runtime_drv_gpioa_exti_exti1_handler_vector() -> Result<(), metadata::Error> {
+    Ok(())
+}
+
+#[cfg(feature = "gpio-async-wait")]
+fn __hair_enable_wch_runtime_drv_gpioa_exti_exti2_handler_vector() -> Result<(), metadata::Error> {
+    pfic().enable_irq(Irq::EXTI2)?;
+    Ok(())
+}
+
+#[cfg(not(feature = "gpio-async-wait"))]
+fn __hair_enable_wch_runtime_drv_gpioa_exti_exti2_handler_vector() -> Result<(), metadata::Error> {
+    Ok(())
+}
+
+#[cfg(feature = "gpio-async-wait")]
+fn __hair_enable_wch_runtime_drv_gpioa_exti_exti3_handler_vector() -> Result<(), metadata::Error> {
+    pfic().enable_irq(Irq::EXTI3)?;
+    Ok(())
+}
+
+#[cfg(not(feature = "gpio-async-wait"))]
+fn __hair_enable_wch_runtime_drv_gpioa_exti_exti3_handler_vector() -> Result<(), metadata::Error> {
+    Ok(())
+}
+
+#[cfg(feature = "gpio-async-wait")]
+fn __hair_enable_wch_runtime_drv_gpioa_exti_exti4_handler_vector() -> Result<(), metadata::Error> {
+    pfic().enable_irq(Irq::EXTI4)?;
+    Ok(())
+}
+
+#[cfg(not(feature = "gpio-async-wait"))]
+fn __hair_enable_wch_runtime_drv_gpioa_exti_exti4_handler_vector() -> Result<(), metadata::Error> {
+    Ok(())
+}
+
+#[cfg(feature = "dma-async")]
+fn __hair_enable_wch_runtime_drv_dma1_ch1_handler_vector() -> Result<(), metadata::Error> {
+    pfic().enable_irq(Irq::DMA1Channel1)?;
+    Ok(())
+}
+
+#[cfg(not(feature = "dma-async"))]
+fn __hair_enable_wch_runtime_drv_dma1_ch1_handler_vector() -> Result<(), metadata::Error> {
+    Ok(())
+}
+
+#[cfg(feature = "gpio-async-wait")]
+fn __hair_enable_wch_runtime_drv_gpioa_exti_exti9_5_handler_vector() -> Result<(), metadata::Error>
+{
+    pfic().enable_irq(Irq::EXTI95)?;
+    Ok(())
+}
+
+#[cfg(not(feature = "gpio-async-wait"))]
+fn __hair_enable_wch_runtime_drv_gpioa_exti_exti9_5_handler_vector() -> Result<(), metadata::Error>
+{
+    Ok(())
+}
+
+#[cfg(feature = "gpio-async-wait")]
+fn __hair_enable_wch_runtime_drv_gpioa_exti_exti15_10_handler_vector() -> Result<(), metadata::Error>
+{
+    pfic().enable_irq(Irq::EXTI1510)?;
+    Ok(())
+}
+
+#[cfg(not(feature = "gpio-async-wait"))]
+fn __hair_enable_wch_runtime_drv_gpioa_exti_exti15_10_handler_vector() -> Result<(), metadata::Error>
+{
+    Ok(())
+}
+
+#[cfg(feature = "wch-runtime")]
+fn __hair_enable_wch_time_driver_handler_vector() -> Result<(), metadata::Error> {
+    pfic().enable_irq(Irq::RTCAlarm)?;
+    Ok(())
+}
+
+#[cfg(not(feature = "wch-runtime"))]
+fn __hair_enable_wch_time_driver_handler_vector() -> Result<(), metadata::Error> {
+    Ok(())
+}
+
+#[cfg(feature = "dma-async")]
 const GENERATED_WCH_RUNTIME_DRV_DMA1_RESOURCES: DMA1Resources = DMA1Resources {
     clocks: &[],
     resets: &[],
@@ -474,6 +765,7 @@ const GENERATED_WCH_RUNTIME_DRV_DMA1_RESOURCES: DMA1Resources = DMA1Resources {
     capability_tags: &[],
 };
 
+#[cfg(feature = "dma-async")]
 fn generated_wch_runtime_drv_dma1() -> DMA1 {
     DMA1::new(GENERATED_WCH_RUNTIME_DRV_DMA1_RESOURCES)
         .expect("generated WCH runtime driver resources")
@@ -488,15 +780,15 @@ pub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {
             value = in(reg) ((&WCH_VECTOR_TABLE as *const WchVectorTable as usize) | 0x3)
         );
     }
-    pfic().enable_irq(Irq::EXTI0)?;
-    pfic().enable_irq(Irq::EXTI1)?;
-    pfic().enable_irq(Irq::EXTI2)?;
-    pfic().enable_irq(Irq::EXTI3)?;
-    pfic().enable_irq(Irq::EXTI4)?;
-    pfic().enable_irq(Irq::DMA1Channel1)?;
-    pfic().enable_irq(Irq::EXTI95)?;
-    pfic().enable_irq(Irq::EXTI1510)?;
-    pfic().enable_irq(Irq::RTCAlarm)?;
+    __hair_enable_wch_runtime_drv_gpioa_exti_exti0_handler_vector()?;
+    __hair_enable_wch_runtime_drv_gpioa_exti_exti1_handler_vector()?;
+    __hair_enable_wch_runtime_drv_gpioa_exti_exti2_handler_vector()?;
+    __hair_enable_wch_runtime_drv_gpioa_exti_exti3_handler_vector()?;
+    __hair_enable_wch_runtime_drv_gpioa_exti_exti4_handler_vector()?;
+    __hair_enable_wch_runtime_drv_dma1_ch1_handler_vector()?;
+    __hair_enable_wch_runtime_drv_gpioa_exti_exti9_5_handler_vector()?;
+    __hair_enable_wch_runtime_drv_gpioa_exti_exti15_10_handler_vector()?;
+    __hair_enable_wch_time_driver_handler_vector()?;
     unsafe {
         asm!("csrs mie, {value}", value = in(reg) 0x800usize);
         asm!("csrs mstatus, {value}", value = in(reg) 0x88usize);
@@ -504,6 +796,7 @@ pub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {
     Ok(())
 }
 
+#[cfg(feature = "gpio-async-wait")]
 #[unsafe(no_mangle)]
 extern "C" fn __hair_wch_drv_gpioa_exti_exti0_irq_rust() {
     let _ = generated_drv_gpioa_signal_gpio_wait(0u32);
@@ -511,6 +804,7 @@ extern "C" fn __hair_wch_drv_gpioa_exti_exti0_irq_rust() {
     let _ = generated_drv_gpiod_signal_gpio_wait(0u32);
 }
 
+#[cfg(feature = "gpio-async-wait")]
 #[unsafe(no_mangle)]
 extern "C" fn __hair_wch_drv_gpioa_exti_exti1_irq_rust() {
     let _ = generated_drv_gpioa_signal_gpio_wait(1u32);
@@ -518,28 +812,33 @@ extern "C" fn __hair_wch_drv_gpioa_exti_exti1_irq_rust() {
     let _ = generated_drv_gpiod_signal_gpio_wait(1u32);
 }
 
+#[cfg(feature = "gpio-async-wait")]
 #[unsafe(no_mangle)]
 extern "C" fn __hair_wch_drv_gpioa_exti_exti2_irq_rust() {
     let _ = generated_drv_gpioa_signal_gpio_wait(2u32);
 }
 
+#[cfg(feature = "gpio-async-wait")]
 #[unsafe(no_mangle)]
 extern "C" fn __hair_wch_drv_gpioa_exti_exti3_irq_rust() {
     let _ = generated_drv_gpioa_signal_gpio_wait(3u32);
     let _ = generated_drv_gpiob_signal_gpio_wait(3u32);
 }
 
+#[cfg(feature = "gpio-async-wait")]
 #[unsafe(no_mangle)]
 extern "C" fn __hair_wch_drv_gpioa_exti_exti4_irq_rust() {
     let _ = generated_drv_gpioa_signal_gpio_wait(4u32);
     let _ = generated_drv_gpiob_signal_gpio_wait(4u32);
 }
 
+#[cfg(feature = "dma-async")]
 #[unsafe(no_mangle)]
 extern "C" fn __hair_wch_drv_dma1_ch1_irq_rust() {
     let _ = generated_wch_runtime_drv_dma1().on_interrupt(1);
 }
 
+#[cfg(feature = "gpio-async-wait")]
 #[unsafe(no_mangle)]
 extern "C" fn __hair_wch_drv_gpioa_exti_exti9_5_irq_rust() {
     let _ = generated_drv_gpioa_signal_gpio_wait(5u32);
@@ -551,6 +850,7 @@ extern "C" fn __hair_wch_drv_gpioa_exti_exti9_5_irq_rust() {
     let _ = generated_drv_gpiob_signal_gpio_wait(7u32);
 }
 
+#[cfg(feature = "gpio-async-wait")]
 #[unsafe(no_mangle)]
 extern "C" fn __hair_wch_drv_gpioa_exti_exti15_10_irq_rust() {
     let _ = generated_drv_gpioa_signal_gpio_wait(10u32);
@@ -561,6 +861,7 @@ extern "C" fn __hair_wch_drv_gpioa_exti_exti15_10_irq_rust() {
     let _ = generated_drv_gpioa_signal_gpio_wait(15u32);
 }
 
+#[cfg(feature = "wch-runtime")]
 #[unsafe(no_mangle)]
 extern "C" fn __hair_wch_embassy_time_driver_irq_rust() {
     time_driver().on_time_driver_interrupt();

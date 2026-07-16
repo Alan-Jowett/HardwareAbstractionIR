@@ -7,12 +7,33 @@ edition = "2024"
 name = "ch32v203g6u6_embassy_hal"
 path = "src/lib.rs"
 
+[features]
+adc = []
+default = []
+dma = []
+dma-async = ["dma", "interrupt"]
+flash = ["dep:embedded-storage"]
+gpio = []
+gpio-async-wait = ["dep:critical-section", "dep:embedded-hal", "dep:embedded-hal-async", "gpio", "interrupt"]
+i2c = []
+interrupt = []
+pwm = ["dep:embedded-hal"]
+rcc = []
+rtc = []
+spi = []
+time = ["dep:critical-section", "dep:embassy-time-driver", "dep:embassy-time-queue-utils"]
+timer = []
+uart = []
+usb = ["dep:critical-section", "dep:embassy-usb-driver"]
+watchdog = ["dep:embedded-hal-02"]
+wch-runtime = ["interrupt", "time"]
+
 [dependencies]
-critical-section = "1.2"
-embassy-time-driver = { version = "0.2.2", features = ["tick-hz-1_000"] }
-embassy-time-queue-utils = { version = "0.3.2", features = ["generic-queue-8"] }
-embassy-usb-driver = "0.2.2"
-embedded-hal = "1.0"
-embedded-hal-async = "1.0"
-embedded-hal-02 = { package = "embedded-hal", version = "0.2.7", features = ["unproven"] }
-embedded-storage = "0.3"
+critical-section = { version = "1.2", optional = true }
+embassy-time-driver = { version = "0.2.2", features = ["tick-hz-1_000"], optional = true }
+embassy-time-queue-utils = { version = "0.3.2", features = ["generic-queue-8"], optional = true }
+embassy-usb-driver = { version = "0.2.2", optional = true }
+embedded-hal = { version = "1.0", optional = true }
+embedded-hal-async = { version = "1.0", optional = true }
+embedded-hal-02 = { package = "embedded-hal", version = "0.2.7", features = ["unproven"], optional = true }
+embedded-storage = { version = "0.3", optional = true }

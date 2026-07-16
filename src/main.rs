@@ -2062,6 +2062,9 @@ const TIMER_LOWERING_COUNTER_COMPARE: &str = "counter-compare-timer";
 const USB_LOWERING_FSDEV_PMA_BTABLE: &str = "fsdev-pma-btable";
 const USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK: &str = "serial-jtag-preserve-link";
 const USB_PRESERVE_LINK_OPERATION_ID: &str = "op.usb_device.preserve_serial_jtag_link";
+const EMBASSY_FEATURE_GPIO_ASYNC_WAIT: &str = "gpio-async-wait";
+const EMBASSY_FEATURE_DMA_ASYNC: &str = "dma-async";
+const EMBASSY_FEATURE_WCH_RUNTIME: &str = "wch-runtime";
 
 fn has_time_driver_tag(tags: &[String]) -> bool {
     tags.iter().any(|tag| tag == EMBASSY_TIME_DRIVER_TAG)
@@ -2552,6 +2555,33 @@ impl EmbassyGenerationModel {
             })
             .collect()
     }
+}
+
+fn embassy_generated_module_features(model: &EmbassyGenerationModel) -> Vec<String> {
+    model
+        .module_names()
+        .into_iter()
+        .filter(|module_name| module_name != "metadata")
+        .collect()
+}
+
+fn embassy_has_gpio_async_wait(model: &EmbassyGenerationModel) -> bool {
+    model.drivers.iter().any(driver_has_gpio_async_wait_support)
+}
+
+fn embassy_has_dma_async(model: &EmbassyGenerationModel) -> bool {
+    model.drivers.iter().any(|driver| {
+        dma_async_bindings(driver).is_some_and(|bindings| !bindings.channels.is_empty())
+    })
+}
+
+fn render_embassy_feature_name(name: &str) -> String {
+    render_rust_string(name)
+}
+
+fn driver_has_gpio_async_wait_support(driver: &ResolvedDriverInstance) -> bool {
+    has_gpio_async_wait_tag(&driver.capability_tags)
+        && gpio_exti_wait_bindings(driver).is_some_and(|bindings| !bindings.lines.is_empty())
 }
 
 fn validate_supported_driver_kind(driver_kind: &str) -> Result<()> {
@@ -4485,6 +4515,7 @@ fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
         render_rust_string(&model.crate_info.package_name),
         render_rust_string(&model.crate_info.crate_name)
     );
+    let module_features = embassy_generated_module_features(model);
     let has_time_driver = model
         .drivers
         .iter()
@@ -4493,21 +4524,95 @@ fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
         .drivers
         .iter()
         .any(driver_uses_usb_fsdev_pma_btable_lowering);
-    let has_embedded_hal_1 = model.drivers.iter().any(|driver| {
-        driver.driver_kind == "pwm" || has_gpio_async_wait_tag(&driver.capability_tags)
-    });
+    let has_embedded_hal_1 = model
+        .drivers
+        .iter()
+        .any(|driver| driver.driver_kind == "pwm")
+        || embassy_has_gpio_async_wait(model);
     let has_embedded_hal_02 = model
         .drivers
         .iter()
         .any(|driver| driver.driver_kind == "watchdog");
-    let has_embedded_hal_async = model
-        .drivers
-        .iter()
-        .any(|driver| has_gpio_async_wait_tag(&driver.capability_tags));
+    let has_embedded_hal_async = embassy_has_gpio_async_wait(model);
     let has_embedded_storage = model
         .drivers
         .iter()
         .any(|driver| driver.driver_kind == "flash");
+    let has_dma_async = embassy_has_dma_async(model);
+    let has_wch_runtime = uses_generated_wch_runtime_module(model);
+
+    let mut feature_map = BTreeMap::<String, BTreeSet<String>>::new();
+    feature_map.insert("default".to_string(), BTreeSet::new());
+    for feature in &module_features {
+        feature_map.entry(feature.clone()).or_default();
+    }
+    if has_wch_runtime {
+        let runtime_feature = feature_map
+            .entry(EMBASSY_FEATURE_WCH_RUNTIME.to_string())
+            .or_default();
+        runtime_feature.insert("interrupt".to_string());
+        runtime_feature.insert("time".to_string());
+    }
+    if has_time_driver {
+        let time_feature = feature_map.entry("time".to_string()).or_default();
+        time_feature.insert("dep:critical-section".to_string());
+        time_feature.insert("dep:embassy-time-driver".to_string());
+        time_feature.insert("dep:embassy-time-queue-utils".to_string());
+    }
+    if has_fsdev_usb {
+        let usb_feature = feature_map.entry("usb".to_string()).or_default();
+        usb_feature.insert("dep:critical-section".to_string());
+        usb_feature.insert("dep:embassy-usb-driver".to_string());
+    }
+    if model
+        .drivers
+        .iter()
+        .any(|driver| driver.driver_kind == "pwm")
+    {
+        feature_map
+            .entry("pwm".to_string())
+            .or_default()
+            .insert("dep:embedded-hal".to_string());
+    }
+    if has_embedded_hal_02 {
+        feature_map
+            .entry("watchdog".to_string())
+            .or_default()
+            .insert("dep:embedded-hal-02".to_string());
+    }
+    if has_embedded_storage {
+        feature_map
+            .entry("flash".to_string())
+            .or_default()
+            .insert("dep:embedded-storage".to_string());
+    }
+    if has_embedded_hal_async {
+        let wait_feature = feature_map
+            .entry(EMBASSY_FEATURE_GPIO_ASYNC_WAIT.to_string())
+            .or_default();
+        wait_feature.insert("gpio".to_string());
+        wait_feature.insert("interrupt".to_string());
+        wait_feature.insert("dep:critical-section".to_string());
+        wait_feature.insert("dep:embedded-hal".to_string());
+        wait_feature.insert("dep:embedded-hal-async".to_string());
+    }
+    if has_dma_async {
+        let dma_feature = feature_map
+            .entry(EMBASSY_FEATURE_DMA_ASYNC.to_string())
+            .or_default();
+        dma_feature.insert("dma".to_string());
+        dma_feature.insert("interrupt".to_string());
+    }
+    out.push_str("\n[features]\n");
+    for (feature_name, dependencies) in feature_map {
+        let rendered_dependencies = dependencies
+            .into_iter()
+            .map(|dependency| render_embassy_feature_name(&dependency))
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push_str(&format!("{} = [{}]\n", feature_name, rendered_dependencies));
+    }
+
     if has_time_driver
         || has_fsdev_usb
         || has_embedded_hal_1
@@ -4516,33 +4621,42 @@ fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
         || has_embedded_storage
     {
         out.push_str("\n[dependencies]\n");
-        if has_time_driver || has_fsdev_usb || has_embedded_hal_async {
-            out.push_str("critical-section = \"1.2\"\n");
-        }
+    }
+    if has_time_driver || has_fsdev_usb || has_embedded_hal_async {
+        out.push_str("critical-section = { version = \"1.2\", optional = true }\n");
     }
     if has_time_driver {
-        out.push_str(&format!(
-            "{}\n",
-            render_embassy_time_driver_dependency(&model.drivers)
-        ));
-        out.push_str("embassy-time-queue-utils = { version = \"0.3.2\", features = [\"generic-queue-8\"] }\n");
+        if let Some(driver) = model
+            .drivers
+            .iter()
+            .find(|driver| has_time_driver_tag(&driver.capability_tags))
+            && let Some(tick_hz) = time_driver_tick_hz(driver)
+        {
+            out.push_str(&format!(
+                "embassy-time-driver = {{ version = \"0.2.2\", features = [{}], optional = true }}\n",
+                render_rust_string(&render_tick_hz_feature(tick_hz))
+            ));
+        } else {
+            out.push_str("embassy-time-driver = { version = \"0.2.2\", optional = true }\n");
+        }
+        out.push_str("embassy-time-queue-utils = { version = \"0.3.2\", features = [\"generic-queue-8\"], optional = true }\n");
     }
     if has_fsdev_usb {
-        out.push_str("embassy-usb-driver = \"0.2.2\"\n");
+        out.push_str("embassy-usb-driver = { version = \"0.2.2\", optional = true }\n");
     }
     if has_embedded_hal_1 {
-        out.push_str("embedded-hal = \"1.0\"\n");
+        out.push_str("embedded-hal = { version = \"1.0\", optional = true }\n");
     }
     if has_embedded_hal_async {
-        out.push_str("embedded-hal-async = \"1.0\"\n");
+        out.push_str("embedded-hal-async = { version = \"1.0\", optional = true }\n");
     }
     if has_embedded_hal_02 {
         out.push_str(
-            "embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"] }\n",
+            "embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"], optional = true }\n",
         );
     }
     if has_embedded_storage {
-        out.push_str("embedded-storage = \"0.3\"\n");
+        out.push_str("embedded-storage = { version = \"0.3\", optional = true }\n");
     }
     out
 }
@@ -4577,10 +4691,20 @@ fn render_embassy_time_driver_dependency(drivers: &[ResolvedDriverInstance]) -> 
 fn render_embassy_lib_rs(model: &EmbassyGenerationModel) -> String {
     let mut out = String::from("#![no_std]\n\n");
     for module_name in model.module_names() {
-        out.push_str(&format!("pub mod {module_name};\n"));
+        if module_name == "metadata" {
+            out.push_str("pub mod metadata;\n");
+        } else {
+            out.push_str(&format!(
+                "#[cfg(feature = {})]\npub mod {module_name};\n",
+                render_embassy_feature_name(&module_name)
+            ));
+        }
     }
     if uses_generated_wch_runtime_module(model) {
-        out.push_str("pub mod wch;\n");
+        out.push_str(&format!(
+            "#[cfg(feature = {})]\npub mod wch;\n",
+            render_embassy_feature_name(EMBASSY_FEATURE_WCH_RUNTIME)
+        ));
     }
     out
 }
@@ -4590,7 +4714,7 @@ fn render_embassy_metadata_rs(model: &EmbassyGenerationModel) -> String {
     let error_trait_impl = if model.drivers.iter().any(|driver| {
         driver.driver_kind == "pwm" || has_gpio_async_wait_tag(&driver.capability_tags)
     }) {
-        "\nimpl embedded_hal::digital::Error for Error {\n    fn kind(&self) -> embedded_hal::digital::ErrorKind {\n        embedded_hal::digital::ErrorKind::Other\n    }\n}\n"
+        "\n#[cfg(any(feature = \"pwm\", feature = \"gpio-async-wait\"))]\nimpl embedded_hal::digital::Error for Error {\n    fn kind(&self) -> embedded_hal::digital::ErrorKind {\n        embedded_hal::digital::ErrorKind::Other\n    }\n}\n"
     } else {
         ""
     };
@@ -4680,10 +4804,27 @@ fn render_driver_instance(
     driver: &ResolvedDriverInstance,
 ) -> Result<String> {
     let const_prefix = to_rust_const_name(&driver.id);
+    let gpio_async_wait_support =
+        driver.driver_kind == "gpio-port" && driver_has_gpio_async_wait_support(driver);
     let support_items = render_driver_support_items(model, driver)?;
     let support_items = support_items.trim_end();
     let methods = render_driver_methods(model, driver)?;
     let methods = methods.trim_end();
+    let interrupt_sources = render_interrupt_source_slice(&driver.interrupt_sources);
+    let interrupt_routes = render_interrupt_route_slice(&driver.interrupt_routes);
+    let capability_tags = render_named_entity_slice(&driver.capability_tags);
+    let capability_tags_without_gpio_async_wait = if gpio_async_wait_support {
+        render_named_entity_slice(
+            &driver
+                .capability_tags
+                .iter()
+                .filter(|tag| tag.as_str() != EMBEDDED_HAL_ASYNC_WAIT_TAG)
+                .cloned()
+                .collect::<Vec<_>>(),
+        )
+    } else {
+        capability_tags.clone()
+    };
     let mut out = String::new();
     out.push_str(&format!(
         "// Driver instance: {} ({}) from canonical block {} -> {}\n",
@@ -4700,14 +4841,21 @@ fn render_driver_instance(
         "pub const {const_prefix}_RESET_BINDINGS: &[metadata::ResetBinding] = &{};\n",
         render_reset_binding_slice(&driver.reset_bindings)
     ));
-    out.push_str(&format!(
-        "pub const {const_prefix}_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &{};\n",
-        render_interrupt_source_slice(&driver.interrupt_sources)
-    ));
-    out.push_str(&format!(
-        "pub const {const_prefix}_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &{};\n",
-        render_interrupt_route_slice(&driver.interrupt_routes)
-    ));
+    if gpio_async_wait_support {
+        out.push_str(&format!(
+            "#[cfg(feature = \"{EMBASSY_FEATURE_GPIO_ASYNC_WAIT}\")]\npub const {const_prefix}_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &{interrupt_sources};\n#[cfg(not(feature = \"{EMBASSY_FEATURE_GPIO_ASYNC_WAIT}\"))]\npub const {const_prefix}_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];\n"
+        ));
+        out.push_str(&format!(
+            "#[cfg(feature = \"{EMBASSY_FEATURE_GPIO_ASYNC_WAIT}\")]\npub const {const_prefix}_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &{interrupt_routes};\n#[cfg(not(feature = \"{EMBASSY_FEATURE_GPIO_ASYNC_WAIT}\"))]\npub const {const_prefix}_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];\n"
+        ));
+    } else {
+        out.push_str(&format!(
+            "pub const {const_prefix}_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &{interrupt_sources};\n"
+        ));
+        out.push_str(&format!(
+            "pub const {const_prefix}_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &{interrupt_routes};\n"
+        ));
+    }
     out.push_str(&format!(
         "pub const {const_prefix}_DMA_CHANNELS: &[metadata::DmaChannel] = &{};\n",
         render_dma_channel_slice(&driver.dma_channels)
@@ -4734,10 +4882,15 @@ fn render_driver_instance(
         "pub const {const_prefix}_STATE_MACHINES: &[metadata::SemanticStateMachine] = &{};\n",
         render_semantic_state_machine_slice(&driver.state_machines)
     ));
-    out.push_str(&format!(
-        "pub const {const_prefix}_CAPABILITY_TAGS: &[&str] = &{};\n\n",
-        render_named_entity_slice(&driver.capability_tags)
-    ));
+    if gpio_async_wait_support {
+        out.push_str(&format!(
+            "#[cfg(feature = \"{EMBASSY_FEATURE_GPIO_ASYNC_WAIT}\")]\npub const {const_prefix}_CAPABILITY_TAGS: &[&str] = &{capability_tags};\n#[cfg(not(feature = \"{EMBASSY_FEATURE_GPIO_ASYNC_WAIT}\"))]\npub const {const_prefix}_CAPABILITY_TAGS: &[&str] = &{capability_tags_without_gpio_async_wait};\n\n"
+        ));
+    } else {
+        out.push_str(&format!(
+            "pub const {const_prefix}_CAPABILITY_TAGS: &[&str] = &{capability_tags};\n\n"
+        ));
+    }
     out.push_str(&format!(
         "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub lowering_pattern: Option<&'static str>,\n    pub time_driver_source: Option<&'static str>,\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    lowering_pattern: {lowering_pattern},\n    time_driver_source: {time_driver_source},\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n{support_items}",
         type_name = driver.type_name,
@@ -5942,6 +6095,7 @@ struct GeneratedWchRuntimeVectorHandler {
     vector_const_name: String,
     vector_symbol_name: String,
     rust_handler_name: String,
+    cfg_feature: Option<String>,
     import_line: Option<String>,
     helper_items: String,
     rust_handler_body: String,
@@ -6020,6 +6174,7 @@ fn generated_wch_runtime_vector_handlers(
         vector_const_name: "WCH_TIME_DRIVER_HANDLER_VECTOR".to_string(),
         vector_symbol_name: "__hair_wch_embassy_time_driver_vector".to_string(),
         rust_handler_name: "__hair_wch_embassy_time_driver_irq_rust".to_string(),
+        cfg_feature: Some(format!("feature = \"{}\"", EMBASSY_FEATURE_WCH_RUNTIME)),
         import_line: None,
         helper_items: String::new(),
         rust_handler_body: "    time_driver().on_time_driver_interrupt();\n".to_string(),
@@ -6102,7 +6257,7 @@ fn generated_wch_runtime_vector_handlers(
             );
             let helper_items = if emitted_driver_helpers.insert(driver.id.clone()) {
                 format!(
-                    "const {helper_const_name}: {resource_type} = {resource_type} {{\n    clocks: &[],\n    resets: &[],\n    interrupt_sources: &[],\n    interrupts: &[],\n    dma_channels: &[],\n    dma: &[],\n    pins: &[],\n    init_operations: &[],\n    state_machines: &[],\n    lowering_pattern: None,\n    time_driver_source: None,\n    capability_tags: &[],\n}};\n\nfn {helper_fn_name}() -> {type_name} {{\n    {type_name}::new({helper_const_name}).expect(\"generated WCH runtime driver resources\")\n}}\n\n"
+                    "#[cfg(feature = \"{EMBASSY_FEATURE_DMA_ASYNC}\")]\nconst {helper_const_name}: {resource_type} = {resource_type} {{\n    clocks: &[],\n    resets: &[],\n    interrupt_sources: &[],\n    interrupts: &[],\n    dma_channels: &[],\n    dma: &[],\n    pins: &[],\n    init_operations: &[],\n    state_machines: &[],\n    lowering_pattern: None,\n    time_driver_source: None,\n    capability_tags: &[],\n}};\n\n#[cfg(feature = \"{EMBASSY_FEATURE_DMA_ASYNC}\")]\nfn {helper_fn_name}() -> {type_name} {{\n    {type_name}::new({helper_const_name}).expect(\"generated WCH runtime driver resources\")\n}}\n\n"
                 )
             } else {
                 String::new()
@@ -6116,6 +6271,7 @@ fn generated_wch_runtime_vector_handlers(
                 ),
                 vector_symbol_name: format!("__hair_wch_{}_vector", handler_slug),
                 rust_handler_name: format!("__hair_wch_{}_irq_rust", handler_slug),
+                cfg_feature: Some(format!("feature = \"{}\"", EMBASSY_FEATURE_DMA_ASYNC)),
                 import_line: Some(format!(
                     "use crate::{}::{{{}, {}}};",
                     driver.module_name, type_name, resource_type
@@ -6207,6 +6363,7 @@ fn generated_wch_runtime_vector_handlers(
                 ),
                 vector_symbol_name: format!("__hair_wch_{}_vector", handler_slug),
                 rust_handler_name: format!("__hair_wch_{}_irq_rust", handler_slug),
+                cfg_feature: Some(format!("feature = \"{}\"", EMBASSY_FEATURE_GPIO_ASYNC_WAIT)),
                 import_line: Some(import_line.clone()),
                 helper_items: String::new(),
                 rust_handler_body,
@@ -6245,6 +6402,13 @@ fn generated_wch_runtime_vector_handlers(
             {
                 existing.helper_items.push_str(&handler.helper_items);
             }
+            match (&existing.cfg_feature, &handler.cfg_feature) {
+                (Some(existing_cfg), Some(next_cfg)) if existing_cfg != next_cfg => {
+                    existing.cfg_feature = Some(format!("any({}, {})", existing_cfg, next_cfg));
+                }
+                (None, Some(next_cfg)) => existing.cfg_feature = Some(next_cfg.clone()),
+                _ => {}
+            }
             existing
                 .rust_handler_body
                 .push_str(&handler.rust_handler_body);
@@ -6257,6 +6421,12 @@ fn generated_wch_runtime_vector_handlers(
 }
 
 fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<String> {
+    fn render_cfg_attr(cfg_condition: Option<&str>) -> String {
+        cfg_condition
+            .map(|condition| format!("#[cfg({condition})]\n"))
+            .unwrap_or_default()
+    }
+
     let Some(inputs) = generated_wch_runtime_inputs(model)? else {
         bail!("WCH runtime support requested without PFIC + non-SysTick time-driver inputs");
     };
@@ -6299,42 +6469,71 @@ fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<Strin
     let mut import_lines = BTreeSet::new();
     let mut extern_decls = String::new();
     let mut vector_consts = String::new();
-    let mut table_assignments = String::new();
+    let mut table_assignment_helpers = String::new();
+    let mut table_assignment_calls = String::new();
     let mut asm_wrappers = String::new();
+    let mut init_enable_helpers = String::new();
     let mut init_enable_calls = String::new();
     let mut helper_items = String::new();
     let mut rust_handlers = String::new();
     for handler in &handlers {
+        let cfg_attr = render_cfg_attr(handler.cfg_feature.as_deref());
+        let table_assignment_fn = format!(
+            "__hair_assign_{}",
+            handler.vector_const_name.to_ascii_lowercase()
+        );
+        let init_enable_fn = format!(
+            "__hair_enable_{}",
+            handler.vector_const_name.to_ascii_lowercase()
+        );
         if let Some(import_line) = &handler.import_line {
             for line in import_line.lines() {
                 let trimmed = line.trim();
                 if !trimmed.is_empty() {
-                    import_lines.insert(trimmed.to_string());
+                    import_lines.insert(format!("{cfg_attr}{trimmed}"));
                 }
             }
         }
-        extern_decls.push_str(&format!("    fn {}();\n", handler.vector_symbol_name));
+        extern_decls.push_str(&format!(
+            "{cfg_attr}    fn {}();\n",
+            handler.vector_symbol_name
+        ));
         vector_consts.push_str(&format!(
-            "const {}: WchVector = WchVector {{\n    handler: {},\n}};\n",
+            "{cfg_attr}const {}: WchVector = WchVector {{\n    handler: {},\n}};\n",
             handler.vector_const_name, handler.vector_symbol_name
         ));
-        table_assignments.push_str(&format!(
-            "    table[{}] = {};\n",
+        table_assignment_helpers.push_str(&format!(
+            "{cfg_attr}const fn {table_assignment_fn}(table: &mut [WchVector; WCH_VECTOR_COUNT]) {{\n    table[{}] = {};\n}}\n\n",
             handler.vector_slot, handler.vector_const_name
         ));
-        asm_wrappers.push_str(&render_wch_runtime_vector_wrapper(
-            &handler.vector_symbol_name,
-            &handler.rust_handler_name,
+        if let Some(cfg_condition) = handler.cfg_feature.as_deref() {
+            table_assignment_helpers.push_str(&format!(
+                "#[cfg(not({cfg_condition}))]\nconst fn {table_assignment_fn}(_table: &mut [WchVector; WCH_VECTOR_COUNT]) {{}}\n\n"
+            ));
+        }
+        table_assignment_calls.push_str(&format!("    {table_assignment_fn}(&mut table);\n"));
+        asm_wrappers.push_str(&format!(
+            "{cfg_attr}global_asm!(\n    r#\"\n{}\"#\n);\n\n",
+            render_wch_runtime_vector_wrapper(
+                &handler.vector_symbol_name,
+                &handler.rust_handler_name,
+            )
         ));
-        init_enable_calls.push_str(&format!(
-            "    pfic().enable_irq(Irq::{})?;\n",
+        init_enable_helpers.push_str(&format!(
+            "{cfg_attr}fn {init_enable_fn}() -> Result<(), metadata::Error> {{\n    pfic().enable_irq(Irq::{})?;\n    Ok(())\n}}\n\n",
             handler.irq_variant
         ));
+        if let Some(cfg_condition) = handler.cfg_feature.as_deref() {
+            init_enable_helpers.push_str(&format!(
+                "#[cfg(not({cfg_condition}))]\nfn {init_enable_fn}() -> Result<(), metadata::Error> {{\n    Ok(())\n}}\n\n"
+            ));
+        }
+        init_enable_calls.push_str(&format!("    {init_enable_fn}()?;\n"));
         if !handler.helper_items.is_empty() {
             helper_items.push_str(&handler.helper_items);
         }
         rust_handlers.push_str(&format!(
-            "#[unsafe(no_mangle)]\nextern \"C\" fn {}() {{\n{}}}\n\n",
+            "{cfg_attr}#[unsafe(no_mangle)]\nextern \"C\" fn {}() {{\n{}}}\n\n",
             handler.rust_handler_name, handler.rust_handler_body
         ));
     }
@@ -6348,14 +6547,16 @@ fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<Strin
     };
 
     Ok(format!(
-        "//! Generated WCH/QingKe runtime support for {}.\n\nuse crate::interrupt::{{{interrupt_driver_resources}, Irq, {interrupt_driver_type}}};\nuse crate::metadata;\nuse crate::time::{{{time_driver_resources}, {time_driver_type}}};\nuse core::arch::{{asm, global_asm}};\n{extra_imports}{module_provenance}\nunsafe extern \"C\" {{\n    fn __hair_wch_hang_vector();\n{extern_decls}}}\n\n#[derive(Clone, Copy)]\n#[repr(C)]\nunion WchVector {{\n    handler: unsafe extern \"C\" fn(),\n    reserved: usize,\n}}\n\nconst WCH_VECTOR_COUNT: usize = {vector_count};\nconst WCH_RESERVED_VECTOR: WchVector = WchVector {{ reserved: 0 }};\nconst WCH_HANG_VECTOR: WchVector = WchVector {{\n    handler: __hair_wch_hang_vector,\n}};\n{vector_consts}\n#[repr(C, align(64))]\nstruct WchVectorTable([WchVector; WCH_VECTOR_COUNT]);\n\nconst fn build_wch_vector_table() -> WchVectorTable {{\n    let mut table = [WCH_HANG_VECTOR; WCH_VECTOR_COUNT];\n    table[1] = WCH_RESERVED_VECTOR;\n    table[4] = WCH_RESERVED_VECTOR;\n    table[6] = WCH_RESERVED_VECTOR;\n    table[7] = WCH_RESERVED_VECTOR;\n    table[10] = WCH_RESERVED_VECTOR;\n    table[11] = WCH_RESERVED_VECTOR;\n    table[13] = WCH_RESERVED_VECTOR;\n    table[15] = WCH_RESERVED_VECTOR;\n{table_assignments}    WchVectorTable(table)\n}}\n\n#[unsafe(link_section = \".vector\")]\n#[used]\nstatic WCH_VECTOR_TABLE: WchVectorTable = build_wch_vector_table();\n\nglobal_asm!(\n    r#\"\n    .global __hair_wch_hang_vector\n__hair_wch_hang_vector:\n1:\n    j 1b\n\n{asm_wrappers}\"#\n);\n\nfn pfic() -> {interrupt_driver_type} {{\n    {interrupt_driver_type}::new({interrupt_driver_resources}).expect(\"generated WCH PFIC resources\")\n}}\n\nfn time_driver() -> {time_driver_type} {{\n    {time_driver_type}::new({time_driver_resources}).expect(\"generated WCH time-driver resources\")\n}}\n\n{helper_items}pub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {{\n    time_driver().init_time_driver()?;\n    unsafe {{\n        asm!(\"csrw 0x804, {{value}}\", value = in(reg) 0x3usize);\n        asm!(\n            \"csrw mtvec, {{value}}\",\n            value = in(reg) ((&WCH_VECTOR_TABLE as *const WchVectorTable as usize) | 0x3)\n        );\n    }}\n{init_enable_calls}    unsafe {{\n        asm!(\"csrs mie, {{value}}\", value = in(reg) 0x800usize);\n        asm!(\"csrs mstatus, {{value}}\", value = in(reg) 0x88usize);\n    }}\n    Ok(())\n}}\n\n{rust_handlers}",
+        "//! Generated WCH/QingKe runtime support for {}.\n\nuse crate::interrupt::{{{interrupt_driver_resources}, Irq, {interrupt_driver_type}}};\nuse crate::metadata;\nuse crate::time::{{{time_driver_resources}, {time_driver_type}}};\nuse core::arch::{{asm, global_asm}};\n{extra_imports}{module_provenance}\nunsafe extern \"C\" {{\n    fn __hair_wch_hang_vector();\n{extern_decls}}}\n\n#[derive(Clone, Copy)]\n#[repr(C)]\nunion WchVector {{\n    handler: unsafe extern \"C\" fn(),\n    reserved: usize,\n}}\n\nconst WCH_VECTOR_COUNT: usize = {vector_count};\nconst WCH_RESERVED_VECTOR: WchVector = WchVector {{ reserved: 0 }};\nconst WCH_HANG_VECTOR: WchVector = WchVector {{\n    handler: __hair_wch_hang_vector,\n}};\n{vector_consts}\n#[repr(C, align(64))]\nstruct WchVectorTable([WchVector; WCH_VECTOR_COUNT]);\n\n{table_assignment_helpers}const fn build_wch_vector_table() -> WchVectorTable {{\n    let mut table = [WCH_HANG_VECTOR; WCH_VECTOR_COUNT];\n    table[1] = WCH_RESERVED_VECTOR;\n    table[4] = WCH_RESERVED_VECTOR;\n    table[6] = WCH_RESERVED_VECTOR;\n    table[7] = WCH_RESERVED_VECTOR;\n    table[10] = WCH_RESERVED_VECTOR;\n    table[11] = WCH_RESERVED_VECTOR;\n    table[13] = WCH_RESERVED_VECTOR;\n    table[15] = WCH_RESERVED_VECTOR;\n{table_assignment_calls}    WchVectorTable(table)\n}}\n\n#[unsafe(link_section = \".vector\")]\n#[used]\nstatic WCH_VECTOR_TABLE: WchVectorTable = build_wch_vector_table();\n\nglobal_asm!(\n    r#\"\n    .global __hair_wch_hang_vector\n__hair_wch_hang_vector:\n1:\n    j 1b\n\"#\n);\n\n{asm_wrappers}fn pfic() -> {interrupt_driver_type} {{\n    {interrupt_driver_type}::new({interrupt_driver_resources}).expect(\"generated WCH PFIC resources\")\n}}\n\nfn time_driver() -> {time_driver_type} {{\n    {time_driver_type}::new({time_driver_resources}).expect(\"generated WCH time-driver resources\")\n}}\n\n{init_enable_helpers}{helper_items}pub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {{\n    time_driver().init_time_driver()?;\n    unsafe {{\n        asm!(\"csrw 0x804, {{value}}\", value = in(reg) 0x3usize);\n        asm!(\n            \"csrw mtvec, {{value}}\",\n            value = in(reg) ((&WCH_VECTOR_TABLE as *const WchVectorTable as usize) | 0x3)\n        );\n    }}\n{init_enable_calls}    unsafe {{\n        asm!(\"csrs mie, {{value}}\", value = in(reg) 0x800usize);\n        asm!(\"csrs mstatus, {{value}}\", value = in(reg) 0x88usize);\n    }}\n    Ok(())\n}}\n\n{rust_handlers}",
         render_comment_text(&model.device_name),
         extra_imports = extra_imports,
         module_provenance = render_module_provenance_const("wch"),
         extern_decls = extern_decls,
         vector_consts = vector_consts,
-        table_assignments = table_assignments,
+        table_assignment_helpers = table_assignment_helpers,
+        table_assignment_calls = table_assignment_calls,
         asm_wrappers = asm_wrappers,
+        init_enable_helpers = init_enable_helpers,
         helper_items = helper_items,
         init_enable_calls = init_enable_calls,
         rust_handlers = rust_handlers,
@@ -8589,7 +8790,7 @@ fn render_gpio_support_items(
                 wait_line.line_index
             );
             wait_statics.push_str(&format!(
-                "static {static_name}: critical_section::Mutex<core::cell::RefCell<{state_type}>> = critical_section::Mutex::new(core::cell::RefCell::new({state_type}::new()));\n"
+                "#[cfg(feature = \"gpio-async-wait\")]\nstatic {static_name}: critical_section::Mutex<core::cell::RefCell<{state_type}>> = critical_section::Mutex::new(core::cell::RefCell::new({state_type}::new()));\n"
             ));
             wait_configs.push_str(&format!(
                 "    {config_type} {{ line_index: {}u32, port_select_addr: 0x{:X}u64, port_select_clear_mask: 0x{:08X}u32, port_select_set_mask: 0x{:08X}u32, interrupt_mask_addr: 0x{:X}u64, interrupt_mask_mask: 0x{:08X}u32, rising_trigger_addr: 0x{:X}u64, rising_trigger_mask: 0x{:08X}u32, falling_trigger_addr: 0x{:X}u64, falling_trigger_mask: 0x{:08X}u32, pending_addr: 0x{:X}u64, pending_mask: 0x{:08X}u32 }},\n",
@@ -8616,7 +8817,7 @@ fn render_gpio_support_items(
             to_rust_const_name(&driver.id)
         );
         out.push_str(&format!(
-            "#[derive(Debug)]\nstruct {state_type} {{\n    waker: Option<core::task::Waker>,\n}}\n\nimpl {state_type} {{\n    const fn new() -> Self {{\n        Self {{ waker: None }}\n    }}\n}}\n\n#[derive(Debug, Clone, Copy)]\nstruct {config_type} {{\n    line_index: u32,\n    port_select_addr: u64,\n    port_select_clear_mask: u32,\n    port_select_set_mask: u32,\n    interrupt_mask_addr: u64,\n    interrupt_mask_mask: u32,\n    rising_trigger_addr: u64,\n    rising_trigger_mask: u32,\n    falling_trigger_addr: u64,\n    falling_trigger_mask: u32,\n    pending_addr: u64,\n    pending_mask: u32,\n}}\n\nconst {unsupported_const}: &str = \"GPIO async wait is not bound for the requested pin\";\nconst {wait_config_const}: &[{config_type}] = &[\n{wait_configs}];\n{wait_statics}fn generated_{prefix}_gpio_wait_config(line_index: u32) -> Option<&'static {config_type}> {{\n    {wait_config_const}.iter().find(|config| config.line_index == line_index)\n}}\n\nfn generated_{prefix}_gpio_wait_state(line_index: u32) -> Option<&'static critical_section::Mutex<core::cell::RefCell<{state_type}>>> {{\n    match line_index {{\n{state_arms}        _ => None,\n    }}\n}}\n\nfn generated_{prefix}_clear_gpio_wait_pending(config: &{config_type}) -> Result<(), metadata::Error> {{\n    modify_u32(config.pending_addr, config.pending_mask, config.pending_mask)\n}}\n\nfn generated_{prefix}_prepare_gpio_wait(line_index: u32, rising: bool, falling: bool) -> Result<(), metadata::Error> {{\n    let config = generated_{prefix}_gpio_wait_config(line_index)\n        .ok_or(metadata::Error::InvalidReference({unsupported_const}))?;\n    let state = generated_{prefix}_gpio_wait_state(line_index)\n        .ok_or(metadata::Error::InvalidReference({unsupported_const}))?;\n    critical_section::with(|cs| {{\n        let mut state = state.borrow(cs).borrow_mut();\n        state.waker = None;\n    }});\n    modify_u32(config.port_select_addr, config.port_select_clear_mask, config.port_select_set_mask)?;\n    modify_u32(config.interrupt_mask_addr, config.interrupt_mask_mask, 0x00000000u32)?;\n    modify_u32(config.rising_trigger_addr, config.rising_trigger_mask, if rising {{ config.rising_trigger_mask }} else {{ 0x00000000u32 }})?;\n    modify_u32(config.falling_trigger_addr, config.falling_trigger_mask, if falling {{ config.falling_trigger_mask }} else {{ 0x00000000u32 }})?;\n    generated_{prefix}_clear_gpio_wait_pending(config)?;\n    modify_u32(config.interrupt_mask_addr, config.interrupt_mask_mask, config.interrupt_mask_mask)?;\n    Ok(())\n}}\n\nfn generated_{prefix}_poll_gpio_wait(line_index: u32, cx: &core::task::Context<'_>) -> core::task::Poll<Result<(), metadata::Error>> {{\n    let config = match generated_{prefix}_gpio_wait_config(line_index) {{\n        Some(config) => config,\n        None => return core::task::Poll::Ready(Err(metadata::Error::InvalidReference({unsupported_const}))),\n    }};\n    let state = match generated_{prefix}_gpio_wait_state(line_index) {{\n        Some(state) => state,\n        None => return core::task::Poll::Ready(Err(metadata::Error::InvalidReference({unsupported_const}))),\n    }};\n    if let Ok(pending) = read_u32(config.pending_addr) {{\n        if (pending & config.pending_mask) != 0 {{\n            if let Err(err) = modify_u32(config.interrupt_mask_addr, config.interrupt_mask_mask, 0x00000000u32) {{\n                return core::task::Poll::Ready(Err(err));\n            }}\n            if let Err(err) = generated_{prefix}_clear_gpio_wait_pending(config) {{\n                return core::task::Poll::Ready(Err(err));\n            }}\n            return core::task::Poll::Ready(Ok(()));\n        }}\n    }} else if let Err(err) = read_u32(config.pending_addr) {{\n        return core::task::Poll::Ready(Err(err));\n    }}\n    critical_section::with(|cs| {{\n        let mut state = state.borrow(cs).borrow_mut();\n        state.waker = Some(cx.waker().clone());\n    }});\n    match read_u32(config.pending_addr) {{\n        Ok(pending) if (pending & config.pending_mask) != 0 => {{\n            critical_section::with(|cs| {{\n                let mut state = state.borrow(cs).borrow_mut();\n                state.waker = None;\n            }});\n            if let Err(err) = modify_u32(config.interrupt_mask_addr, config.interrupt_mask_mask, 0x00000000u32) {{\n                return core::task::Poll::Ready(Err(err));\n            }}\n            if let Err(err) = generated_{prefix}_clear_gpio_wait_pending(config) {{\n                return core::task::Poll::Ready(Err(err));\n            }}\n            core::task::Poll::Ready(Ok(()))\n        }}\n        Ok(_) => core::task::Poll::Pending,\n        Err(err) => core::task::Poll::Ready(Err(err)),\n    }}\n}}\n\npub(crate) fn generated_{prefix}_signal_gpio_wait(line_index: u32) -> Result<(), metadata::Error> {{\n    let state = generated_{prefix}_gpio_wait_state(line_index)\n        .ok_or(metadata::Error::InvalidReference({unsupported_const}))?;\n    let waker = critical_section::with(|cs| {{\n        let mut state = state.borrow(cs).borrow_mut();\n        state.waker.take()\n    }});\n    if let Some(waker) = waker {{\n        waker.wake();\n    }}\n    Ok(())\n}}\n\nasync fn generated_{prefix}_wait_gpio_edge(line_index: u32, rising: bool, falling: bool) -> Result<(), metadata::Error> {{\n    generated_{prefix}_prepare_gpio_wait(line_index, rising, falling)?;\n    core::future::poll_fn(|cx| generated_{prefix}_poll_gpio_wait(line_index, cx)).await\n}}\n\nimpl embedded_hal::digital::ErrorType for {input_type} {{\n    type Error = metadata::Error;\n}}\n\nimpl embedded_hal_async::digital::Wait for {input_type} {{\n    async fn wait_for_high(&mut self) -> Result<(), Self::Error> {{\n        loop {{\n            if self.is_high()? {{\n                return Ok(());\n            }}\n            generated_{prefix}_wait_gpio_edge(self.pin.exti_line_index, true, false).await?;\n        }}\n    }}\n\n    async fn wait_for_low(&mut self) -> Result<(), Self::Error> {{\n        loop {{\n            if self.is_low()? {{\n                return Ok(());\n            }}\n            generated_{prefix}_wait_gpio_edge(self.pin.exti_line_index, false, true).await?;\n        }}\n    }}\n\n    async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {{\n        generated_{prefix}_wait_gpio_edge(self.pin.exti_line_index, true, false).await\n    }}\n\n    async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {{\n        generated_{prefix}_wait_gpio_edge(self.pin.exti_line_index, false, true).await\n    }}\n\n    async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {{\n        generated_{prefix}_wait_gpio_edge(self.pin.exti_line_index, true, true).await\n    }}\n}}\n\n"
+            "#[cfg(feature = \"gpio-async-wait\")]\n#[derive(Debug)]\nstruct {state_type} {{\n    waker: Option<core::task::Waker>,\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nimpl {state_type} {{\n    const fn new() -> Self {{\n        Self {{ waker: None }}\n    }}\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\n#[derive(Debug, Clone, Copy)]\nstruct {config_type} {{\n    line_index: u32,\n    port_select_addr: u64,\n    port_select_clear_mask: u32,\n    port_select_set_mask: u32,\n    interrupt_mask_addr: u64,\n    interrupt_mask_mask: u32,\n    rising_trigger_addr: u64,\n    rising_trigger_mask: u32,\n    falling_trigger_addr: u64,\n    falling_trigger_mask: u32,\n    pending_addr: u64,\n    pending_mask: u32,\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nconst {unsupported_const}: &str = \"GPIO async wait is not bound for the requested pin\";\n#[cfg(feature = \"gpio-async-wait\")]\nconst {wait_config_const}: &[{config_type}] = &[\n{wait_configs}];\n{wait_statics}#[cfg(feature = \"gpio-async-wait\")]\nfn generated_{prefix}_gpio_wait_config(line_index: u32) -> Option<&'static {config_type}> {{\n    {wait_config_const}.iter().find(|config| config.line_index == line_index)\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nfn generated_{prefix}_gpio_wait_state(line_index: u32) -> Option<&'static critical_section::Mutex<core::cell::RefCell<{state_type}>>> {{\n    match line_index {{\n{state_arms}        _ => None,\n    }}\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nfn generated_{prefix}_clear_gpio_wait_pending(config: &{config_type}) -> Result<(), metadata::Error> {{\n    modify_u32(config.pending_addr, config.pending_mask, config.pending_mask)\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nfn generated_{prefix}_prepare_gpio_wait(line_index: u32, rising: bool, falling: bool) -> Result<(), metadata::Error> {{\n    let config = generated_{prefix}_gpio_wait_config(line_index)\n        .ok_or(metadata::Error::InvalidReference({unsupported_const}))?;\n    let state = generated_{prefix}_gpio_wait_state(line_index)\n        .ok_or(metadata::Error::InvalidReference({unsupported_const}))?;\n    critical_section::with(|cs| {{\n        let mut state = state.borrow(cs).borrow_mut();\n        state.waker = None;\n    }});\n    modify_u32(config.port_select_addr, config.port_select_clear_mask, config.port_select_set_mask)?;\n    modify_u32(config.interrupt_mask_addr, config.interrupt_mask_mask, 0x00000000u32)?;\n    modify_u32(config.rising_trigger_addr, config.rising_trigger_mask, if rising {{ config.rising_trigger_mask }} else {{ 0x00000000u32 }})?;\n    modify_u32(config.falling_trigger_addr, config.falling_trigger_mask, if falling {{ config.falling_trigger_mask }} else {{ 0x00000000u32 }})?;\n    generated_{prefix}_clear_gpio_wait_pending(config)?;\n    modify_u32(config.interrupt_mask_addr, config.interrupt_mask_mask, config.interrupt_mask_mask)?;\n    Ok(())\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nfn generated_{prefix}_poll_gpio_wait(line_index: u32, cx: &core::task::Context<'_>) -> core::task::Poll<Result<(), metadata::Error>> {{\n    let config = match generated_{prefix}_gpio_wait_config(line_index) {{\n        Some(config) => config,\n        None => return core::task::Poll::Ready(Err(metadata::Error::InvalidReference({unsupported_const}))),\n    }};\n    let state = match generated_{prefix}_gpio_wait_state(line_index) {{\n        Some(state) => state,\n        None => return core::task::Poll::Ready(Err(metadata::Error::InvalidReference({unsupported_const}))),\n    }};\n    if let Ok(pending) = read_u32(config.pending_addr) {{\n        if (pending & config.pending_mask) != 0 {{\n            if let Err(err) = modify_u32(config.interrupt_mask_addr, config.interrupt_mask_mask, 0x00000000u32) {{\n                return core::task::Poll::Ready(Err(err));\n            }}\n            if let Err(err) = generated_{prefix}_clear_gpio_wait_pending(config) {{\n                return core::task::Poll::Ready(Err(err));\n            }}\n            return core::task::Poll::Ready(Ok(()));\n        }}\n    }} else if let Err(err) = read_u32(config.pending_addr) {{\n        return core::task::Poll::Ready(Err(err));\n    }}\n    critical_section::with(|cs| {{\n        let mut state = state.borrow(cs).borrow_mut();\n        state.waker = Some(cx.waker().clone());\n    }});\n    match read_u32(config.pending_addr) {{\n        Ok(pending) if (pending & config.pending_mask) != 0 => {{\n            critical_section::with(|cs| {{\n                let mut state = state.borrow(cs).borrow_mut();\n                state.waker = None;\n            }});\n            if let Err(err) = modify_u32(config.interrupt_mask_addr, config.interrupt_mask_mask, 0x00000000u32) {{\n                return core::task::Poll::Ready(Err(err));\n            }}\n            if let Err(err) = generated_{prefix}_clear_gpio_wait_pending(config) {{\n                return core::task::Poll::Ready(Err(err));\n            }}\n            core::task::Poll::Ready(Ok(()))\n        }}\n        Ok(_) => core::task::Poll::Pending,\n        Err(err) => core::task::Poll::Ready(Err(err)),\n    }}\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\npub(crate) fn generated_{prefix}_signal_gpio_wait(line_index: u32) -> Result<(), metadata::Error> {{\n    let state = generated_{prefix}_gpio_wait_state(line_index)\n        .ok_or(metadata::Error::InvalidReference({unsupported_const}))?;\n    let waker = critical_section::with(|cs| {{\n        let mut state = state.borrow(cs).borrow_mut();\n        state.waker.take()\n    }});\n    if let Some(waker) = waker {{\n        waker.wake();\n    }}\n    Ok(())\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nasync fn generated_{prefix}_wait_gpio_edge(line_index: u32, rising: bool, falling: bool) -> Result<(), metadata::Error> {{\n    generated_{prefix}_prepare_gpio_wait(line_index, rising, falling)?;\n    core::future::poll_fn(|cx| generated_{prefix}_poll_gpio_wait(line_index, cx)).await\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nimpl embedded_hal::digital::ErrorType for {input_type} {{\n    type Error = metadata::Error;\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nimpl embedded_hal_async::digital::Wait for {input_type} {{\n    async fn wait_for_high(&mut self) -> Result<(), Self::Error> {{\n        loop {{\n            if self.is_high()? {{\n                return Ok(());\n            }}\n            generated_{prefix}_wait_gpio_edge(self.pin.exti_line_index, true, false).await?;\n        }}\n    }}\n\n    async fn wait_for_low(&mut self) -> Result<(), Self::Error> {{\n        loop {{\n            if self.is_low()? {{\n                return Ok(());\n            }}\n            generated_{prefix}_wait_gpio_edge(self.pin.exti_line_index, false, true).await?;\n        }}\n    }}\n\n    async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {{\n        generated_{prefix}_wait_gpio_edge(self.pin.exti_line_index, true, false).await\n    }}\n\n    async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {{\n        generated_{prefix}_wait_gpio_edge(self.pin.exti_line_index, false, true).await\n    }}\n\n    async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {{\n        generated_{prefix}_wait_gpio_edge(self.pin.exti_line_index, true, true).await\n    }}\n}}\n\n"
         ));
     }
 
@@ -19294,7 +19495,7 @@ fn host_emulator_tracks_esp_gpio_output_level() {
             .expect("generated lib.rs");
         let usb_rs = std::fs::read_to_string(output_dir.path().join("src").join("usb.rs"))
             .expect("generated usb.rs");
-        assert!(lib_rs.contains("pub mod usb;"));
+        assert!(lib_rs.contains("#[cfg(feature = \"usb\")]\npub mod usb;"));
         assert!(usb_rs.contains("pub fn apply_preserve_serial_jtag_link(&self)"));
         assert!(usb_rs.contains("lowering_pattern: Some(\"serial-jtag-preserve-link\")"));
         assert!(!usb_rs.contains("pub fn enable_usb_pad(&self)"));
@@ -19323,7 +19524,7 @@ fn host_emulator_tracks_esp_gpio_output_level() {
             .expect("generated lib.rs");
         let usb_rs = std::fs::read_to_string(output_dir.path().join("src").join("usb.rs"))
             .expect("generated usb.rs");
-        assert!(lib_rs.contains("pub mod usb;"));
+        assert!(lib_rs.contains("#[cfg(feature = \"usb\")]\npub mod usb;"));
         assert!(usb_rs.contains("lowering_pattern: Some(\"fsdev-pma-btable\")"));
         assert!(usb_rs.contains("pub fn enable_clock(&self)"));
         assert!(usb_rs.contains("pub fn assert_reset(&self)"));
@@ -20158,7 +20359,8 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         let pwm_rs =
             std::fs::read_to_string(output_dir.path().join("src").join("pwm.rs")).expect("pwm.rs");
 
-        assert!(cargo_toml.contains("embedded-hal = \"1.0\""));
+        assert!(cargo_toml.contains("embedded-hal = { version = \"1.0\", optional = true }"));
+        assert!(cargo_toml.contains("pwm = [\"dep:embedded-hal\"]"));
         assert!(pwm_rs.contains("pub fn set_prescaler"));
         assert!(pwm_rs.contains("pub fn set_auto_reload"));
         assert!(pwm_rs.contains("pub fn generate_update"));
@@ -20201,7 +20403,10 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             std::fs::read_to_string(output_dir.path().join("src").join("watchdog.rs"))
                 .expect("watchdog.rs");
 
-        assert!(cargo_toml.contains("embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"] }"));
+        assert!(cargo_toml.contains(
+            "embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"], optional = true }"
+        ));
+        assert!(cargo_toml.contains("watchdog = [\"dep:embedded-hal-02\"]"));
         assert!(watchdog_rs.contains("pub struct"));
         assert!(watchdog_rs.contains("Config {"));
         assert!(watchdog_rs.contains("pub fn configure(&self, config:"));
@@ -20243,7 +20448,9 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             std::fs::read_to_string(output_dir.path().join("src").join("watchdog.rs"))
                 .expect("watchdog.rs");
 
-        assert!(cargo_toml.contains("embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"] }"));
+        assert!(cargo_toml.contains(
+            "embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"] }"
+        ));
         assert!(watchdog_rs.contains("pub fn start_with_config(&self, config:"));
         assert!(watchdog_rs.contains("impl embedded_hal_02::watchdog::Watchdog for "));
         assert!(watchdog_rs.contains("impl embedded_hal_02::watchdog::WatchdogEnable for "));
@@ -20280,7 +20487,8 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         let flash_rs = std::fs::read_to_string(output_dir.path().join("src").join("flash.rs"))
             .expect("flash.rs");
 
-        assert!(cargo_toml.contains("embedded-storage = \"0.3\""));
+        assert!(cargo_toml.contains("embedded-storage = { version = \"0.3\", optional = true }"));
+        assert!(cargo_toml.contains("flash = [\"dep:embedded-storage\"]"));
         assert!(flash_rs.contains("pub fn unlock(&self) -> Result<(), metadata::Error>"));
         assert!(flash_rs.contains("pub fn is_busy(&self) -> Result<bool, metadata::Error>"));
         assert!(flash_rs.contains("impl embedded_storage::nor_flash::ReadNorFlash for "));
@@ -20485,6 +20693,7 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         );
         assert!(adc_rs.contains("dma.prepare_transfer_complete_wait(1)?;"));
         assert!(adc_rs.contains("if dma.is_transfer_complete(1)? {"));
+        assert!(wch_rs.contains("fn __hair_enable_wch_runtime_drv_dma1_ch1_handler_vector()"));
         assert!(wch_rs.contains("pfic().enable_irq(Irq::DMA1Channel1)?;"));
         assert!(wch_rs.contains("generated_wch_runtime_drv_dma1().on_interrupt(1);"));
         assert!(wch_rs.contains("const GENERATED_WCH_RUNTIME_DRV_DMA1_RESOURCES: DMA1Resources"));
@@ -20511,9 +20720,25 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         let wch_rs =
             std::fs::read_to_string(output_dir.path().join("src").join("wch.rs")).expect("wch.rs");
 
-        assert!(cargo_toml.contains("embedded-hal-async = \"1.0\""));
-        assert!(cargo_toml.contains("critical-section = \"1.2\""));
+        assert!(cargo_toml.contains("embedded-hal-async = { version = \"1.0\", optional = true }"));
+        assert!(cargo_toml.contains("critical-section = { version = \"1.2\", optional = true }"));
+        assert!(cargo_toml.contains("gpio-async-wait = ["));
+        assert!(cargo_toml.contains("\"gpio\""));
+        assert!(cargo_toml.contains("\"interrupt\""));
+        assert!(cargo_toml.contains("\"dep:critical-section\""));
+        assert!(cargo_toml.contains("\"dep:embedded-hal\""));
+        assert!(cargo_toml.contains("\"dep:embedded-hal-async\""));
+        assert!(gpio_rs.contains(
+            "#[cfg(feature = \"gpio-async-wait\")]\npub const DRV_GPIOA_INTERRUPT_SOURCES"
+        ));
+        assert!(gpio_rs.contains(
+            "#[cfg(not(feature = \"gpio-async-wait\"))]\npub const DRV_GPIOA_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];"
+        ));
+        assert!(gpio_rs.contains(
+            "#[cfg(not(feature = \"gpio-async-wait\"))]\npub const DRV_GPIOA_CAPABILITY_TAGS: &[&str] = &[];"
+        ));
         assert!(gpio_rs.contains("impl embedded_hal_async::digital::Wait for"));
+        assert!(gpio_rs.contains("#[cfg(feature = \"gpio-async-wait\")]"));
         assert!(gpio_rs.contains(
             "generated_drv_gpioa_wait_gpio_edge(self.pin.exti_line_index, true, false).await"
         ));
@@ -22210,10 +22435,9 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         let time_rs = std::fs::read_to_string(output_dir.path().join("src").join("time.rs"))
             .expect("time.rs");
 
-        assert!(wch_rs.contains("    pfic().enable_irq(Irq::DMA1Channel1)?;\n    unsafe {\n"));
-        assert!(
-            !wch_rs.contains("    pfic().enable_irq(Irq::DMA1Channel1)?;\n            unsafe {\n")
-        );
+        assert!(wch_rs.contains("fn __hair_enable_wch_runtime_drv_dma1_ch1_handler_vector()"));
+        assert!(wch_rs.contains("pfic().enable_irq(Irq::DMA1Channel1)?;"));
+        assert!(wch_rs.contains("\n    unsafe {\n"));
         assert!(time_rs.contains(
             "            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_RTCSEL_MASK,\n                GENERATED_RCC_BDCTLR_RTCSEL_LSI_MASK,\n            );\n            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_RTCEN_MASK,\n"
         ));
@@ -22655,7 +22879,7 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             .expect("generated time module");
         assert!(cargo_toml.contains("embassy-time-driver"));
         assert!(cargo_toml.contains("embassy-time-queue-utils"));
-        assert!(lib_rs.contains("pub mod time;"));
+        assert!(lib_rs.contains("#[cfg(feature = \"time\")]\npub mod time;"));
         assert!(time_rs.contains("init_time_driver"));
         assert!(time_rs.contains("extern \"C\" fn SysTick()"));
         assert!(time_rs.contains("#[allow(dead_code)]"));
@@ -23085,8 +23309,8 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
 
         assert!(cargo_toml.contains("embassy-time-driver"));
         assert!(cargo_toml.contains("tick-hz-1_000"));
-        assert!(lib_rs.contains("pub mod time;"));
-        assert!(lib_rs.contains("pub mod wch;"));
+        assert!(lib_rs.contains("#[cfg(feature = \"time\")]\npub mod time;"));
+        assert!(lib_rs.contains("#[cfg(feature = \"wch-runtime\")]\npub mod wch;"));
         assert!(time_rs.contains("generated_drv_time_tim4_time_driver_interrupt"));
         assert!(time_rs.contains("GENERATED_TIME_COUNTER_ADDRESS"));
         assert!(time_rs.contains("GENERATED_TIME_INTERRUPT_PENDING_MASK"));
@@ -23094,6 +23318,7 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(
             wch_rs.contains("pub fn init_embassy_time_runtime() -> Result<(), metadata::Error>")
         );
+        assert!(wch_rs.contains("fn __hair_enable_wch_time_driver_handler_vector()"));
         assert!(wch_rs.contains("pfic().enable_irq(Irq::TIM4)?;"));
         assert!(wch_rs.contains("call __hair_wch_embassy_time_driver_irq_rust"));
     }

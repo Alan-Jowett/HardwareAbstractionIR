@@ -135,6 +135,7 @@ pub const DRV_GPIOA_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::Rese
     assert_operation_refs: &[],
     release_operation_refs: &[],
 }];
+#[cfg(feature = "gpio-async-wait")]
 pub const DRV_GPIOA_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[
     metadata::InterruptSource {
         id: "isrc.exti.line0",
@@ -272,6 +273,9 @@ pub const DRV_GPIOA_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[
         clear_operation_refs: &["op.exti.clear_line15_pending"],
     },
 ];
+#[cfg(not(feature = "gpio-async-wait"))]
+pub const DRV_GPIOA_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];
+#[cfg(feature = "gpio-async-wait")]
 pub const DRV_GPIOA_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[
     metadata::InterruptRoute {
         id: "iroute.exti.line0",
@@ -469,6 +473,8 @@ pub const DRV_GPIOA_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[
         shared_group: Some("exti15_10"),
     },
 ];
+#[cfg(not(feature = "gpio-async-wait"))]
+pub const DRV_GPIOA_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];
 pub const DRV_GPIOA_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_GPIOA_DMA_ROUTES: &[metadata::DmaRoute] = &[];
 pub const DRV_GPIOA_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
@@ -745,7 +751,10 @@ pub const DRV_GPIOA_PIN_ROLES: &[metadata::PinRole] = &[
 ];
 pub const DRV_GPIOA_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_GPIOA_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
+#[cfg(feature = "gpio-async-wait")]
 pub const DRV_GPIOA_CAPABILITY_TAGS: &[&str] = &["embedded-hal-async-wait"];
+#[cfg(not(feature = "gpio-async-wait"))]
+pub const DRV_GPIOA_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
 pub struct GPIOAResources {
@@ -1307,17 +1316,20 @@ impl GPIOAOutput {
     }
 }
 
+#[cfg(feature = "gpio-async-wait")]
 #[derive(Debug)]
 struct GPIOAInputWaitState {
     waker: Option<core::task::Waker>,
 }
 
+#[cfg(feature = "gpio-async-wait")]
 impl GPIOAInputWaitState {
     const fn new() -> Self {
         Self { waker: None }
     }
 }
 
+#[cfg(feature = "gpio-async-wait")]
 #[derive(Debug, Clone, Copy)]
 struct GPIOAInputWaitLineConfig {
     line_index: u32,
@@ -1334,8 +1346,10 @@ struct GPIOAInputWaitLineConfig {
     pending_mask: u32,
 }
 
+#[cfg(feature = "gpio-async-wait")]
 const GENERATED_DRV_GPIOA_GPIO_WAIT_UNSUPPORTED: &str =
     "GPIO async wait is not bound for the requested pin";
+#[cfg(feature = "gpio-async-wait")]
 const GENERATED_DRV_GPIOA_GPIO_WAIT_LINES: &[GPIOAInputWaitLineConfig] = &[
     GPIOAInputWaitLineConfig {
         line_index: 0u32,
@@ -1548,51 +1562,67 @@ const GENERATED_DRV_GPIOA_GPIO_WAIT_LINES: &[GPIOAInputWaitLineConfig] = &[
         pending_mask: 0x00008000u32,
     },
 ];
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_0: critical_section::Mutex<
     core::cell::RefCell<GPIOAInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_1: critical_section::Mutex<
     core::cell::RefCell<GPIOAInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_2: critical_section::Mutex<
     core::cell::RefCell<GPIOAInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_3: critical_section::Mutex<
     core::cell::RefCell<GPIOAInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_4: critical_section::Mutex<
     core::cell::RefCell<GPIOAInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_5: critical_section::Mutex<
     core::cell::RefCell<GPIOAInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_6: critical_section::Mutex<
     core::cell::RefCell<GPIOAInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_7: critical_section::Mutex<
     core::cell::RefCell<GPIOAInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_9: critical_section::Mutex<
     core::cell::RefCell<GPIOAInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_10: critical_section::Mutex<
     core::cell::RefCell<GPIOAInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_11: critical_section::Mutex<
     core::cell::RefCell<GPIOAInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_12: critical_section::Mutex<
     core::cell::RefCell<GPIOAInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_13: critical_section::Mutex<
     core::cell::RefCell<GPIOAInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_14: critical_section::Mutex<
     core::cell::RefCell<GPIOAInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_15: critical_section::Mutex<
     core::cell::RefCell<GPIOAInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 fn generated_drv_gpioa_gpio_wait_config(
     line_index: u32,
 ) -> Option<&'static GPIOAInputWaitLineConfig> {
@@ -1601,6 +1631,7 @@ fn generated_drv_gpioa_gpio_wait_config(
         .find(|config| config.line_index == line_index)
 }
 
+#[cfg(feature = "gpio-async-wait")]
 fn generated_drv_gpioa_gpio_wait_state(
     line_index: u32,
 ) -> Option<&'static critical_section::Mutex<core::cell::RefCell<GPIOAInputWaitState>>> {
@@ -1624,6 +1655,7 @@ fn generated_drv_gpioa_gpio_wait_state(
     }
 }
 
+#[cfg(feature = "gpio-async-wait")]
 fn generated_drv_gpioa_clear_gpio_wait_pending(
     config: &GPIOAInputWaitLineConfig,
 ) -> Result<(), metadata::Error> {
@@ -1634,6 +1666,7 @@ fn generated_drv_gpioa_clear_gpio_wait_pending(
     )
 }
 
+#[cfg(feature = "gpio-async-wait")]
 fn generated_drv_gpioa_prepare_gpio_wait(
     line_index: u32,
     rising: bool,
@@ -1686,6 +1719,7 @@ fn generated_drv_gpioa_prepare_gpio_wait(
     Ok(())
 }
 
+#[cfg(feature = "gpio-async-wait")]
 fn generated_drv_gpioa_poll_gpio_wait(
     line_index: u32,
     cx: &core::task::Context<'_>,
@@ -1750,6 +1784,7 @@ fn generated_drv_gpioa_poll_gpio_wait(
     }
 }
 
+#[cfg(feature = "gpio-async-wait")]
 pub(crate) fn generated_drv_gpioa_signal_gpio_wait(line_index: u32) -> Result<(), metadata::Error> {
     let state = generated_drv_gpioa_gpio_wait_state(line_index).ok_or(
         metadata::Error::InvalidReference(GENERATED_DRV_GPIOA_GPIO_WAIT_UNSUPPORTED),
@@ -1764,6 +1799,7 @@ pub(crate) fn generated_drv_gpioa_signal_gpio_wait(line_index: u32) -> Result<()
     Ok(())
 }
 
+#[cfg(feature = "gpio-async-wait")]
 async fn generated_drv_gpioa_wait_gpio_edge(
     line_index: u32,
     rising: bool,
@@ -1773,10 +1809,12 @@ async fn generated_drv_gpioa_wait_gpio_edge(
     core::future::poll_fn(|cx| generated_drv_gpioa_poll_gpio_wait(line_index, cx)).await
 }
 
+#[cfg(feature = "gpio-async-wait")]
 impl embedded_hal::digital::ErrorType for GPIOAInput {
     type Error = metadata::Error;
 }
 
+#[cfg(feature = "gpio-async-wait")]
 impl embedded_hal_async::digital::Wait for GPIOAInput {
     async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
         loop {
@@ -1831,6 +1869,7 @@ pub const DRV_GPIOB_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::Rese
     assert_operation_refs: &[],
     release_operation_refs: &[],
 }];
+#[cfg(feature = "gpio-async-wait")]
 pub const DRV_GPIOB_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[
     metadata::InterruptSource {
         id: "isrc.exti.line0",
@@ -1896,6 +1935,9 @@ pub const DRV_GPIOB_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[
         clear_operation_refs: &["op.exti.clear_line7_pending"],
     },
 ];
+#[cfg(not(feature = "gpio-async-wait"))]
+pub const DRV_GPIOB_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];
+#[cfg(feature = "gpio-async-wait")]
 pub const DRV_GPIOB_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[
     metadata::InterruptRoute {
         id: "iroute.exti.line0",
@@ -1989,6 +2031,8 @@ pub const DRV_GPIOB_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[
         shared_group: Some("exti9_5"),
     },
 ];
+#[cfg(not(feature = "gpio-async-wait"))]
+pub const DRV_GPIOB_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];
 pub const DRV_GPIOB_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_GPIOB_DMA_ROUTES: &[metadata::DmaRoute] = &[];
 pub const DRV_GPIOB_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
@@ -2121,7 +2165,10 @@ pub const DRV_GPIOB_PIN_ROLES: &[metadata::PinRole] = &[
 ];
 pub const DRV_GPIOB_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_GPIOB_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
+#[cfg(feature = "gpio-async-wait")]
 pub const DRV_GPIOB_CAPABILITY_TAGS: &[&str] = &["embedded-hal-async-wait"];
+#[cfg(not(feature = "gpio-async-wait"))]
+pub const DRV_GPIOB_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
 pub struct GPIOBResources {
@@ -2531,17 +2578,20 @@ impl GPIOBOutput {
     }
 }
 
+#[cfg(feature = "gpio-async-wait")]
 #[derive(Debug)]
 struct GPIOBInputWaitState {
     waker: Option<core::task::Waker>,
 }
 
+#[cfg(feature = "gpio-async-wait")]
 impl GPIOBInputWaitState {
     const fn new() -> Self {
         Self { waker: None }
     }
 }
 
+#[cfg(feature = "gpio-async-wait")]
 #[derive(Debug, Clone, Copy)]
 struct GPIOBInputWaitLineConfig {
     line_index: u32,
@@ -2558,8 +2608,10 @@ struct GPIOBInputWaitLineConfig {
     pending_mask: u32,
 }
 
+#[cfg(feature = "gpio-async-wait")]
 const GENERATED_DRV_GPIOB_GPIO_WAIT_UNSUPPORTED: &str =
     "GPIO async wait is not bound for the requested pin";
+#[cfg(feature = "gpio-async-wait")]
 const GENERATED_DRV_GPIOB_GPIO_WAIT_LINES: &[GPIOBInputWaitLineConfig] = &[
     GPIOBInputWaitLineConfig {
         line_index: 0u32,
@@ -2660,27 +2712,35 @@ const GENERATED_DRV_GPIOB_GPIO_WAIT_LINES: &[GPIOBInputWaitLineConfig] = &[
         pending_mask: 0x00000080u32,
     },
 ];
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_0: critical_section::Mutex<
     core::cell::RefCell<GPIOBInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOBInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_1: critical_section::Mutex<
     core::cell::RefCell<GPIOBInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOBInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_3: critical_section::Mutex<
     core::cell::RefCell<GPIOBInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOBInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_4: critical_section::Mutex<
     core::cell::RefCell<GPIOBInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOBInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_5: critical_section::Mutex<
     core::cell::RefCell<GPIOBInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOBInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_6: critical_section::Mutex<
     core::cell::RefCell<GPIOBInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOBInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_7: critical_section::Mutex<
     core::cell::RefCell<GPIOBInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIOBInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 fn generated_drv_gpiob_gpio_wait_config(
     line_index: u32,
 ) -> Option<&'static GPIOBInputWaitLineConfig> {
@@ -2689,6 +2749,7 @@ fn generated_drv_gpiob_gpio_wait_config(
         .find(|config| config.line_index == line_index)
 }
 
+#[cfg(feature = "gpio-async-wait")]
 fn generated_drv_gpiob_gpio_wait_state(
     line_index: u32,
 ) -> Option<&'static critical_section::Mutex<core::cell::RefCell<GPIOBInputWaitState>>> {
@@ -2704,6 +2765,7 @@ fn generated_drv_gpiob_gpio_wait_state(
     }
 }
 
+#[cfg(feature = "gpio-async-wait")]
 fn generated_drv_gpiob_clear_gpio_wait_pending(
     config: &GPIOBInputWaitLineConfig,
 ) -> Result<(), metadata::Error> {
@@ -2714,6 +2776,7 @@ fn generated_drv_gpiob_clear_gpio_wait_pending(
     )
 }
 
+#[cfg(feature = "gpio-async-wait")]
 fn generated_drv_gpiob_prepare_gpio_wait(
     line_index: u32,
     rising: bool,
@@ -2766,6 +2829,7 @@ fn generated_drv_gpiob_prepare_gpio_wait(
     Ok(())
 }
 
+#[cfg(feature = "gpio-async-wait")]
 fn generated_drv_gpiob_poll_gpio_wait(
     line_index: u32,
     cx: &core::task::Context<'_>,
@@ -2830,6 +2894,7 @@ fn generated_drv_gpiob_poll_gpio_wait(
     }
 }
 
+#[cfg(feature = "gpio-async-wait")]
 pub(crate) fn generated_drv_gpiob_signal_gpio_wait(line_index: u32) -> Result<(), metadata::Error> {
     let state = generated_drv_gpiob_gpio_wait_state(line_index).ok_or(
         metadata::Error::InvalidReference(GENERATED_DRV_GPIOB_GPIO_WAIT_UNSUPPORTED),
@@ -2844,6 +2909,7 @@ pub(crate) fn generated_drv_gpiob_signal_gpio_wait(line_index: u32) -> Result<()
     Ok(())
 }
 
+#[cfg(feature = "gpio-async-wait")]
 async fn generated_drv_gpiob_wait_gpio_edge(
     line_index: u32,
     rising: bool,
@@ -2853,10 +2919,12 @@ async fn generated_drv_gpiob_wait_gpio_edge(
     core::future::poll_fn(|cx| generated_drv_gpiob_poll_gpio_wait(line_index, cx)).await
 }
 
+#[cfg(feature = "gpio-async-wait")]
 impl embedded_hal::digital::ErrorType for GPIOBInput {
     type Error = metadata::Error;
 }
 
+#[cfg(feature = "gpio-async-wait")]
 impl embedded_hal_async::digital::Wait for GPIOBInput {
     async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
         loop {
@@ -2911,6 +2979,7 @@ pub const DRV_GPIOD_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::Rese
     assert_operation_refs: &[],
     release_operation_refs: &[],
 }];
+#[cfg(feature = "gpio-async-wait")]
 pub const DRV_GPIOD_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[
     metadata::InterruptSource {
         id: "isrc.exti.line0",
@@ -2931,6 +3000,9 @@ pub const DRV_GPIOD_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[
         clear_operation_refs: &["op.exti.clear_line1_pending"],
     },
 ];
+#[cfg(not(feature = "gpio-async-wait"))]
+pub const DRV_GPIOD_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];
+#[cfg(feature = "gpio-async-wait")]
 pub const DRV_GPIOD_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[
     metadata::InterruptRoute {
         id: "iroute.exti.line0",
@@ -2959,6 +3031,8 @@ pub const DRV_GPIOD_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[
         shared_group: None,
     },
 ];
+#[cfg(not(feature = "gpio-async-wait"))]
+pub const DRV_GPIOD_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];
 pub const DRV_GPIOD_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_GPIOD_DMA_ROUTES: &[metadata::DmaRoute] = &[];
 pub const DRV_GPIOD_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
@@ -3001,7 +3075,10 @@ pub const DRV_GPIOD_PIN_ROLES: &[metadata::PinRole] = &[
 ];
 pub const DRV_GPIOD_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_GPIOD_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
+#[cfg(feature = "gpio-async-wait")]
 pub const DRV_GPIOD_CAPABILITY_TAGS: &[&str] = &["embedded-hal-async-wait"];
+#[cfg(not(feature = "gpio-async-wait"))]
+pub const DRV_GPIOD_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
 pub struct GPIODResources {
@@ -3316,17 +3393,20 @@ impl GPIODOutput {
     }
 }
 
+#[cfg(feature = "gpio-async-wait")]
 #[derive(Debug)]
 struct GPIODInputWaitState {
     waker: Option<core::task::Waker>,
 }
 
+#[cfg(feature = "gpio-async-wait")]
 impl GPIODInputWaitState {
     const fn new() -> Self {
         Self { waker: None }
     }
 }
 
+#[cfg(feature = "gpio-async-wait")]
 #[derive(Debug, Clone, Copy)]
 struct GPIODInputWaitLineConfig {
     line_index: u32,
@@ -3343,8 +3423,10 @@ struct GPIODInputWaitLineConfig {
     pending_mask: u32,
 }
 
+#[cfg(feature = "gpio-async-wait")]
 const GENERATED_DRV_GPIOD_GPIO_WAIT_UNSUPPORTED: &str =
     "GPIO async wait is not bound for the requested pin";
+#[cfg(feature = "gpio-async-wait")]
 const GENERATED_DRV_GPIOD_GPIO_WAIT_LINES: &[GPIODInputWaitLineConfig] = &[
     GPIODInputWaitLineConfig {
         line_index: 0u32,
@@ -3375,12 +3457,15 @@ const GENERATED_DRV_GPIOD_GPIO_WAIT_LINES: &[GPIODInputWaitLineConfig] = &[
         pending_mask: 0x00000002u32,
     },
 ];
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOD_GPIO_EXTI_WAIT_LINE_0: critical_section::Mutex<
     core::cell::RefCell<GPIODInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIODInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 static GENERATED_DRV_GPIOD_GPIO_EXTI_WAIT_LINE_1: critical_section::Mutex<
     core::cell::RefCell<GPIODInputWaitState>,
 > = critical_section::Mutex::new(core::cell::RefCell::new(GPIODInputWaitState::new()));
+#[cfg(feature = "gpio-async-wait")]
 fn generated_drv_gpiod_gpio_wait_config(
     line_index: u32,
 ) -> Option<&'static GPIODInputWaitLineConfig> {
@@ -3389,6 +3474,7 @@ fn generated_drv_gpiod_gpio_wait_config(
         .find(|config| config.line_index == line_index)
 }
 
+#[cfg(feature = "gpio-async-wait")]
 fn generated_drv_gpiod_gpio_wait_state(
     line_index: u32,
 ) -> Option<&'static critical_section::Mutex<core::cell::RefCell<GPIODInputWaitState>>> {
@@ -3399,6 +3485,7 @@ fn generated_drv_gpiod_gpio_wait_state(
     }
 }
 
+#[cfg(feature = "gpio-async-wait")]
 fn generated_drv_gpiod_clear_gpio_wait_pending(
     config: &GPIODInputWaitLineConfig,
 ) -> Result<(), metadata::Error> {
@@ -3409,6 +3496,7 @@ fn generated_drv_gpiod_clear_gpio_wait_pending(
     )
 }
 
+#[cfg(feature = "gpio-async-wait")]
 fn generated_drv_gpiod_prepare_gpio_wait(
     line_index: u32,
     rising: bool,
@@ -3461,6 +3549,7 @@ fn generated_drv_gpiod_prepare_gpio_wait(
     Ok(())
 }
 
+#[cfg(feature = "gpio-async-wait")]
 fn generated_drv_gpiod_poll_gpio_wait(
     line_index: u32,
     cx: &core::task::Context<'_>,
@@ -3525,6 +3614,7 @@ fn generated_drv_gpiod_poll_gpio_wait(
     }
 }
 
+#[cfg(feature = "gpio-async-wait")]
 pub(crate) fn generated_drv_gpiod_signal_gpio_wait(line_index: u32) -> Result<(), metadata::Error> {
     let state = generated_drv_gpiod_gpio_wait_state(line_index).ok_or(
         metadata::Error::InvalidReference(GENERATED_DRV_GPIOD_GPIO_WAIT_UNSUPPORTED),
@@ -3539,6 +3629,7 @@ pub(crate) fn generated_drv_gpiod_signal_gpio_wait(line_index: u32) -> Result<()
     Ok(())
 }
 
+#[cfg(feature = "gpio-async-wait")]
 async fn generated_drv_gpiod_wait_gpio_edge(
     line_index: u32,
     rising: bool,
@@ -3548,10 +3639,12 @@ async fn generated_drv_gpiod_wait_gpio_edge(
     core::future::poll_fn(|cx| generated_drv_gpiod_poll_gpio_wait(line_index, cx)).await
 }
 
+#[cfg(feature = "gpio-async-wait")]
 impl embedded_hal::digital::ErrorType for GPIODInput {
     type Error = metadata::Error;
 }
 
+#[cfg(feature = "gpio-async-wait")]
 impl embedded_hal_async::digital::Wait for GPIODInput {
     async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
         loop {

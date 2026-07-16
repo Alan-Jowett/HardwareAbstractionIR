@@ -384,6 +384,19 @@ surface: helper structs and constants in the emitted crate must preserve
 the lowering-relevant structure needed to explain and reuse the approved
 driver contract.
 
+The generated embedded HAL crate must also preserve that traceability in
+its Cargo feature surface. At minimum, each emitted peripheral family must
+be selectable through an opt-in feature, and `default` must not silently
+enable the whole generated driver inventory. Disabling a family feature
+must suppress the corresponding `src\lib.rs` export plus any helper data,
+interrupt handlers, or runtime glue that exist only to realize that
+family's APIs or optional async/IRQ-backed capabilities. If a family such
+as GPIO can emit an additional capability that would otherwise force
+unrelated runtime code into every image, the generator may add extra
+non-default support features for that capability as long as those features
+remain derived from the approved HAIR contract rather than from ad hoc
+manual source edits.
+
 For host-emulated generation, the same traceability rule applies to the
 companion emulator/state handles and their observation/control methods.
 

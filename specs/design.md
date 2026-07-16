@@ -471,6 +471,17 @@ generation model, and emits a multi-file Rust crate rooted at `--output-dir`.
 It generates `Cargo.toml`, `src\lib.rs`, `src\metadata.rs`, and one or more
 module files derived from the resolved driver set.
 
+The generated embedded crate's `Cargo.toml` is also part of the executable
+lowering contract. The generator must partition emitted code by peripheral
+family behind opt-in Cargo features, leave the default feature set empty, and
+ensure those features gate both public module exports and any family-specific
+runtime/support code that would otherwise be retained by shared interrupt or
+runtime initialization paths. In other words, a consumer that does not opt
+into GPIO async wait, DMA async completion, USB support, or another generated
+family/capability must not pay flash for the corresponding helper tables,
+vector handlers, or runtime wiring merely because some other generated module
+exists in the same crate.
+
 The generator enforces driver-kind support, scope checks, reference
 resolution, and profile-specific failure contracts before writing output. Its
 lowering path is intentionally family-aware rather than vendor-name-driven:
