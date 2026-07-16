@@ -285,7 +285,7 @@
       "description": "Optional explicit master-transaction lowering bindings for `i2c` driver instances that select a family such as `legacy-event-i2c-master`. These bindings name the exact control, status, and data handles used by the generated portable 7-bit controller-master transaction path. When the same driver instance also claims capability tag `embedded-hal-async-i2c-master`, the binding map may additionally name the interrupt-enable handles used to wake async tasks from the same approved event/error route closure. Generators must fail explicitly rather than inferring these roles from vendor register names when the selected lowering family requires them.",
       "properties": {
         "dataRegisterRef": {
-          "description": "Entity ref for the data register or field used for both address-byte and payload-byte transfers on the selected master path.",
+          "description": "Entity ref for the data register field used for both address-byte and payload-byte transfers on the selected master path.",
           "$ref": "../common.json#/$defs/entityRef"
         },
         "startRef": {
