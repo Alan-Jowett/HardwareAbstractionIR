@@ -268,9 +268,134 @@ pub const DRV_I2C1_PIN_ROLES: &[metadata::PinRole] = &[
         requirement: metadata::ResourceRequirement::Optional,
     },
 ];
-pub const DRV_I2C1_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
+pub const DRV_I2C1_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[
+    metadata::SemanticOperation {
+        id: "op.i2c1.init_master_100khz",
+        name: "I2C1 initialize fixed 100 kHz master timing",
+        description: None,
+        kind: Some("initialization"),
+        target_refs: &["periph.i2c1"],
+        steps: &[
+            metadata::SemanticOperationStep {
+                index: 0,
+                action: "write",
+                target_ref: Some("reg.i2c1.ctlr1"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Clear PE",
+                }),
+                value: None,
+                description: Some(
+                    "Disable the peripheral before reprogramming the fixed timing profile.",
+                ),
+            },
+            metadata::SemanticOperationStep {
+                index: 1,
+                action: "write",
+                target_ref: Some("reg.i2c1.ctlr1"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Set SWRST = 1",
+                }),
+                value: None,
+                description: Some(
+                    "Assert the documented software reset bit before reinitialization.",
+                ),
+            },
+            metadata::SemanticOperationStep {
+                index: 2,
+                action: "write",
+                target_ref: Some("reg.i2c1.ctlr1"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Clear SWRST",
+                }),
+                value: None,
+                description: Some("Release the software reset bit."),
+            },
+            metadata::SemanticOperationStep {
+                index: 3,
+                action: "write",
+                target_ref: Some("reg.i2c1.ctlr2"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Write FREQ = 36",
+                }),
+                value: None,
+                description: Some(
+                    "Model the fixed APB1 = 36 MHz kernel clock selected for the first-cut generated helper.",
+                ),
+            },
+            metadata::SemanticOperationStep {
+                index: 4,
+                action: "write",
+                target_ref: Some("reg.i2c1.ckcfgr"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Clear FS",
+                }),
+                value: None,
+                description: Some("Use standard-mode timing rather than fast mode."),
+            },
+            metadata::SemanticOperationStep {
+                index: 5,
+                action: "write",
+                target_ref: Some("reg.i2c1.ckcfgr"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Clear DUTY",
+                }),
+                value: None,
+                description: Some(
+                    "Keep the reset-default duty selection for the fixed standard-mode profile.",
+                ),
+            },
+            metadata::SemanticOperationStep {
+                index: 6,
+                action: "write",
+                target_ref: Some("reg.i2c1.ckcfgr"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Write CCR = 180",
+                }),
+                value: None,
+                description: Some(
+                    "Program the standard-mode clock divider for a 100 kHz bus with a 36 MHz APB1 clock.",
+                ),
+            },
+            metadata::SemanticOperationStep {
+                index: 7,
+                action: "write",
+                target_ref: Some("reg.i2c1.rtr"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Write TRISE = 37",
+                }),
+                value: None,
+                description: Some(
+                    "Program the standard-mode maximum rise-time value for the same fixed timing profile.",
+                ),
+            },
+            metadata::SemanticOperationStep {
+                index: 8,
+                action: "write",
+                target_ref: Some("reg.i2c1.ctlr1"),
+                expression: Some(metadata::SemanticExpression {
+                    language: Some("plain"),
+                    text: "Set PE = 1",
+                }),
+                value: None,
+                description: Some(
+                    "Re-enable the peripheral after the fixed timing profile is loaded.",
+                ),
+            },
+        ],
+        preconditions: &[],
+        postconditions: &[],
+    },
+];
 pub const DRV_I2C1_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
-pub const DRV_I2C1_CAPABILITY_TAGS: &[&str] = &[];
+pub const DRV_I2C1_CAPABILITY_TAGS: &[&str] = &["embedded-hal-async-i2c-master"];
 
 #[derive(Debug, Clone, Copy)]
 pub struct I2C1RuntimeResources {}
@@ -303,7 +428,7 @@ pub const DRV_I2C1_METADATA_RESOURCES: I2C1MetadataResources = I2C1MetadataResou
     pins: DRV_I2C1_PIN_ROLES,
     init_operations: DRV_I2C1_INIT_OPERATIONS,
     state_machines: DRV_I2C1_STATE_MACHINES,
-    lowering_pattern: None,
+    lowering_pattern: Some("legacy-event-i2c-master"),
     time_driver_source: None,
     capability_tags: DRV_I2C1_CAPABILITY_TAGS,
 };
@@ -342,5 +467,584 @@ impl I2C1 {
     pub fn release_reset(&self) -> Result<(), metadata::Error> {
         modify_u32(0x40021010u64, 0x00200000u32, 0x00000000u32)?;
         Ok(())
+    }
+
+    fn generated_validate_7bit_address(&self, address: u8) -> Result<u8, metadata::Error> {
+        if address > 0x7Fu8 {
+            return Err(metadata::Error::Unsupported(
+                "I2C address exceeds the modeled 7-bit master subset",
+            ));
+        }
+        Ok(address)
+    }
+
+    pub fn init_master(&self) -> Result<(), metadata::Error> {
+        self.apply_init_master_100khz()?;
+        Ok(())
+    }
+
+    fn generated_check_and_clear_i2c_error_flags(&self) -> Result<(), metadata::Error> {
+        if ((u32::from(read_u16(0x40005414u64)?) & 0x00000400u32) >> 10) != 0u32 {
+            modify_u16(0x40005414u64, 0x0400u16, 0x0000u16)?;
+            return Err(metadata::Error::NoAcknowledge);
+        }
+        if ((u32::from(read_u16(0x40005414u64)?) & 0x00000200u32) >> 9) != 0u32 {
+            modify_u16(0x40005414u64, 0x0200u16, 0x0000u16)?;
+            return Err(metadata::Error::ArbitrationLoss);
+        }
+        if ((u32::from(read_u16(0x40005414u64)?) & 0x00000100u32) >> 8) != 0u32 {
+            modify_u16(0x40005414u64, 0x0100u16, 0x0000u16)?;
+            return Err(metadata::Error::Bus);
+        }
+        Ok(())
+    }
+
+    fn generated_wait_until_bus_free(&self) -> Result<(), metadata::Error> {
+        while ((u32::from(read_u16(0x40005418u64)?) & 0x00000002u32) >> 1) != 0u32 {
+            self.generated_check_and_clear_i2c_error_flags()?;
+            core::hint::spin_loop();
+        }
+        Ok(())
+    }
+
+    fn generated_send_start(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40005400u64, 0x0100u16, 0x0100u16)?;
+        while (u32::from(read_u16(0x40005414u64)?) & 0x00000001u32) == 0u32 {
+            self.generated_check_and_clear_i2c_error_flags()?;
+            core::hint::spin_loop();
+        }
+        Ok(())
+    }
+
+    fn generated_set_ack(&self, enabled: bool) -> Result<(), metadata::Error> {
+        if enabled {
+            modify_u16(0x40005400u64, 0x0400u16, 0x0400u16)?;
+        } else {
+            modify_u16(0x40005400u64, 0x0400u16, 0x0000u16)?;
+        }
+        Ok(())
+    }
+
+    fn generated_set_ack_position(&self, enabled: bool) -> Result<(), metadata::Error> {
+        if enabled {
+            modify_u16(0x40005400u64, 0x0800u16, 0x0800u16)?;
+        } else {
+            modify_u16(0x40005400u64, 0x0800u16, 0x0000u16)?;
+        }
+        Ok(())
+    }
+
+    fn generated_send_stop(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40005400u64, 0x0200u16, 0x0200u16)?;
+        Ok(())
+    }
+
+    fn generated_send_address(&self, address: u8, read: bool) -> Result<(), metadata::Error> {
+        let address = self.generated_validate_7bit_address(address)?;
+        let header = (address << 1) | u8::from(read);
+        modify_u16(0x40005410u64, 0x00FFu16, (u16::from(header)) & 0x00FFu16)?;
+
+        while ((u32::from(read_u16(0x40005414u64)?) & 0x00000002u32) >> 1) == 0u32 {
+            self.generated_check_and_clear_i2c_error_flags()?;
+            core::hint::spin_loop();
+        }
+        let _ = u32::from(read_u16(0x40005414u64)?);
+        let _ = u32::from(read_u16(0x40005418u64)?);
+        Ok(())
+    }
+
+    fn generated_send_data_byte(&self, value: u8) -> Result<(), metadata::Error> {
+        while ((u32::from(read_u16(0x40005414u64)?) & 0x00000080u32) >> 7) == 0u32 {
+            self.generated_check_and_clear_i2c_error_flags()?;
+            core::hint::spin_loop();
+        }
+        modify_u16(0x40005410u64, 0x00FFu16, (u16::from(value)) & 0x00FFu16)?;
+
+        while ((u32::from(read_u16(0x40005414u64)?) & 0x00000004u32) >> 2) == 0u32 {
+            self.generated_check_and_clear_i2c_error_flags()?;
+            core::hint::spin_loop();
+        }
+        Ok(())
+    }
+
+    fn generated_receive_data_byte(&self) -> Result<u8, metadata::Error> {
+        while ((u32::from(read_u16(0x40005414u64)?) & 0x00000040u32) >> 6) == 0u32 {
+            self.generated_check_and_clear_i2c_error_flags()?;
+            core::hint::spin_loop();
+        }
+        let value = u32::from(read_u16(0x40005410u64)?) & 0x000000FFu32;
+        u8::try_from(value)
+            .map_err(|_| metadata::Error::Unsupported("generated I2C data field exceeds u8"))
+    }
+
+    fn generated_write_frame(
+        &self,
+        address: u8,
+        write: &[u8],
+        send_start: bool,
+        send_stop: bool,
+    ) -> Result<(), metadata::Error> {
+        if send_start {
+            self.generated_send_start()?;
+            self.generated_send_address(address, false)?;
+        } else if write.is_empty() && !send_stop {
+            return Ok(());
+        }
+        for &value in write {
+            self.generated_send_data_byte(value)?;
+        }
+        if !write.is_empty() {
+            while ((u32::from(read_u16(0x40005414u64)?) & 0x00000004u32) >> 2) == 0u32 {
+                self.generated_check_and_clear_i2c_error_flags()?;
+                core::hint::spin_loop();
+            }
+        }
+        if send_stop {
+            self.generated_send_stop()?;
+        }
+        Ok(())
+    }
+
+    fn generated_read_frame(
+        &self,
+        address: u8,
+        read: &mut [u8],
+        send_start: bool,
+        send_nack: bool,
+        send_stop: bool,
+    ) -> Result<(), metadata::Error> {
+        let Some((last, prefix)) = read.split_last_mut() else {
+            return Err(metadata::Error::Overrun);
+        };
+        if send_start {
+            self.generated_set_ack_position(false)?;
+            self.generated_set_ack(true)?;
+            self.generated_send_start()?;
+            self.generated_send_address(address, true)?;
+        }
+        for value in prefix {
+            *value = self.generated_receive_data_byte()?;
+        }
+        if send_nack {
+            self.generated_set_ack(false)?;
+        }
+        if send_stop {
+            self.generated_send_stop()?;
+        }
+        *last = self.generated_receive_data_byte()?;
+        Ok(())
+    }
+
+    pub fn blocking_write_7bit(&self, address: u8, write: &[u8]) -> Result<(), metadata::Error> {
+        self.generated_wait_until_bus_free()?;
+        self.generated_write_frame(address, write, true, true)
+    }
+
+    pub fn blocking_read_7bit(&self, address: u8, read: &mut [u8]) -> Result<(), metadata::Error> {
+        self.generated_wait_until_bus_free()?;
+        self.generated_read_frame(address, read, true, true, true)
+    }
+
+    pub fn blocking_write_read_7bit(
+        &self,
+        address: u8,
+        write: &[u8],
+        read: &mut [u8],
+    ) -> Result<(), metadata::Error> {
+        self.generated_wait_until_bus_free()?;
+        self.generated_write_frame(address, write, true, false)?;
+        self.generated_read_frame(address, read, true, true, true)
+    }
+
+    pub fn blocking_transaction_7bit(
+        &self,
+        address: u8,
+        operations: &mut [embedded_hal::i2c::Operation<'_>],
+    ) -> Result<(), metadata::Error> {
+        if operations.is_empty() {
+            return Ok(());
+        }
+        self.generated_wait_until_bus_free()?;
+        for index in 0..operations.len() {
+            let send_start = if index == 0 {
+                true
+            } else {
+                core::mem::discriminant(&operations[index - 1])
+                    != core::mem::discriminant(&operations[index])
+            };
+            let is_last = index + 1 == operations.len();
+            let next_changes_kind = if is_last {
+                true
+            } else {
+                core::mem::discriminant(&operations[index])
+                    != core::mem::discriminant(&operations[index + 1])
+            };
+            match &mut operations[index] {
+                embedded_hal::i2c::Operation::Write(write) => {
+                    self.generated_write_frame(address, write, send_start, is_last)?;
+                }
+                embedded_hal::i2c::Operation::Read(read) => {
+                    self.generated_read_frame(
+                        address,
+                        read,
+                        send_start,
+                        next_changes_kind,
+                        is_last,
+                    )?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "i2c-async")]
+    async fn generated_wait_i2c_async_until<F>(&self, mut ready: F) -> Result<(), metadata::Error>
+    where
+        F: FnMut(&Self) -> Result<bool, metadata::Error>,
+    {
+        loop {
+            generated_drv_i2c1_prepare_i2c_async_wait();
+            self.generated_check_and_clear_i2c_error_flags()?;
+            if ready(self)? {
+                return Ok(());
+            }
+            self.generated_enable_i2c_async_interrupts()?;
+            generated_drv_i2c1_wait_i2c_async().await?;
+        }
+    }
+
+    #[cfg(feature = "i2c-async")]
+    fn generated_enable_i2c_async_interrupts(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40005404u64, 0x0200u16, 0x0200u16)?;
+        modify_u16(0x40005404u64, 0x0400u16, 0x0400u16)?;
+        modify_u16(0x40005404u64, 0x0100u16, 0x0100u16)?;
+        Ok(())
+    }
+
+    #[cfg(feature = "i2c-async")]
+    async fn generated_send_start_async(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40005400u64, 0x0100u16, 0x0100u16)?;
+        self.generated_wait_i2c_async_until(|_| {
+            Ok((u32::from(read_u16(0x40005414u64)?) & 0x00000001u32) != 0u32)
+        })
+        .await
+    }
+
+    #[cfg(feature = "i2c-async")]
+    async fn generated_send_address_async(
+        &self,
+        address: u8,
+        read: bool,
+    ) -> Result<(), metadata::Error> {
+        let address = self.generated_validate_7bit_address(address)?;
+        let header = (address << 1) | u8::from(read);
+        modify_u16(0x40005410u64, 0x00FFu16, (u16::from(header)) & 0x00FFu16)?;
+
+        self.generated_wait_i2c_async_until(|_| {
+            Ok(((u32::from(read_u16(0x40005414u64)?) & 0x00000002u32) >> 1) != 0u32)
+        })
+        .await?;
+        let _ = u32::from(read_u16(0x40005414u64)?);
+        let _ = u32::from(read_u16(0x40005418u64)?);
+        Ok(())
+    }
+
+    #[cfg(feature = "i2c-async")]
+    async fn generated_send_data_byte_async(&self, value: u8) -> Result<(), metadata::Error> {
+        self.generated_wait_i2c_async_until(|_| {
+            Ok(((u32::from(read_u16(0x40005414u64)?) & 0x00000080u32) >> 7) != 0u32)
+        })
+        .await?;
+        modify_u16(0x40005410u64, 0x00FFu16, (u16::from(value)) & 0x00FFu16)?;
+
+        self.generated_wait_i2c_async_until(|_| {
+            Ok(((u32::from(read_u16(0x40005414u64)?) & 0x00000004u32) >> 2) != 0u32)
+        })
+        .await
+    }
+
+    #[cfg(feature = "i2c-async")]
+    async fn generated_receive_data_byte_async(&self) -> Result<u8, metadata::Error> {
+        self.generated_wait_i2c_async_until(|_| {
+            Ok(((u32::from(read_u16(0x40005414u64)?) & 0x00000040u32) >> 6) != 0u32)
+        })
+        .await?;
+        let value = u32::from(read_u16(0x40005410u64)?) & 0x000000FFu32;
+        u8::try_from(value)
+            .map_err(|_| metadata::Error::Unsupported("generated I2C data field exceeds u8"))
+    }
+
+    #[cfg(feature = "i2c-async")]
+    async fn generated_write_frame_async(
+        &self,
+        address: u8,
+        write: &[u8],
+        send_start: bool,
+        send_stop: bool,
+    ) -> Result<(), metadata::Error> {
+        if send_start {
+            self.generated_send_start_async().await?;
+            self.generated_send_address_async(address, false).await?;
+        } else if write.is_empty() && !send_stop {
+            return Ok(());
+        }
+        for &value in write {
+            self.generated_send_data_byte_async(value).await?;
+        }
+        if !write.is_empty() {
+            self.generated_wait_i2c_async_until(|_| {
+                Ok(((u32::from(read_u16(0x40005414u64)?) & 0x00000004u32) >> 2) != 0u32)
+            })
+            .await?;
+        }
+        if send_stop {
+            self.generated_send_stop()?;
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "i2c-async")]
+    async fn generated_read_frame_async(
+        &self,
+        address: u8,
+        read: &mut [u8],
+        send_start: bool,
+        send_nack: bool,
+        send_stop: bool,
+    ) -> Result<(), metadata::Error> {
+        let Some((last, prefix)) = read.split_last_mut() else {
+            return Err(metadata::Error::Overrun);
+        };
+        if send_start {
+            self.generated_set_ack_position(false)?;
+            self.generated_set_ack(true)?;
+            self.generated_send_start_async().await?;
+            self.generated_send_address_async(address, true).await?;
+        }
+        for value in prefix {
+            *value = self.generated_receive_data_byte_async().await?;
+        }
+        if send_nack {
+            self.generated_set_ack(false)?;
+        }
+        if send_stop {
+            self.generated_send_stop()?;
+        }
+        *last = self.generated_receive_data_byte_async().await?;
+        Ok(())
+    }
+
+    #[cfg(feature = "i2c-async")]
+    pub async fn write_async_7bit(&self, address: u8, write: &[u8]) -> Result<(), metadata::Error> {
+        self.generated_wait_until_bus_free()?;
+        self.generated_write_frame_async(address, write, true, true)
+            .await
+    }
+
+    #[cfg(feature = "i2c-async")]
+    pub async fn read_async_7bit(
+        &self,
+        address: u8,
+        read: &mut [u8],
+    ) -> Result<(), metadata::Error> {
+        self.generated_wait_until_bus_free()?;
+        self.generated_read_frame_async(address, read, true, true, true)
+            .await
+    }
+
+    #[cfg(feature = "i2c-async")]
+    pub async fn write_read_async_7bit(
+        &self,
+        address: u8,
+        write: &[u8],
+        read: &mut [u8],
+    ) -> Result<(), metadata::Error> {
+        self.generated_wait_until_bus_free()?;
+        self.generated_write_frame_async(address, write, true, false)
+            .await?;
+        self.generated_read_frame_async(address, read, true, true, true)
+            .await
+    }
+
+    #[cfg(feature = "i2c-async")]
+    pub async fn transaction_async_7bit(
+        &self,
+        address: u8,
+        operations: &mut [embedded_hal::i2c::Operation<'_>],
+    ) -> Result<(), metadata::Error> {
+        if operations.is_empty() {
+            return Ok(());
+        }
+        self.generated_wait_until_bus_free()?;
+        for index in 0..operations.len() {
+            let send_start = if index == 0 {
+                true
+            } else {
+                core::mem::discriminant(&operations[index - 1])
+                    != core::mem::discriminant(&operations[index])
+            };
+            let is_last = index + 1 == operations.len();
+            let next_changes_kind = if is_last {
+                true
+            } else {
+                core::mem::discriminant(&operations[index])
+                    != core::mem::discriminant(&operations[index + 1])
+            };
+            match &mut operations[index] {
+                embedded_hal::i2c::Operation::Write(write) => {
+                    self.generated_write_frame_async(address, write, send_start, is_last)
+                        .await?;
+                }
+                embedded_hal::i2c::Operation::Read(read) => {
+                    self.generated_read_frame_async(
+                        address,
+                        read,
+                        send_start,
+                        next_changes_kind,
+                        is_last,
+                    )
+                    .await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn apply_init_master_100khz(&self) -> Result<(), metadata::Error> {
+        modify_u16(0x40005400u64, 0x0001u16, 0x0000u16)?;
+        modify_u16(0x40005400u64, 0x8000u16, 0x8000u16)?;
+        modify_u16(0x40005400u64, 0x8000u16, 0x0000u16)?;
+        modify_u16(0x40005404u64, 0x003Fu16, 0x0024u16)?;
+        modify_u16(0x4000541Cu64, 0x8000u16, 0x0000u16)?;
+        modify_u16(0x4000541Cu64, 0x4000u16, 0x0000u16)?;
+        modify_u16(0x4000541Cu64, 0x0FFFu16, 0x00B4u16)?;
+        modify_u16(0x40005420u64, 0x003Fu16, 0x0025u16)?;
+        modify_u16(0x40005400u64, 0x0001u16, 0x0001u16)?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "i2c")]
+impl embedded_hal::i2c::ErrorType for I2C1 {
+    type Error = metadata::Error;
+}
+
+#[cfg(feature = "i2c")]
+impl embedded_hal::i2c::I2c<embedded_hal::i2c::SevenBitAddress> for I2C1 {
+    fn read(&mut self, address: u8, read: &mut [u8]) -> Result<(), Self::Error> {
+        self.blocking_read_7bit(address, read)
+    }
+
+    fn write(&mut self, address: u8, write: &[u8]) -> Result<(), Self::Error> {
+        self.blocking_write_7bit(address, write)
+    }
+
+    fn write_read(
+        &mut self,
+        address: u8,
+        write: &[u8],
+        read: &mut [u8],
+    ) -> Result<(), Self::Error> {
+        self.blocking_write_read_7bit(address, write, read)
+    }
+
+    fn transaction(
+        &mut self,
+        address: u8,
+        operations: &mut [embedded_hal::i2c::Operation<'_>],
+    ) -> Result<(), Self::Error> {
+        self.blocking_transaction_7bit(address, operations)
+    }
+}
+
+#[cfg(feature = "i2c-async")]
+#[derive(Debug)]
+struct GeneratedI2C1I2cAsyncState {
+    ready: bool,
+    waker: Option<core::task::Waker>,
+}
+
+#[cfg(feature = "i2c-async")]
+impl GeneratedI2C1I2cAsyncState {
+    const fn new() -> Self {
+        Self {
+            ready: false,
+            waker: None,
+        }
+    }
+}
+
+#[cfg(feature = "i2c-async")]
+static GENERATED_DRV_I2C1_I2C_ASYNC_STATE: critical_section::Mutex<
+    core::cell::RefCell<GeneratedI2C1I2cAsyncState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GeneratedI2C1I2cAsyncState::new()));
+
+#[cfg(feature = "i2c-async")]
+fn generated_drv_i2c1_prepare_i2c_async_wait() {
+    critical_section::with(|cs| {
+        let mut state = GENERATED_DRV_I2C1_I2C_ASYNC_STATE.borrow(cs).borrow_mut();
+        state.ready = false;
+        state.waker = None;
+    });
+}
+
+#[cfg(feature = "i2c-async")]
+async fn generated_drv_i2c1_wait_i2c_async() -> Result<(), metadata::Error> {
+    core::future::poll_fn(|cx| {
+        critical_section::with(|cs| {
+            let mut state = GENERATED_DRV_I2C1_I2C_ASYNC_STATE.borrow(cs).borrow_mut();
+            if state.ready {
+                state.ready = false;
+                core::task::Poll::Ready(Ok(()))
+            } else {
+                state.waker = Some(cx.waker().clone());
+                core::task::Poll::Pending
+            }
+        })
+    })
+    .await
+}
+
+#[cfg(feature = "i2c-async")]
+pub(crate) fn generated_drv_i2c1_signal_i2c_async() -> Result<(), metadata::Error> {
+    modify_u16(0x40005404u64, 0x0200u16, 0x0000u16)?;
+    modify_u16(0x40005404u64, 0x0400u16, 0x0000u16)?;
+    modify_u16(0x40005404u64, 0x0100u16, 0x0000u16)?;
+    let waker = critical_section::with(|cs| {
+        let mut state = GENERATED_DRV_I2C1_I2C_ASYNC_STATE.borrow(cs).borrow_mut();
+        state.ready = true;
+        state.waker.take()
+    });
+    if let Some(waker) = waker {
+        waker.wake();
+    }
+    Ok(())
+}
+
+#[cfg(feature = "i2c-async")]
+impl embedded_hal_async::i2c::I2c<embedded_hal::i2c::SevenBitAddress> for I2C1 {
+    async fn read(&mut self, address: u8, read: &mut [u8]) -> Result<(), Self::Error> {
+        self.read_async_7bit(address, read).await
+    }
+
+    async fn write(&mut self, address: u8, write: &[u8]) -> Result<(), Self::Error> {
+        self.write_async_7bit(address, write).await
+    }
+
+    async fn write_read(
+        &mut self,
+        address: u8,
+        write: &[u8],
+        read: &mut [u8],
+    ) -> Result<(), Self::Error> {
+        self.write_read_async_7bit(address, write, read).await
+    }
+
+    async fn transaction(
+        &mut self,
+        address: u8,
+        operations: &mut [embedded_hal::i2c::Operation<'_>],
+    ) -> Result<(), Self::Error> {
+        self.transaction_async_7bit(address, operations).await
     }
 }

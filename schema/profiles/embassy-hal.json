@@ -66,13 +66,14 @@
     },
     "loweringPattern": {
       "type": "string",
-      "description": "Optional generator-facing lowering selector for cases where one supported driver kind has more than one approved evidence-backed lowering family with materially different bring-up behavior. Reserved values currently include `serial-jtag-preserve-link`, which selects a USB Serial/JTAG-style lowering that preserves an already boot-established link instead of synthesizing a reset-and-reattach sequence; `fsdev-pma-btable`, which selects a controller-level full-speed USB device family built around PMA/BTABLE-style endpoint state and attach/reset servicing; `counter-compare-timer`, which selects a timer-backed Embassy async timing family built around an explicitly modeled free-running counter plus compare/alarm path; `regular-sequence-adc-dma`, which selects a software-started regular-group buffered ADC sampling family backed by one explicit DMA path; and `stm32f1-page-flash`, which selects an STM32F1-class memory-mapped internal flash sequencer with explicit unlock, page-erase, program, busy/error, and flag-clear bindings. Generators must fail explicitly if a selected lowering pattern lacks the referenced semantic inputs it requires.",
+      "description": "Optional generator-facing lowering selector for cases where one supported driver kind has more than one approved evidence-backed lowering family with materially different bring-up behavior. Reserved values currently include `serial-jtag-preserve-link`, which selects a USB Serial/JTAG-style lowering that preserves an already boot-established link instead of synthesizing a reset-and-reattach sequence; `fsdev-pma-btable`, which selects a controller-level full-speed USB device family built around PMA/BTABLE-style endpoint state and attach/reset servicing; `counter-compare-timer`, which selects a timer-backed Embassy async timing family built around an explicitly modeled free-running counter plus compare/alarm path; `regular-sequence-adc-dma`, which selects a software-started regular-group buffered ADC sampling family backed by one explicit DMA path; `stm32f1-page-flash`, which selects an STM32F1-class memory-mapped internal flash sequencer with explicit unlock, page-erase, program, busy/error, and flag-clear bindings; and `legacy-event-i2c-master`, which selects a legacy event/status-flag-driven I2C controller-master family whose portable lowering is limited to 7-bit master transactions backed by explicit control/status/data bindings. Generators must fail explicitly if a selected lowering pattern lacks the referenced semantic inputs it requires.",
       "enum": [
         "serial-jtag-preserve-link",
         "fsdev-pma-btable",
         "counter-compare-timer",
         "regular-sequence-adc-dma",
-        "stm32f1-page-flash"
+        "stm32f1-page-flash",
+        "legacy-event-i2c-master"
       ]
     },
     "timeDriverSource": {
@@ -276,6 +277,115 @@
       },
       "required": [
         "lines"
+      ],
+      "additionalProperties": false
+    },
+    "i2cMasterBindings": {
+      "type": "object",
+      "description": "Optional explicit master-transaction lowering bindings for `i2c` driver instances that select a family such as `legacy-event-i2c-master`. These bindings name the exact control, status, and data handles used by the generated portable 7-bit controller-master transaction path. When the same driver instance also claims capability tag `embedded-hal-async-i2c-master`, the binding map may additionally name the interrupt-enable handles used to wake async tasks from the same approved event/error route closure. Generators must fail explicitly rather than inferring these roles from vendor register names when the selected lowering family requires them.",
+      "properties": {
+        "dataRegisterRef": {
+          "description": "Entity ref for the data register or field used for both address-byte and payload-byte transfers on the selected master path.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "startRef": {
+          "description": "Entity ref for the control field written to request a START or repeated-START condition.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "stopRef": {
+          "description": "Entity ref for the control field written to request a STOP condition.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "acknowledgeRef": {
+          "description": "Entity ref for the control field that enables or disables ACK generation during master reads.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "acknowledgePositionRef": {
+          "description": "Optional entity ref for a controller-local ACK/POS field used by families whose final-byte receive sequencing distinguishes the ACK position from the ACK enable itself.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "busyFlagRef": {
+          "description": "Entity ref for the status flag that reports whether the bus is currently busy.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "startConditionFlagRef": {
+          "description": "Entity ref for the status flag that reports completion of the requested START or repeated-START condition.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "addressSentFlagRef": {
+          "description": "Entity ref for the status flag that reports completion of the controller-master address phase before any family-specific clear sequence is applied.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "transmitBufferEmptyFlagRef": {
+          "description": "Entity ref for the status flag that reports transmit-buffer empty or data-register-ready state for the selected master path.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "receiveBufferNotEmptyFlagRef": {
+          "description": "Entity ref for the status flag that reports receive-buffer not-empty state for the selected master path.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "byteTransferFinishedFlagRef": {
+          "description": "Entity ref for the status flag that reports end-of-byte or byte-transfer-finished state when the selected family requires it for STOP/final-byte sequencing.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "acknowledgeFailureFlagRef": {
+          "description": "Optional entity ref for the status flag that reports address or data NACK / acknowledge failure on the selected family.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "arbitrationLostFlagRef": {
+          "description": "Optional entity ref for the status flag that reports arbitration loss on the selected family.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "busErrorFlagRef": {
+          "description": "Optional entity ref for the status flag that reports a bus-error condition on the selected family.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "clearAddressOperationRefs": {
+          "description": "Semantic operations that perform the family-specific address-phase clear or acknowledge sequence required after the address-complete flag is observed and before payload transfer may continue.",
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "clearAcknowledgeFailureOperationRef": {
+          "description": "Optional entity ref for the semantic operation that acknowledges or clears the selected family's NACK / acknowledge-failure condition.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "clearArbitrationLostOperationRef": {
+          "description": "Optional entity ref for the semantic operation that acknowledges or clears arbitration-lost state on the selected family.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "clearBusErrorOperationRef": {
+          "description": "Optional entity ref for the semantic operation that acknowledges or clears bus-error state on the selected family.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "eventInterruptEnableRef": {
+          "description": "Optional entity ref for the control field that enables the controller's event interrupt path for async master transactions.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "bufferInterruptEnableRef": {
+          "description": "Optional entity ref for the control field that enables buffer-ready interrupts for async master transactions when the selected family exposes them separately from event interrupts.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "errorInterruptEnableRef": {
+          "description": "Optional entity ref for the control field that enables the controller's error interrupt path for async master transactions.",
+          "$ref": "../common.json#/$defs/entityRef"
+        }
+      },
+      "required": [
+        "dataRegisterRef",
+        "startRef",
+        "stopRef",
+        "acknowledgeRef",
+        "busyFlagRef",
+        "startConditionFlagRef",
+        "addressSentFlagRef",
+        "transmitBufferEmptyFlagRef",
+        "receiveBufferNotEmptyFlagRef",
+        "byteTransferFinishedFlagRef",
+        "clearAddressOperationRefs"
       ],
       "additionalProperties": false
     },
@@ -626,6 +736,9 @@
             "gpioExtiWaitBindings": {
               "$ref": "#/$defs/gpioExtiWaitBindings"
             },
+            "i2cMasterBindings": {
+              "$ref": "#/$defs/i2cMasterBindings"
+            },
             "flashBindings": {
               "$ref": "#/$defs/flashBindings"
             },
@@ -686,7 +799,7 @@
               "uniqueItems": true
             },
             "capabilityTags": {
-              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support, and `embedded-hal-async-wait` to mark `gpio-port` driver instances that may expose the `embedded_hal_async::digital::Wait` contract when explicit EXTI-backed wait bindings are also present. The accompanying `timeDriverSource` selector determines whether that support is the existing SysTick-backed interrupt path, an explicitly modeled hardware-timer-backed path, or an explicitly modeled rtc-backed path; `timeDriverTickHz` fixes the Embassy tick rate for modeled non-SysTick sources; `timeDriverBindings` names the exact non-SysTick lowering handles when that path is used; `adcDmaBindings` names the exact direct roles for `regular-sequence-adc-dma` buffered sampling when that ADC family is selected; `dmaAsyncBindings` names the exact channel-local interrupt/flag handles for generated DMA completion futures; `gpioExtiWaitBindings` names the exact line-local selector, trigger, pending, clear, and interrupt-route handles for EXTI-backed GPIO waits; and `flashBindings` names the managed region, geometry, control/status bindings, and required semantic operations for a portable internal-flash NOR surface.",
+              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support, `embedded-hal-async-wait` to mark `gpio-port` driver instances that may expose the `embedded_hal_async::digital::Wait` contract when explicit EXTI-backed wait bindings are also present, and `embedded-hal-async-i2c-master` to mark `i2c` driver instances that may expose the async `embedded_hal_async::i2c::I2c<SevenBitAddress>` master surface when explicit master bindings plus the required interrupt-route closure are present. The accompanying `timeDriverSource` selector determines whether that support is the existing SysTick-backed interrupt path, an explicitly modeled hardware-timer-backed path, or an explicitly modeled rtc-backed path; `timeDriverTickHz` fixes the Embassy tick rate for modeled non-SysTick sources; `timeDriverBindings` names the exact non-SysTick lowering handles when that path is used; `adcDmaBindings` names the exact direct roles for `regular-sequence-adc-dma` buffered sampling when that ADC family is selected; `dmaAsyncBindings` names the exact channel-local interrupt/flag handles for generated DMA completion futures; `gpioExtiWaitBindings` names the exact line-local selector, trigger, pending, clear, and interrupt-route handles for EXTI-backed GPIO waits; `i2cMasterBindings` names the exact legacy-I2C control/status/data roles and optional interrupt-enable handles for portable blocking and async 7-bit master transactions; and `flashBindings` names the managed region, geometry, control/status bindings, and required semantic operations for a portable internal-flash NOR surface.",
               "type": "array",
               "items": {
                 "type": "string"

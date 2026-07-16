@@ -8,6 +8,8 @@ use crate::gpio::generated_drv_gpioa_signal_gpio_wait;
 use crate::gpio::generated_drv_gpiob_signal_gpio_wait;
 #[cfg(feature = "gpio-async-wait")]
 use crate::gpio::generated_drv_gpiod_signal_gpio_wait;
+#[cfg(feature = "i2c-async")]
+use crate::i2c::generated_drv_i2c1_signal_i2c_async;
 use crate::interrupt::{DRV_PFIC_RUNTIME_RESOURCES, Irq, PFIC};
 use crate::metadata;
 use crate::time::{DRV_TIME_RTC_RUNTIME_RESOURCES, RTCEmbassyTimeDriver};
@@ -37,6 +39,10 @@ unsafe extern "C" {
     fn __hair_wch_drv_dma1_ch1_vector();
     #[cfg(feature = "gpio-async-wait")]
     fn __hair_wch_drv_gpioa_exti_exti9_5_vector();
+    #[cfg(feature = "i2c-async")]
+    fn __hair_wch_drv_i2c1_i2c1_ev_vector();
+    #[cfg(feature = "i2c-async")]
+    fn __hair_wch_drv_i2c1_i2c1_er_vector();
     #[cfg(feature = "gpio-async-wait")]
     fn __hair_wch_drv_gpioa_exti_exti15_10_vector();
     #[cfg(feature = "wch-runtime")]
@@ -82,6 +88,14 @@ const WCH_RUNTIME_DRV_DMA1_CH1_HANDLER_VECTOR: WchVector = WchVector {
 #[cfg(feature = "gpio-async-wait")]
 const WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI9_5_HANDLER_VECTOR: WchVector = WchVector {
     handler: __hair_wch_drv_gpioa_exti_exti9_5_vector,
+};
+#[cfg(feature = "i2c-async")]
+const WCH_RUNTIME_DRV_I2C1_I2C1_EV_HANDLER_VECTOR: WchVector = WchVector {
+    handler: __hair_wch_drv_i2c1_i2c1_ev_vector,
+};
+#[cfg(feature = "i2c-async")]
+const WCH_RUNTIME_DRV_I2C1_I2C1_ER_HANDLER_VECTOR: WchVector = WchVector {
+    handler: __hair_wch_drv_i2c1_i2c1_er_vector,
 };
 #[cfg(feature = "gpio-async-wait")]
 const WCH_RUNTIME_DRV_GPIOA_EXTI_EXTI15_10_HANDLER_VECTOR: WchVector = WchVector {
@@ -186,6 +200,32 @@ const fn __hair_assign_wch_runtime_drv_gpioa_exti_exti9_5_handler_vector(
 ) {
 }
 
+#[cfg(feature = "i2c-async")]
+const fn __hair_assign_wch_runtime_drv_i2c1_i2c1_ev_handler_vector(
+    table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+    table[47] = WCH_RUNTIME_DRV_I2C1_I2C1_EV_HANDLER_VECTOR;
+}
+
+#[cfg(not(feature = "i2c-async"))]
+const fn __hair_assign_wch_runtime_drv_i2c1_i2c1_ev_handler_vector(
+    _table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+}
+
+#[cfg(feature = "i2c-async")]
+const fn __hair_assign_wch_runtime_drv_i2c1_i2c1_er_handler_vector(
+    table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+    table[48] = WCH_RUNTIME_DRV_I2C1_I2C1_ER_HANDLER_VECTOR;
+}
+
+#[cfg(not(feature = "i2c-async"))]
+const fn __hair_assign_wch_runtime_drv_i2c1_i2c1_er_handler_vector(
+    _table: &mut [WchVector; WCH_VECTOR_COUNT],
+) {
+}
+
 #[cfg(feature = "gpio-async-wait")]
 const fn __hair_assign_wch_runtime_drv_gpioa_exti_exti15_10_handler_vector(
     table: &mut [WchVector; WCH_VECTOR_COUNT],
@@ -224,6 +264,8 @@ const fn build_wch_vector_table() -> WchVectorTable {
     __hair_assign_wch_runtime_drv_gpioa_exti_exti4_handler_vector(&mut table);
     __hair_assign_wch_runtime_drv_dma1_ch1_handler_vector(&mut table);
     __hair_assign_wch_runtime_drv_gpioa_exti_exti9_5_handler_vector(&mut table);
+    __hair_assign_wch_runtime_drv_i2c1_i2c1_ev_handler_vector(&mut table);
+    __hair_assign_wch_runtime_drv_i2c1_i2c1_er_handler_vector(&mut table);
     __hair_assign_wch_runtime_drv_gpioa_exti_exti15_10_handler_vector(&mut table);
     __hair_assign_wch_time_driver_handler_vector(&mut table);
     WchVectorTable(table)
@@ -550,6 +592,94 @@ __hair_wch_drv_gpioa_exti_exti9_5_vector:
 "#
 );
 
+#[cfg(feature = "i2c-async")]
+global_asm!(
+    r#"
+    .global __hair_wch_drv_i2c1_i2c1_ev_vector
+__hair_wch_drv_i2c1_i2c1_ev_vector:
+    addi sp, sp, -64
+    sw ra, 0(sp)
+    sw t0, 4(sp)
+    sw t1, 8(sp)
+    sw t2, 12(sp)
+    sw t3, 16(sp)
+    sw t4, 20(sp)
+    sw t5, 24(sp)
+    sw t6, 28(sp)
+    sw a0, 32(sp)
+    sw a1, 36(sp)
+    sw a2, 40(sp)
+    sw a3, 44(sp)
+    sw a4, 48(sp)
+    sw a5, 52(sp)
+    sw a6, 56(sp)
+    sw a7, 60(sp)
+    call __hair_wch_drv_i2c1_i2c1_ev_irq_rust
+    lw ra, 0(sp)
+    lw t0, 4(sp)
+    lw t1, 8(sp)
+    lw t2, 12(sp)
+    lw t3, 16(sp)
+    lw t4, 20(sp)
+    lw t5, 24(sp)
+    lw t6, 28(sp)
+    lw a0, 32(sp)
+    lw a1, 36(sp)
+    lw a2, 40(sp)
+    lw a3, 44(sp)
+    lw a4, 48(sp)
+    lw a5, 52(sp)
+    lw a6, 56(sp)
+    lw a7, 60(sp)
+    addi sp, sp, 64
+    mret
+"#
+);
+
+#[cfg(feature = "i2c-async")]
+global_asm!(
+    r#"
+    .global __hair_wch_drv_i2c1_i2c1_er_vector
+__hair_wch_drv_i2c1_i2c1_er_vector:
+    addi sp, sp, -64
+    sw ra, 0(sp)
+    sw t0, 4(sp)
+    sw t1, 8(sp)
+    sw t2, 12(sp)
+    sw t3, 16(sp)
+    sw t4, 20(sp)
+    sw t5, 24(sp)
+    sw t6, 28(sp)
+    sw a0, 32(sp)
+    sw a1, 36(sp)
+    sw a2, 40(sp)
+    sw a3, 44(sp)
+    sw a4, 48(sp)
+    sw a5, 52(sp)
+    sw a6, 56(sp)
+    sw a7, 60(sp)
+    call __hair_wch_drv_i2c1_i2c1_er_irq_rust
+    lw ra, 0(sp)
+    lw t0, 4(sp)
+    lw t1, 8(sp)
+    lw t2, 12(sp)
+    lw t3, 16(sp)
+    lw t4, 20(sp)
+    lw t5, 24(sp)
+    lw t6, 28(sp)
+    lw a0, 32(sp)
+    lw a1, 36(sp)
+    lw a2, 40(sp)
+    lw a3, 44(sp)
+    lw a4, 48(sp)
+    lw a5, 52(sp)
+    lw a6, 56(sp)
+    lw a7, 60(sp)
+    addi sp, sp, 64
+    mret
+"#
+);
+
 #[cfg(feature = "gpio-async-wait")]
 global_asm!(
     r#"
@@ -726,6 +856,28 @@ fn __hair_enable_wch_runtime_drv_gpioa_exti_exti9_5_handler_vector() -> Result<(
     Ok(())
 }
 
+#[cfg(feature = "i2c-async")]
+fn __hair_enable_wch_runtime_drv_i2c1_i2c1_ev_handler_vector() -> Result<(), metadata::Error> {
+    pfic().enable_irq(Irq::I2C1EV)?;
+    Ok(())
+}
+
+#[cfg(not(feature = "i2c-async"))]
+fn __hair_enable_wch_runtime_drv_i2c1_i2c1_ev_handler_vector() -> Result<(), metadata::Error> {
+    Ok(())
+}
+
+#[cfg(feature = "i2c-async")]
+fn __hair_enable_wch_runtime_drv_i2c1_i2c1_er_handler_vector() -> Result<(), metadata::Error> {
+    pfic().enable_irq(Irq::I2C1ER)?;
+    Ok(())
+}
+
+#[cfg(not(feature = "i2c-async"))]
+fn __hair_enable_wch_runtime_drv_i2c1_i2c1_er_handler_vector() -> Result<(), metadata::Error> {
+    Ok(())
+}
+
 #[cfg(feature = "gpio-async-wait")]
 fn __hair_enable_wch_runtime_drv_gpioa_exti_exti15_10_handler_vector() -> Result<(), metadata::Error>
 {
@@ -776,6 +928,8 @@ pub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {
     __hair_enable_wch_runtime_drv_gpioa_exti_exti4_handler_vector()?;
     __hair_enable_wch_runtime_drv_dma1_ch1_handler_vector()?;
     __hair_enable_wch_runtime_drv_gpioa_exti_exti9_5_handler_vector()?;
+    __hair_enable_wch_runtime_drv_i2c1_i2c1_ev_handler_vector()?;
+    __hair_enable_wch_runtime_drv_i2c1_i2c1_er_handler_vector()?;
     __hair_enable_wch_runtime_drv_gpioa_exti_exti15_10_handler_vector()?;
     __hair_enable_wch_time_driver_handler_vector()?;
     unsafe {
@@ -837,6 +991,18 @@ extern "C" fn __hair_wch_drv_gpioa_exti_exti9_5_irq_rust() {
     let _ = generated_drv_gpiob_signal_gpio_wait(5u32);
     let _ = generated_drv_gpiob_signal_gpio_wait(6u32);
     let _ = generated_drv_gpiob_signal_gpio_wait(7u32);
+}
+
+#[cfg(feature = "i2c-async")]
+#[unsafe(no_mangle)]
+extern "C" fn __hair_wch_drv_i2c1_i2c1_ev_irq_rust() {
+    let _ = generated_drv_i2c1_signal_i2c_async();
+}
+
+#[cfg(feature = "i2c-async")]
+#[unsafe(no_mangle)]
+extern "C" fn __hair_wch_drv_i2c1_i2c1_er_irq_rust() {
+    let _ = generated_drv_i2c1_signal_i2c_async();
 }
 
 #[cfg(feature = "gpio-async-wait")]

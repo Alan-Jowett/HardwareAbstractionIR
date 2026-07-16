@@ -65038,6 +65038,243 @@
         }
       },
       {
+        "id": "op.i2c1.init_master_100khz",
+        "name": "I2C1 initialize fixed 100 kHz master timing",
+        "kind": "initialization",
+        "targetRefs": [
+          "periph.i2c1"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.i2c1.ctlr1",
+            "expression": {
+              "language": "plain",
+              "text": "Clear PE"
+            },
+            "description": "Disable the peripheral before reprogramming the fixed timing profile."
+          },
+          {
+            "index": 1,
+            "action": "write",
+            "targetRef": "reg.i2c1.ctlr1",
+            "expression": {
+              "language": "plain",
+              "text": "Set SWRST = 1"
+            },
+            "description": "Assert the documented software reset bit before reinitialization."
+          },
+          {
+            "index": 2,
+            "action": "write",
+            "targetRef": "reg.i2c1.ctlr1",
+            "expression": {
+              "language": "plain",
+              "text": "Clear SWRST"
+            },
+            "description": "Release the software reset bit."
+          },
+          {
+            "index": 3,
+            "action": "write",
+            "targetRef": "reg.i2c1.ctlr2",
+            "expression": {
+              "language": "plain",
+              "text": "Write FREQ = 36"
+            },
+            "description": "Model the fixed APB1 = 36 MHz kernel clock selected for the first-cut generated helper."
+          },
+          {
+            "index": 4,
+            "action": "write",
+            "targetRef": "reg.i2c1.ckcfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Clear FS"
+            },
+            "description": "Use standard-mode timing rather than fast mode."
+          },
+          {
+            "index": 5,
+            "action": "write",
+            "targetRef": "reg.i2c1.ckcfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Clear DUTY"
+            },
+            "description": "Keep the reset-default duty selection for the fixed standard-mode profile."
+          },
+          {
+            "index": 6,
+            "action": "write",
+            "targetRef": "reg.i2c1.ckcfgr",
+            "expression": {
+              "language": "plain",
+              "text": "Write CCR = 180"
+            },
+            "description": "Program the standard-mode clock divider for a 100 kHz bus with a 36 MHz APB1 clock."
+          },
+          {
+            "index": 7,
+            "action": "write",
+            "targetRef": "reg.i2c1.rtr",
+            "expression": {
+              "language": "plain",
+              "text": "Write TRISE = 37"
+            },
+            "description": "Program the standard-mode maximum rise-time value for the same fixed timing profile."
+          },
+          {
+            "index": 8,
+            "action": "write",
+            "targetRef": "reg.i2c1.ctlr1",
+            "expression": {
+              "language": "plain",
+              "text": "Set PE = 1"
+            },
+            "description": "Re-enable the peripheral after the fixed timing profile is loaded."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs"
+          ],
+          "status": "verified",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.i2c1.clear_addr",
+        "name": "I2C1 clear ADDR latch",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.i2c1"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "read",
+            "targetRef": "reg.i2c1.star1",
+            "description": "Read STAR1 as the first half of the documented ADDR-clear sequence."
+          },
+          {
+            "index": 1,
+            "action": "read",
+            "targetRef": "reg.i2c1.star2",
+            "description": "Read STAR2 to complete the documented ADDR-clear sequence."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs"
+          ],
+          "status": "verified",
+          "confidence": 0.86
+        }
+      },
+      {
+        "id": "op.i2c1.clear_af",
+        "name": "I2C1 clear acknowledge failure",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.i2c1"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.i2c1.star1",
+            "expression": {
+              "language": "plain",
+              "text": "Clear AF"
+            },
+            "description": "Clear the acknowledge-failure status bit after a NACK."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs"
+          ],
+          "status": "verified",
+          "confidence": 0.86
+        }
+      },
+      {
+        "id": "op.i2c1.clear_arlo",
+        "name": "I2C1 clear arbitration-lost status",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.i2c1"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.i2c1.star1",
+            "expression": {
+              "language": "plain",
+              "text": "Clear ARLO"
+            },
+            "description": "Clear the arbitration-lost status bit."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs"
+          ],
+          "status": "verified",
+          "confidence": 0.86
+        }
+      },
+      {
+        "id": "op.i2c1.clear_berr",
+        "name": "I2C1 clear bus-error status",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.i2c1"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.i2c1.star1",
+            "expression": {
+              "language": "plain",
+              "text": "Clear BERR"
+            },
+            "description": "Clear the bus-error status bit."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs"
+          ],
+          "status": "verified",
+          "confidence": 0.86
+        }
+      },
+      {
         "id": "op.exti.clear_line0_pending",
         "name": "Clear EXTI line 0 pending flag",
         "kind": "mode-transition",
@@ -76244,12 +76481,38 @@
           "targetRef": "block.i2c1",
           "driverKind": "i2c",
           "modulePath": "i2c",
+          "loweringPattern": "legacy-event-i2c-master",
           "clockBindingRefs": [
             "clk.i2c1"
           ],
           "resetBindingRefs": [
             "rst.i2c1"
           ],
+          "i2cMasterBindings": {
+            "dataRegisterRef": "field.i2c_datar.dr_datar",
+            "startRef": "field.i2c_ctlr1.start",
+            "stopRef": "field.i2c_ctlr1.stop",
+            "acknowledgeRef": "field.i2c_ctlr1.ack",
+            "acknowledgePositionRef": "field.i2c_ctlr1.pos",
+            "busyFlagRef": "field.i2c_star2.busy",
+            "startConditionFlagRef": "field.i2c_star1.sb",
+            "addressSentFlagRef": "field.i2c_star1.addr",
+            "transmitBufferEmptyFlagRef": "field.i2c_star1.txe",
+            "receiveBufferNotEmptyFlagRef": "field.i2c_star1.rxne",
+            "byteTransferFinishedFlagRef": "field.i2c_star1.btf",
+            "acknowledgeFailureFlagRef": "field.i2c_star1.af",
+            "arbitrationLostFlagRef": "field.i2c_star1.arlo",
+            "busErrorFlagRef": "field.i2c_star1.berr",
+            "clearAddressOperationRefs": [
+              "op.i2c1.clear_addr"
+            ],
+            "clearAcknowledgeFailureOperationRef": "op.i2c1.clear_af",
+            "clearArbitrationLostOperationRef": "op.i2c1.clear_arlo",
+            "clearBusErrorOperationRef": "op.i2c1.clear_berr",
+            "eventInterruptEnableRef": "field.i2c_ctlr2.itevten",
+            "bufferInterruptEnableRef": "field.i2c_ctlr2.itbufen",
+            "errorInterruptEnableRef": "field.i2c_ctlr2.iterren"
+          },
           "pinRoles": [
             {
               "role": "scl",
@@ -76287,6 +76550,12 @@
             "status": "verified",
             "confidence": 0.86
           },
+          "initOperationRefs": [
+            "op.i2c1.init_master_100khz"
+          ],
+          "capabilityTags": [
+            "embedded-hal-async-i2c-master"
+          ],
           "interruptRouteRefs": [
             "iroute.i2c1.er",
             "iroute.i2c1.ev"
