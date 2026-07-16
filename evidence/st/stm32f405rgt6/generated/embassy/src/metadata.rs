@@ -11,6 +11,10 @@ pub enum ResourceRequirement {
 pub enum Error {
     Unsupported(&'static str),
     InvalidReference(&'static str),
+    Bus,
+    ArbitrationLoss,
+    NoAcknowledge,
+    Overrun,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
