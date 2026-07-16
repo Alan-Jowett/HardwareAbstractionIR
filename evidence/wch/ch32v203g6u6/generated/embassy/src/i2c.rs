@@ -584,20 +584,19 @@ impl I2C1 {
         send_start: bool,
         send_stop: bool,
     ) -> Result<(), metadata::Error> {
+        if write.is_empty() {
+            return Ok(());
+        }
         if send_start {
             self.generated_send_start()?;
             self.generated_send_address(address, false)?;
-        } else if write.is_empty() && !send_stop {
-            return Ok(());
         }
         for &value in write {
             self.generated_send_data_byte(value)?;
         }
-        if !write.is_empty() {
-            while ((u32::from(read_u16(0x40005414u64)?) & 0x00000004u32) >> 2) == 0u32 {
-                self.generated_check_and_clear_i2c_error_flags()?;
-                core::hint::spin_loop();
-            }
+        while ((u32::from(read_u16(0x40005414u64)?) & 0x00000004u32) >> 2) == 0u32 {
+            self.generated_check_and_clear_i2c_error_flags()?;
+            core::hint::spin_loop();
         }
         if send_stop {
             self.generated_send_stop()?;
@@ -613,8 +612,11 @@ impl I2C1 {
         send_nack: bool,
         send_stop: bool,
     ) -> Result<(), metadata::Error> {
+        if read.is_empty() {
+            return Ok(());
+        }
         let Some((last, prefix)) = read.split_last_mut() else {
-            return Err(metadata::Error::Overrun);
+            return Ok(());
         };
         if send_start {
             self.generated_set_ack_position(false)?;
@@ -636,11 +638,17 @@ impl I2C1 {
     }
 
     pub fn blocking_write_7bit(&self, address: u8, write: &[u8]) -> Result<(), metadata::Error> {
+        if write.is_empty() {
+            return Ok(());
+        }
         self.generated_wait_until_bus_free()?;
         self.generated_write_frame(address, write, true, true)
     }
 
     pub fn blocking_read_7bit(&self, address: u8, read: &mut [u8]) -> Result<(), metadata::Error> {
+        if read.is_empty() {
+            return Ok(());
+        }
         self.generated_wait_until_bus_free()?;
         self.generated_read_frame(address, read, true, true, true)
     }
@@ -651,6 +659,12 @@ impl I2C1 {
         write: &[u8],
         read: &mut [u8],
     ) -> Result<(), metadata::Error> {
+        if write.is_empty() {
+            return self.blocking_read_7bit(address, read);
+        }
+        if read.is_empty() {
+            return self.blocking_write_7bit(address, write);
+        }
         self.generated_wait_until_bus_free()?;
         self.generated_write_frame(address, write, true, false)?;
         self.generated_read_frame(address, read, true, true, true)
@@ -661,24 +675,40 @@ impl I2C1 {
         address: u8,
         operations: &mut [embedded_hal::i2c::Operation<'_>],
     ) -> Result<(), metadata::Error> {
-        if operations.is_empty() {
-            return Ok(());
+        let mut previous_kind: Option<bool> = None;
+        let mut last_non_empty_index = None;
+        for (index, operation) in operations.iter().enumerate() {
+            let is_empty = match operation {
+                embedded_hal::i2c::Operation::Write(write) => write.is_empty(),
+                embedded_hal::i2c::Operation::Read(read) => read.is_empty(),
+            };
+            if !is_empty {
+                last_non_empty_index = Some(index);
+            }
         }
+        let Some(last_non_empty_index) = last_non_empty_index else {
+            return Ok(());
+        };
         self.generated_wait_until_bus_free()?;
         for index in 0..operations.len() {
-            let send_start = if index == 0 {
-                true
-            } else {
-                core::mem::discriminant(&operations[index - 1])
-                    != core::mem::discriminant(&operations[index])
+            let current_kind = match &operations[index] {
+                embedded_hal::i2c::Operation::Write(write) if !write.is_empty() => Some(false),
+                embedded_hal::i2c::Operation::Read(read) if !read.is_empty() => Some(true),
+                _ => None,
             };
-            let is_last = index + 1 == operations.len();
-            let next_changes_kind = if is_last {
-                true
-            } else {
-                core::mem::discriminant(&operations[index])
-                    != core::mem::discriminant(&operations[index + 1])
+            let Some(current_kind) = current_kind else {
+                continue;
             };
+            let send_start = previous_kind != Some(current_kind);
+            let is_last = index == last_non_empty_index;
+            let next_kind = operations[index + 1..]
+                .iter()
+                .find_map(|operation| match operation {
+                    embedded_hal::i2c::Operation::Write(write) if !write.is_empty() => Some(false),
+                    embedded_hal::i2c::Operation::Read(read) if !read.is_empty() => Some(true),
+                    _ => None,
+                });
+            let next_changes_kind = next_kind != Some(current_kind);
             match &mut operations[index] {
                 embedded_hal::i2c::Operation::Write(write) => {
                     self.generated_write_frame(address, write, send_start, is_last)?;
@@ -693,6 +723,7 @@ impl I2C1 {
                     )?;
                 }
             }
+            previous_kind = Some(current_kind);
         }
         Ok(())
     }
@@ -782,21 +813,20 @@ impl I2C1 {
         send_start: bool,
         send_stop: bool,
     ) -> Result<(), metadata::Error> {
+        if write.is_empty() {
+            return Ok(());
+        }
         if send_start {
             self.generated_send_start_async().await?;
             self.generated_send_address_async(address, false).await?;
-        } else if write.is_empty() && !send_stop {
-            return Ok(());
         }
         for &value in write {
             self.generated_send_data_byte_async(value).await?;
         }
-        if !write.is_empty() {
-            self.generated_wait_i2c_async_until(|_| {
-                Ok(((u32::from(read_u16(0x40005414u64)?) & 0x00000004u32) >> 2) != 0u32)
-            })
-            .await?;
-        }
+        self.generated_wait_i2c_async_until(|_| {
+            Ok(((u32::from(read_u16(0x40005414u64)?) & 0x00000004u32) >> 2) != 0u32)
+        })
+        .await?;
         if send_stop {
             self.generated_send_stop()?;
         }
@@ -812,8 +842,11 @@ impl I2C1 {
         send_nack: bool,
         send_stop: bool,
     ) -> Result<(), metadata::Error> {
+        if read.is_empty() {
+            return Ok(());
+        }
         let Some((last, prefix)) = read.split_last_mut() else {
-            return Err(metadata::Error::Overrun);
+            return Ok(());
         };
         if send_start {
             self.generated_set_ack_position(false)?;
@@ -836,6 +869,9 @@ impl I2C1 {
 
     #[cfg(feature = "i2c-async")]
     pub async fn write_async_7bit(&self, address: u8, write: &[u8]) -> Result<(), metadata::Error> {
+        if write.is_empty() {
+            return Ok(());
+        }
         self.generated_wait_until_bus_free()?;
         self.generated_write_frame_async(address, write, true, true)
             .await
@@ -847,6 +883,9 @@ impl I2C1 {
         address: u8,
         read: &mut [u8],
     ) -> Result<(), metadata::Error> {
+        if read.is_empty() {
+            return Ok(());
+        }
         self.generated_wait_until_bus_free()?;
         self.generated_read_frame_async(address, read, true, true, true)
             .await
@@ -859,6 +898,12 @@ impl I2C1 {
         write: &[u8],
         read: &mut [u8],
     ) -> Result<(), metadata::Error> {
+        if write.is_empty() {
+            return self.read_async_7bit(address, read).await;
+        }
+        if read.is_empty() {
+            return self.write_async_7bit(address, write).await;
+        }
         self.generated_wait_until_bus_free()?;
         self.generated_write_frame_async(address, write, true, false)
             .await?;
@@ -872,24 +917,40 @@ impl I2C1 {
         address: u8,
         operations: &mut [embedded_hal::i2c::Operation<'_>],
     ) -> Result<(), metadata::Error> {
-        if operations.is_empty() {
-            return Ok(());
+        let mut previous_kind: Option<bool> = None;
+        let mut last_non_empty_index = None;
+        for (index, operation) in operations.iter().enumerate() {
+            let is_empty = match operation {
+                embedded_hal::i2c::Operation::Write(write) => write.is_empty(),
+                embedded_hal::i2c::Operation::Read(read) => read.is_empty(),
+            };
+            if !is_empty {
+                last_non_empty_index = Some(index);
+            }
         }
+        let Some(last_non_empty_index) = last_non_empty_index else {
+            return Ok(());
+        };
         self.generated_wait_until_bus_free()?;
         for index in 0..operations.len() {
-            let send_start = if index == 0 {
-                true
-            } else {
-                core::mem::discriminant(&operations[index - 1])
-                    != core::mem::discriminant(&operations[index])
+            let current_kind = match &operations[index] {
+                embedded_hal::i2c::Operation::Write(write) if !write.is_empty() => Some(false),
+                embedded_hal::i2c::Operation::Read(read) if !read.is_empty() => Some(true),
+                _ => None,
             };
-            let is_last = index + 1 == operations.len();
-            let next_changes_kind = if is_last {
-                true
-            } else {
-                core::mem::discriminant(&operations[index])
-                    != core::mem::discriminant(&operations[index + 1])
+            let Some(current_kind) = current_kind else {
+                continue;
             };
+            let send_start = previous_kind != Some(current_kind);
+            let is_last = index == last_non_empty_index;
+            let next_kind = operations[index + 1..]
+                .iter()
+                .find_map(|operation| match operation {
+                    embedded_hal::i2c::Operation::Write(write) if !write.is_empty() => Some(false),
+                    embedded_hal::i2c::Operation::Read(read) if !read.is_empty() => Some(true),
+                    _ => None,
+                });
+            let next_changes_kind = next_kind != Some(current_kind);
             match &mut operations[index] {
                 embedded_hal::i2c::Operation::Write(write) => {
                     self.generated_write_frame_async(address, write, send_start, is_last)
@@ -906,6 +967,7 @@ impl I2C1 {
                     .await?;
                 }
             }
+            previous_kind = Some(current_kind);
         }
         Ok(())
     }
