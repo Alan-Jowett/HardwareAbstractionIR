@@ -207,6 +207,78 @@
       ],
       "additionalProperties": false
     },
+    "gpioExtiWaitLineBinding": {
+      "type": "object",
+      "description": "Explicit EXTI-backed async wait bindings for one GPIO pin/line on a `gpio-port` driver instance. These bindings name the exact port-select, mask, trigger, pending, clear, and interrupt-route handles used by edge-triggered `embedded_hal_async::digital::Wait` lowering. Level waits may still be lowered from the GPIO input-sample path, but edge waits must fail explicitly when the selected pin lacks one of these bindings.",
+      "properties": {
+        "pinRef": {
+          "description": "Physical pin ref for the pin whose EXTI-backed wait path this binding names.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "lineIndex": {
+          "description": "Controller-local EXTI line index used by this pin on the selected family.",
+          "$ref": "../common.json#/$defs/nonNegativeInteger"
+        },
+        "portSelectRef": {
+          "description": "Entity ref for the AFIO/IO-mux field or equivalent selector that binds this EXTI line to the bound GPIO port.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "interruptMaskRef": {
+          "description": "Entity ref for the EXTI interrupt-mask field that enables interrupt delivery for this line.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "risingTriggerRef": {
+          "description": "Entity ref for the rising-edge trigger-enable field for this line.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "fallingTriggerRef": {
+          "description": "Entity ref for the falling-edge trigger-enable field for this line.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "pendingFlagRef": {
+          "description": "Entity ref for the pending/status flag read by the generated wait path before acknowledging a delivered edge.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "pendingClearOperationRef": {
+          "description": "Entity ref for the semantic operation that clears or acknowledges the pending edge on this line.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "interruptRouteRef": {
+          "description": "Interrupt route ref for the IRQ path that wakes this line. Shared-vector families still bind one route per line so the generator does not guess line-to-vector attribution.",
+          "$ref": "../common.json#/$defs/entityRef"
+        }
+      },
+      "required": [
+        "pinRef",
+        "lineIndex",
+        "portSelectRef",
+        "interruptMaskRef",
+        "risingTriggerRef",
+        "fallingTriggerRef",
+        "pendingFlagRef",
+        "pendingClearOperationRef",
+        "interruptRouteRef"
+      ],
+      "additionalProperties": false
+    },
+    "gpioExtiWaitBindings": {
+      "type": "object",
+      "description": "Optional explicit EXTI-backed async wait bindings for `gpio-port` driver instances that claim capability tag `embedded-hal-async-wait`. These bindings authorize the generator to expose the edge-triggered portion of `embedded_hal_async::digital::Wait` only for the named pins/lines and only when the same driver instance also carries the referenced interrupt routes.",
+      "properties": {
+        "lines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gpioExtiWaitLineBinding"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "lines"
+      ],
+      "additionalProperties": false
+    },
     "flashBindings": {
       "type": "object",
       "description": "Optional explicit internal-flash lowering bindings for `flash` driver instances. These bindings name the managed memory region, the portable erase/program geometry, the controller-local status and control handles, and the semantic unlock/lock/flag-clear operations required to expose a real `embedded-storage` NOR surface. They do not authorize option-byte, mass-erase, or vendor-specific fast-program helpers unless a later approved lowering family names those paths explicitly.",
@@ -551,6 +623,9 @@
             "dmaAsyncBindings": {
               "$ref": "#/$defs/dmaAsyncBindings"
             },
+            "gpioExtiWaitBindings": {
+              "$ref": "#/$defs/gpioExtiWaitBindings"
+            },
             "flashBindings": {
               "$ref": "#/$defs/flashBindings"
             },
@@ -611,7 +686,7 @@
               "uniqueItems": true
             },
             "capabilityTags": {
-              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support. The accompanying `timeDriverSource` selector determines whether that support is the existing SysTick-backed interrupt path, an explicitly modeled hardware-timer-backed path, or an explicitly modeled rtc-backed path; `timeDriverTickHz` fixes the Embassy tick rate for modeled non-SysTick sources; `timeDriverBindings` names the exact non-SysTick lowering handles when that path is used; `adcDmaBindings` names the exact direct roles for `regular-sequence-adc-dma` buffered sampling when that ADC family is selected; `dmaAsyncBindings` names the exact channel-local interrupt/flag handles for generated DMA completion futures; and `flashBindings` names the managed region, geometry, control/status bindings, and required semantic operations for a portable internal-flash NOR surface.",
+              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support, and `embedded-hal-async-wait` to mark `gpio-port` driver instances that may expose the `embedded_hal_async::digital::Wait` contract when explicit EXTI-backed wait bindings are also present. The accompanying `timeDriverSource` selector determines whether that support is the existing SysTick-backed interrupt path, an explicitly modeled hardware-timer-backed path, or an explicitly modeled rtc-backed path; `timeDriverTickHz` fixes the Embassy tick rate for modeled non-SysTick sources; `timeDriverBindings` names the exact non-SysTick lowering handles when that path is used; `adcDmaBindings` names the exact direct roles for `regular-sequence-adc-dma` buffered sampling when that ADC family is selected; `dmaAsyncBindings` names the exact channel-local interrupt/flag handles for generated DMA completion futures; `gpioExtiWaitBindings` names the exact line-local selector, trigger, pending, clear, and interrupt-route handles for EXTI-backed GPIO waits; and `flashBindings` names the managed region, geometry, control/status bindings, and required semantic operations for a portable internal-flash NOR surface.",
               "type": "array",
               "items": {
                 "type": "string"

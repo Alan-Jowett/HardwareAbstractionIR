@@ -290,7 +290,13 @@ pub const DRV_RCC_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_RCC_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct SystemClockResetResources {
+pub struct SystemClockResetRuntimeResources {}
+
+pub const DRV_RCC_RUNTIME_RESOURCES: SystemClockResetRuntimeResources =
+    SystemClockResetRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct SystemClockResetMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -305,33 +311,33 @@ pub struct SystemClockResetResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_RCC_RESOURCES: SystemClockResetResources = SystemClockResetResources {
-    clocks: DRV_RCC_CLOCK_BINDINGS,
-    resets: DRV_RCC_RESET_BINDINGS,
-    interrupt_sources: DRV_RCC_INTERRUPT_SOURCES,
-    interrupts: DRV_RCC_INTERRUPT_ROUTES,
-    dma_channels: DRV_RCC_DMA_CHANNELS,
-    dma: DRV_RCC_DMA_ROUTES,
-    pins: DRV_RCC_PIN_ROLES,
-    init_operations: DRV_RCC_INIT_OPERATIONS,
-    state_machines: DRV_RCC_STATE_MACHINES,
-    lowering_pattern: None,
-    time_driver_source: None,
-    capability_tags: DRV_RCC_CAPABILITY_TAGS,
-};
+pub const DRV_RCC_METADATA_RESOURCES: SystemClockResetMetadataResources =
+    SystemClockResetMetadataResources {
+        clocks: DRV_RCC_CLOCK_BINDINGS,
+        resets: DRV_RCC_RESET_BINDINGS,
+        interrupt_sources: DRV_RCC_INTERRUPT_SOURCES,
+        interrupts: DRV_RCC_INTERRUPT_ROUTES,
+        dma_channels: DRV_RCC_DMA_CHANNELS,
+        dma: DRV_RCC_DMA_ROUTES,
+        pins: DRV_RCC_PIN_ROLES,
+        init_operations: DRV_RCC_INIT_OPERATIONS,
+        state_machines: DRV_RCC_STATE_MACHINES,
+        lowering_pattern: None,
+        time_driver_source: None,
+        capability_tags: DRV_RCC_CAPABILITY_TAGS,
+    };
 
 #[derive(Debug, Clone, Copy)]
-pub struct SystemClockReset {
-    resources: SystemClockResetResources,
-}
+pub struct SystemClockReset;
 
 impl SystemClockReset {
-    pub fn new(resources: SystemClockResetResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: SystemClockResetRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> SystemClockResetResources {
-        self.resources
+    pub fn metadata_resources() -> SystemClockResetMetadataResources {
+        DRV_RCC_METADATA_RESOURCES
     }
     /// Enable the UART0 clock gate.
     pub fn enable_uart0_clock(&self) -> Result<(), metadata::Error> {

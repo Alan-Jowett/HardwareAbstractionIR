@@ -508,7 +508,12 @@ pub const DRV_TIM1_STATE_MACHINES: &[metadata::SemanticStateMachine] =
 pub const DRV_TIM1_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct TIM1Resources {
+pub struct TIM1RuntimeResources {}
+
+pub const DRV_TIM1_RUNTIME_RESOURCES: TIM1RuntimeResources = TIM1RuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM1MetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -523,7 +528,7 @@ pub struct TIM1Resources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_TIM1_RESOURCES: TIM1Resources = TIM1Resources {
+pub const DRV_TIM1_METADATA_RESOURCES: TIM1MetadataResources = TIM1MetadataResources {
     clocks: DRV_TIM1_CLOCK_BINDINGS,
     resets: DRV_TIM1_RESET_BINDINGS,
     interrupt_sources: DRV_TIM1_INTERRUPT_SOURCES,
@@ -539,17 +544,16 @@ pub const DRV_TIM1_RESOURCES: TIM1Resources = TIM1Resources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct TIM1 {
-    resources: TIM1Resources,
-}
+pub struct TIM1;
 
 impl TIM1 {
-    pub fn new(resources: TIM1Resources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: TIM1RuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> TIM1Resources {
-        self.resources
+    pub fn metadata_resources() -> TIM1MetadataResources {
+        DRV_TIM1_METADATA_RESOURCES
     }
     /// Enable the TIM1 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -987,7 +991,12 @@ pub const DRV_TIM2_STATE_MACHINES: &[metadata::SemanticStateMachine] =
 pub const DRV_TIM2_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct TIM2Resources {
+pub struct TIM2RuntimeResources {}
+
+pub const DRV_TIM2_RUNTIME_RESOURCES: TIM2RuntimeResources = TIM2RuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM2MetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -1002,7 +1011,7 @@ pub struct TIM2Resources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_TIM2_RESOURCES: TIM2Resources = TIM2Resources {
+pub const DRV_TIM2_METADATA_RESOURCES: TIM2MetadataResources = TIM2MetadataResources {
     clocks: DRV_TIM2_CLOCK_BINDINGS,
     resets: DRV_TIM2_RESET_BINDINGS,
     interrupt_sources: DRV_TIM2_INTERRUPT_SOURCES,
@@ -1018,17 +1027,16 @@ pub const DRV_TIM2_RESOURCES: TIM2Resources = TIM2Resources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct TIM2 {
-    resources: TIM2Resources,
-}
+pub struct TIM2;
 
 impl TIM2 {
-    pub fn new(resources: TIM2Resources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: TIM2RuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> TIM2Resources {
-        self.resources
+    pub fn metadata_resources() -> TIM2MetadataResources {
+        DRV_TIM2_METADATA_RESOURCES
     }
     /// Enable the TIM2 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -1362,7 +1370,12 @@ pub const DRV_TIM3_STATE_MACHINES: &[metadata::SemanticStateMachine] =
 pub const DRV_TIM3_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct TIM3Resources {
+pub struct TIM3RuntimeResources {}
+
+pub const DRV_TIM3_RUNTIME_RESOURCES: TIM3RuntimeResources = TIM3RuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM3MetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -1377,7 +1390,7 @@ pub struct TIM3Resources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_TIM3_RESOURCES: TIM3Resources = TIM3Resources {
+pub const DRV_TIM3_METADATA_RESOURCES: TIM3MetadataResources = TIM3MetadataResources {
     clocks: DRV_TIM3_CLOCK_BINDINGS,
     resets: DRV_TIM3_RESET_BINDINGS,
     interrupt_sources: DRV_TIM3_INTERRUPT_SOURCES,
@@ -1393,17 +1406,16 @@ pub const DRV_TIM3_RESOURCES: TIM3Resources = TIM3Resources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct TIM3 {
-    resources: TIM3Resources,
-}
+pub struct TIM3;
 
 impl TIM3 {
-    pub fn new(resources: TIM3Resources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: TIM3RuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> TIM3Resources {
-        self.resources
+    pub fn metadata_resources() -> TIM3MetadataResources {
+        DRV_TIM3_METADATA_RESOURCES
     }
     /// Enable the TIM3 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -1645,7 +1657,12 @@ pub const DRV_TIM4_STATE_MACHINES: &[metadata::SemanticStateMachine] =
 pub const DRV_TIM4_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct TIM4Resources {
+pub struct TIM4RuntimeResources {}
+
+pub const DRV_TIM4_RUNTIME_RESOURCES: TIM4RuntimeResources = TIM4RuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct TIM4MetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -1660,7 +1677,7 @@ pub struct TIM4Resources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_TIM4_RESOURCES: TIM4Resources = TIM4Resources {
+pub const DRV_TIM4_METADATA_RESOURCES: TIM4MetadataResources = TIM4MetadataResources {
     clocks: DRV_TIM4_CLOCK_BINDINGS,
     resets: DRV_TIM4_RESET_BINDINGS,
     interrupt_sources: DRV_TIM4_INTERRUPT_SOURCES,
@@ -1676,17 +1693,16 @@ pub const DRV_TIM4_RESOURCES: TIM4Resources = TIM4Resources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct TIM4 {
-    resources: TIM4Resources,
-}
+pub struct TIM4;
 
 impl TIM4 {
-    pub fn new(resources: TIM4Resources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: TIM4RuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> TIM4Resources {
-        self.resources
+    pub fn metadata_resources() -> TIM4MetadataResources {
+        DRV_TIM4_METADATA_RESOURCES
     }
     /// Enable the TIM4 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {

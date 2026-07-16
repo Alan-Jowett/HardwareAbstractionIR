@@ -7,7 +7,19 @@ edition = "2024"
 name = "esp32c3fn4_generated"
 path = "src/lib.rs"
 
+[features]
+adc = []
+default = []
+gpio = []
+i2c = []
+interrupt = []
+rcc = []
+spi = []
+time = ["dep:critical-section", "dep:embassy-time-driver", "dep:embassy-time-queue-utils"]
+uart = []
+usb = []
+
 [dependencies]
-critical-section = "1.2"
-embassy-time-driver = { version = "0.2.2", features = ["tick-hz-16_000_000"] }
-embassy-time-queue-utils = { version = "0.3.2", features = ["generic-queue-8"] }
+critical-section = { version = "1.2", optional = true }
+embassy-time-driver = { version = "0.2.2", features = ["tick-hz-16_000_000"], optional = true }
+embassy-time-queue-utils = { version = "0.3.2", features = ["generic-queue-8"], optional = true }

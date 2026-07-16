@@ -46,7 +46,8 @@ dependencies = [
  "embassy-time-driver",
  "embassy-time-queue-utils",
  "embassy-usb-driver",
- "embedded-hal 0.2.7",
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
 ]
 
 [[package]]
@@ -127,6 +128,20 @@ name = "embassy-executor-timer-queue"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fc328bf943af66b80b98755db9106bf7e7471b0cf47dc8559cd9a6be504cc9c"
+
+[[package]]
+name = "embassy-exti-wait-smoke"
+version = "0.1.0"
+dependencies = [
+ "ch32v203g6u6-embassy-hal",
+ "embassy-executor",
+ "embassy-time",
+ "embassy-usb",
+ "embedded-hal-async",
+ "heapless 0.8.0",
+ "riscv",
+ "riscv-rt",
+]
 
 [[package]]
 name = "embassy-futures"
@@ -226,20 +241,6 @@ checksum = "fa675c5f4349b6aa0fcffc4bf9b241f18cd11b97c1f8323273fb9a5449937fbd"
 dependencies = [
  "embedded-io-async 0.6.1",
  "embedded-io-async 0.7.0",
-]
-
-[[package]]
-name = "embassy-watchdog-smoke"
-version = "0.1.0"
-dependencies = [
- "ch32v203g6u6-embassy-hal",
- "embassy-executor",
- "embassy-time",
- "embassy-usb",
- "embedded-hal 0.2.7",
- "heapless 0.8.0",
- "riscv",
- "riscv-rt",
 ]
 
 [[package]]

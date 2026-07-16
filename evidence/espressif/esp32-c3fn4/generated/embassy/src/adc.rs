@@ -366,7 +366,12 @@ pub const DRV_ADC_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_ADC_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct ApbSarAdcResources {
+pub struct ApbSarAdcRuntimeResources {}
+
+pub const DRV_ADC_RUNTIME_RESOURCES: ApbSarAdcRuntimeResources = ApbSarAdcRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct ApbSarAdcMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -381,7 +386,7 @@ pub struct ApbSarAdcResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_ADC_RESOURCES: ApbSarAdcResources = ApbSarAdcResources {
+pub const DRV_ADC_METADATA_RESOURCES: ApbSarAdcMetadataResources = ApbSarAdcMetadataResources {
     clocks: DRV_ADC_CLOCK_BINDINGS,
     resets: DRV_ADC_RESET_BINDINGS,
     interrupt_sources: DRV_ADC_INTERRUPT_SOURCES,
@@ -397,17 +402,16 @@ pub const DRV_ADC_RESOURCES: ApbSarAdcResources = ApbSarAdcResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct ApbSarAdc {
-    resources: ApbSarAdcResources,
-}
+pub struct ApbSarAdc;
 
 impl ApbSarAdc {
-    pub fn new(resources: ApbSarAdcResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: ApbSarAdcRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> ApbSarAdcResources {
-        self.resources
+    pub fn metadata_resources() -> ApbSarAdcMetadataResources {
+        DRV_ADC_METADATA_RESOURCES
     }
     /// Enable the APB_SARADC clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {

@@ -225,7 +225,12 @@ pub const DRV_SSI0_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_SSI0_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct SSI0Resources {
+pub struct SSI0RuntimeResources {}
+
+pub const DRV_SSI0_RUNTIME_RESOURCES: SSI0RuntimeResources = SSI0RuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct SSI0MetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -240,7 +245,7 @@ pub struct SSI0Resources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_SSI0_RESOURCES: SSI0Resources = SSI0Resources {
+pub const DRV_SSI0_METADATA_RESOURCES: SSI0MetadataResources = SSI0MetadataResources {
     clocks: DRV_SSI0_CLOCK_BINDINGS,
     resets: DRV_SSI0_RESET_BINDINGS,
     interrupt_sources: DRV_SSI0_INTERRUPT_SOURCES,
@@ -256,17 +261,16 @@ pub const DRV_SSI0_RESOURCES: SSI0Resources = SSI0Resources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct SSI0 {
-    resources: SSI0Resources,
-}
+pub struct SSI0;
 
 impl SSI0 {
-    pub fn new(resources: SSI0Resources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: SSI0RuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> SSI0Resources {
-        self.resources
+    pub fn metadata_resources() -> SSI0MetadataResources {
+        DRV_SSI0_METADATA_RESOURCES
     }
     /// Enable the SSI0 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {

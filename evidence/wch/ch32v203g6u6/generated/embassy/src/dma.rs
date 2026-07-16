@@ -297,7 +297,12 @@ pub const DRV_DMA1_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_DMA1_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct DMA1Resources {
+pub struct DMA1RuntimeResources {}
+
+pub const DRV_DMA1_RUNTIME_RESOURCES: DMA1RuntimeResources = DMA1RuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct DMA1MetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -312,7 +317,7 @@ pub struct DMA1Resources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_DMA1_RESOURCES: DMA1Resources = DMA1Resources {
+pub const DRV_DMA1_METADATA_RESOURCES: DMA1MetadataResources = DMA1MetadataResources {
     clocks: DRV_DMA1_CLOCK_BINDINGS,
     resets: DRV_DMA1_RESET_BINDINGS,
     interrupt_sources: DRV_DMA1_INTERRUPT_SOURCES,
@@ -328,17 +333,16 @@ pub const DRV_DMA1_RESOURCES: DMA1Resources = DMA1Resources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct DMA1 {
-    resources: DMA1Resources,
-}
+pub struct DMA1;
 
 impl DMA1 {
-    pub fn new(resources: DMA1Resources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: DMA1RuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> DMA1Resources {
-        self.resources
+    pub fn metadata_resources() -> DMA1MetadataResources {
+        DRV_DMA1_METADATA_RESOURCES
     }
     /// Enable the DMA1 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {

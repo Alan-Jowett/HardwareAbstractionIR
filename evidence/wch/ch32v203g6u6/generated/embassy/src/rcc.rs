@@ -433,7 +433,12 @@ pub const DRV_RCC_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_RCC_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct RCCResources {
+pub struct RCCRuntimeResources {}
+
+pub const DRV_RCC_RUNTIME_RESOURCES: RCCRuntimeResources = RCCRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct RCCMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -448,7 +453,7 @@ pub struct RCCResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_RCC_RESOURCES: RCCResources = RCCResources {
+pub const DRV_RCC_METADATA_RESOURCES: RCCMetadataResources = RCCMetadataResources {
     clocks: DRV_RCC_CLOCK_BINDINGS,
     resets: DRV_RCC_RESET_BINDINGS,
     interrupt_sources: DRV_RCC_INTERRUPT_SOURCES,
@@ -464,17 +469,16 @@ pub const DRV_RCC_RESOURCES: RCCResources = RCCResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct RCC {
-    resources: RCCResources,
-}
+pub struct RCC;
 
 impl RCC {
-    pub fn new(resources: RCCResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: RCCRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> RCCResources {
-        self.resources
+    pub fn metadata_resources() -> RCCMetadataResources {
+        DRV_RCC_METADATA_RESOURCES
     }
     /// Enable the GPIOA clock gate.
     pub fn enable_gpioa_clock(&self) -> Result<(), metadata::Error> {

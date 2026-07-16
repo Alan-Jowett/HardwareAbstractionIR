@@ -434,7 +434,12 @@ pub const DRV_GPIOA_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_GPIOA_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct GpioAResources {
+pub struct GpioARuntimeResources {}
+
+pub const DRV_GPIOA_RUNTIME_RESOURCES: GpioARuntimeResources = GpioARuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct GpioAMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -449,7 +454,7 @@ pub struct GpioAResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_GPIOA_RESOURCES: GpioAResources = GpioAResources {
+pub const DRV_GPIOA_METADATA_RESOURCES: GpioAMetadataResources = GpioAMetadataResources {
     clocks: DRV_GPIOA_CLOCK_BINDINGS,
     resets: DRV_GPIOA_RESET_BINDINGS,
     interrupt_sources: DRV_GPIOA_INTERRUPT_SOURCES,
@@ -465,17 +470,16 @@ pub const DRV_GPIOA_RESOURCES: GpioAResources = GpioAResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct GpioA {
-    resources: GpioAResources,
-}
+pub struct GpioA;
 
 impl GpioA {
-    pub fn new(resources: GpioAResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: GpioARuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> GpioAResources {
-        self.resources
+    pub fn metadata_resources() -> GpioAMetadataResources {
+        DRV_GPIOA_METADATA_RESOURCES
     }
     /// Enable the GPIOA clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -504,8 +508,6 @@ impl GpioA {
     /// Access the PA0 pin on GpioA.
     pub fn pa0(&self) -> GpioAFlex {
         GpioAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[0],
             pin_name: "PA0",
             moder_addr: 0x40020000u64,
             moder_clear_mask: 0x00000003u32,
@@ -527,8 +529,6 @@ impl GpioA {
     /// Access the PA1 pin on GpioA.
     pub fn pa1(&self) -> GpioAFlex {
         GpioAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[1],
             pin_name: "PA1",
             moder_addr: 0x40020000u64,
             moder_clear_mask: 0x0000000Cu32,
@@ -550,8 +550,6 @@ impl GpioA {
     /// Access the PA10 pin on GpioA.
     pub fn pa10(&self) -> GpioAFlex {
         GpioAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[2],
             pin_name: "PA10",
             moder_addr: 0x40020000u64,
             moder_clear_mask: 0x00300000u32,
@@ -573,8 +571,6 @@ impl GpioA {
     /// Access the PA11 pin on GpioA.
     pub fn pa11(&self) -> GpioAFlex {
         GpioAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[3],
             pin_name: "PA11",
             moder_addr: 0x40020000u64,
             moder_clear_mask: 0x00C00000u32,
@@ -596,8 +592,6 @@ impl GpioA {
     /// Access the PA12 pin on GpioA.
     pub fn pa12(&self) -> GpioAFlex {
         GpioAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[4],
             pin_name: "PA12",
             moder_addr: 0x40020000u64,
             moder_clear_mask: 0x03000000u32,
@@ -619,8 +613,6 @@ impl GpioA {
     /// Access the PA13 pin on GpioA.
     pub fn pa13(&self) -> GpioAFlex {
         GpioAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[5],
             pin_name: "PA13",
             moder_addr: 0x40020000u64,
             moder_clear_mask: 0x0C000000u32,
@@ -642,8 +634,6 @@ impl GpioA {
     /// Access the PA14 pin on GpioA.
     pub fn pa14(&self) -> GpioAFlex {
         GpioAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[6],
             pin_name: "PA14",
             moder_addr: 0x40020000u64,
             moder_clear_mask: 0x30000000u32,
@@ -665,8 +655,6 @@ impl GpioA {
     /// Access the PA15 pin on GpioA.
     pub fn pa15(&self) -> GpioAFlex {
         GpioAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[7],
             pin_name: "PA15",
             moder_addr: 0x40020000u64,
             moder_clear_mask: 0xC0000000u32,
@@ -688,8 +676,6 @@ impl GpioA {
     /// Access the PA2 pin on GpioA.
     pub fn pa2(&self) -> GpioAFlex {
         GpioAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[8],
             pin_name: "PA2",
             moder_addr: 0x40020000u64,
             moder_clear_mask: 0x00000030u32,
@@ -711,8 +697,6 @@ impl GpioA {
     /// Access the PA3 pin on GpioA.
     pub fn pa3(&self) -> GpioAFlex {
         GpioAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[9],
             pin_name: "PA3",
             moder_addr: 0x40020000u64,
             moder_clear_mask: 0x000000C0u32,
@@ -734,8 +718,6 @@ impl GpioA {
     /// Access the PA4 pin on GpioA.
     pub fn pa4(&self) -> GpioAFlex {
         GpioAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[10],
             pin_name: "PA4",
             moder_addr: 0x40020000u64,
             moder_clear_mask: 0x00000300u32,
@@ -757,8 +739,6 @@ impl GpioA {
     /// Access the PA5 pin on GpioA.
     pub fn pa5(&self) -> GpioAFlex {
         GpioAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[11],
             pin_name: "PA5",
             moder_addr: 0x40020000u64,
             moder_clear_mask: 0x00000C00u32,
@@ -780,8 +760,6 @@ impl GpioA {
     /// Access the PA6 pin on GpioA.
     pub fn pa6(&self) -> GpioAFlex {
         GpioAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[12],
             pin_name: "PA6",
             moder_addr: 0x40020000u64,
             moder_clear_mask: 0x00003000u32,
@@ -803,8 +781,6 @@ impl GpioA {
     /// Access the PA7 pin on GpioA.
     pub fn pa7(&self) -> GpioAFlex {
         GpioAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[13],
             pin_name: "PA7",
             moder_addr: 0x40020000u64,
             moder_clear_mask: 0x0000C000u32,
@@ -826,8 +802,6 @@ impl GpioA {
     /// Access the PA8 pin on GpioA.
     pub fn pa8(&self) -> GpioAFlex {
         GpioAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[14],
             pin_name: "PA8",
             moder_addr: 0x40020000u64,
             moder_clear_mask: 0x00030000u32,
@@ -849,8 +823,6 @@ impl GpioA {
     /// Access the PA9 pin on GpioA.
     pub fn pa9(&self) -> GpioAFlex {
         GpioAFlex {
-            resources: self.resources,
-            role: &self.resources.pins[15],
             pin_name: "PA9",
             moder_addr: 0x40020000u64,
             moder_clear_mask: 0x000C0000u32,
@@ -872,8 +844,6 @@ impl GpioA {
 
 #[derive(Debug, Clone)]
 pub struct GpioAFlex {
-    resources: GpioAResources,
-    role: &'static metadata::PinRole,
     pin_name: &'static str,
     moder_addr: u64,
     moder_clear_mask: u32,
@@ -902,14 +872,6 @@ pub struct GpioAOutput {
 }
 
 impl GpioAFlex {
-    pub fn resources(&self) -> GpioAResources {
-        self.resources
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.role
-    }
-
     pub fn pin_name(&self) -> &'static str {
         self.pin_name
     }
@@ -1009,10 +971,6 @@ impl GpioAInput {
         self.pin.pin_name()
     }
 
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
-    }
-
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {
         self.pin.set_pull(pull)
     }
@@ -1037,10 +995,6 @@ impl GpioAOutput {
 
     pub fn pin_name(&self) -> &'static str {
         self.pin.pin_name()
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
     }
 
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {
@@ -1393,7 +1347,12 @@ pub const DRV_GPIOB_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_GPIOB_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct GpioBResources {
+pub struct GpioBRuntimeResources {}
+
+pub const DRV_GPIOB_RUNTIME_RESOURCES: GpioBRuntimeResources = GpioBRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct GpioBMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -1408,7 +1367,7 @@ pub struct GpioBResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_GPIOB_RESOURCES: GpioBResources = GpioBResources {
+pub const DRV_GPIOB_METADATA_RESOURCES: GpioBMetadataResources = GpioBMetadataResources {
     clocks: DRV_GPIOB_CLOCK_BINDINGS,
     resets: DRV_GPIOB_RESET_BINDINGS,
     interrupt_sources: DRV_GPIOB_INTERRUPT_SOURCES,
@@ -1424,17 +1383,16 @@ pub const DRV_GPIOB_RESOURCES: GpioBResources = GpioBResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct GpioB {
-    resources: GpioBResources,
-}
+pub struct GpioB;
 
 impl GpioB {
-    pub fn new(resources: GpioBResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: GpioBRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> GpioBResources {
-        self.resources
+    pub fn metadata_resources() -> GpioBMetadataResources {
+        DRV_GPIOB_METADATA_RESOURCES
     }
     /// Enable the GPIOB clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -1463,8 +1421,6 @@ impl GpioB {
     /// Access the PB0 pin on GpioB.
     pub fn pb0(&self) -> GpioBFlex {
         GpioBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[0],
             pin_name: "PB0",
             moder_addr: 0x40020400u64,
             moder_clear_mask: 0x00000003u32,
@@ -1486,8 +1442,6 @@ impl GpioB {
     /// Access the PB1 pin on GpioB.
     pub fn pb1(&self) -> GpioBFlex {
         GpioBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[1],
             pin_name: "PB1",
             moder_addr: 0x40020400u64,
             moder_clear_mask: 0x0000000Cu32,
@@ -1509,8 +1463,6 @@ impl GpioB {
     /// Access the PB10 pin on GpioB.
     pub fn pb10(&self) -> GpioBFlex {
         GpioBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[2],
             pin_name: "PB10",
             moder_addr: 0x40020400u64,
             moder_clear_mask: 0x00300000u32,
@@ -1532,8 +1484,6 @@ impl GpioB {
     /// Access the PB11 pin on GpioB.
     pub fn pb11(&self) -> GpioBFlex {
         GpioBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[3],
             pin_name: "PB11",
             moder_addr: 0x40020400u64,
             moder_clear_mask: 0x00C00000u32,
@@ -1555,8 +1505,6 @@ impl GpioB {
     /// Access the PB12 pin on GpioB.
     pub fn pb12(&self) -> GpioBFlex {
         GpioBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[4],
             pin_name: "PB12",
             moder_addr: 0x40020400u64,
             moder_clear_mask: 0x03000000u32,
@@ -1578,8 +1526,6 @@ impl GpioB {
     /// Access the PB13 pin on GpioB.
     pub fn pb13(&self) -> GpioBFlex {
         GpioBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[5],
             pin_name: "PB13",
             moder_addr: 0x40020400u64,
             moder_clear_mask: 0x0C000000u32,
@@ -1601,8 +1547,6 @@ impl GpioB {
     /// Access the PB14 pin on GpioB.
     pub fn pb14(&self) -> GpioBFlex {
         GpioBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[6],
             pin_name: "PB14",
             moder_addr: 0x40020400u64,
             moder_clear_mask: 0x30000000u32,
@@ -1624,8 +1568,6 @@ impl GpioB {
     /// Access the PB15 pin on GpioB.
     pub fn pb15(&self) -> GpioBFlex {
         GpioBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[7],
             pin_name: "PB15",
             moder_addr: 0x40020400u64,
             moder_clear_mask: 0xC0000000u32,
@@ -1647,8 +1589,6 @@ impl GpioB {
     /// Access the PB2 pin on GpioB.
     pub fn pb2(&self) -> GpioBFlex {
         GpioBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[8],
             pin_name: "PB2",
             moder_addr: 0x40020400u64,
             moder_clear_mask: 0x00000030u32,
@@ -1670,8 +1610,6 @@ impl GpioB {
     /// Access the PB3 pin on GpioB.
     pub fn pb3(&self) -> GpioBFlex {
         GpioBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[9],
             pin_name: "PB3",
             moder_addr: 0x40020400u64,
             moder_clear_mask: 0x000000C0u32,
@@ -1693,8 +1631,6 @@ impl GpioB {
     /// Access the PB4 pin on GpioB.
     pub fn pb4(&self) -> GpioBFlex {
         GpioBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[10],
             pin_name: "PB4",
             moder_addr: 0x40020400u64,
             moder_clear_mask: 0x00000300u32,
@@ -1716,8 +1652,6 @@ impl GpioB {
     /// Access the PB5 pin on GpioB.
     pub fn pb5(&self) -> GpioBFlex {
         GpioBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[11],
             pin_name: "PB5",
             moder_addr: 0x40020400u64,
             moder_clear_mask: 0x00000C00u32,
@@ -1739,8 +1673,6 @@ impl GpioB {
     /// Access the PB6 pin on GpioB.
     pub fn pb6(&self) -> GpioBFlex {
         GpioBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[12],
             pin_name: "PB6",
             moder_addr: 0x40020400u64,
             moder_clear_mask: 0x00003000u32,
@@ -1762,8 +1694,6 @@ impl GpioB {
     /// Access the PB7 pin on GpioB.
     pub fn pb7(&self) -> GpioBFlex {
         GpioBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[13],
             pin_name: "PB7",
             moder_addr: 0x40020400u64,
             moder_clear_mask: 0x0000C000u32,
@@ -1785,8 +1715,6 @@ impl GpioB {
     /// Access the PB8 pin on GpioB.
     pub fn pb8(&self) -> GpioBFlex {
         GpioBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[14],
             pin_name: "PB8",
             moder_addr: 0x40020400u64,
             moder_clear_mask: 0x00030000u32,
@@ -1808,8 +1736,6 @@ impl GpioB {
     /// Access the PB9 pin on GpioB.
     pub fn pb9(&self) -> GpioBFlex {
         GpioBFlex {
-            resources: self.resources,
-            role: &self.resources.pins[15],
             pin_name: "PB9",
             moder_addr: 0x40020400u64,
             moder_clear_mask: 0x000C0000u32,
@@ -1831,8 +1757,6 @@ impl GpioB {
 
 #[derive(Debug, Clone)]
 pub struct GpioBFlex {
-    resources: GpioBResources,
-    role: &'static metadata::PinRole,
     pin_name: &'static str,
     moder_addr: u64,
     moder_clear_mask: u32,
@@ -1861,14 +1785,6 @@ pub struct GpioBOutput {
 }
 
 impl GpioBFlex {
-    pub fn resources(&self) -> GpioBResources {
-        self.resources
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.role
-    }
-
     pub fn pin_name(&self) -> &'static str {
         self.pin_name
     }
@@ -1968,10 +1884,6 @@ impl GpioBInput {
         self.pin.pin_name()
     }
 
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
-    }
-
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {
         self.pin.set_pull(pull)
     }
@@ -1996,10 +1908,6 @@ impl GpioBOutput {
 
     pub fn pin_name(&self) -> &'static str {
         self.pin.pin_name()
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
     }
 
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {
@@ -2352,7 +2260,12 @@ pub const DRV_GPIOC_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_GPIOC_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct GpioCResources {
+pub struct GpioCRuntimeResources {}
+
+pub const DRV_GPIOC_RUNTIME_RESOURCES: GpioCRuntimeResources = GpioCRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct GpioCMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -2367,7 +2280,7 @@ pub struct GpioCResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_GPIOC_RESOURCES: GpioCResources = GpioCResources {
+pub const DRV_GPIOC_METADATA_RESOURCES: GpioCMetadataResources = GpioCMetadataResources {
     clocks: DRV_GPIOC_CLOCK_BINDINGS,
     resets: DRV_GPIOC_RESET_BINDINGS,
     interrupt_sources: DRV_GPIOC_INTERRUPT_SOURCES,
@@ -2383,17 +2296,16 @@ pub const DRV_GPIOC_RESOURCES: GpioCResources = GpioCResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct GpioC {
-    resources: GpioCResources,
-}
+pub struct GpioC;
 
 impl GpioC {
-    pub fn new(resources: GpioCResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: GpioCRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> GpioCResources {
-        self.resources
+    pub fn metadata_resources() -> GpioCMetadataResources {
+        DRV_GPIOC_METADATA_RESOURCES
     }
     /// Enable the GPIOC clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -2422,8 +2334,6 @@ impl GpioC {
     /// Access the PC0 pin on GpioC.
     pub fn pc0(&self) -> GpioCFlex {
         GpioCFlex {
-            resources: self.resources,
-            role: &self.resources.pins[0],
             pin_name: "PC0",
             moder_addr: 0x40020800u64,
             moder_clear_mask: 0x00000003u32,
@@ -2445,8 +2355,6 @@ impl GpioC {
     /// Access the PC1 pin on GpioC.
     pub fn pc1(&self) -> GpioCFlex {
         GpioCFlex {
-            resources: self.resources,
-            role: &self.resources.pins[1],
             pin_name: "PC1",
             moder_addr: 0x40020800u64,
             moder_clear_mask: 0x0000000Cu32,
@@ -2468,8 +2376,6 @@ impl GpioC {
     /// Access the PC10 pin on GpioC.
     pub fn pc10(&self) -> GpioCFlex {
         GpioCFlex {
-            resources: self.resources,
-            role: &self.resources.pins[2],
             pin_name: "PC10",
             moder_addr: 0x40020800u64,
             moder_clear_mask: 0x00300000u32,
@@ -2491,8 +2397,6 @@ impl GpioC {
     /// Access the PC11 pin on GpioC.
     pub fn pc11(&self) -> GpioCFlex {
         GpioCFlex {
-            resources: self.resources,
-            role: &self.resources.pins[3],
             pin_name: "PC11",
             moder_addr: 0x40020800u64,
             moder_clear_mask: 0x00C00000u32,
@@ -2514,8 +2418,6 @@ impl GpioC {
     /// Access the PC12 pin on GpioC.
     pub fn pc12(&self) -> GpioCFlex {
         GpioCFlex {
-            resources: self.resources,
-            role: &self.resources.pins[4],
             pin_name: "PC12",
             moder_addr: 0x40020800u64,
             moder_clear_mask: 0x03000000u32,
@@ -2537,8 +2439,6 @@ impl GpioC {
     /// Access the PC13 pin on GpioC.
     pub fn pc13(&self) -> GpioCFlex {
         GpioCFlex {
-            resources: self.resources,
-            role: &self.resources.pins[5],
             pin_name: "PC13",
             moder_addr: 0x40020800u64,
             moder_clear_mask: 0x0C000000u32,
@@ -2560,8 +2460,6 @@ impl GpioC {
     /// Access the PC14 pin on GpioC.
     pub fn pc14(&self) -> GpioCFlex {
         GpioCFlex {
-            resources: self.resources,
-            role: &self.resources.pins[6],
             pin_name: "PC14",
             moder_addr: 0x40020800u64,
             moder_clear_mask: 0x30000000u32,
@@ -2583,8 +2481,6 @@ impl GpioC {
     /// Access the PC15 pin on GpioC.
     pub fn pc15(&self) -> GpioCFlex {
         GpioCFlex {
-            resources: self.resources,
-            role: &self.resources.pins[7],
             pin_name: "PC15",
             moder_addr: 0x40020800u64,
             moder_clear_mask: 0xC0000000u32,
@@ -2606,8 +2502,6 @@ impl GpioC {
     /// Access the PC2 pin on GpioC.
     pub fn pc2(&self) -> GpioCFlex {
         GpioCFlex {
-            resources: self.resources,
-            role: &self.resources.pins[8],
             pin_name: "PC2",
             moder_addr: 0x40020800u64,
             moder_clear_mask: 0x00000030u32,
@@ -2629,8 +2523,6 @@ impl GpioC {
     /// Access the PC3 pin on GpioC.
     pub fn pc3(&self) -> GpioCFlex {
         GpioCFlex {
-            resources: self.resources,
-            role: &self.resources.pins[9],
             pin_name: "PC3",
             moder_addr: 0x40020800u64,
             moder_clear_mask: 0x000000C0u32,
@@ -2652,8 +2544,6 @@ impl GpioC {
     /// Access the PC4 pin on GpioC.
     pub fn pc4(&self) -> GpioCFlex {
         GpioCFlex {
-            resources: self.resources,
-            role: &self.resources.pins[10],
             pin_name: "PC4",
             moder_addr: 0x40020800u64,
             moder_clear_mask: 0x00000300u32,
@@ -2675,8 +2565,6 @@ impl GpioC {
     /// Access the PC5 pin on GpioC.
     pub fn pc5(&self) -> GpioCFlex {
         GpioCFlex {
-            resources: self.resources,
-            role: &self.resources.pins[11],
             pin_name: "PC5",
             moder_addr: 0x40020800u64,
             moder_clear_mask: 0x00000C00u32,
@@ -2698,8 +2586,6 @@ impl GpioC {
     /// Access the PC6 pin on GpioC.
     pub fn pc6(&self) -> GpioCFlex {
         GpioCFlex {
-            resources: self.resources,
-            role: &self.resources.pins[12],
             pin_name: "PC6",
             moder_addr: 0x40020800u64,
             moder_clear_mask: 0x00003000u32,
@@ -2721,8 +2607,6 @@ impl GpioC {
     /// Access the PC7 pin on GpioC.
     pub fn pc7(&self) -> GpioCFlex {
         GpioCFlex {
-            resources: self.resources,
-            role: &self.resources.pins[13],
             pin_name: "PC7",
             moder_addr: 0x40020800u64,
             moder_clear_mask: 0x0000C000u32,
@@ -2744,8 +2628,6 @@ impl GpioC {
     /// Access the PC8 pin on GpioC.
     pub fn pc8(&self) -> GpioCFlex {
         GpioCFlex {
-            resources: self.resources,
-            role: &self.resources.pins[14],
             pin_name: "PC8",
             moder_addr: 0x40020800u64,
             moder_clear_mask: 0x00030000u32,
@@ -2767,8 +2649,6 @@ impl GpioC {
     /// Access the PC9 pin on GpioC.
     pub fn pc9(&self) -> GpioCFlex {
         GpioCFlex {
-            resources: self.resources,
-            role: &self.resources.pins[15],
             pin_name: "PC9",
             moder_addr: 0x40020800u64,
             moder_clear_mask: 0x000C0000u32,
@@ -2790,8 +2670,6 @@ impl GpioC {
 
 #[derive(Debug, Clone)]
 pub struct GpioCFlex {
-    resources: GpioCResources,
-    role: &'static metadata::PinRole,
     pin_name: &'static str,
     moder_addr: u64,
     moder_clear_mask: u32,
@@ -2820,14 +2698,6 @@ pub struct GpioCOutput {
 }
 
 impl GpioCFlex {
-    pub fn resources(&self) -> GpioCResources {
-        self.resources
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.role
-    }
-
     pub fn pin_name(&self) -> &'static str {
         self.pin_name
     }
@@ -2927,10 +2797,6 @@ impl GpioCInput {
         self.pin.pin_name()
     }
 
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
-    }
-
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {
         self.pin.set_pull(pull)
     }
@@ -2955,10 +2821,6 @@ impl GpioCOutput {
 
     pub fn pin_name(&self) -> &'static str {
         self.pin.pin_name()
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
     }
 
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {
@@ -3039,7 +2901,12 @@ pub const DRV_GPIOD_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_GPIOD_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct GpioDResources {
+pub struct GpioDRuntimeResources {}
+
+pub const DRV_GPIOD_RUNTIME_RESOURCES: GpioDRuntimeResources = GpioDRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct GpioDMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -3054,7 +2921,7 @@ pub struct GpioDResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_GPIOD_RESOURCES: GpioDResources = GpioDResources {
+pub const DRV_GPIOD_METADATA_RESOURCES: GpioDMetadataResources = GpioDMetadataResources {
     clocks: DRV_GPIOD_CLOCK_BINDINGS,
     resets: DRV_GPIOD_RESET_BINDINGS,
     interrupt_sources: DRV_GPIOD_INTERRUPT_SOURCES,
@@ -3070,17 +2937,16 @@ pub const DRV_GPIOD_RESOURCES: GpioDResources = GpioDResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct GpioD {
-    resources: GpioDResources,
-}
+pub struct GpioD;
 
 impl GpioD {
-    pub fn new(resources: GpioDResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: GpioDRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> GpioDResources {
-        self.resources
+    pub fn metadata_resources() -> GpioDMetadataResources {
+        DRV_GPIOD_METADATA_RESOURCES
     }
     /// Enable the GPIOD clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -3109,8 +2975,6 @@ impl GpioD {
     /// Access the PD2 pin on GpioD.
     pub fn pd2(&self) -> GpioDFlex {
         GpioDFlex {
-            resources: self.resources,
-            role: &self.resources.pins[0],
             pin_name: "PD2",
             moder_addr: 0x40020C00u64,
             moder_clear_mask: 0x00000030u32,
@@ -3132,8 +2996,6 @@ impl GpioD {
 
 #[derive(Debug, Clone)]
 pub struct GpioDFlex {
-    resources: GpioDResources,
-    role: &'static metadata::PinRole,
     pin_name: &'static str,
     moder_addr: u64,
     moder_clear_mask: u32,
@@ -3162,14 +3024,6 @@ pub struct GpioDOutput {
 }
 
 impl GpioDFlex {
-    pub fn resources(&self) -> GpioDResources {
-        self.resources
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.role
-    }
-
     pub fn pin_name(&self) -> &'static str {
         self.pin_name
     }
@@ -3269,10 +3123,6 @@ impl GpioDInput {
         self.pin.pin_name()
     }
 
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
-    }
-
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {
         self.pin.set_pull(pull)
     }
@@ -3297,10 +3147,6 @@ impl GpioDOutput {
 
     pub fn pin_name(&self) -> &'static str {
         self.pin.pin_name()
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
     }
 
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {
@@ -3401,7 +3247,12 @@ pub const DRV_GPIOH_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_GPIOH_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct GpioHResources {
+pub struct GpioHRuntimeResources {}
+
+pub const DRV_GPIOH_RUNTIME_RESOURCES: GpioHRuntimeResources = GpioHRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct GpioHMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -3416,7 +3267,7 @@ pub struct GpioHResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_GPIOH_RESOURCES: GpioHResources = GpioHResources {
+pub const DRV_GPIOH_METADATA_RESOURCES: GpioHMetadataResources = GpioHMetadataResources {
     clocks: DRV_GPIOH_CLOCK_BINDINGS,
     resets: DRV_GPIOH_RESET_BINDINGS,
     interrupt_sources: DRV_GPIOH_INTERRUPT_SOURCES,
@@ -3432,17 +3283,16 @@ pub const DRV_GPIOH_RESOURCES: GpioHResources = GpioHResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct GpioH {
-    resources: GpioHResources,
-}
+pub struct GpioH;
 
 impl GpioH {
-    pub fn new(resources: GpioHResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: GpioHRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> GpioHResources {
-        self.resources
+    pub fn metadata_resources() -> GpioHMetadataResources {
+        DRV_GPIOH_METADATA_RESOURCES
     }
     /// Enable the GPIOH clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -3471,8 +3321,6 @@ impl GpioH {
     /// Access the PH0 pin on GpioH.
     pub fn ph0(&self) -> GpioHFlex {
         GpioHFlex {
-            resources: self.resources,
-            role: &self.resources.pins[0],
             pin_name: "PH0",
             moder_addr: 0x40021C00u64,
             moder_clear_mask: 0x00000003u32,
@@ -3494,8 +3342,6 @@ impl GpioH {
     /// Access the PH1 pin on GpioH.
     pub fn ph1(&self) -> GpioHFlex {
         GpioHFlex {
-            resources: self.resources,
-            role: &self.resources.pins[1],
             pin_name: "PH1",
             moder_addr: 0x40021C00u64,
             moder_clear_mask: 0x0000000Cu32,
@@ -3517,8 +3363,6 @@ impl GpioH {
 
 #[derive(Debug, Clone)]
 pub struct GpioHFlex {
-    resources: GpioHResources,
-    role: &'static metadata::PinRole,
     pin_name: &'static str,
     moder_addr: u64,
     moder_clear_mask: u32,
@@ -3547,14 +3391,6 @@ pub struct GpioHOutput {
 }
 
 impl GpioHFlex {
-    pub fn resources(&self) -> GpioHResources {
-        self.resources
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.role
-    }
-
     pub fn pin_name(&self) -> &'static str {
         self.pin_name
     }
@@ -3654,10 +3490,6 @@ impl GpioHInput {
         self.pin.pin_name()
     }
 
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
-    }
-
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {
         self.pin.set_pull(pull)
     }
@@ -3682,10 +3514,6 @@ impl GpioHOutput {
 
     pub fn pin_name(&self) -> &'static str {
         self.pin.pin_name()
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
     }
 
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {

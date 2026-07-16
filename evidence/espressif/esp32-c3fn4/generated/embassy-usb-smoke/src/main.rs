@@ -5,9 +5,9 @@ use embassy_executor::{Executor, task};
 use embassy_time::{Duration, Timer};
 use esp_hal as _;
 use esp32c3fn4_generated::{
-    gpio::{DRV_GPIO_RESOURCES, GPIOPort, GPIOPortOutput, Level},
-    time::{DRV_TIME_RESOURCES, SystemTimer, generated_drv_time_time_driver_interrupt},
-    usb::{DRV_USB_DEVICE_RESOURCES, UsbSerialJtag},
+    gpio::{DRV_GPIO_RUNTIME_RESOURCES, GPIOPort, GPIOPortOutput, Level},
+    time::{DRV_TIME_RUNTIME_RESOURCES, SystemTimer, generated_drv_time_time_driver_interrupt},
+    usb::{DRV_USB_DEVICE_RUNTIME_RESOURCES, UsbSerialJtag},
 };
 use panic_halt as _;
 use static_cell::StaticCell;
@@ -32,18 +32,18 @@ fn note(usb: &UsbSerialJtag, message: &str) {
 }
 
 fn init_usb_serial_jtag() -> UsbSerialJtag {
-    let usb = UsbSerialJtag::new(DRV_USB_DEVICE_RESOURCES).unwrap();
+    let usb = UsbSerialJtag::new(DRV_USB_DEVICE_RUNTIME_RESOURCES).unwrap();
     usb.apply_preserve_serial_jtag_link().unwrap();
     usb
 }
 
 fn init_status_led() -> GPIOPortOutput {
-    let gpio = GPIOPort::new(DRV_GPIO_RESOURCES).unwrap();
+    let gpio = GPIOPort::new(DRV_GPIO_RUNTIME_RESOURCES).unwrap();
     gpio.gpio10().into_output(Level::High).unwrap()
 }
 
 fn init_time() {
-    let timer = SystemTimer::new(DRV_TIME_RESOURCES).unwrap();
+    let timer = SystemTimer::new(DRV_TIME_RUNTIME_RESOURCES).unwrap();
     timer.init_time_driver().unwrap();
     esp_hal::interrupt::enable(
         esp_hal::peripherals::Interrupt::SYSTIMER_TARGET0,

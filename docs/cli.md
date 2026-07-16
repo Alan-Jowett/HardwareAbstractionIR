@@ -66,9 +66,13 @@ First-cut behavior:
 - require an explicit `profiles.embassyHal` contract for the supported generated drivers
 - emit the generated HAL crate only; any vendor-specific bootable application
   image packaging still lives in the consumer board/application crate
+- emit an opt-in Cargo feature surface for the generated embedded HAL crate
+  rather than forcing every emitted peripheral family and runtime hook into all
+  consumer images; consumers must select the generated families they actually
+  use
 - derive the emitted Rust API surface from the approved topology and semantic lowering inputs in the HAIR document rather than from fixed placeholder signatures per driver kind
 - allow explicit `normalization.canonicalTerms[]` / `normalization.mappings[]` to act as secondary lowering hints for equivalent supported concepts across vendor naming schemes, without replacing the required profile/topology/semantic inputs
-- allow a `gpio-port` driver instance to lower into a per-pin GPIO API surface when the approved HAIR routes and structural controls justify that shape
+- allow a `gpio-port` driver instance to lower into a per-pin GPIO API surface when the approved HAIR routes and structural controls justify that shape, and additionally to implement `embedded_hal_async::digital::Wait` only when the same profile entry explicitly claims capability tag `embedded-hal-async-wait` plus `gpioExtiWaitBindings` for the EXTI-backed edge path
 - allow a `usb-device` driver instance to lower only the explicitly justified
   subset of endpoint-oriented and/or serial-style USB behaviors, including
   vendor-specific paths such as ESP32-C3 USB Serial/JTAG when the approved HAIR
@@ -97,6 +101,14 @@ First-cut behavior:
   runtime-agnostic interrupt hook and explicit tick-rate contract for wake
   delivery
 - preserve the generator-relevant structured subset of referenced topology and semantic inputs in the emitted Rust metadata so downstream code does not lose control refs, remap data, or executable semantic structure that the approved HAIR document already provides
+- separate the executable runtime API from the richer metadata-inspection API so
+  constructors and normal peripheral operations depend only on lean runtime
+  resources, while downstream tooling or metadata-aware tests can opt into the
+  richer constants and accessors explicitly
+- make that feature surface behaviorally meaningful: disabling one generated
+  peripheral-family feature must also suppress any helper modules, interrupt
+  handlers, and runtime wiring that exist only to serve that disabled family or
+  one of its optional async/IRQ-backed capabilities
 - emit register-level code only for methods that can be justified by explicit HAIR lowering inputs, and fail explicitly when the requested or implied behavior is underspecified
 - fail explicitly when the input document falls outside the documented supported subset or omits generator-required topology, semantics, or bindings documented in `docs/embassy-hal-profile.md`
 
@@ -112,7 +124,7 @@ First-cut exclusions:
 - fixed success-return driver methods that are disconnected from the input document's approved lowering data
 - inference of driver contracts purely from vendor naming without the approved profile data
 - treating canonical mappings as a substitute for explicit profile, topology, or semantic lowering inputs
-- silent widening of first-cut GPIO support into alternate-function or EXTI helpers when the approved profile did not request or justify them
+- silent widening of first-cut GPIO support into alternate-function helpers, or into EXTI-backed wait helpers when the approved profile did not explicitly request and justify them
 - pretending that generic schema validity alone is enough for Embassy generation readiness
 
 ### `hair generate embassy-host`

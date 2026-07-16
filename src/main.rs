@@ -1644,7 +1644,6 @@ struct GeneratedMethod {
 
 #[derive(Debug, Clone)]
 struct ResolvedIndexedFieldGpioPinLowering {
-    role_index: usize,
     pin_name: String,
     accessor_name: String,
     moder_clear_mask: u32,
@@ -1660,8 +1659,8 @@ struct ResolvedIndexedFieldGpioPinLowering {
 
 #[derive(Debug, Clone)]
 struct ResolvedWchCfgGpioPinLowering {
-    role_index: usize,
     pin_name: String,
+    pin_ref: String,
     accessor_name: String,
     cfg_addr: u64,
     cfg_clear_mask: u32,
@@ -1673,8 +1672,25 @@ struct ResolvedWchCfgGpioPinLowering {
 }
 
 #[derive(Debug, Clone)]
+struct ResolvedGpioExtiWaitLineLowering {
+    line_index: u32,
+    interrupt_route_ref: String,
+    interrupt_number: i32,
+    port_select_register: ResolvedRegister,
+    port_select_clear_mask: u32,
+    port_select_set_mask: u32,
+    interrupt_mask_register: ResolvedRegister,
+    interrupt_mask_mask: u32,
+    rising_trigger_register: ResolvedRegister,
+    rising_trigger_mask: u32,
+    falling_trigger_register: ResolvedRegister,
+    falling_trigger_mask: u32,
+    pending_register: ResolvedRegister,
+    pending_mask: u32,
+}
+
+#[derive(Debug, Clone)]
 struct ResolvedBitmaskGpioPinLowering {
-    role_index: usize,
     pin_name: String,
     accessor_name: String,
     bit_mask: u32,
@@ -1683,7 +1699,6 @@ struct ResolvedBitmaskGpioPinLowering {
 
 #[derive(Debug, Clone)]
 struct ResolvedEspGpioPinLowering {
-    role_index: usize,
     pin_name: String,
     accessor_name: String,
     bit_mask: u32,
@@ -1897,6 +1912,26 @@ struct EmbassyDmaAsyncBindings {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct EmbassyGpioExtiWaitLineBinding {
+    pin_ref: String,
+    line_index: u32,
+    port_select_ref: String,
+    interrupt_mask_ref: String,
+    rising_trigger_ref: String,
+    falling_trigger_ref: String,
+    pending_flag_ref: String,
+    pending_clear_operation_ref: String,
+    interrupt_route_ref: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EmbassyGpioExtiWaitBindings {
+    lines: Vec<EmbassyGpioExtiWaitLineBinding>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct EmbassyDriverInstance {
     id: String,
     name: String,
@@ -1917,6 +1952,8 @@ struct EmbassyDriverInstance {
     adc_dma_bindings: Option<EmbassyAdcDmaBindings>,
     #[serde(default)]
     dma_async_bindings: Option<EmbassyDmaAsyncBindings>,
+    #[serde(default)]
+    gpio_exti_wait_bindings: Option<EmbassyGpioExtiWaitBindings>,
     #[serde(default)]
     clock_binding_refs: Vec<String>,
     #[serde(default)]
@@ -1974,6 +2011,7 @@ struct ResolvedDriverInstance {
     flash_bindings: Option<EmbassyFlashBindings>,
     adc_dma_bindings: Option<EmbassyAdcDmaBindings>,
     dma_async_bindings: Option<EmbassyDmaAsyncBindings>,
+    gpio_exti_wait_bindings: Option<EmbassyGpioExtiWaitBindings>,
     target: McuCanonicalBlock,
     clock_bindings: Vec<McuClockBinding>,
     reset_bindings: Vec<McuResetBinding>,
@@ -2008,6 +2046,7 @@ struct DriverResourceScopeInputs<'a> {
 }
 
 const EMBASSY_TIME_DRIVER_TAG: &str = "embassy-time-driver";
+const EMBEDDED_HAL_ASYNC_WAIT_TAG: &str = "embedded-hal-async-wait";
 const EMBASSY_TIME_DRIVER_SOURCE_SYSTICK: &str = "systick";
 const EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER: &str = "hardware-timer";
 const EMBASSY_TIME_DRIVER_SOURCE_RTC: &str = "rtc";
@@ -2019,9 +2058,16 @@ const TIMER_LOWERING_COUNTER_COMPARE: &str = "counter-compare-timer";
 const USB_LOWERING_FSDEV_PMA_BTABLE: &str = "fsdev-pma-btable";
 const USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK: &str = "serial-jtag-preserve-link";
 const USB_PRESERVE_LINK_OPERATION_ID: &str = "op.usb_device.preserve_serial_jtag_link";
+const EMBASSY_FEATURE_GPIO_ASYNC_WAIT: &str = "gpio-async-wait";
+const EMBASSY_FEATURE_DMA_ASYNC: &str = "dma-async";
+const EMBASSY_FEATURE_WCH_RUNTIME: &str = "wch-runtime";
 
 fn has_time_driver_tag(tags: &[String]) -> bool {
     tags.iter().any(|tag| tag == EMBASSY_TIME_DRIVER_TAG)
+}
+
+fn has_gpio_async_wait_tag(tags: &[String]) -> bool {
+    tags.iter().any(|tag| tag == EMBEDDED_HAL_ASYNC_WAIT_TAG)
 }
 
 fn time_driver_source(driver: &ResolvedDriverInstance) -> Option<&str> {
@@ -2042,6 +2088,12 @@ fn adc_dma_bindings(driver: &ResolvedDriverInstance) -> Option<&EmbassyAdcDmaBin
 
 fn dma_async_bindings(driver: &ResolvedDriverInstance) -> Option<&EmbassyDmaAsyncBindings> {
     driver.dma_async_bindings.as_ref()
+}
+
+fn gpio_exti_wait_bindings(
+    driver: &ResolvedDriverInstance,
+) -> Option<&EmbassyGpioExtiWaitBindings> {
+    driver.gpio_exti_wait_bindings.as_ref()
 }
 
 fn has_regular_sequence_adc_dma_lowering(pattern: Option<&str>) -> bool {
@@ -2374,6 +2426,15 @@ impl EmbassyGenerationModel {
                 &driver_interrupt_sources,
                 &interrupt_routes,
             )?;
+            validate_gpio_exti_wait_bindings(
+                &registers,
+                &operations,
+                &document.physical.pins,
+                driver,
+                &pin_roles,
+                &driver_interrupt_sources,
+                &interrupt_routes,
+            )?;
             validate_driver_lowering_pattern(driver, &init_operations)?;
 
             drivers.push(ResolvedDriverInstance {
@@ -2389,6 +2450,7 @@ impl EmbassyGenerationModel {
                 flash_bindings: driver.flash_bindings.clone(),
                 adc_dma_bindings: driver.adc_dma_bindings.clone(),
                 dma_async_bindings: driver.dma_async_bindings.clone(),
+                gpio_exti_wait_bindings: driver.gpio_exti_wait_bindings.clone(),
                 target,
                 clock_bindings,
                 reset_bindings,
@@ -2489,6 +2551,33 @@ impl EmbassyGenerationModel {
             })
             .collect()
     }
+}
+
+fn embassy_generated_module_features(model: &EmbassyGenerationModel) -> Vec<String> {
+    model
+        .module_names()
+        .into_iter()
+        .filter(|module_name| module_name != "metadata")
+        .collect()
+}
+
+fn embassy_has_gpio_async_wait(model: &EmbassyGenerationModel) -> bool {
+    model.drivers.iter().any(driver_has_gpio_async_wait_support)
+}
+
+fn embassy_has_dma_async(model: &EmbassyGenerationModel) -> bool {
+    model.drivers.iter().any(|driver| {
+        dma_async_bindings(driver).is_some_and(|bindings| !bindings.channels.is_empty())
+    })
+}
+
+fn render_embassy_feature_name(name: &str) -> String {
+    render_rust_string(name)
+}
+
+fn driver_has_gpio_async_wait_support(driver: &ResolvedDriverInstance) -> bool {
+    has_gpio_async_wait_tag(&driver.capability_tags)
+        && gpio_exti_wait_bindings(driver).is_some_and(|bindings| !bindings.lines.is_empty())
 }
 
 fn validate_supported_driver_kind(driver_kind: &str) -> Result<()> {
@@ -2821,6 +2910,14 @@ fn validate_driver_module_scope(driver: &EmbassyDriverInstance, module_name: &st
             EMBASSY_TIME_DRIVER_TAG
         );
     }
+    if driver.gpio_exti_wait_bindings.is_some() && !has_gpio_async_wait_tag(&driver.capability_tags)
+    {
+        bail!(
+            "driver {} declares gpioExtiWaitBindings without capability tag {}",
+            driver.id,
+            EMBEDDED_HAL_ASYNC_WAIT_TAG
+        );
+    }
     Ok(())
 }
 
@@ -3078,6 +3175,37 @@ fn validate_capability_tag_contracts(drivers: &[ResolvedDriverInstance]) -> Resu
             }
         }
     }
+    for driver in drivers {
+        let has_wait_tag = has_gpio_async_wait_tag(&driver.capability_tags);
+        let has_wait_bindings = driver.gpio_exti_wait_bindings.is_some();
+        if !has_wait_tag && !has_wait_bindings {
+            continue;
+        }
+        if driver.driver_kind != "gpio-port" {
+            bail!(
+                "driver {} claims capability tag {} or gpioExtiWaitBindings but has unsupported driver kind {}; only gpio-port drivers may expose generated GPIO wait support",
+                driver.id,
+                EMBEDDED_HAL_ASYNC_WAIT_TAG,
+                driver.driver_kind
+            );
+        }
+        let bindings = driver.gpio_exti_wait_bindings.as_ref().ok_or_else(|| {
+            anyhow!(
+                "driver {} claims capability tag {} but omits required gpioExtiWaitBindings",
+                driver.id,
+                EMBEDDED_HAL_ASYNC_WAIT_TAG
+            )
+        })?;
+        if bindings.lines.len() != driver.pin_roles.len() {
+            bail!(
+                "driver {} claims capability tag {} but provides {} gpioExtiWaitBindings.lines for {} GPIO pin roles",
+                driver.id,
+                EMBEDDED_HAL_ASYNC_WAIT_TAG,
+                bindings.lines.len(),
+                driver.pin_roles.len()
+            );
+        }
+    }
     Ok(())
 }
 
@@ -3143,8 +3271,8 @@ fn validate_driver_resource_scope(
     resources: &DriverResourceScopeInputs<'_>,
 ) -> Result<()> {
     match driver.driver_kind.as_str() {
-        "uart" | "usart" | "spi" | "i2c" | "timer" | "pwm" | "adc" | "gpio-port" | "usb-device"
-        | "watchdog" | "flash" => {
+        "uart" | "usart" | "spi" | "i2c" | "timer" | "pwm" | "adc" | "usb-device" | "watchdog"
+        | "flash" => {
             let target_ref = target.target_ref.as_str();
             for binding in resources.clock_bindings {
                 if binding.consumer_ref != target_ref {
@@ -3181,6 +3309,80 @@ fn validate_driver_resource_scope(
                         )
                     })?;
                 if source.source_ref != target_ref {
+                    bail!(
+                        "driver {} references interrupt route {} for {} instead of {}",
+                        driver.id,
+                        route.id,
+                        source.source_ref,
+                        target_ref
+                    );
+                }
+            }
+            for route in resources.dma_routes {
+                if route.peripheral_ref != target_ref {
+                    bail!(
+                        "driver {} references DMA route {} for {} instead of {}",
+                        driver.id,
+                        route.id,
+                        route.peripheral_ref,
+                        target_ref
+                    );
+                }
+            }
+            for pin_role in resources.pin_roles {
+                for route in &pin_role.routes {
+                    if route.peripheral_ref != target_ref {
+                        bail!(
+                            "driver {} pin role {} references pin route {} for {} instead of {}",
+                            driver.id,
+                            pin_role.role,
+                            route.id,
+                            route.peripheral_ref,
+                            target_ref
+                        );
+                    }
+                }
+            }
+        }
+        "gpio-port" => {
+            let target_ref = target.target_ref.as_str();
+            for binding in resources.clock_bindings {
+                if binding.consumer_ref != target_ref {
+                    bail!(
+                        "driver {} references clock binding {} for {} instead of {}",
+                        driver.id,
+                        binding.id,
+                        binding.consumer_ref,
+                        target_ref
+                    );
+                }
+            }
+            for binding in resources.reset_bindings {
+                if binding.target_ref != target_ref {
+                    bail!(
+                        "driver {} references reset binding {} for {} instead of {}",
+                        driver.id,
+                        binding.id,
+                        binding.target_ref,
+                        target_ref
+                    );
+                }
+            }
+            let allow_exti_routes = has_gpio_async_wait_tag(&driver.capability_tags)
+                || driver.gpio_exti_wait_bindings.is_some();
+            for route in resources.interrupt_routes {
+                let source = resources
+                    .interrupt_sources
+                    .get(route.source_ref.as_str())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "driver {} interrupt route {} references unknown source {}",
+                            driver.id,
+                            route.id,
+                            route.source_ref
+                        )
+                    })?;
+                if source.source_ref != target_ref && !allow_exti_routes {
                     bail!(
                         "driver {} references interrupt route {} for {} instead of {}",
                         driver.id,
@@ -3606,6 +3808,13 @@ fn validate_driver_requirements(
                     driver.id
                 );
             }
+            if driver.gpio_exti_wait_bindings.is_some() && requirements.interrupt_routes.is_empty()
+            {
+                bail!(
+                    "gpio-port driver {} requires interrupt routes for gpioExtiWaitBindings-backed async waits",
+                    driver.id
+                );
+            }
         }
         "uart" | "usart" => {
             if requirements.pin_roles.is_empty() {
@@ -3955,6 +4164,189 @@ fn validate_dma_async_bindings(
     Ok(())
 }
 
+fn validate_gpio_exti_wait_bindings(
+    registers: &HashMap<String, ResolvedRegister>,
+    operations: &HashMap<&str, SemanticOperation>,
+    pins: &[PhysicalPin],
+    driver: &EmbassyDriverInstance,
+    pin_roles: &[ResolvedEmbassyPinRole],
+    interrupt_sources: &[McuInterruptSource],
+    driver_interrupt_routes: &[McuInterruptRoute],
+) -> Result<()> {
+    let Some(bindings) = driver.gpio_exti_wait_bindings.as_ref() else {
+        return Ok(());
+    };
+    if driver.driver_kind != "gpio-port" {
+        bail!(
+            "driver {} declares gpioExtiWaitBindings but that contract is only supported on gpio-port drivers",
+            driver.id
+        );
+    }
+    if driver_interrupt_routes.is_empty() {
+        bail!(
+            "driver {} declares gpioExtiWaitBindings but omits required interruptRouteRefs",
+            driver.id
+        );
+    }
+
+    let pin_by_id = pins
+        .iter()
+        .map(|pin| (pin.id.as_str(), pin))
+        .collect::<HashMap<_, _>>();
+    let driver_pin_refs = pin_roles
+        .iter()
+        .flat_map(|pin_role| pin_role.routes.iter().map(|route| route.pin_ref.as_str()))
+        .collect::<BTreeSet<_>>();
+    let mut seen_pin_refs = BTreeSet::new();
+    let mut seen_line_indices = BTreeSet::new();
+
+    for binding in &bindings.lines {
+        if !driver_pin_refs.contains(binding.pin_ref.as_str()) {
+            bail!(
+                "driver {} gpioExtiWaitBindings references pin {} that is not exposed by this gpio-port driver",
+                driver.id,
+                binding.pin_ref
+            );
+        }
+        if !seen_pin_refs.insert(binding.pin_ref.as_str()) {
+            bail!(
+                "driver {} gpioExtiWaitBindings repeats pinRef {}",
+                driver.id,
+                binding.pin_ref
+            );
+        }
+        if !seen_line_indices.insert(binding.line_index) {
+            bail!(
+                "driver {} gpioExtiWaitBindings repeats lineIndex {}",
+                driver.id,
+                binding.line_index
+            );
+        }
+
+        let pin = pin_by_id.get(binding.pin_ref.as_str()).ok_or_else(|| {
+            anyhow!(
+                "driver {} gpioExtiWaitBindings references unknown physical pin {}",
+                driver.id,
+                binding.pin_ref
+            )
+        })?;
+        let pin_index = pin.index.ok_or_else(|| {
+            anyhow!(
+                "driver {} gpioExtiWaitBindings pin {} is missing the physical index required for EXTI lowering",
+                driver.id,
+                binding.pin_ref
+            )
+        })?;
+        if pin_index != binding.line_index {
+            bail!(
+                "driver {} gpioExtiWaitBindings pin {} uses lineIndex {} but the modeled physical pin index is {}",
+                driver.id,
+                binding.pin_ref,
+                binding.line_index,
+                pin_index
+            );
+        }
+
+        for (field_ref, usage) in [
+            (&binding.port_select_ref, "portSelectRef"),
+            (&binding.interrupt_mask_ref, "interruptMaskRef"),
+            (&binding.rising_trigger_ref, "risingTriggerRef"),
+            (&binding.falling_trigger_ref, "fallingTriggerRef"),
+            (&binding.pending_flag_ref, "pendingFlagRef"),
+        ] {
+            if !registers
+                .values()
+                .any(|register| register.fields.iter().any(|field| field.id == *field_ref))
+            {
+                bail!(
+                    "driver {} gpioExtiWaitBindings {} {} does not resolve to a modeled register field",
+                    driver.id,
+                    usage,
+                    field_ref
+                );
+            }
+        }
+
+        let operation = operations
+            .get(binding.pending_clear_operation_ref.as_str())
+            .ok_or_else(|| {
+                anyhow!(
+                    "driver {} gpioExtiWaitBindings pendingClearOperationRef {} could not be resolved",
+                    driver.id,
+                    binding.pending_clear_operation_ref
+                )
+            })?;
+        if operation.steps.is_empty() {
+            bail!(
+                "driver {} gpioExtiWaitBindings pendingClearOperationRef {} must contain at least one write step",
+                driver.id,
+                binding.pending_clear_operation_ref
+            );
+        }
+
+        let interrupt_route = driver_interrupt_routes
+            .iter()
+            .find(|route| route.id == binding.interrupt_route_ref)
+            .ok_or_else(|| {
+                anyhow!(
+                    "driver {} gpioExtiWaitBindings references unknown interrupt route {}",
+                    driver.id,
+                    binding.interrupt_route_ref
+                )
+            })?;
+        if interrupt_route.line_index != Some(binding.line_index) {
+            bail!(
+                "driver {} gpioExtiWaitBindings lineIndex {} references route {} with mismatched lineIndex {:?}",
+                driver.id,
+                binding.line_index,
+                interrupt_route.id,
+                interrupt_route.line_index
+            );
+        }
+        let interrupt_source = interrupt_sources
+            .iter()
+            .find(|source| source.id == interrupt_route.source_ref)
+            .ok_or_else(|| {
+                anyhow!(
+                    "driver {} gpioExtiWaitBindings route {} references unknown interrupt source {}",
+                    driver.id,
+                    interrupt_route.id,
+                    interrupt_route.source_ref
+                )
+            })?;
+        if !interrupt_source
+            .flag_refs
+            .contains(&binding.pending_flag_ref)
+        {
+            bail!(
+                "driver {} gpioExtiWaitBindings lineIndex {} requires interrupt source {} to advertise pending flag {}",
+                driver.id,
+                binding.line_index,
+                interrupt_source.id,
+                binding.pending_flag_ref
+            );
+        }
+        if !interrupt_source
+            .clear_operation_refs
+            .contains(&binding.pending_clear_operation_ref)
+            && !interrupt_route
+                .acknowledge_operation_refs
+                .contains(&binding.pending_clear_operation_ref)
+        {
+            bail!(
+                "driver {} gpioExtiWaitBindings lineIndex {} requires pendingClearOperationRef {} to be carried by interrupt source {} or route {}",
+                driver.id,
+                binding.line_index,
+                binding.pending_clear_operation_ref,
+                interrupt_source.id,
+                interrupt_route.id
+            );
+        }
+    }
+
+    Ok(())
+}
+
 fn validate_counter_compare_timer_lowering(driver: &EmbassyDriverInstance) -> Result<()> {
     if driver.driver_kind != "timer" {
         bail!(
@@ -4119,6 +4511,7 @@ fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
         render_rust_string(&model.crate_info.package_name),
         render_rust_string(&model.crate_info.crate_name)
     );
+    let module_features = embassy_generated_module_features(model);
     let has_time_driver = model
         .drivers
         .iter()
@@ -4130,46 +4523,136 @@ fn render_embassy_cargo_toml(model: &EmbassyGenerationModel) -> String {
     let has_embedded_hal_1 = model
         .drivers
         .iter()
-        .any(|driver| driver.driver_kind == "pwm");
+        .any(|driver| driver.driver_kind == "pwm")
+        || embassy_has_gpio_async_wait(model);
     let has_embedded_hal_02 = model
         .drivers
         .iter()
         .any(|driver| driver.driver_kind == "watchdog");
+    let has_embedded_hal_async = embassy_has_gpio_async_wait(model);
     let has_embedded_storage = model
         .drivers
         .iter()
         .any(|driver| driver.driver_kind == "flash");
+    let has_dma_async = embassy_has_dma_async(model);
+    let has_wch_runtime = uses_generated_wch_runtime_module(model);
+
+    let mut feature_map = BTreeMap::<String, BTreeSet<String>>::new();
+    feature_map.insert("default".to_string(), BTreeSet::new());
+    for feature in &module_features {
+        feature_map.entry(feature.clone()).or_default();
+    }
+    if has_wch_runtime {
+        let runtime_feature = feature_map
+            .entry(EMBASSY_FEATURE_WCH_RUNTIME.to_string())
+            .or_default();
+        runtime_feature.insert("interrupt".to_string());
+        runtime_feature.insert("time".to_string());
+    }
+    if has_time_driver {
+        let time_feature = feature_map.entry("time".to_string()).or_default();
+        time_feature.insert("dep:critical-section".to_string());
+        time_feature.insert("dep:embassy-time-driver".to_string());
+        time_feature.insert("dep:embassy-time-queue-utils".to_string());
+    }
+    if has_fsdev_usb {
+        let usb_feature = feature_map.entry("usb".to_string()).or_default();
+        usb_feature.insert("dep:critical-section".to_string());
+        usb_feature.insert("dep:embassy-usb-driver".to_string());
+    }
+    if model
+        .drivers
+        .iter()
+        .any(|driver| driver.driver_kind == "pwm")
+    {
+        feature_map
+            .entry("pwm".to_string())
+            .or_default()
+            .insert("dep:embedded-hal".to_string());
+    }
+    if has_embedded_hal_02 {
+        feature_map
+            .entry("watchdog".to_string())
+            .or_default()
+            .insert("dep:embedded-hal-02".to_string());
+    }
+    if has_embedded_storage {
+        feature_map
+            .entry("flash".to_string())
+            .or_default()
+            .insert("dep:embedded-storage".to_string());
+    }
+    if has_embedded_hal_async {
+        let wait_feature = feature_map
+            .entry(EMBASSY_FEATURE_GPIO_ASYNC_WAIT.to_string())
+            .or_default();
+        wait_feature.insert("gpio".to_string());
+        wait_feature.insert("interrupt".to_string());
+        wait_feature.insert("dep:critical-section".to_string());
+        wait_feature.insert("dep:embedded-hal".to_string());
+        wait_feature.insert("dep:embedded-hal-async".to_string());
+    }
+    if has_dma_async {
+        let dma_feature = feature_map
+            .entry(EMBASSY_FEATURE_DMA_ASYNC.to_string())
+            .or_default();
+        dma_feature.insert("dma".to_string());
+        dma_feature.insert("interrupt".to_string());
+    }
+    out.push_str("\n[features]\n");
+    for (feature_name, dependencies) in feature_map {
+        let rendered_dependencies = dependencies
+            .into_iter()
+            .map(|dependency| render_embassy_feature_name(&dependency))
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push_str(&format!("{} = [{}]\n", feature_name, rendered_dependencies));
+    }
+
     if has_time_driver
         || has_fsdev_usb
         || has_embedded_hal_1
         || has_embedded_hal_02
+        || has_embedded_hal_async
         || has_embedded_storage
     {
         out.push_str("\n[dependencies]\n");
-        if has_time_driver || has_fsdev_usb {
-            out.push_str("critical-section = \"1.2\"\n");
-        }
+    }
+    if has_time_driver || has_fsdev_usb || has_embedded_hal_async {
+        out.push_str("critical-section = { version = \"1.2\", optional = true }\n");
     }
     if has_time_driver {
-        out.push_str(&format!(
-            "{}\n",
-            render_embassy_time_driver_dependency(&model.drivers)
-        ));
-        out.push_str("embassy-time-queue-utils = { version = \"0.3.2\", features = [\"generic-queue-8\"] }\n");
+        if let Some(driver) = model
+            .drivers
+            .iter()
+            .find(|driver| has_time_driver_tag(&driver.capability_tags))
+            && let Some(tick_hz) = time_driver_tick_hz(driver)
+        {
+            out.push_str(&format!(
+                "embassy-time-driver = {{ version = \"0.2.2\", features = [{}], optional = true }}\n",
+                render_rust_string(&render_tick_hz_feature(tick_hz))
+            ));
+        } else {
+            out.push_str("embassy-time-driver = { version = \"0.2.2\", optional = true }\n");
+        }
+        out.push_str("embassy-time-queue-utils = { version = \"0.3.2\", features = [\"generic-queue-8\"], optional = true }\n");
     }
     if has_fsdev_usb {
-        out.push_str("embassy-usb-driver = \"0.2.2\"\n");
+        out.push_str("embassy-usb-driver = { version = \"0.2.2\", optional = true }\n");
     }
     if has_embedded_hal_1 {
-        out.push_str("embedded-hal = \"1.0\"\n");
+        out.push_str("embedded-hal = { version = \"1.0\", optional = true }\n");
+    }
+    if has_embedded_hal_async {
+        out.push_str("embedded-hal-async = { version = \"1.0\", optional = true }\n");
     }
     if has_embedded_hal_02 {
         out.push_str(
-            "embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"] }\n",
+            "embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"], optional = true }\n",
         );
     }
     if has_embedded_storage {
-        out.push_str("embedded-storage = \"0.3\"\n");
+        out.push_str("embedded-storage = { version = \"0.3\", optional = true }\n");
     }
     out
 }
@@ -4204,19 +4687,37 @@ fn render_embassy_time_driver_dependency(drivers: &[ResolvedDriverInstance]) -> 
 fn render_embassy_lib_rs(model: &EmbassyGenerationModel) -> String {
     let mut out = String::from("#![no_std]\n\n");
     for module_name in model.module_names() {
-        out.push_str(&format!("pub mod {module_name};\n"));
+        if module_name == "metadata" {
+            out.push_str("pub mod metadata;\n");
+        } else {
+            out.push_str(&format!(
+                "#[cfg(feature = {})]\npub mod {module_name};\n",
+                render_embassy_feature_name(&module_name)
+            ));
+        }
     }
     if uses_generated_wch_runtime_module(model) {
-        out.push_str("pub mod wch;\n");
+        out.push_str(&format!(
+            "#[cfg(feature = {})]\npub mod wch;\n",
+            render_embassy_feature_name(EMBASSY_FEATURE_WCH_RUNTIME)
+        ));
     }
     out
 }
 
 fn render_embassy_metadata_rs(model: &EmbassyGenerationModel) -> String {
     let doc_comment_title = render_comment_text(&model.document_title);
+    let error_trait_impl = if model.drivers.iter().any(|driver| {
+        driver.driver_kind == "pwm" || has_gpio_async_wait_tag(&driver.capability_tags)
+    }) {
+        "\n#[cfg(any(feature = \"pwm\", feature = \"gpio-async-wait\"))]\nimpl embedded_hal::digital::Error for Error {\n    fn kind(&self) -> embedded_hal::digital::ErrorKind {\n        embedded_hal::digital::ErrorKind::Other\n    }\n}\n"
+    } else {
+        ""
+    };
     format!(
-        "//! Generated Embassy-style HAL metadata for {}.\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum ResourceRequirement {{\n    Required,\n    Optional,\n    MutuallyExclusive,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Error {{\n    Unsupported(&'static str),\n    InvalidReference(&'static str),\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub enum ValueLiteral {{\n    Integer(i64),\n    Unsigned(u64),\n    Number(f64),\n    String(&'static str),\n    Bool(bool),\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct SemanticExpression {{\n    pub language: Option<&'static str>,\n    pub text: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct Predicate {{\n    pub kind: &'static str,\n    pub target_ref: Option<&'static str>,\n    pub expression: Option<SemanticExpression>,\n    pub expected_value: Option<ValueLiteral>,\n    pub description: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct SemanticOperationStep {{\n    pub index: u32,\n    pub action: &'static str,\n    pub target_ref: Option<&'static str>,\n    pub expression: Option<SemanticExpression>,\n    pub value: Option<ValueLiteral>,\n    pub description: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct SemanticOperation {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub description: Option<&'static str>,\n    pub kind: Option<&'static str>,\n    pub target_refs: &'static [&'static str],\n    pub steps: &'static [SemanticOperationStep],\n    pub preconditions: &'static [Predicate],\n    pub postconditions: &'static [Predicate],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct SemanticState {{\n    pub name: &'static str,\n    pub description: Option<&'static str>,\n    pub invariants: &'static [Predicate],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct SemanticSideEffect {{\n    pub kind: &'static str,\n    pub target_ref: Option<&'static str>,\n    pub description: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct SemanticTransition {{\n    pub from: &'static str,\n    pub to: &'static str,\n    pub trigger: Option<&'static str>,\n    pub conditions: &'static [Predicate],\n    pub effects: &'static [SemanticSideEffect],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct SemanticStateMachine {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub description: Option<&'static str>,\n    pub target_refs: &'static [&'static str],\n    pub initial_state: Option<&'static str>,\n    pub states: &'static [SemanticState],\n    pub transitions: &'static [SemanticTransition],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ClockBinding {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub consumer_ref: &'static str,\n    pub clock_ref: &'static str,\n    pub controller_ref: Option<&'static str>,\n    pub binding_kind: &'static str,\n    pub control_refs: &'static [&'static str],\n    pub enable_operation_refs: &'static [&'static str],\n    pub disable_operation_refs: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ResetBinding {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub target_ref: &'static str,\n    pub controller_ref: Option<&'static str>,\n    pub reset_domain_ref: Option<&'static str>,\n    pub binding_kind: &'static str,\n    pub control_refs: &'static [&'static str],\n    pub assert_operation_refs: &'static [&'static str],\n    pub release_operation_refs: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct InterruptSource {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_ref: &'static str,\n    pub producer_ref: Option<&'static str>,\n    pub kind: &'static str,\n    pub flag_refs: &'static [&'static str],\n    pub clear_operation_refs: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct InterruptRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_ref: &'static str,\n    pub interrupt_ref: &'static str,\n    pub controller_ref: &'static str,\n    pub cpu_target_ref: Option<&'static str>,\n    pub line_index: Option<u32>,\n    pub route_type: &'static str,\n    pub control_refs: &'static [&'static str],\n    pub acknowledge_operation_refs: &'static [&'static str],\n    pub shared_group: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct DmaChannel {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub controller_ref: &'static str,\n    pub target_ref: Option<&'static str>,\n    pub channel_index: u32,\n    pub capabilities: &'static [&'static str],\n    pub priority_levels: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct DmaRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub peripheral_ref: &'static str,\n    pub signal: Option<&'static str>,\n    pub channel_ref: &'static str,\n    pub direction: &'static str,\n    pub control_refs: &'static [&'static str],\n    pub shared_channel_group_ref: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct PinRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub pin_ref: &'static str,\n    pub peripheral_ref: &'static str,\n    pub signal: &'static str,\n    pub route_type: &'static str,\n    pub control_refs: &'static [&'static str],\n    pub electrical_constraint_refs: &'static [&'static str],\n    pub conflict_refs: &'static [&'static str],\n    pub default_after_reset: Option<bool>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct PinRole {{\n    pub role: &'static str,\n    pub signal: &'static str,\n    pub routes: &'static [PinRoute],\n    pub requirement: ResourceRequirement,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct ProvenanceSource {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub kind: Option<&'static str>,\n    pub path: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct ProvenanceEvidence {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_ref: &'static str,\n    pub normalized_claim: Option<&'static str>,\n    pub extraction_method: Option<&'static str>,\n    pub confidence: Option<f64>,\n    pub locator: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ModuleProvenance {{\n    pub module_name: &'static str,\n    pub document_title: &'static str,\n    pub document_version: &'static str,\n    pub source_ids: &'static [&'static str],\n    pub evidence_ids: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct GeneratedMetadata {{\n    pub document_title: &'static str,\n    pub document_version: &'static str,\n    pub device_name: &'static str,\n    pub target_architecture: Option<&'static str>,\n    pub executor_idle_strategy: Option<&'static str>,\n    pub feature_flags: &'static [&'static str],\n    pub provenance_sources: &'static [ProvenanceSource],\n    pub provenance_evidence: &'static [ProvenanceEvidence],\n}}\n\npub const GENERATED_PROVENANCE_SOURCE_IDS: &[&str] = &{};\npub const GENERATED_PROVENANCE_EVIDENCE_IDS: &[&str] = &{};\n\npub const GENERATED_METADATA: GeneratedMetadata = GeneratedMetadata {{\n    document_title: {},\n    document_version: {},\n    device_name: {},\n    target_architecture: {},\n    executor_idle_strategy: {},\n    feature_flags: &{},\n    provenance_sources: &{},\n    provenance_evidence: &{},\n}};\n",
+        "//! Generated Embassy-style HAL metadata for {}.\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum ResourceRequirement {{\n    Required,\n    Optional,\n    MutuallyExclusive,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Error {{\n    Unsupported(&'static str),\n    InvalidReference(&'static str),\n}}\n{} \n#[derive(Debug, Clone, Copy, PartialEq)]\npub enum ValueLiteral {{\n    Integer(i64),\n    Unsigned(u64),\n    Number(f64),\n    String(&'static str),\n    Bool(bool),\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct SemanticExpression {{\n    pub language: Option<&'static str>,\n    pub text: &'static str,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct Predicate {{\n    pub kind: &'static str,\n    pub target_ref: Option<&'static str>,\n    pub expression: Option<SemanticExpression>,\n    pub expected_value: Option<ValueLiteral>,\n    pub description: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct SemanticOperationStep {{\n    pub index: u32,\n    pub action: &'static str,\n    pub target_ref: Option<&'static str>,\n    pub expression: Option<SemanticExpression>,\n    pub value: Option<ValueLiteral>,\n    pub description: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct SemanticOperation {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub description: Option<&'static str>,\n    pub kind: Option<&'static str>,\n    pub target_refs: &'static [&'static str],\n    pub steps: &'static [SemanticOperationStep],\n    pub preconditions: &'static [Predicate],\n    pub postconditions: &'static [Predicate],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct SemanticState {{\n    pub name: &'static str,\n    pub description: Option<&'static str>,\n    pub invariants: &'static [Predicate],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct SemanticSideEffect {{\n    pub kind: &'static str,\n    pub target_ref: Option<&'static str>,\n    pub description: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct SemanticTransition {{\n    pub from: &'static str,\n    pub to: &'static str,\n    pub trigger: Option<&'static str>,\n    pub conditions: &'static [Predicate],\n    pub effects: &'static [SemanticSideEffect],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct SemanticStateMachine {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub description: Option<&'static str>,\n    pub target_refs: &'static [&'static str],\n    pub initial_state: Option<&'static str>,\n    pub states: &'static [SemanticState],\n    pub transitions: &'static [SemanticTransition],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ClockBinding {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub consumer_ref: &'static str,\n    pub clock_ref: &'static str,\n    pub controller_ref: Option<&'static str>,\n    pub binding_kind: &'static str,\n    pub control_refs: &'static [&'static str],\n    pub enable_operation_refs: &'static [&'static str],\n    pub disable_operation_refs: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ResetBinding {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub target_ref: &'static str,\n    pub controller_ref: Option<&'static str>,\n    pub reset_domain_ref: Option<&'static str>,\n    pub binding_kind: &'static str,\n    pub control_refs: &'static [&'static str],\n    pub assert_operation_refs: &'static [&'static str],\n    pub release_operation_refs: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct InterruptSource {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_ref: &'static str,\n    pub producer_ref: Option<&'static str>,\n    pub kind: &'static str,\n    pub flag_refs: &'static [&'static str],\n    pub clear_operation_refs: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct InterruptRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_ref: &'static str,\n    pub interrupt_ref: &'static str,\n    pub controller_ref: &'static str,\n    pub cpu_target_ref: Option<&'static str>,\n    pub line_index: Option<u32>,\n    pub route_type: &'static str,\n    pub control_refs: &'static [&'static str],\n    pub acknowledge_operation_refs: &'static [&'static str],\n    pub shared_group: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct DmaChannel {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub controller_ref: &'static str,\n    pub target_ref: Option<&'static str>,\n    pub channel_index: u32,\n    pub capabilities: &'static [&'static str],\n    pub priority_levels: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct DmaRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub peripheral_ref: &'static str,\n    pub signal: Option<&'static str>,\n    pub channel_ref: &'static str,\n    pub direction: &'static str,\n    pub control_refs: &'static [&'static str],\n    pub shared_channel_group_ref: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct PinRoute {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub pin_ref: &'static str,\n    pub peripheral_ref: &'static str,\n    pub signal: &'static str,\n    pub route_type: &'static str,\n    pub control_refs: &'static [&'static str],\n    pub electrical_constraint_refs: &'static [&'static str],\n    pub conflict_refs: &'static [&'static str],\n    pub default_after_reset: Option<bool>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct PinRole {{\n    pub role: &'static str,\n    pub signal: &'static str,\n    pub routes: &'static [PinRoute],\n    pub requirement: ResourceRequirement,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct ProvenanceSource {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub kind: Option<&'static str>,\n    pub path: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct ProvenanceEvidence {{\n    pub id: &'static str,\n    pub name: &'static str,\n    pub source_ref: &'static str,\n    pub normalized_claim: Option<&'static str>,\n    pub extraction_method: Option<&'static str>,\n    pub confidence: Option<f64>,\n    pub locator: Option<&'static str>,\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct ModuleProvenance {{\n    pub module_name: &'static str,\n    pub document_title: &'static str,\n    pub document_version: &'static str,\n    pub source_ids: &'static [&'static str],\n    pub evidence_ids: &'static [&'static str],\n}}\n\n#[derive(Debug, Clone, Copy, PartialEq)]\npub struct GeneratedMetadata {{\n    pub document_title: &'static str,\n    pub document_version: &'static str,\n    pub device_name: &'static str,\n    pub target_architecture: Option<&'static str>,\n    pub executor_idle_strategy: Option<&'static str>,\n    pub feature_flags: &'static [&'static str],\n    pub provenance_sources: &'static [ProvenanceSource],\n    pub provenance_evidence: &'static [ProvenanceEvidence],\n}}\n\npub const GENERATED_PROVENANCE_SOURCE_IDS: &[&str] = &{};\npub const GENERATED_PROVENANCE_EVIDENCE_IDS: &[&str] = &{};\n\npub const GENERATED_METADATA: GeneratedMetadata = GeneratedMetadata {{\n    document_title: {},\n    document_version: {},\n    device_name: {},\n    target_architecture: {},\n    executor_idle_strategy: {},\n    feature_flags: &{},\n    provenance_sources: &{},\n    provenance_evidence: &{},\n}};\n",
         doc_comment_title,
+        error_trait_impl,
         render_named_entity_slice(
             &model
                 .provenance
@@ -4299,10 +4800,27 @@ fn render_driver_instance(
     driver: &ResolvedDriverInstance,
 ) -> Result<String> {
     let const_prefix = to_rust_const_name(&driver.id);
+    let gpio_async_wait_support =
+        driver.driver_kind == "gpio-port" && driver_has_gpio_async_wait_support(driver);
     let support_items = render_driver_support_items(model, driver)?;
     let support_items = support_items.trim_end();
     let methods = render_driver_methods(model, driver)?;
     let methods = methods.trim_end();
+    let interrupt_sources = render_interrupt_source_slice(&driver.interrupt_sources);
+    let interrupt_routes = render_interrupt_route_slice(&driver.interrupt_routes);
+    let capability_tags = render_named_entity_slice(&driver.capability_tags);
+    let capability_tags_without_gpio_async_wait = if gpio_async_wait_support {
+        render_named_entity_slice(
+            &driver
+                .capability_tags
+                .iter()
+                .filter(|tag| tag.as_str() != EMBEDDED_HAL_ASYNC_WAIT_TAG)
+                .cloned()
+                .collect::<Vec<_>>(),
+        )
+    } else {
+        capability_tags.clone()
+    };
     let mut out = String::new();
     out.push_str(&format!(
         "// Driver instance: {} ({}) from canonical block {} -> {}\n",
@@ -4319,14 +4837,21 @@ fn render_driver_instance(
         "pub const {const_prefix}_RESET_BINDINGS: &[metadata::ResetBinding] = &{};\n",
         render_reset_binding_slice(&driver.reset_bindings)
     ));
-    out.push_str(&format!(
-        "pub const {const_prefix}_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &{};\n",
-        render_interrupt_source_slice(&driver.interrupt_sources)
-    ));
-    out.push_str(&format!(
-        "pub const {const_prefix}_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &{};\n",
-        render_interrupt_route_slice(&driver.interrupt_routes)
-    ));
+    if gpio_async_wait_support {
+        out.push_str(&format!(
+            "#[cfg(feature = \"{EMBASSY_FEATURE_GPIO_ASYNC_WAIT}\")]\npub const {const_prefix}_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &{interrupt_sources};\n#[cfg(not(feature = \"{EMBASSY_FEATURE_GPIO_ASYNC_WAIT}\"))]\npub const {const_prefix}_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];\n"
+        ));
+        out.push_str(&format!(
+            "#[cfg(feature = \"{EMBASSY_FEATURE_GPIO_ASYNC_WAIT}\")]\npub const {const_prefix}_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &{interrupt_routes};\n#[cfg(not(feature = \"{EMBASSY_FEATURE_GPIO_ASYNC_WAIT}\"))]\npub const {const_prefix}_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];\n"
+        ));
+    } else {
+        out.push_str(&format!(
+            "pub const {const_prefix}_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &{interrupt_sources};\n"
+        ));
+        out.push_str(&format!(
+            "pub const {const_prefix}_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &{interrupt_routes};\n"
+        ));
+    }
     out.push_str(&format!(
         "pub const {const_prefix}_DMA_CHANNELS: &[metadata::DmaChannel] = &{};\n",
         render_dma_channel_slice(&driver.dma_channels)
@@ -4353,12 +4878,17 @@ fn render_driver_instance(
         "pub const {const_prefix}_STATE_MACHINES: &[metadata::SemanticStateMachine] = &{};\n",
         render_semantic_state_machine_slice(&driver.state_machines)
     ));
+    if gpio_async_wait_support {
+        out.push_str(&format!(
+            "#[cfg(feature = \"{EMBASSY_FEATURE_GPIO_ASYNC_WAIT}\")]\npub const {const_prefix}_CAPABILITY_TAGS: &[&str] = &{capability_tags};\n#[cfg(not(feature = \"{EMBASSY_FEATURE_GPIO_ASYNC_WAIT}\"))]\npub const {const_prefix}_CAPABILITY_TAGS: &[&str] = &{capability_tags_without_gpio_async_wait};\n\n"
+        ));
+    } else {
+        out.push_str(&format!(
+            "pub const {const_prefix}_CAPABILITY_TAGS: &[&str] = &{capability_tags};\n\n"
+        ));
+    }
     out.push_str(&format!(
-        "pub const {const_prefix}_CAPABILITY_TAGS: &[&str] = &{};\n\n",
-        render_named_entity_slice(&driver.capability_tags)
-    ));
-    out.push_str(&format!(
-        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub lowering_pattern: Option<&'static str>,\n    pub time_driver_source: Option<&'static str>,\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    lowering_pattern: {lowering_pattern},\n    time_driver_source: {time_driver_source},\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n{support_items}",
+        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}RuntimeResources {{}}\n\npub const {const_prefix}_RUNTIME_RESOURCES: {type_name}RuntimeResources = {type_name}RuntimeResources {{}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name}MetadataResources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub lowering_pattern: Option<&'static str>,\n    pub time_driver_source: Option<&'static str>,\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_METADATA_RESOURCES: {type_name}MetadataResources = {type_name}MetadataResources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    lowering_pattern: {lowering_pattern},\n    time_driver_source: {time_driver_source},\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name};\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}RuntimeResources) -> Result<Self, metadata::Error> {{\n        let _ = resources;\n        Ok(Self)\n    }}\n\n    pub fn metadata_resources() -> {type_name}MetadataResources {{\n        {const_prefix}_METADATA_RESOURCES\n    }}\n{methods}\n}}\n\n{support_items}",
         type_name = driver.type_name,
         const_prefix = const_prefix,
         lowering_pattern = render_optional_rust_string(driver.lowering_pattern.as_deref()),
@@ -4573,7 +5103,7 @@ pub struct {type_name}UsbDriver {{
 }}
 
 impl {type_name}UsbDriver {{
-    fn new(resources: {type_name}Resources) -> Self {{
+    fn new(resources: {type_name}RuntimeResources) -> Self {{
         let _ = resources;
         Self {{
             pairs: [FsdevEndpointPair::new(); 8],
@@ -5357,8 +5887,8 @@ fn render_driver_methods(
     let mut methods = Vec::new();
     if driver.driver_kind == "interrupt" {
         methods.push(GeneratedMethod {
-            name: "bind".to_string(),
-            code: "    pub fn bind(&self) -> &'static [metadata::InterruptRoute] {\n        self.resources.interrupts\n    }\n"
+            name: "interrupt_routes".to_string(),
+            code: "    pub fn interrupt_routes() -> &'static [metadata::InterruptRoute] {\n        Self::metadata_resources().interrupts\n    }\n"
                 .to_string(),
         });
         if driver_uses_pfic_runtime_support(driver) {
@@ -5561,6 +6091,7 @@ struct GeneratedWchRuntimeVectorHandler {
     vector_const_name: String,
     vector_symbol_name: String,
     rust_handler_name: String,
+    cfg_feature: Option<String>,
     import_line: Option<String>,
     helper_items: String,
     rust_handler_body: String,
@@ -5639,6 +6170,7 @@ fn generated_wch_runtime_vector_handlers(
         vector_const_name: "WCH_TIME_DRIVER_HANDLER_VECTOR".to_string(),
         vector_symbol_name: "__hair_wch_embassy_time_driver_vector".to_string(),
         rust_handler_name: "__hair_wch_embassy_time_driver_irq_rust".to_string(),
+        cfg_feature: Some(format!("feature = \"{}\"", EMBASSY_FEATURE_WCH_RUNTIME)),
         import_line: None,
         helper_items: String::new(),
         rust_handler_body: "    time_driver().on_time_driver_interrupt();\n".to_string(),
@@ -5712,16 +6244,16 @@ fn generated_wch_runtime_vector_handlers(
                 channel.channel_index
             );
             let type_name = driver.type_name.as_str();
-            let resource_type = format!("{type_name}Resources");
+            let resource_type = format!("{type_name}RuntimeResources");
             let helper_fn_name =
                 format!("generated_wch_runtime_{}", to_rust_method_name(&driver.id));
             let helper_const_name = format!(
-                "GENERATED_WCH_RUNTIME_{}_RESOURCES",
+                "GENERATED_WCH_RUNTIME_{}_RUNTIME_RESOURCES",
                 to_rust_const_name(&driver.id)
             );
             let helper_items = if emitted_driver_helpers.insert(driver.id.clone()) {
                 format!(
-                    "const {helper_const_name}: {resource_type} = {resource_type} {{\n    clocks: &[],\n    resets: &[],\n    interrupt_sources: &[],\n    interrupts: &[],\n    dma_channels: &[],\n    dma: &[],\n    pins: &[],\n    init_operations: &[],\n    state_machines: &[],\n    lowering_pattern: None,\n    time_driver_source: None,\n    capability_tags: &[],\n}};\n\nfn {helper_fn_name}() -> {type_name} {{\n    {type_name}::new({helper_const_name}).expect(\"generated WCH runtime driver resources\")\n}}\n\n"
+                    "#[cfg(feature = \"{EMBASSY_FEATURE_DMA_ASYNC}\")]\nconst {helper_const_name}: {resource_type} = {resource_type} {{}};\n\n#[cfg(feature = \"{EMBASSY_FEATURE_DMA_ASYNC}\")]\nfn {helper_fn_name}() -> {type_name} {{\n    {type_name}::new({helper_const_name}).expect(\"generated WCH runtime driver resources\")\n}}\n\n"
                 )
             } else {
                 String::new()
@@ -5735,6 +6267,7 @@ fn generated_wch_runtime_vector_handlers(
                 ),
                 vector_symbol_name: format!("__hair_wch_{}_vector", handler_slug),
                 rust_handler_name: format!("__hair_wch_{}_irq_rust", handler_slug),
+                cfg_feature: Some(format!("feature = \"{}\"", EMBASSY_FEATURE_DMA_ASYNC)),
                 import_line: Some(format!(
                     "use crate::{}::{{{}, {}}};",
                     driver.module_name, type_name, resource_type
@@ -5748,32 +6281,159 @@ fn generated_wch_runtime_vector_handlers(
         }
     }
 
-    let mut seen_slots = BTreeMap::<usize, String>::new();
-    for handler in &handlers {
-        if let Some(previous) =
-            seen_slots.insert(handler.vector_slot, handler.vector_const_name.clone())
-        {
-            bail!(
-                "WCH runtime generated conflicting vector handlers {} and {} for slot {}",
-                previous,
-                handler.vector_const_name,
-                handler.vector_slot
+    for driver in &model.drivers {
+        if !has_gpio_async_wait_tag(&driver.capability_tags) {
+            continue;
+        }
+        let wait_lines = resolve_gpio_exti_wait_lines(model, driver)?;
+        if wait_lines.is_empty() {
+            continue;
+        }
+        let prefix = to_rust_method_name(&driver.id);
+        let import_line = format!(
+            "use crate::{}::generated_{}_signal_gpio_wait;",
+            driver.module_name, prefix
+        );
+        let mut lines_by_interrupt: BTreeMap<String, Vec<&ResolvedGpioExtiWaitLineLowering>> =
+            BTreeMap::new();
+        for wait_line in wait_lines.values() {
+            let route = driver
+                .interrupt_routes
+                .iter()
+                .find(|route| route.id == wait_line.interrupt_route_ref)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "driver {} gpio async wait line {} references missing interrupt route {}",
+                        driver.id,
+                        wait_line.line_index,
+                        wait_line.interrupt_route_ref
+                    )
+                })?;
+            if route.controller_ref != inputs.interrupt_driver.target.id {
+                bail!(
+                    "driver {} gpio async wait line {} uses interrupt controller {} instead of WCH runtime controller {}",
+                    driver.id,
+                    wait_line.line_index,
+                    route.controller_ref,
+                    inputs.interrupt_driver.target.id
+                );
+            }
+            lines_by_interrupt
+                .entry(route.interrupt_ref.clone())
+                .or_default()
+                .push(wait_line);
+        }
+        for (interrupt_ref, mut interrupt_lines) in lines_by_interrupt {
+            let interrupt = model
+                .interrupts
+                .iter()
+                .find(|interrupt| interrupt.id == interrupt_ref)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "driver {} gpio async wait references unknown interrupt {}",
+                        driver.id,
+                        interrupt_ref
+                    )
+                })?;
+            validate_wch_runtime_interrupt_number(numbering, interrupt)?;
+            interrupt_lines.sort_by_key(|line| line.line_index);
+            let vector_slot = render_wch_vector_slot(numbering, interrupt.number)?;
+            let handler_slug = format!(
+                "{}_exti_{}",
+                to_rust_const_name(&driver.id).to_lowercase(),
+                to_rust_const_name(&interrupt.name).to_lowercase()
             );
+            let mut rust_handler_body = String::new();
+            for wait_line in interrupt_lines {
+                rust_handler_body.push_str(&format!(
+                    "    let _ = generated_{prefix}_signal_gpio_wait({}u32);\n",
+                    wait_line.line_index
+                ));
+            }
+            handlers.push(GeneratedWchRuntimeVectorHandler {
+                vector_slot,
+                irq_variant: to_rust_type_name(&interrupt.name),
+                vector_const_name: format!(
+                    "WCH_RUNTIME_{}_HANDLER_VECTOR",
+                    to_rust_const_name(&handler_slug)
+                ),
+                vector_symbol_name: format!("__hair_wch_{}_vector", handler_slug),
+                rust_handler_name: format!("__hair_wch_{}_irq_rust", handler_slug),
+                cfg_feature: Some(format!("feature = \"{}\"", EMBASSY_FEATURE_GPIO_ASYNC_WAIT)),
+                import_line: Some(import_line.clone()),
+                helper_items: String::new(),
+                rust_handler_body,
+            });
         }
     }
 
-    Ok(handlers)
+    let mut merged = BTreeMap::<usize, GeneratedWchRuntimeVectorHandler>::new();
+    for handler in handlers {
+        if let Some(existing) = merged.get_mut(&handler.vector_slot) {
+            if existing.irq_variant != handler.irq_variant {
+                bail!(
+                    "WCH runtime generated conflicting vector handlers {} and {} for slot {}",
+                    existing.vector_const_name,
+                    handler.vector_const_name,
+                    handler.vector_slot
+                );
+            }
+            match (&existing.import_line, &handler.import_line) {
+                (Some(existing_import), Some(next_import)) => {
+                    let mut merged_imports = BTreeSet::new();
+                    for line in existing_import.lines().chain(next_import.lines()) {
+                        let trimmed = line.trim();
+                        if !trimmed.is_empty() {
+                            merged_imports.insert(trimmed.to_string());
+                        }
+                    }
+                    existing.import_line =
+                        Some(merged_imports.into_iter().collect::<Vec<_>>().join("\n"));
+                }
+                (None, Some(next_import)) => existing.import_line = Some(next_import.clone()),
+                _ => {}
+            }
+            if !handler.helper_items.is_empty()
+                && !existing.helper_items.contains(&handler.helper_items)
+            {
+                existing.helper_items.push_str(&handler.helper_items);
+            }
+            match (&existing.cfg_feature, &handler.cfg_feature) {
+                (Some(existing_cfg), Some(next_cfg)) if existing_cfg != next_cfg => {
+                    existing.cfg_feature = Some(format!("any({}, {})", existing_cfg, next_cfg));
+                }
+                (None, Some(next_cfg)) => existing.cfg_feature = Some(next_cfg.clone()),
+                _ => {}
+            }
+            existing
+                .rust_handler_body
+                .push_str(&handler.rust_handler_body);
+        } else {
+            merged.insert(handler.vector_slot, handler);
+        }
+    }
+
+    Ok(merged.into_values().collect())
 }
 
 fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<String> {
+    fn render_cfg_attr(cfg_condition: Option<&str>) -> String {
+        cfg_condition
+            .map(|condition| format!("#[cfg({condition})]\n"))
+            .unwrap_or_default()
+    }
+
     let Some(inputs) = generated_wch_runtime_inputs(model)? else {
         bail!("WCH runtime support requested without PFIC + non-SysTick time-driver inputs");
     };
     let time_driver_type = &inputs.time_driver.type_name;
-    let time_driver_resources = format!("{}_RESOURCES", to_rust_const_name(&inputs.time_driver.id));
+    let time_driver_resources = format!(
+        "{}_RUNTIME_RESOURCES",
+        to_rust_const_name(&inputs.time_driver.id)
+    );
     let interrupt_driver_type = &inputs.interrupt_driver.type_name;
     let interrupt_driver_resources = format!(
-        "{}_RESOURCES",
+        "{}_RUNTIME_RESOURCES",
         to_rust_const_name(&inputs.interrupt_driver.id)
     );
     let controller_ref = inputs
@@ -5808,37 +6468,71 @@ fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<Strin
     let mut import_lines = BTreeSet::new();
     let mut extern_decls = String::new();
     let mut vector_consts = String::new();
-    let mut table_assignments = String::new();
+    let mut table_assignment_helpers = String::new();
+    let mut table_assignment_calls = String::new();
     let mut asm_wrappers = String::new();
+    let mut init_enable_helpers = String::new();
     let mut init_enable_calls = String::new();
     let mut helper_items = String::new();
     let mut rust_handlers = String::new();
     for handler in &handlers {
+        let cfg_attr = render_cfg_attr(handler.cfg_feature.as_deref());
+        let table_assignment_fn = format!(
+            "__hair_assign_{}",
+            handler.vector_const_name.to_ascii_lowercase()
+        );
+        let init_enable_fn = format!(
+            "__hair_enable_{}",
+            handler.vector_const_name.to_ascii_lowercase()
+        );
         if let Some(import_line) = &handler.import_line {
-            import_lines.insert(import_line.clone());
+            for line in import_line.lines() {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    import_lines.insert(format!("{cfg_attr}{trimmed}"));
+                }
+            }
         }
-        extern_decls.push_str(&format!("    fn {}();\n", handler.vector_symbol_name));
+        extern_decls.push_str(&format!(
+            "{cfg_attr}    fn {}();\n",
+            handler.vector_symbol_name
+        ));
         vector_consts.push_str(&format!(
-            "const {}: WchVector = WchVector {{\n    handler: {},\n}};\n",
+            "{cfg_attr}const {}: WchVector = WchVector {{\n    handler: {},\n}};\n",
             handler.vector_const_name, handler.vector_symbol_name
         ));
-        table_assignments.push_str(&format!(
-            "    table[{}] = {};\n",
+        table_assignment_helpers.push_str(&format!(
+            "{cfg_attr}const fn {table_assignment_fn}(table: &mut [WchVector; WCH_VECTOR_COUNT]) {{\n    table[{}] = {};\n}}\n\n",
             handler.vector_slot, handler.vector_const_name
         ));
-        asm_wrappers.push_str(&render_wch_runtime_vector_wrapper(
-            &handler.vector_symbol_name,
-            &handler.rust_handler_name,
+        if let Some(cfg_condition) = handler.cfg_feature.as_deref() {
+            table_assignment_helpers.push_str(&format!(
+                "#[cfg(not({cfg_condition}))]\nconst fn {table_assignment_fn}(_table: &mut [WchVector; WCH_VECTOR_COUNT]) {{}}\n\n"
+            ));
+        }
+        table_assignment_calls.push_str(&format!("    {table_assignment_fn}(&mut table);\n"));
+        asm_wrappers.push_str(&format!(
+            "{cfg_attr}global_asm!(\n    r#\"\n{}\"#\n);\n\n",
+            render_wch_runtime_vector_wrapper(
+                &handler.vector_symbol_name,
+                &handler.rust_handler_name,
+            )
         ));
-        init_enable_calls.push_str(&format!(
-            "    pfic().enable_irq(Irq::{})?;\n",
+        init_enable_helpers.push_str(&format!(
+            "{cfg_attr}fn {init_enable_fn}() -> Result<(), metadata::Error> {{\n    pfic().enable_irq(Irq::{})?;\n    Ok(())\n}}\n\n",
             handler.irq_variant
         ));
+        if let Some(cfg_condition) = handler.cfg_feature.as_deref() {
+            init_enable_helpers.push_str(&format!(
+                "#[cfg(not({cfg_condition}))]\nfn {init_enable_fn}() -> Result<(), metadata::Error> {{\n    Ok(())\n}}\n\n"
+            ));
+        }
+        init_enable_calls.push_str(&format!("    {init_enable_fn}()?;\n"));
         if !handler.helper_items.is_empty() {
             helper_items.push_str(&handler.helper_items);
         }
         rust_handlers.push_str(&format!(
-            "#[unsafe(no_mangle)]\nextern \"C\" fn {}() {{\n{}}}\n\n",
+            "{cfg_attr}#[unsafe(no_mangle)]\nextern \"C\" fn {}() {{\n{}}}\n\n",
             handler.rust_handler_name, handler.rust_handler_body
         ));
     }
@@ -5852,14 +6546,16 @@ fn render_embassy_wch_runtime_rs(model: &EmbassyGenerationModel) -> Result<Strin
     };
 
     Ok(format!(
-        "//! Generated WCH/QingKe runtime support for {}.\n\nuse crate::interrupt::{{{interrupt_driver_resources}, Irq, {interrupt_driver_type}}};\nuse crate::metadata;\nuse crate::time::{{{time_driver_resources}, {time_driver_type}}};\nuse core::arch::{{asm, global_asm}};\n{extra_imports}{module_provenance}\nunsafe extern \"C\" {{\n    fn __hair_wch_hang_vector();\n{extern_decls}}}\n\n#[derive(Clone, Copy)]\n#[repr(C)]\nunion WchVector {{\n    handler: unsafe extern \"C\" fn(),\n    reserved: usize,\n}}\n\nconst WCH_VECTOR_COUNT: usize = {vector_count};\nconst WCH_RESERVED_VECTOR: WchVector = WchVector {{ reserved: 0 }};\nconst WCH_HANG_VECTOR: WchVector = WchVector {{\n    handler: __hair_wch_hang_vector,\n}};\n{vector_consts}\n#[repr(C, align(64))]\nstruct WchVectorTable([WchVector; WCH_VECTOR_COUNT]);\n\nconst fn build_wch_vector_table() -> WchVectorTable {{\n    let mut table = [WCH_HANG_VECTOR; WCH_VECTOR_COUNT];\n    table[1] = WCH_RESERVED_VECTOR;\n    table[4] = WCH_RESERVED_VECTOR;\n    table[6] = WCH_RESERVED_VECTOR;\n    table[7] = WCH_RESERVED_VECTOR;\n    table[10] = WCH_RESERVED_VECTOR;\n    table[11] = WCH_RESERVED_VECTOR;\n    table[13] = WCH_RESERVED_VECTOR;\n    table[15] = WCH_RESERVED_VECTOR;\n{table_assignments}    WchVectorTable(table)\n}}\n\n#[unsafe(link_section = \".vector\")]\n#[used]\nstatic WCH_VECTOR_TABLE: WchVectorTable = build_wch_vector_table();\n\nglobal_asm!(\n    r#\"\n    .global __hair_wch_hang_vector\n__hair_wch_hang_vector:\n1:\n    j 1b\n\n{asm_wrappers}\"#\n);\n\nfn pfic() -> {interrupt_driver_type} {{\n    {interrupt_driver_type}::new({interrupt_driver_resources}).expect(\"generated WCH PFIC resources\")\n}}\n\nfn time_driver() -> {time_driver_type} {{\n    {time_driver_type}::new({time_driver_resources}).expect(\"generated WCH time-driver resources\")\n}}\n\n{helper_items}pub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {{\n    time_driver().init_time_driver()?;\n    unsafe {{\n        asm!(\"csrw 0x804, {{value}}\", value = in(reg) 0x3usize);\n        asm!(\n            \"csrw mtvec, {{value}}\",\n            value = in(reg) ((&WCH_VECTOR_TABLE as *const WchVectorTable as usize) | 0x3)\n        );\n    }}\n{init_enable_calls}    unsafe {{\n        asm!(\"csrs mie, {{value}}\", value = in(reg) 0x800usize);\n        asm!(\"csrs mstatus, {{value}}\", value = in(reg) 0x88usize);\n    }}\n    Ok(())\n}}\n\n{rust_handlers}",
+        "//! Generated WCH/QingKe runtime support for {}.\n\nuse crate::interrupt::{{{interrupt_driver_resources}, Irq, {interrupt_driver_type}}};\nuse crate::metadata;\nuse crate::time::{{{time_driver_resources}, {time_driver_type}}};\nuse core::arch::{{asm, global_asm}};\n{extra_imports}{module_provenance}\nunsafe extern \"C\" {{\n    fn __hair_wch_hang_vector();\n{extern_decls}}}\n\n#[derive(Clone, Copy)]\n#[repr(C)]\nunion WchVector {{\n    handler: unsafe extern \"C\" fn(),\n    reserved: usize,\n}}\n\nconst WCH_VECTOR_COUNT: usize = {vector_count};\nconst WCH_RESERVED_VECTOR: WchVector = WchVector {{ reserved: 0 }};\nconst WCH_HANG_VECTOR: WchVector = WchVector {{\n    handler: __hair_wch_hang_vector,\n}};\n{vector_consts}\n#[repr(C, align(64))]\nstruct WchVectorTable([WchVector; WCH_VECTOR_COUNT]);\n\n{table_assignment_helpers}const fn build_wch_vector_table() -> WchVectorTable {{\n    let mut table = [WCH_HANG_VECTOR; WCH_VECTOR_COUNT];\n    table[1] = WCH_RESERVED_VECTOR;\n    table[4] = WCH_RESERVED_VECTOR;\n    table[6] = WCH_RESERVED_VECTOR;\n    table[7] = WCH_RESERVED_VECTOR;\n    table[10] = WCH_RESERVED_VECTOR;\n    table[11] = WCH_RESERVED_VECTOR;\n    table[13] = WCH_RESERVED_VECTOR;\n    table[15] = WCH_RESERVED_VECTOR;\n{table_assignment_calls}    WchVectorTable(table)\n}}\n\n#[unsafe(link_section = \".vector\")]\n#[used]\nstatic WCH_VECTOR_TABLE: WchVectorTable = build_wch_vector_table();\n\nglobal_asm!(\n    r#\"\n    .global __hair_wch_hang_vector\n__hair_wch_hang_vector:\n1:\n    j 1b\n\"#\n);\n\n{asm_wrappers}fn pfic() -> {interrupt_driver_type} {{\n    {interrupt_driver_type}::new({interrupt_driver_resources}).expect(\"generated WCH PFIC resources\")\n}}\n\nfn time_driver() -> {time_driver_type} {{\n    {time_driver_type}::new({time_driver_resources}).expect(\"generated WCH time-driver resources\")\n}}\n\n{init_enable_helpers}{helper_items}pub fn init_embassy_time_runtime() -> Result<(), metadata::Error> {{\n    time_driver().init_time_driver()?;\n    unsafe {{\n        asm!(\"csrw 0x804, {{value}}\", value = in(reg) 0x3usize);\n        asm!(\n            \"csrw mtvec, {{value}}\",\n            value = in(reg) ((&WCH_VECTOR_TABLE as *const WchVectorTable as usize) | 0x3)\n        );\n    }}\n{init_enable_calls}    unsafe {{\n        asm!(\"csrs mie, {{value}}\", value = in(reg) 0x800usize);\n        asm!(\"csrs mstatus, {{value}}\", value = in(reg) 0x88usize);\n    }}\n    Ok(())\n}}\n\n{rust_handlers}",
         render_comment_text(&model.device_name),
         extra_imports = extra_imports,
         module_provenance = render_module_provenance_const("wch"),
         extern_decls = extern_decls,
         vector_consts = vector_consts,
-        table_assignments = table_assignments,
+        table_assignment_helpers = table_assignment_helpers,
+        table_assignment_calls = table_assignment_calls,
         asm_wrappers = asm_wrappers,
+        init_enable_helpers = init_enable_helpers,
         helper_items = helper_items,
         init_enable_calls = init_enable_calls,
         rust_handlers = rust_handlers,
@@ -7258,6 +7954,15 @@ fn render_gpio_methods(
     }
 
     let lowering = resolve_gpio_port_lowering(model, driver)?;
+    let gpio_wait_lines = resolve_gpio_exti_wait_lines(model, driver)?;
+    if !gpio_wait_lines.is_empty()
+        && !matches!(lowering, ResolvedGpioPortLowering::WchCfgRegisters { .. })
+    {
+        bail!(
+            "gpio async wait is currently only supported for CH32-style GPIO lowering on driver {}",
+            driver.id
+        );
+    }
     let flex_type = format!("{}Flex", driver.type_name);
     let mut methods = Vec::new();
     match &lowering {
@@ -7280,9 +7985,8 @@ fn render_gpio_methods(
                     pin.accessor_name, flex_type
                 ));
                 code.push_str(&format!(
-                    "        {} {{\n            resources: self.resources,\n            role: &self.resources.pins[{}],\n            pin_name: {},\n            moder_addr: 0x{:X}u64,\n            moder_clear_mask: 0x{:08X}u32,\n            moder_output_mask: 0x{:08X}u32,\n            pupdr_addr: 0x{:X}u64,\n            pupdr_clear_mask: 0x{:08X}u32,\n            pupdr_up_mask: 0x{:08X}u32,\n            pupdr_down_mask: 0x{:08X}u32,\n            idr_addr: 0x{:X}u64,\n            idr_mask: 0x{:08X}u32,\n            odr_addr: 0x{:X}u64,\n            odr_mask: 0x{:08X}u32,\n            bsrr_addr: 0x{:X}u64,\n            bsrr_set_mask: 0x{:08X}u32,\n            bsrr_reset_mask: 0x{:08X}u32,\n        }}\n",
+                    "        {} {{\n            pin_name: {},\n            moder_addr: 0x{:X}u64,\n            moder_clear_mask: 0x{:08X}u32,\n            moder_output_mask: 0x{:08X}u32,\n            pupdr_addr: 0x{:X}u64,\n            pupdr_clear_mask: 0x{:08X}u32,\n            pupdr_up_mask: 0x{:08X}u32,\n            pupdr_down_mask: 0x{:08X}u32,\n            idr_addr: 0x{:X}u64,\n            idr_mask: 0x{:08X}u32,\n            odr_addr: 0x{:X}u64,\n            odr_mask: 0x{:08X}u32,\n            bsrr_addr: 0x{:X}u64,\n            bsrr_set_mask: 0x{:08X}u32,\n            bsrr_reset_mask: 0x{:08X}u32,\n        }}\n",
                     flex_type,
-                    pin.role_index,
                     render_rust_string(&pin.pin_name),
                     moder.absolute_address,
                     pin.moder_clear_mask,
@@ -7308,6 +8012,7 @@ fn render_gpio_methods(
         }
         ResolvedGpioPortLowering::WchCfgRegisters { idr, odr, pins } => {
             for pin in pins {
+                let wait_line = gpio_wait_lines.get(&pin.pin_ref);
                 let mut code = format!(
                     "    /// Access the {} pin on {}.\n",
                     render_comment_text(&pin.pin_name),
@@ -7318,9 +8023,8 @@ fn render_gpio_methods(
                     pin.accessor_name, flex_type
                 ));
                 code.push_str(&format!(
-                    "        {} {{\n            resources: self.resources,\n            role: &self.resources.pins[{}],\n            pin_name: {},\n            cfg_addr: 0x{:X}u64,\n            cfg_clear_mask: 0x{:08X}u32,\n            cfg_input_float_mask: 0x{:08X}u32,\n            cfg_input_pull_mask: 0x{:08X}u32,\n            cfg_output_mask: 0x{:08X}u32,\n            idr_addr: 0x{:X}u64,\n            idr_mask: 0x{:08X}u32,\n            odr_addr: 0x{:X}u64,\n            odr_mask: 0x{:08X}u32,\n        }}\n",
+                    "        {} {{\n            pin_name: {},\n            cfg_addr: 0x{:X}u64,\n            cfg_clear_mask: 0x{:08X}u32,\n            cfg_input_float_mask: 0x{:08X}u32,\n            cfg_input_pull_mask: 0x{:08X}u32,\n            cfg_output_mask: 0x{:08X}u32,\n            idr_addr: 0x{:X}u64,\n            idr_mask: 0x{:08X}u32,\n            odr_addr: 0x{:X}u64,\n            odr_mask: 0x{:08X}u32,\n",
                     flex_type,
-                    pin.role_index,
                     render_rust_string(&pin.pin_name),
                     pin.cfg_addr,
                     pin.cfg_clear_mask,
@@ -7332,6 +8036,13 @@ fn render_gpio_methods(
                     odr.absolute_address,
                     pin.odr_mask,
                 ));
+                if let Some(wait_line) = wait_line {
+                    code.push_str(&format!(
+                        "            exti_line_index: {}u32,\n",
+                        wait_line.line_index,
+                    ));
+                }
+                code.push_str("        }\n");
                 code.push_str("    }\n");
                 methods.push(GeneratedMethod {
                     name: pin.accessor_name.clone(),
@@ -7358,9 +8069,8 @@ fn render_gpio_methods(
                     pin.accessor_name, flex_type
                 ));
                 code.push_str(&format!(
-                    "        {} {{\n            resources: self.resources,\n            role: &self.resources.pins[{}],\n            pin_name: {},\n            dir_addr: 0x{:X}u64,\n            afsel_addr: 0x{:X}u64,\n            den_addr: 0x{:X}u64,\n            pur_addr: 0x{:X}u64,\n            pdr_addr: 0x{:X}u64,\n            data_alias_addr: 0x{:X}u64,\n            bit_mask: 0x{:08X}u32,\n        }}\n",
+                    "        {} {{\n            pin_name: {},\n            dir_addr: 0x{:X}u64,\n            afsel_addr: 0x{:X}u64,\n            den_addr: 0x{:X}u64,\n            pur_addr: 0x{:X}u64,\n            pdr_addr: 0x{:X}u64,\n            data_alias_addr: 0x{:X}u64,\n            bit_mask: 0x{:08X}u32,\n        }}\n",
                     flex_type,
-                    pin.role_index,
                     render_rust_string(&pin.pin_name),
                     dir.absolute_address,
                     afsel.absolute_address,
@@ -7398,9 +8108,8 @@ fn render_gpio_methods(
                     pin.accessor_name, flex_type
                 ));
                 code.push_str(&format!(
-                    "        {} {{\n            resources: self.resources,\n            role: &self.resources.pins[{}],\n            pin_name: {},\n            out_addr: 0x{:X}u64,\n            out_w1ts_addr: 0x{:X}u64,\n            out_w1tc_addr: 0x{:X}u64,\n            enable_w1ts_addr: 0x{:X}u64,\n            enable_w1tc_addr: 0x{:X}u64,\n            input_addr: 0x{:X}u64,\n            out_sel_cfg_addr: 0x{:X}u64,\n            out_sel_clear_mask: 0x{:08X}u32,\n            out_sel_gpio_mask: 0x{:08X}u32,\n            inv_sel_mask: 0x{:08X}u32,\n            oen_sel_mask: 0x{:08X}u32,\n            oen_inv_sel_mask: 0x{:08X}u32,\n            io_mux_addr: 0x{:X}u64,\n            mcu_sel_mask: 0x{:08X}u32,\n            bit_mask: 0x{:08X}u32,\n            fun_wpd_mask: 0x{:08X}u32,\n            fun_wpu_mask: 0x{:08X}u32,\n            fun_ie_mask: 0x{:08X}u32,\n        }}\n",
+                    "        {} {{\n            pin_name: {},\n            out_addr: 0x{:X}u64,\n            out_w1ts_addr: 0x{:X}u64,\n            out_w1tc_addr: 0x{:X}u64,\n            enable_w1ts_addr: 0x{:X}u64,\n            enable_w1tc_addr: 0x{:X}u64,\n            input_addr: 0x{:X}u64,\n            out_sel_cfg_addr: 0x{:X}u64,\n            out_sel_clear_mask: 0x{:08X}u32,\n            out_sel_gpio_mask: 0x{:08X}u32,\n            inv_sel_mask: 0x{:08X}u32,\n            oen_sel_mask: 0x{:08X}u32,\n            oen_inv_sel_mask: 0x{:08X}u32,\n            io_mux_addr: 0x{:X}u64,\n            mcu_sel_mask: 0x{:08X}u32,\n            bit_mask: 0x{:08X}u32,\n            fun_wpd_mask: 0x{:08X}u32,\n            fun_wpu_mask: 0x{:08X}u32,\n            fun_ie_mask: 0x{:08X}u32,\n        }}\n",
                     flex_type,
-                    pin.role_index,
                     render_rust_string(&pin.pin_name),
                     out.absolute_address,
                     out_w1ts.absolute_address,
@@ -7432,6 +8141,171 @@ fn render_gpio_methods(
     Ok(methods)
 }
 
+fn resolve_gpio_exti_wait_lines(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<HashMap<String, ResolvedGpioExtiWaitLineLowering>> {
+    let Some(bindings) = gpio_exti_wait_bindings(driver) else {
+        return Ok(HashMap::new());
+    };
+    let mut lines = HashMap::new();
+    for binding in &bindings.lines {
+        let _pin = model
+            .pins
+            .iter()
+            .find(|pin| pin.id == binding.pin_ref)
+            .ok_or_else(|| {
+                anyhow!(
+                    "driver {} gpioExtiWaitBindings references unknown physical pin {}",
+                    driver.id,
+                    binding.pin_ref
+                )
+            })?;
+        let port_select_field = resolve_structural_field_target(
+            model,
+            &binding.port_select_ref,
+            None,
+            None,
+            &driver.id,
+            "GPIO EXTI wait port select",
+        )?;
+        let port_select_register = resolve_structural_register_ref(
+            model,
+            &port_select_field.register_id,
+            Some(port_select_field.peripheral_ref.as_str()),
+            None,
+            &driver.id,
+            "GPIO EXTI wait port select register",
+        )?;
+        let full_port_select_field = resolve_register_field(
+            &port_select_register,
+            &format!("EXTI{}", binding.line_index),
+        )?;
+        let port_select_clear_mask =
+            field_bit_mask_or_range_mask(&full_port_select_field, &port_select_register)?;
+        let port_select_set_mask = if port_select_field.field.id == full_port_select_field.id {
+            0
+        } else {
+            field_bit_mask_or_range_mask(&port_select_field.field, &port_select_register)?
+        };
+
+        let interrupt_mask_field = resolve_structural_field_target(
+            model,
+            &binding.interrupt_mask_ref,
+            None,
+            None,
+            &driver.id,
+            "GPIO EXTI wait interrupt mask",
+        )?;
+        let interrupt_mask_register = resolve_structural_register_ref(
+            model,
+            &interrupt_mask_field.register_id,
+            Some(interrupt_mask_field.peripheral_ref.as_str()),
+            None,
+            &driver.id,
+            "GPIO EXTI wait interrupt mask register",
+        )?;
+        let rising_trigger_field = resolve_structural_field_target(
+            model,
+            &binding.rising_trigger_ref,
+            None,
+            None,
+            &driver.id,
+            "GPIO EXTI wait rising trigger",
+        )?;
+        let rising_trigger_register = resolve_structural_register_ref(
+            model,
+            &rising_trigger_field.register_id,
+            Some(rising_trigger_field.peripheral_ref.as_str()),
+            None,
+            &driver.id,
+            "GPIO EXTI wait rising trigger register",
+        )?;
+        let falling_trigger_field = resolve_structural_field_target(
+            model,
+            &binding.falling_trigger_ref,
+            None,
+            None,
+            &driver.id,
+            "GPIO EXTI wait falling trigger",
+        )?;
+        let falling_trigger_register = resolve_structural_register_ref(
+            model,
+            &falling_trigger_field.register_id,
+            Some(falling_trigger_field.peripheral_ref.as_str()),
+            None,
+            &driver.id,
+            "GPIO EXTI wait falling trigger register",
+        )?;
+        let pending_field = resolve_structural_field_target(
+            model,
+            &binding.pending_flag_ref,
+            None,
+            None,
+            &driver.id,
+            "GPIO EXTI wait pending flag",
+        )?;
+        let pending_register = resolve_structural_register_ref(
+            model,
+            &pending_field.register_id,
+            Some(pending_field.peripheral_ref.as_str()),
+            None,
+            &driver.id,
+            "GPIO EXTI wait pending register",
+        )?;
+        let interrupt_mask_mask =
+            field_bit_mask(&interrupt_mask_field.field, &interrupt_mask_register)?;
+        let rising_trigger_mask =
+            field_bit_mask(&rising_trigger_field.field, &rising_trigger_register)?;
+        let falling_trigger_mask =
+            field_bit_mask(&falling_trigger_field.field, &falling_trigger_register)?;
+        let pending_mask = field_bit_mask(&pending_field.field, &pending_register)?;
+        let interrupt_route = driver
+            .interrupt_routes
+            .iter()
+            .find(|route| route.id == binding.interrupt_route_ref)
+            .ok_or_else(|| {
+                anyhow!(
+                    "driver {} gpioExtiWaitBindings references unresolved interrupt route {}",
+                    driver.id,
+                    binding.interrupt_route_ref
+                )
+            })?;
+        let interrupt = model
+            .interrupts
+            .iter()
+            .find(|interrupt| interrupt.id == interrupt_route.interrupt_ref)
+            .ok_or_else(|| {
+                anyhow!(
+                    "driver {} gpioExtiWaitBindings route {} references unknown interrupt {}",
+                    driver.id,
+                    interrupt_route.id,
+                    interrupt_route.interrupt_ref
+                )
+            })?;
+        lines.insert(
+            binding.pin_ref.clone(),
+            ResolvedGpioExtiWaitLineLowering {
+                line_index: binding.line_index,
+                interrupt_route_ref: binding.interrupt_route_ref.clone(),
+                interrupt_number: interrupt.number,
+                port_select_register,
+                port_select_clear_mask,
+                port_select_set_mask,
+                interrupt_mask_register,
+                interrupt_mask_mask,
+                rising_trigger_register,
+                rising_trigger_mask,
+                falling_trigger_register,
+                falling_trigger_mask,
+                pending_register,
+                pending_mask,
+            },
+        );
+    }
+    Ok(lines)
+}
+
 fn render_gpio_support_items(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
@@ -7441,6 +8315,15 @@ fn render_gpio_support_items(
     }
 
     let lowering = resolve_gpio_port_lowering(model, driver)?;
+    let gpio_wait_lines = resolve_gpio_exti_wait_lines(model, driver)?;
+    if !gpio_wait_lines.is_empty()
+        && !matches!(lowering, ResolvedGpioPortLowering::WchCfgRegisters { .. })
+    {
+        bail!(
+            "gpio async wait is currently only supported for CH32-style GPIO lowering on driver {}",
+            driver.id
+        );
+    }
     let flex_type = format!("{}Flex", driver.type_name);
     let input_type = format!("{}Input", driver.type_name);
     let output_type = format!("{}Output", driver.type_name);
@@ -7448,8 +8331,6 @@ fn render_gpio_support_items(
 
     out.push_str("#[derive(Debug, Clone)]\n");
     out.push_str(&format!("pub struct {flex_type} {{\n"));
-    out.push_str(&format!("    resources: {}Resources,\n", driver.type_name));
-    out.push_str("    role: &'static metadata::PinRole,\n");
     out.push_str("    pin_name: &'static str,\n");
     match &lowering {
         ResolvedGpioPortLowering::IndexedFields { .. } => {
@@ -7509,6 +8390,9 @@ fn render_gpio_support_items(
             out.push_str("    fun_ie_mask: u32,\n");
         }
     }
+    if !gpio_wait_lines.is_empty() {
+        out.push_str("    exti_line_index: u32,\n");
+    }
     out.push_str("}\n\n");
 
     out.push_str("#[derive(Debug, Clone)]\n");
@@ -7522,13 +8406,6 @@ fn render_gpio_support_items(
     out.push_str("}\n\n");
 
     out.push_str(&format!("impl {flex_type} {{\n"));
-    out.push_str(&format!(
-        "    pub fn resources(&self) -> {}Resources {{\n",
-        driver.type_name
-    ));
-    out.push_str("        self.resources\n    }\n\n");
-    out.push_str("    pub fn role(&self) -> &'static metadata::PinRole {\n");
-    out.push_str("        self.role\n    }\n\n");
     out.push_str("    pub fn pin_name(&self) -> &'static str {\n");
     out.push_str("        self.pin_name\n    }\n\n");
     out.push_str(&format!(
@@ -7840,8 +8717,6 @@ fn render_gpio_support_items(
     out.push_str("        self.pin\n    }\n\n");
     out.push_str("    pub fn pin_name(&self) -> &'static str {\n");
     out.push_str("        self.pin.pin_name()\n    }\n\n");
-    out.push_str("    pub fn role(&self) -> &'static metadata::PinRole {\n");
-    out.push_str("        self.pin.role()\n    }\n\n");
     out.push_str("    pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {\n");
     out.push_str("        self.pin.set_pull(pull)\n    }\n\n");
     out.push_str("    pub fn is_high(&self) -> Result<bool, metadata::Error> {\n");
@@ -7850,6 +8725,10 @@ fn render_gpio_support_items(
     out.push_str("        self.pin.is_low()\n    }\n\n");
     out.push_str("    pub fn get_level(&self) -> Result<Level, metadata::Error> {\n");
     out.push_str("        self.pin.get_level()\n    }\n");
+    if !gpio_wait_lines.is_empty() {
+        out.push_str("    pub fn exti_line_index(&self) -> u32 {\n");
+        out.push_str("        self.pin.exti_line_index\n    }\n");
+    }
     out.push_str("}\n\n");
 
     out.push_str(&format!("impl {output_type} {{\n"));
@@ -7857,8 +8736,6 @@ fn render_gpio_support_items(
     out.push_str("        self.pin\n    }\n\n");
     out.push_str("    pub fn pin_name(&self) -> &'static str {\n");
     out.push_str("        self.pin.pin_name()\n    }\n\n");
-    out.push_str("    pub fn role(&self) -> &'static metadata::PinRole {\n");
-    out.push_str("        self.pin.role()\n    }\n\n");
     out.push_str("    pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {\n");
     out.push_str("        self.pin.set_pull(pull)\n    }\n\n");
     out.push_str("    pub fn set_high(&self) -> Result<(), metadata::Error> {\n");
@@ -7874,6 +8751,57 @@ fn render_gpio_support_items(
     out.push_str("    pub fn get_output_level(&self) -> Result<Level, metadata::Error> {\n");
     out.push_str("        self.pin.get_output_level()\n    }\n");
     out.push_str("}\n\n");
+
+    if !gpio_wait_lines.is_empty() {
+        let state_type = format!("{}InputWaitState", driver.type_name);
+        let config_type = format!("{}InputWaitLineConfig", driver.type_name);
+        let prefix = to_rust_method_name(&driver.id);
+        let wait_config_const = format!(
+            "GENERATED_{}_GPIO_WAIT_LINES",
+            to_rust_const_name(&driver.id)
+        );
+        let mut wait_statics = String::new();
+        let mut wait_configs = String::new();
+        let mut state_arms = String::new();
+        let mut ordered_wait_lines = gpio_wait_lines.values().collect::<Vec<_>>();
+        ordered_wait_lines.sort_by_key(|line| line.line_index);
+        for wait_line in ordered_wait_lines {
+            let static_name = format!(
+                "GENERATED_{}_GPIO_EXTI_WAIT_LINE_{}",
+                to_rust_const_name(&driver.id),
+                wait_line.line_index
+            );
+            wait_statics.push_str(&format!(
+                "#[cfg(feature = \"gpio-async-wait\")]\nstatic {static_name}: critical_section::Mutex<core::cell::RefCell<{state_type}>> = critical_section::Mutex::new(core::cell::RefCell::new({state_type}::new()));\n"
+            ));
+            wait_configs.push_str(&format!(
+                "    {config_type} {{ line_index: {}u32, port_select_addr: 0x{:X}u64, port_select_clear_mask: 0x{:08X}u32, port_select_set_mask: 0x{:08X}u32, interrupt_mask_addr: 0x{:X}u64, interrupt_mask_mask: 0x{:08X}u32, rising_trigger_addr: 0x{:X}u64, rising_trigger_mask: 0x{:08X}u32, falling_trigger_addr: 0x{:X}u64, falling_trigger_mask: 0x{:08X}u32, pending_addr: 0x{:X}u64, pending_mask: 0x{:08X}u32 }},\n",
+                wait_line.line_index,
+                wait_line.port_select_register.absolute_address,
+                wait_line.port_select_clear_mask,
+                wait_line.port_select_set_mask,
+                wait_line.interrupt_mask_register.absolute_address,
+                wait_line.interrupt_mask_mask,
+                wait_line.rising_trigger_register.absolute_address,
+                wait_line.rising_trigger_mask,
+                wait_line.falling_trigger_register.absolute_address,
+                wait_line.falling_trigger_mask,
+                wait_line.pending_register.absolute_address,
+                wait_line.pending_mask,
+            ));
+            state_arms.push_str(&format!(
+                "        {} => Some(&{}),\n",
+                wait_line.line_index, static_name
+            ));
+        }
+        let unsupported_const = format!(
+            "GENERATED_{}_GPIO_WAIT_UNSUPPORTED",
+            to_rust_const_name(&driver.id)
+        );
+        out.push_str(&format!(
+            "#[cfg(feature = \"gpio-async-wait\")]\n#[derive(Debug)]\nstruct {state_type} {{\n    waker: Option<core::task::Waker>,\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nimpl {state_type} {{\n    const fn new() -> Self {{\n        Self {{ waker: None }}\n    }}\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\n#[derive(Debug, Clone, Copy)]\nstruct {config_type} {{\n    line_index: u32,\n    port_select_addr: u64,\n    port_select_clear_mask: u32,\n    port_select_set_mask: u32,\n    interrupt_mask_addr: u64,\n    interrupt_mask_mask: u32,\n    rising_trigger_addr: u64,\n    rising_trigger_mask: u32,\n    falling_trigger_addr: u64,\n    falling_trigger_mask: u32,\n    pending_addr: u64,\n    pending_mask: u32,\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nconst {unsupported_const}: &str = \"GPIO async wait is not bound for the requested pin\";\n#[cfg(feature = \"gpio-async-wait\")]\nconst {wait_config_const}: &[{config_type}] = &[\n{wait_configs}];\n{wait_statics}#[cfg(feature = \"gpio-async-wait\")]\nfn generated_{prefix}_gpio_wait_config(line_index: u32) -> Option<&'static {config_type}> {{\n    {wait_config_const}.iter().find(|config| config.line_index == line_index)\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nfn generated_{prefix}_gpio_wait_state(line_index: u32) -> Option<&'static critical_section::Mutex<core::cell::RefCell<{state_type}>>> {{\n    match line_index {{\n{state_arms}        _ => None,\n    }}\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nfn generated_{prefix}_clear_gpio_wait_pending(config: &{config_type}) -> Result<(), metadata::Error> {{\n    modify_u32(config.pending_addr, config.pending_mask, config.pending_mask)\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nfn generated_{prefix}_prepare_gpio_wait(line_index: u32, rising: bool, falling: bool) -> Result<(), metadata::Error> {{\n    let config = generated_{prefix}_gpio_wait_config(line_index)\n        .ok_or(metadata::Error::InvalidReference({unsupported_const}))?;\n    let state = generated_{prefix}_gpio_wait_state(line_index)\n        .ok_or(metadata::Error::InvalidReference({unsupported_const}))?;\n    critical_section::with(|cs| {{\n        let mut state = state.borrow(cs).borrow_mut();\n        state.waker = None;\n    }});\n    modify_u32(config.port_select_addr, config.port_select_clear_mask, config.port_select_set_mask)?;\n    modify_u32(config.interrupt_mask_addr, config.interrupt_mask_mask, 0x00000000u32)?;\n    modify_u32(config.rising_trigger_addr, config.rising_trigger_mask, if rising {{ config.rising_trigger_mask }} else {{ 0x00000000u32 }})?;\n    modify_u32(config.falling_trigger_addr, config.falling_trigger_mask, if falling {{ config.falling_trigger_mask }} else {{ 0x00000000u32 }})?;\n    generated_{prefix}_clear_gpio_wait_pending(config)?;\n    modify_u32(config.interrupt_mask_addr, config.interrupt_mask_mask, config.interrupt_mask_mask)?;\n    Ok(())\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nfn generated_{prefix}_poll_gpio_wait(line_index: u32, cx: &core::task::Context<'_>) -> core::task::Poll<Result<(), metadata::Error>> {{\n    let config = match generated_{prefix}_gpio_wait_config(line_index) {{\n        Some(config) => config,\n        None => return core::task::Poll::Ready(Err(metadata::Error::InvalidReference({unsupported_const}))),\n    }};\n    let state = match generated_{prefix}_gpio_wait_state(line_index) {{\n        Some(state) => state,\n        None => return core::task::Poll::Ready(Err(metadata::Error::InvalidReference({unsupported_const}))),\n    }};\n    if let Ok(pending) = read_u32(config.pending_addr) {{\n        if (pending & config.pending_mask) != 0 {{\n            if let Err(err) = modify_u32(config.interrupt_mask_addr, config.interrupt_mask_mask, 0x00000000u32) {{\n                return core::task::Poll::Ready(Err(err));\n            }}\n            if let Err(err) = generated_{prefix}_clear_gpio_wait_pending(config) {{\n                return core::task::Poll::Ready(Err(err));\n            }}\n            return core::task::Poll::Ready(Ok(()));\n        }}\n    }} else if let Err(err) = read_u32(config.pending_addr) {{\n        return core::task::Poll::Ready(Err(err));\n    }}\n    critical_section::with(|cs| {{\n        let mut state = state.borrow(cs).borrow_mut();\n        state.waker = Some(cx.waker().clone());\n    }});\n    match read_u32(config.pending_addr) {{\n        Ok(pending) if (pending & config.pending_mask) != 0 => {{\n            critical_section::with(|cs| {{\n                let mut state = state.borrow(cs).borrow_mut();\n                state.waker = None;\n            }});\n            if let Err(err) = modify_u32(config.interrupt_mask_addr, config.interrupt_mask_mask, 0x00000000u32) {{\n                return core::task::Poll::Ready(Err(err));\n            }}\n            if let Err(err) = generated_{prefix}_clear_gpio_wait_pending(config) {{\n                return core::task::Poll::Ready(Err(err));\n            }}\n            core::task::Poll::Ready(Ok(()))\n        }}\n        Ok(_) => core::task::Poll::Pending,\n        Err(err) => core::task::Poll::Ready(Err(err)),\n    }}\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\npub(crate) fn generated_{prefix}_signal_gpio_wait(line_index: u32) -> Result<(), metadata::Error> {{\n    let state = generated_{prefix}_gpio_wait_state(line_index)\n        .ok_or(metadata::Error::InvalidReference({unsupported_const}))?;\n    let waker = critical_section::with(|cs| {{\n        let mut state = state.borrow(cs).borrow_mut();\n        state.waker.take()\n    }});\n    if let Some(waker) = waker {{\n        waker.wake();\n    }}\n    Ok(())\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nasync fn generated_{prefix}_wait_gpio_edge(line_index: u32, rising: bool, falling: bool) -> Result<(), metadata::Error> {{\n    generated_{prefix}_prepare_gpio_wait(line_index, rising, falling)?;\n    core::future::poll_fn(|cx| generated_{prefix}_poll_gpio_wait(line_index, cx)).await\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nimpl embedded_hal::digital::ErrorType for {input_type} {{\n    type Error = metadata::Error;\n}}\n\n#[cfg(feature = \"gpio-async-wait\")]\nimpl embedded_hal_async::digital::Wait for {input_type} {{\n    async fn wait_for_high(&mut self) -> Result<(), Self::Error> {{\n        loop {{\n            if self.is_high()? {{\n                return Ok(());\n            }}\n            generated_{prefix}_wait_gpio_edge(self.pin.exti_line_index, true, false).await?;\n        }}\n    }}\n\n    async fn wait_for_low(&mut self) -> Result<(), Self::Error> {{\n        loop {{\n            if self.is_low()? {{\n                return Ok(());\n            }}\n            generated_{prefix}_wait_gpio_edge(self.pin.exti_line_index, false, true).await?;\n        }}\n    }}\n\n    async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {{\n        generated_{prefix}_wait_gpio_edge(self.pin.exti_line_index, true, false).await\n    }}\n\n    async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {{\n        generated_{prefix}_wait_gpio_edge(self.pin.exti_line_index, false, true).await\n    }}\n\n    async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {{\n        generated_{prefix}_wait_gpio_edge(self.pin.exti_line_index, true, true).await\n    }}\n}}\n\n"
+        ));
+    }
 
     Ok(out)
 }
@@ -7945,7 +8873,7 @@ fn resolve_indexed_field_gpio_port_lowering(
     let mut pins = Vec::with_capacity(driver.pin_roles.len());
     let mut seen_accessors = BTreeSet::new();
 
-    for (role_index, pin_role) in driver.pin_roles.iter().enumerate() {
+    for pin_role in &driver.pin_roles {
         let [route] = pin_role.routes.as_slice() else {
             bail!(
                 "gpio-port driver {} pin role {} requires exactly one route for first-cut per-pin lowering, found {}",
@@ -8005,7 +8933,6 @@ fn resolve_indexed_field_gpio_port_lowering(
         let pupdr_shift = pupdr_field.lsb;
 
         pins.push(ResolvedIndexedFieldGpioPinLowering {
-            role_index,
             pin_name: pin.name.clone(),
             accessor_name,
             moder_clear_mask: shifted_field_mask(&moder_field, &moder)?,
@@ -8044,7 +8971,7 @@ fn resolve_bitmask_gpio_port_lowering(
     let mut pins = Vec::with_capacity(driver.pin_roles.len());
     let mut seen_accessors = BTreeSet::new();
 
-    for (role_index, pin_role) in driver.pin_roles.iter().enumerate() {
+    for pin_role in &driver.pin_roles {
         let [route] = pin_role.routes.as_slice() else {
             bail!(
                 "gpio-port driver {} pin role {} requires exactly one route for first-cut per-pin lowering, found {}",
@@ -8126,7 +9053,6 @@ fn resolve_bitmask_gpio_port_lowering(
         let data_alias_address = resolve_bitmask_gpio_data_alias_address(&data, bit_mask, driver)?;
 
         pins.push(ResolvedBitmaskGpioPinLowering {
-            role_index,
             pin_name: pin.name.clone(),
             accessor_name,
             bit_mask,
@@ -8156,7 +9082,7 @@ fn resolve_wch_cfg_gpio_port_lowering(
     let mut pins = Vec::with_capacity(driver.pin_roles.len());
     let mut seen_accessors = BTreeSet::new();
 
-    for (role_index, pin_role) in driver.pin_roles.iter().enumerate() {
+    for pin_role in &driver.pin_roles {
         let [route] = pin_role.routes.as_slice() else {
             bail!(
                 "gpio-port driver {} pin role {} requires exactly one route for first-cut per-pin lowering, found {}",
@@ -8211,8 +9137,8 @@ fn resolve_wch_cfg_gpio_port_lowering(
         let odr_field = resolve_register_field(&odr, &format!("ODR{pin_index}"))?;
 
         pins.push(ResolvedWchCfgGpioPinLowering {
-            role_index,
             pin_name: pin.name.clone(),
+            pin_ref: pin.id.clone(),
             accessor_name,
             cfg_addr: cfg_register.absolute_address,
             cfg_clear_mask,
@@ -8243,7 +9169,7 @@ fn resolve_esp_gpio_port_lowering(
     let mut pins = Vec::with_capacity(driver.pin_roles.len());
     let mut seen_accessors = BTreeSet::new();
 
-    for (role_index, pin_role) in driver.pin_roles.iter().enumerate() {
+    for pin_role in &driver.pin_roles {
         let [route] = pin_role.routes.as_slice() else {
             bail!(
                 "gpio-port driver {} pin role {} requires exactly one route for first-cut per-pin lowering, found {}",
@@ -8343,7 +9269,6 @@ fn resolve_esp_gpio_port_lowering(
         }
 
         pins.push(ResolvedEspGpioPinLowering {
-            role_index,
             pin_name: pin.name.clone(),
             accessor_name,
             bit_mask,
@@ -10914,7 +11839,7 @@ fn render_usb_device_methods(
         return Ok(vec![GeneratedMethod {
             name: "embassy_usb_driver".to_string(),
             code: format!(
-                "    pub fn embassy_usb_driver(&self) -> {type_name}UsbDriver {{\n        {type_name}UsbDriver::new(self.resources)\n    }}\n",
+                "    pub fn embassy_usb_driver(&self) -> {type_name}UsbDriver {{\n        {type_name}UsbDriver::new({type_name}RuntimeResources {{}})\n    }}\n",
                 type_name = driver.type_name
             ),
         }]);
@@ -14263,6 +15188,38 @@ fn collect_embassy_register_scope(
                 );
             }
         }
+        if let Some(bindings) = &driver.gpio_exti_wait_bindings {
+            for line in &bindings.lines {
+                for binding_ref in [
+                    &line.port_select_ref,
+                    &line.interrupt_mask_ref,
+                    &line.rising_trigger_ref,
+                    &line.falling_trigger_ref,
+                    &line.pending_flag_ref,
+                ] {
+                    collect_semantic_target_peripheral(
+                        &mut required,
+                        scope.register_owners,
+                        Some(binding_ref.as_str()),
+                    );
+                }
+                let operation = scope
+                    .operations
+                    .get(line.pending_clear_operation_ref.as_str())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "operation reference {} on driver {} could not be resolved",
+                            line.pending_clear_operation_ref,
+                            driver.id
+                        )
+                    })?;
+                collect_operation_target_peripherals(
+                    &mut required,
+                    scope.register_owners,
+                    operation,
+                );
+            }
+        }
     }
     Ok(required)
 }
@@ -14406,6 +15363,29 @@ fn collect_embassy_field_scope(
                 Some(bindings.erase_start_ref.as_str()),
             ] {
                 collect_semantic_field_ref(&mut required, binding_ref);
+            }
+        }
+        if let Some(bindings) = &driver.gpio_exti_wait_bindings {
+            for line in &bindings.lines {
+                for binding_ref in [
+                    Some(line.port_select_ref.as_str()),
+                    Some(line.interrupt_mask_ref.as_str()),
+                    Some(line.rising_trigger_ref.as_str()),
+                    Some(line.falling_trigger_ref.as_str()),
+                    Some(line.pending_flag_ref.as_str()),
+                ] {
+                    collect_semantic_field_ref(&mut required, binding_ref);
+                }
+                let operation = operations
+                    .get(line.pending_clear_operation_ref.as_str())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "operation reference {} on driver {} could not be resolved",
+                            line.pending_clear_operation_ref,
+                            driver.id
+                        )
+                    })?;
+                collect_operation_field_refs(&mut required, operation);
             }
         }
         for route_ref in &driver.interrupt_route_refs {
@@ -16287,19 +17267,27 @@ fn render_embassy_host_cargo_toml(model: &EmbassyGenerationModel) -> String {
         .drivers
         .iter()
         .any(|driver| has_time_driver_tag(&driver.capability_tags));
-    let has_embedded_hal_1 = model
-        .drivers
-        .iter()
-        .any(|driver| driver.driver_kind == "pwm");
+    let has_embedded_hal_1 = model.drivers.iter().any(|driver| {
+        driver.driver_kind == "pwm" || has_gpio_async_wait_tag(&driver.capability_tags)
+    });
     let has_embedded_hal_02 = model
         .drivers
         .iter()
         .any(|driver| driver.driver_kind == "watchdog");
+    let has_embedded_hal_async = model
+        .drivers
+        .iter()
+        .any(|driver| has_gpio_async_wait_tag(&driver.capability_tags));
     let has_embedded_storage = model
         .drivers
         .iter()
         .any(|driver| driver.driver_kind == "flash");
-    if has_time_driver || has_embedded_hal_1 || has_embedded_hal_02 || has_embedded_storage {
+    if has_time_driver
+        || has_embedded_hal_1
+        || has_embedded_hal_02
+        || has_embedded_hal_async
+        || has_embedded_storage
+    {
         out.push_str("\n[dependencies]\n");
     }
     if has_time_driver {
@@ -16311,6 +17299,10 @@ fn render_embassy_host_cargo_toml(model: &EmbassyGenerationModel) -> String {
     }
     if has_embedded_hal_1 {
         out.push_str("embedded-hal = \"1.0\"\n");
+    }
+    if has_embedded_hal_async {
+        out.push_str("critical-section = \"1.2\"\n");
+        out.push_str("embedded-hal-async = \"1.0\"\n");
     }
     if has_embedded_hal_02 {
         out.push_str(
@@ -16442,7 +17434,7 @@ fn render_embassy_host_root_rs(model: &EmbassyGenerationModel) -> String {
         let accessor = to_rust_method_name(&driver.name);
         let emulator_accessor = format!("{accessor}_emulator");
         out.push_str(&format!(
-            "\n    pub fn {accessor}(&self) -> Result<crate::{module}::{type_name}, metadata::Error> {{\n        self.activate();\n        crate::{module}::{type_name}::new(crate::{module}::{const_prefix}_RESOURCES)\n    }}\n\n    pub fn {emulator_accessor}(&self) -> crate::{module}::{type_name}Emulator {{\n        self.activate();\n        crate::{module}::{type_name}Emulator::new(self.state.clone())\n    }}\n",
+            "\n    pub fn {accessor}(&self) -> Result<crate::{module}::{type_name}, metadata::Error> {{\n        self.activate();\n        crate::{module}::{type_name}::new(crate::{module}::{const_prefix}_RUNTIME_RESOURCES)\n    }}\n\n    pub fn {emulator_accessor}(&self) -> crate::{module}::{type_name}Emulator {{\n        self.activate();\n        crate::{module}::{type_name}Emulator::new(self.state.clone())\n    }}\n",
             module = driver.module_name,
             type_name = driver.type_name,
             const_prefix = to_rust_const_name(&driver.id),
@@ -16552,7 +17544,7 @@ fn render_embassy_host_driver_instance(
         render_named_entity_slice(&driver.capability_tags)
     ));
     out.push_str(&format!(
-        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}Resources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub lowering_pattern: Option<&'static str>,\n    pub time_driver_source: Option<&'static str>,\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_RESOURCES: {type_name}Resources = {type_name}Resources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    lowering_pattern: {lowering_pattern},\n    time_driver_source: {time_driver_source},\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name} {{\n    resources: {type_name}Resources,\n}}\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}Resources) -> Result<Self, metadata::Error> {{\n        Ok(Self {{ resources }})\n    }}\n\n    pub fn resources(&self) -> {type_name}Resources {{\n        self.resources\n    }}\n{methods}\n}}\n\n{support_items}\n{emulator_items}",
+        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}RuntimeResources {{}}\n\npub const {const_prefix}_RUNTIME_RESOURCES: {type_name}RuntimeResources = {type_name}RuntimeResources {{}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name}MetadataResources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub lowering_pattern: Option<&'static str>,\n    pub time_driver_source: Option<&'static str>,\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_METADATA_RESOURCES: {type_name}MetadataResources = {type_name}MetadataResources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    lowering_pattern: {lowering_pattern},\n    time_driver_source: {time_driver_source},\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name};\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}RuntimeResources) -> Result<Self, metadata::Error> {{\n        let _ = resources;\n        Ok(Self)\n    }}\n\n    pub fn metadata_resources() -> {type_name}MetadataResources {{\n        {const_prefix}_METADATA_RESOURCES\n    }}\n{methods}\n}}\n\n{support_items}\n{emulator_items}",
         type_name = driver.type_name,
         const_prefix = const_prefix,
         lowering_pattern = render_optional_rust_string(driver.lowering_pattern.as_deref()),
@@ -16678,6 +17670,7 @@ fn render_host_gpio_emulator_methods(
     driver: &ResolvedDriverInstance,
 ) -> Result<String> {
     let lowering = resolve_gpio_port_lowering(model, driver)?;
+    let gpio_wait_lines = resolve_gpio_exti_wait_lines(model, driver)?;
     let mut out = String::new();
     match lowering {
         ResolvedGpioPortLowering::IndexedFields { idr, odr, pins, .. } => {
@@ -16713,13 +17706,40 @@ fn render_host_gpio_emulator_methods(
                 "    pub fn set_input_level(&self, pin_name: &str, high: bool) -> Result<(), metadata::Error> {\n        match pin_name {\n",
             );
             for pin in &pins {
-                out.push_str(&format!(
-                    "            {} => metadata::modify_u32_for(&self.state, 0x{:X}u64, 0x{:08X}u32, if high {{ 0x{:08X}u32 }} else {{ 0x00000000u32 }})?,\n",
-                    render_rust_string(&pin.pin_name),
-                    idr.absolute_address,
-                    pin.idr_mask,
-                    pin.idr_mask,
-                ));
+                if let Some(wait_line) = gpio_wait_lines.get(&pin.pin_ref) {
+                    let prefix = to_rust_method_name(&driver.id);
+                    out.push_str(&format!(
+                        "            {} => {{\n                let previous = (metadata::read_u32_for(&self.state, 0x{:X}u64)? & 0x{:08X}u32) != 0;\n                metadata::modify_u32_for(&self.state, 0x{:X}u64, 0x{:08X}u32, if high {{ 0x{:08X}u32 }} else {{ 0x00000000u32 }})?;\n                if previous != high {{\n                    let port_selected = (metadata::read_u32_for(&self.state, 0x{:X}u64)? & 0x{:08X}u32) == 0x{:08X}u32;\n                    let interrupt_enabled = (metadata::read_u32_for(&self.state, 0x{:X}u64)? & 0x{:08X}u32) != 0;\n                    let rising_enabled = (metadata::read_u32_for(&self.state, 0x{:X}u64)? & 0x{:08X}u32) != 0;\n                    let falling_enabled = (metadata::read_u32_for(&self.state, 0x{:X}u64)? & 0x{:08X}u32) != 0;\n                    let edge_matches = (high && !previous && rising_enabled) || (!high && previous && falling_enabled);\n                    if port_selected && interrupt_enabled && edge_matches {{\n                        metadata::modify_u32_for(&self.state, 0x{:X}u64, 0x{:08X}u32, 0x{:08X}u32)?;\n                        metadata::set_irq_pending_for(&self.state, {}, true);\n                        generated_{prefix}_signal_gpio_wait({}u32)?;\n                    }}\n                }}\n            }},\n",
+                        render_rust_string(&pin.pin_name),
+                        idr.absolute_address,
+                        pin.idr_mask,
+                        idr.absolute_address,
+                        pin.idr_mask,
+                        pin.idr_mask,
+                        wait_line.port_select_register.absolute_address,
+                        wait_line.port_select_clear_mask,
+                        wait_line.port_select_set_mask,
+                        wait_line.interrupt_mask_register.absolute_address,
+                        wait_line.interrupt_mask_mask,
+                        wait_line.rising_trigger_register.absolute_address,
+                        wait_line.rising_trigger_mask,
+                        wait_line.falling_trigger_register.absolute_address,
+                        wait_line.falling_trigger_mask,
+                        wait_line.pending_register.absolute_address,
+                        wait_line.pending_mask,
+                        wait_line.pending_mask,
+                        wait_line.interrupt_number,
+                        wait_line.line_index,
+                    ));
+                } else {
+                    out.push_str(&format!(
+                        "            {} => metadata::modify_u32_for(&self.state, 0x{:X}u64, 0x{:08X}u32, if high {{ 0x{:08X}u32 }} else {{ 0x00000000u32 }})?,\n",
+                        render_rust_string(&pin.pin_name),
+                        idr.absolute_address,
+                        pin.idr_mask,
+                        pin.idr_mask,
+                    ));
+                }
             }
             out.push_str(
                 "            _ => return Err(metadata::Error::InvalidReference(\"unknown GPIO pin\")),\n        }\n        Ok(())\n    }\n\n    pub fn output_level(&self, pin_name: &str) -> Result<bool, metadata::Error> {\n        match pin_name {\n",
@@ -18453,7 +19473,7 @@ fn host_emulator_tracks_esp_gpio_output_level() {
             .expect("generated lib.rs");
         let usb_rs = std::fs::read_to_string(output_dir.path().join("src").join("usb.rs"))
             .expect("generated usb.rs");
-        assert!(lib_rs.contains("pub mod usb;"));
+        assert!(lib_rs.contains("#[cfg(feature = \"usb\")]\npub mod usb;"));
         assert!(usb_rs.contains("pub fn apply_preserve_serial_jtag_link(&self)"));
         assert!(usb_rs.contains("lowering_pattern: Some(\"serial-jtag-preserve-link\")"));
         assert!(!usb_rs.contains("pub fn enable_usb_pad(&self)"));
@@ -18482,7 +19502,7 @@ fn host_emulator_tracks_esp_gpio_output_level() {
             .expect("generated lib.rs");
         let usb_rs = std::fs::read_to_string(output_dir.path().join("src").join("usb.rs"))
             .expect("generated usb.rs");
-        assert!(lib_rs.contains("pub mod usb;"));
+        assert!(lib_rs.contains("#[cfg(feature = \"usb\")]\npub mod usb;"));
         assert!(usb_rs.contains("lowering_pattern: Some(\"fsdev-pma-btable\")"));
         assert!(usb_rs.contains("pub fn enable_clock(&self)"));
         assert!(usb_rs.contains("pub fn assert_reset(&self)"));
@@ -19317,7 +20337,8 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         let pwm_rs =
             std::fs::read_to_string(output_dir.path().join("src").join("pwm.rs")).expect("pwm.rs");
 
-        assert!(cargo_toml.contains("embedded-hal = \"1.0\""));
+        assert!(cargo_toml.contains("embedded-hal = { version = \"1.0\", optional = true }"));
+        assert!(cargo_toml.contains("pwm = [\"dep:embedded-hal\"]"));
         assert!(pwm_rs.contains("pub fn set_prescaler"));
         assert!(pwm_rs.contains("pub fn set_auto_reload"));
         assert!(pwm_rs.contains("pub fn generate_update"));
@@ -19360,7 +20381,10 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             std::fs::read_to_string(output_dir.path().join("src").join("watchdog.rs"))
                 .expect("watchdog.rs");
 
-        assert!(cargo_toml.contains("embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"] }"));
+        assert!(cargo_toml.contains(
+            "embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"], optional = true }"
+        ));
+        assert!(cargo_toml.contains("watchdog = [\"dep:embedded-hal-02\"]"));
         assert!(watchdog_rs.contains("pub struct"));
         assert!(watchdog_rs.contains("Config {"));
         assert!(watchdog_rs.contains("pub fn configure(&self, config:"));
@@ -19402,7 +20426,9 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             std::fs::read_to_string(output_dir.path().join("src").join("watchdog.rs"))
                 .expect("watchdog.rs");
 
-        assert!(cargo_toml.contains("embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"] }"));
+        assert!(cargo_toml.contains(
+            "embedded-hal-02 = { package = \"embedded-hal\", version = \"0.2.7\", features = [\"unproven\"] }"
+        ));
         assert!(watchdog_rs.contains("pub fn start_with_config(&self, config:"));
         assert!(watchdog_rs.contains("impl embedded_hal_02::watchdog::Watchdog for "));
         assert!(watchdog_rs.contains("impl embedded_hal_02::watchdog::WatchdogEnable for "));
@@ -19439,7 +20465,8 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         let flash_rs = std::fs::read_to_string(output_dir.path().join("src").join("flash.rs"))
             .expect("flash.rs");
 
-        assert!(cargo_toml.contains("embedded-storage = \"0.3\""));
+        assert!(cargo_toml.contains("embedded-storage = { version = \"0.3\", optional = true }"));
+        assert!(cargo_toml.contains("flash = [\"dep:embedded-storage\"]"));
         assert!(flash_rs.contains("pub fn unlock(&self) -> Result<(), metadata::Error>"));
         assert!(flash_rs.contains("pub fn is_busy(&self) -> Result<bool, metadata::Error>"));
         assert!(flash_rs.contains("impl embedded_storage::nor_flash::ReadNorFlash for "));
@@ -19644,9 +20671,87 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         );
         assert!(adc_rs.contains("dma.prepare_transfer_complete_wait(1)?;"));
         assert!(adc_rs.contains("if dma.is_transfer_complete(1)? {"));
+        assert!(wch_rs.contains("fn __hair_enable_wch_runtime_drv_dma1_ch1_handler_vector()"));
         assert!(wch_rs.contains("pfic().enable_irq(Irq::DMA1Channel1)?;"));
         assert!(wch_rs.contains("generated_wch_runtime_drv_dma1().on_interrupt(1);"));
-        assert!(wch_rs.contains("const GENERATED_WCH_RUNTIME_DRV_DMA1_RESOURCES: DMA1Resources"));
+        assert!(wch_rs.contains(
+            "const GENERATED_WCH_RUNTIME_DRV_DMA1_RUNTIME_RESOURCES: DMA1RuntimeResources"
+        ));
+    }
+
+    #[test]
+    fn generate_embassy_emits_gpio_wait_helpers_for_ch32v203g6u6() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let input = repo_root
+            .join("evidence")
+            .join("wch")
+            .join("ch32v203g6u6")
+            .join("hair.json");
+        let document = load_validated_hair_document(&input, &repo_root)
+            .expect("reference hair document should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&document, output_dir.path()).expect("embassy generation");
+
+        let cargo_toml =
+            std::fs::read_to_string(output_dir.path().join("Cargo.toml")).expect("Cargo.toml");
+        let gpio_rs = std::fs::read_to_string(output_dir.path().join("src").join("gpio.rs"))
+            .expect("gpio.rs");
+        let wch_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("wch.rs")).expect("wch.rs");
+
+        assert!(cargo_toml.contains("embedded-hal-async = { version = \"1.0\", optional = true }"));
+        assert!(cargo_toml.contains("critical-section = { version = \"1.2\", optional = true }"));
+        assert!(cargo_toml.contains("gpio-async-wait = ["));
+        assert!(cargo_toml.contains("\"gpio\""));
+        assert!(cargo_toml.contains("\"interrupt\""));
+        assert!(cargo_toml.contains("\"dep:critical-section\""));
+        assert!(cargo_toml.contains("\"dep:embedded-hal\""));
+        assert!(cargo_toml.contains("\"dep:embedded-hal-async\""));
+        assert!(gpio_rs.contains(
+            "#[cfg(feature = \"gpio-async-wait\")]\npub const DRV_GPIOA_INTERRUPT_SOURCES"
+        ));
+        assert!(gpio_rs.contains(
+            "#[cfg(not(feature = \"gpio-async-wait\"))]\npub const DRV_GPIOA_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];"
+        ));
+        assert!(gpio_rs.contains(
+            "#[cfg(not(feature = \"gpio-async-wait\"))]\npub const DRV_GPIOA_CAPABILITY_TAGS: &[&str] = &[];"
+        ));
+        assert!(gpio_rs.contains("impl embedded_hal_async::digital::Wait for"));
+        assert!(gpio_rs.contains("#[cfg(feature = \"gpio-async-wait\")]"));
+        assert!(gpio_rs.contains(
+            "generated_drv_gpioa_wait_gpio_edge(self.pin.exti_line_index, true, false).await"
+        ));
+        assert!(
+            gpio_rs.contains("pub(crate) fn generated_drv_gpioa_signal_gpio_wait(line_index: u32)")
+        );
+        assert!(wch_rs.contains("generated_drv_gpioa_signal_gpio_wait(5u32);"));
+        assert!(wch_rs.contains("generated_drv_gpioa_signal_gpio_wait(15u32);"));
+    }
+
+    #[test]
+    fn generate_embassy_host_emits_gpio_wait_helpers_for_ch32v203g6u6() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_wch_gpio_wait_fixture();
+        let document = load_validated_hair_document(fixture.path(), &repo_root)
+            .expect("WCH GPIO wait fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_host_crate(&document, output_dir.path()).expect("embassy-host generation");
+
+        let cargo_toml =
+            std::fs::read_to_string(output_dir.path().join("Cargo.toml")).expect("Cargo.toml");
+        let gpio_rs = std::fs::read_to_string(output_dir.path().join("src").join("gpio.rs"))
+            .expect("gpio.rs");
+
+        assert!(cargo_toml.contains("embedded-hal-async = \"1.0\""));
+        assert!(cargo_toml.contains("critical-section = \"1.2\""));
+        assert!(gpio_rs.contains("impl embedded_hal_async::digital::Wait for"));
+        assert!(gpio_rs.contains("generated_drv_gpioa_signal_gpio_wait(0u32)?;"));
+        assert!(gpio_rs.contains("metadata::set_irq_pending_for(&self.state"));
+        assert!(gpio_rs.contains(
+            "generated_drv_gpioa_wait_gpio_edge(self.pin.exti_line_index, true, true).await"
+        ));
     }
 
     #[test]
@@ -21310,10 +22415,9 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         let time_rs = std::fs::read_to_string(output_dir.path().join("src").join("time.rs"))
             .expect("time.rs");
 
-        assert!(wch_rs.contains("    pfic().enable_irq(Irq::DMA1Channel1)?;\n    unsafe {\n"));
-        assert!(
-            !wch_rs.contains("    pfic().enable_irq(Irq::DMA1Channel1)?;\n            unsafe {\n")
-        );
+        assert!(wch_rs.contains("fn __hair_enable_wch_runtime_drv_dma1_ch1_handler_vector()"));
+        assert!(wch_rs.contains("pfic().enable_irq(Irq::DMA1Channel1)?;"));
+        assert!(wch_rs.contains("\n    unsafe {\n"));
         assert!(time_rs.contains(
             "            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_RTCSEL_MASK,\n                GENERATED_RCC_BDCTLR_RTCSEL_LSI_MASK,\n            );\n            must_modify_u32(\n                GENERATED_RCC_BDCTLR_ADDRESS,\n                GENERATED_RCC_BDCTLR_RTCEN_MASK,\n"
         ));
@@ -21755,7 +22859,7 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             .expect("generated time module");
         assert!(cargo_toml.contains("embassy-time-driver"));
         assert!(cargo_toml.contains("embassy-time-queue-utils"));
-        assert!(lib_rs.contains("pub mod time;"));
+        assert!(lib_rs.contains("#[cfg(feature = \"time\")]\npub mod time;"));
         assert!(time_rs.contains("init_time_driver"));
         assert!(time_rs.contains("extern \"C\" fn SysTick()"));
         assert!(time_rs.contains("#[allow(dead_code)]"));
@@ -22185,8 +23289,8 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
 
         assert!(cargo_toml.contains("embassy-time-driver"));
         assert!(cargo_toml.contains("tick-hz-1_000"));
-        assert!(lib_rs.contains("pub mod time;"));
-        assert!(lib_rs.contains("pub mod wch;"));
+        assert!(lib_rs.contains("#[cfg(feature = \"time\")]\npub mod time;"));
+        assert!(lib_rs.contains("#[cfg(feature = \"wch-runtime\")]\npub mod wch;"));
         assert!(time_rs.contains("generated_drv_time_tim4_time_driver_interrupt"));
         assert!(time_rs.contains("GENERATED_TIME_COUNTER_ADDRESS"));
         assert!(time_rs.contains("GENERATED_TIME_INTERRUPT_PENDING_MASK"));
@@ -22194,6 +23298,7 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(
             wch_rs.contains("pub fn init_embassy_time_runtime() -> Result<(), metadata::Error>")
         );
+        assert!(wch_rs.contains("fn __hair_enable_wch_time_driver_handler_vector()"));
         assert!(wch_rs.contains("pfic().enable_irq(Irq::TIM4)?;"));
         assert!(wch_rs.contains("call __hair_wch_embassy_time_driver_irq_rust"));
     }
@@ -24147,6 +25252,337 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
                 }
             }
         });
+        fs::write(
+            file.path(),
+            serde_json::to_string_pretty(&document).expect("serialize fixture"),
+        )
+        .expect("write fixture");
+        file
+    }
+
+    fn write_wch_gpio_wait_fixture() -> NamedTempFile {
+        let base = write_embassy_fixture(false);
+        let mut document = load_json_file(base.path()).expect("fixture json");
+
+        let interrupts = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("interrupts")
+            .and_then(Value::as_array_mut)
+            .expect("interrupts");
+        interrupts.clear();
+        interrupts.push(serde_json::json!({
+            "id": "irq.exti0",
+            "name": "EXTI0",
+            "number": 6,
+            "controllerRef": "ic.pfic"
+        }));
+
+        let peripherals = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("structure")
+            .and_then(Value::as_object_mut)
+            .expect("structure object")
+            .get_mut("device")
+            .and_then(Value::as_object_mut)
+            .expect("device object")
+            .get_mut("peripherals")
+            .and_then(Value::as_array_mut)
+            .expect("peripherals");
+        peripherals.retain(|peripheral| {
+            matches!(
+                peripheral["id"].as_str(),
+                Some("periph.rcc" | "periph.gpioa" | "periph.pfic")
+            )
+        });
+        let gpioa = peripherals
+            .iter_mut()
+            .find(|peripheral| peripheral["id"] == "periph.gpioa")
+            .and_then(Value::as_object_mut)
+            .expect("gpioa peripheral");
+        *gpioa
+            .get_mut("registers")
+            .and_then(Value::as_array_mut)
+            .expect("gpioa registers") = vec![
+            serde_json::json!({
+                "id": "reg.gpioa.cfglr",
+                "name": "CFGLR",
+                "kind": "register",
+                "offsetBytes": 0,
+                "widthBits": 32,
+                "fields": [{
+                    "id": "field.gpioa.cfglr.mode0",
+                    "name": "MODE0",
+                    "bitRange": { "lsb": 0, "msb": 3 }
+                }]
+            }),
+            serde_json::json!({
+                "id": "reg.gpioa.cfghr",
+                "name": "CFGHR",
+                "kind": "register",
+                "offsetBytes": 4,
+                "widthBits": 32,
+                "fields": []
+            }),
+            serde_json::json!({
+                "id": "reg.gpioa.indr",
+                "name": "INDR",
+                "kind": "register",
+                "offsetBytes": 8,
+                "widthBits": 32,
+                "fields": [{
+                    "id": "field.gpioa.indr.idr0",
+                    "name": "IDR0",
+                    "bitRange": { "lsb": 0, "msb": 0 }
+                }]
+            }),
+            serde_json::json!({
+                "id": "reg.gpioa.outdr",
+                "name": "OUTDR",
+                "kind": "register",
+                "offsetBytes": 12,
+                "widthBits": 32,
+                "fields": [{
+                    "id": "field.gpioa.outdr.odr0",
+                    "name": "ODR0",
+                    "bitRange": { "lsb": 0, "msb": 0 }
+                }]
+            }),
+        ];
+        peripherals.extend([
+            serde_json::json!({
+                "id": "periph.afio",
+                "name": "AFIO",
+                "kind": "peripheral",
+                "type": "AFIO",
+                "baseAddress": 1073879040u64,
+                "registers": [{
+                    "id": "reg.afio.exticr1",
+                    "name": "EXTICR1",
+                    "kind": "register",
+                    "offsetBytes": 8,
+                    "widthBits": 32,
+                    "fields": [{
+                        "id": "field.afio_exticr1.exti0",
+                        "name": "EXTI0",
+                        "bitRange": { "lsb": 0, "msb": 3 }
+                    }]
+                }]
+            }),
+            serde_json::json!({
+                "id": "periph.exti",
+                "name": "EXTI",
+                "kind": "peripheral",
+                "type": "EXTI",
+                "baseAddress": 1073808384u64,
+                "interruptRefs": ["irq.exti0"],
+                "registers": [
+                    {
+                        "id": "reg.exti.intenr",
+                        "name": "INTENR",
+                        "kind": "register",
+                        "offsetBytes": 0,
+                        "widthBits": 32,
+                        "fields": [{ "id": "field.exti_intenr.mr0", "name": "MR0", "bitRange": { "lsb": 0, "msb": 0 } }]
+                    },
+                    {
+                        "id": "reg.exti.rtenr",
+                        "name": "RTENR",
+                        "kind": "register",
+                        "offsetBytes": 8,
+                        "widthBits": 32,
+                        "fields": [{ "id": "field.exti_rtenr.tr0", "name": "TR0", "bitRange": { "lsb": 0, "msb": 0 } }]
+                    },
+                    {
+                        "id": "reg.exti.ftenr",
+                        "name": "FTENR",
+                        "kind": "register",
+                        "offsetBytes": 12,
+                        "widthBits": 32,
+                        "fields": [{ "id": "field.exti_ftenr.tr0", "name": "TR0", "bitRange": { "lsb": 0, "msb": 0 } }]
+                    },
+                    {
+                        "id": "reg.exti.intfr",
+                        "name": "INTFR",
+                        "kind": "register",
+                        "offsetBytes": 20,
+                        "widthBits": 32,
+                        "fields": [{ "id": "field.exti_intfr.intf_intf0", "name": "INTF_INTF0", "bitRange": { "lsb": 0, "msb": 0 } }]
+                    }
+                ]
+            }),
+        ]);
+
+        let canonical_blocks = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object")
+            .get_mut("canonicalBlocks")
+            .and_then(Value::as_array_mut)
+            .expect("canonicalBlocks");
+        canonical_blocks.retain(|block| {
+            matches!(
+                block["id"].as_str(),
+                Some("block.rcc" | "block.gpioa" | "block.pfic")
+            )
+        });
+        canonical_blocks.extend([
+            serde_json::json!({ "id": "block.afio", "name": "AFIO block", "targetRef": "periph.afio", "blockClass": "io-mux" }),
+            serde_json::json!({ "id": "block.exti", "name": "EXTI block", "targetRef": "periph.exti", "blockClass": "interrupt-controller" }),
+        ]);
+
+        let mcu_soc = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("mcuSoc")
+            .and_then(Value::as_object_mut)
+            .expect("mcuSoc object");
+        mcu_soc
+            .get_mut("clockResetTopology")
+            .and_then(Value::as_object_mut)
+            .expect("clockResetTopology")
+            .get_mut("clockBindings")
+            .and_then(Value::as_array_mut)
+            .expect("clockBindings")
+            .retain(|binding| binding["id"] == "clk.gpioa");
+        mcu_soc
+            .get_mut("clockResetTopology")
+            .and_then(Value::as_object_mut)
+            .expect("clockResetTopology")
+            .get_mut("resetBindings")
+            .and_then(Value::as_array_mut)
+            .expect("resetBindings")
+            .retain(|binding| binding["id"] == "rst.gpioa");
+        mcu_soc
+            .get_mut("pinTopology")
+            .and_then(Value::as_object_mut)
+            .expect("pinTopology")
+            .get_mut("routes")
+            .and_then(Value::as_array_mut)
+            .expect("pin routes")
+            .retain(|route| route["id"] == "pinroute.gpioa.pa0");
+        let interrupt_topology = mcu_soc
+            .get_mut("interruptTopology")
+            .and_then(Value::as_object_mut)
+            .expect("interruptTopology");
+        interrupt_topology
+            .get_mut("sources")
+            .and_then(Value::as_array_mut)
+            .expect("sources")
+            .clear();
+        interrupt_topology
+            .get_mut("routes")
+            .and_then(Value::as_array_mut)
+            .expect("routes")
+            .clear();
+        interrupt_topology
+            .get_mut("sources")
+            .and_then(Value::as_array_mut)
+            .expect("sources")
+            .push(serde_json::json!({
+                "id": "isrc.exti.line0",
+                "name": "EXTI line 0 interrupt source",
+                "sourceRef": "periph.exti",
+                "kind": "peripheral",
+                "flagRefs": ["field.exti_intfr.intf_intf0"],
+                "clearOperationRefs": ["op.exti.clear_line0_pending"]
+            }));
+        interrupt_topology
+            .get_mut("routes")
+            .and_then(Value::as_array_mut)
+            .expect("routes")
+            .push(serde_json::json!({
+                "id": "iroute.exti.line0",
+                "name": "EXTI line 0 interrupt route",
+                "sourceRef": "isrc.exti.line0",
+                "interruptRef": "irq.exti0",
+                "controllerRef": "block.pfic",
+                "lineIndex": 0,
+                "routeType": "hardwired"
+            }));
+
+        let operations = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations");
+        operations.clear();
+        operations.push(serde_json::json!({
+            "id": "op.exti.clear_line0_pending",
+            "name": "Clear EXTI line 0 pending flag",
+            "kind": "mode-transition",
+            "targetRefs": ["periph.exti"],
+            "steps": [{
+                "index": 0,
+                "action": "write",
+                "targetRef": "reg.exti.intfr",
+                "expression": { "language": "plain", "text": "Set INTF_INTF0 = 1" }
+            }]
+        }));
+
+        let driver_instances = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driverInstances");
+        driver_instances.retain(|driver| driver["id"] == "drv.gpioa");
+        let gpio_driver = driver_instances
+            .iter_mut()
+            .find(|driver| driver["id"] == "drv.gpioa")
+            .and_then(Value::as_object_mut)
+            .expect("drv.gpioa");
+        gpio_driver.insert(
+            "interruptRouteRefs".to_string(),
+            serde_json::json!(["iroute.exti.line0"]),
+        );
+        gpio_driver.insert(
+            "capabilityTags".to_string(),
+            serde_json::json!(["embedded-hal-async-wait"]),
+        );
+        gpio_driver.insert(
+            "gpioExtiWaitBindings".to_string(),
+            serde_json::json!({
+                "lines": [{
+                    "pinRef": "pin.pa0",
+                    "lineIndex": 0,
+                    "portSelectRef": "field.afio_exticr1.exti0",
+                    "interruptMaskRef": "field.exti_intenr.mr0",
+                    "risingTriggerRef": "field.exti_rtenr.tr0",
+                    "fallingTriggerRef": "field.exti_ftenr.tr0",
+                    "pendingFlagRef": "field.exti_intfr.intf_intf0",
+                    "pendingClearOperationRef": "op.exti.clear_line0_pending",
+                    "interruptRouteRef": "iroute.exti.line0"
+                }]
+            }),
+        );
+
+        let file = NamedTempFile::new().expect("temp file");
         fs::write(
             file.path(),
             serde_json::to_string_pretty(&document).expect("serialize fixture"),

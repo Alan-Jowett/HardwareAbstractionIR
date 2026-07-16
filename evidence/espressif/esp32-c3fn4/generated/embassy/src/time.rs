@@ -244,7 +244,12 @@ pub const DRV_TIME_STATE_MACHINES: &[metadata::SemanticStateMachine] =
 pub const DRV_TIME_CAPABILITY_TAGS: &[&str] = &["embassy-time-driver"];
 
 #[derive(Debug, Clone, Copy)]
-pub struct SystemTimerResources {
+pub struct SystemTimerRuntimeResources {}
+
+pub const DRV_TIME_RUNTIME_RESOURCES: SystemTimerRuntimeResources = SystemTimerRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct SystemTimerMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -259,33 +264,33 @@ pub struct SystemTimerResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_TIME_RESOURCES: SystemTimerResources = SystemTimerResources {
-    clocks: DRV_TIME_CLOCK_BINDINGS,
-    resets: DRV_TIME_RESET_BINDINGS,
-    interrupt_sources: DRV_TIME_INTERRUPT_SOURCES,
-    interrupts: DRV_TIME_INTERRUPT_ROUTES,
-    dma_channels: DRV_TIME_DMA_CHANNELS,
-    dma: DRV_TIME_DMA_ROUTES,
-    pins: DRV_TIME_PIN_ROLES,
-    init_operations: DRV_TIME_INIT_OPERATIONS,
-    state_machines: DRV_TIME_STATE_MACHINES,
-    lowering_pattern: None,
-    time_driver_source: Some("hardware-timer"),
-    capability_tags: DRV_TIME_CAPABILITY_TAGS,
-};
+pub const DRV_TIME_METADATA_RESOURCES: SystemTimerMetadataResources =
+    SystemTimerMetadataResources {
+        clocks: DRV_TIME_CLOCK_BINDINGS,
+        resets: DRV_TIME_RESET_BINDINGS,
+        interrupt_sources: DRV_TIME_INTERRUPT_SOURCES,
+        interrupts: DRV_TIME_INTERRUPT_ROUTES,
+        dma_channels: DRV_TIME_DMA_CHANNELS,
+        dma: DRV_TIME_DMA_ROUTES,
+        pins: DRV_TIME_PIN_ROLES,
+        init_operations: DRV_TIME_INIT_OPERATIONS,
+        state_machines: DRV_TIME_STATE_MACHINES,
+        lowering_pattern: None,
+        time_driver_source: Some("hardware-timer"),
+        capability_tags: DRV_TIME_CAPABILITY_TAGS,
+    };
 
 #[derive(Debug, Clone, Copy)]
-pub struct SystemTimer {
-    resources: SystemTimerResources,
-}
+pub struct SystemTimer;
 
 impl SystemTimer {
-    pub fn new(resources: SystemTimerResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: SystemTimerRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> SystemTimerResources {
-        self.resources
+    pub fn metadata_resources() -> SystemTimerMetadataResources {
+        DRV_TIME_METADATA_RESOURCES
     }
     /// Enable the SYSTIMER clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {

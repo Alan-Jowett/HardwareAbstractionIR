@@ -416,7 +416,12 @@ pub const DRV_ADC1_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_ADC1_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct ADC1Resources {
+pub struct ADC1RuntimeResources {}
+
+pub const DRV_ADC1_RUNTIME_RESOURCES: ADC1RuntimeResources = ADC1RuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct ADC1MetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -431,7 +436,7 @@ pub struct ADC1Resources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_ADC1_RESOURCES: ADC1Resources = ADC1Resources {
+pub const DRV_ADC1_METADATA_RESOURCES: ADC1MetadataResources = ADC1MetadataResources {
     clocks: DRV_ADC1_CLOCK_BINDINGS,
     resets: DRV_ADC1_RESET_BINDINGS,
     interrupt_sources: DRV_ADC1_INTERRUPT_SOURCES,
@@ -447,17 +452,16 @@ pub const DRV_ADC1_RESOURCES: ADC1Resources = ADC1Resources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct ADC1 {
-    resources: ADC1Resources,
-}
+pub struct ADC1;
 
 impl ADC1 {
-    pub fn new(resources: ADC1Resources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: ADC1RuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> ADC1Resources {
-        self.resources
+    pub fn metadata_resources() -> ADC1MetadataResources {
+        DRV_ADC1_METADATA_RESOURCES
     }
     /// Enable the ADC1 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -3720,7 +3724,12 @@ pub const DRV_ADC2_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_ADC2_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct ADC2Resources {
+pub struct ADC2RuntimeResources {}
+
+pub const DRV_ADC2_RUNTIME_RESOURCES: ADC2RuntimeResources = ADC2RuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct ADC2MetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -3735,7 +3744,7 @@ pub struct ADC2Resources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_ADC2_RESOURCES: ADC2Resources = ADC2Resources {
+pub const DRV_ADC2_METADATA_RESOURCES: ADC2MetadataResources = ADC2MetadataResources {
     clocks: DRV_ADC2_CLOCK_BINDINGS,
     resets: DRV_ADC2_RESET_BINDINGS,
     interrupt_sources: DRV_ADC2_INTERRUPT_SOURCES,
@@ -3751,17 +3760,16 @@ pub const DRV_ADC2_RESOURCES: ADC2Resources = ADC2Resources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct ADC2 {
-    resources: ADC2Resources,
-}
+pub struct ADC2;
 
 impl ADC2 {
-    pub fn new(resources: ADC2Resources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: ADC2RuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> ADC2Resources {
-        self.resources
+    pub fn metadata_resources() -> ADC2MetadataResources {
+        DRV_ADC2_METADATA_RESOURCES
     }
     /// Enable the ADC2 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {

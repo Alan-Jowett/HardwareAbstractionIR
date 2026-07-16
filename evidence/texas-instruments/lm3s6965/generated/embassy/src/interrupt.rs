@@ -624,7 +624,12 @@ pub const DRV_NVIC_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_NVIC_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct NVICResources {
+pub struct NVICRuntimeResources {}
+
+pub const DRV_NVIC_RUNTIME_RESOURCES: NVICRuntimeResources = NVICRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct NVICMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -639,7 +644,7 @@ pub struct NVICResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_NVIC_RESOURCES: NVICResources = NVICResources {
+pub const DRV_NVIC_METADATA_RESOURCES: NVICMetadataResources = NVICMetadataResources {
     clocks: DRV_NVIC_CLOCK_BINDINGS,
     resets: DRV_NVIC_RESET_BINDINGS,
     interrupt_sources: DRV_NVIC_INTERRUPT_SOURCES,
@@ -655,19 +660,18 @@ pub const DRV_NVIC_RESOURCES: NVICResources = NVICResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct NVIC {
-    resources: NVICResources,
-}
+pub struct NVIC;
 
 impl NVIC {
-    pub fn new(resources: NVICResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: NVICRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> NVICResources {
-        self.resources
+    pub fn metadata_resources() -> NVICMetadataResources {
+        DRV_NVIC_METADATA_RESOURCES
     }
-    pub fn bind(&self) -> &'static [metadata::InterruptRoute] {
-        self.resources.interrupts
+    pub fn interrupt_routes() -> &'static [metadata::InterruptRoute] {
+        Self::metadata_resources().interrupts
     }
 }

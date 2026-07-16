@@ -4,8 +4,8 @@
 use core::panic::PanicInfo;
 
 use ch32v203g6u6_embassy_hal::{
-    gpio::{DRV_GPIOA_RESOURCES, GPIOA},
-    pwm::{DRV_PWM_TIM3_RESOURCES, TIM3PWM},
+    gpio::{DRV_GPIOA_RUNTIME_RESOURCES, GPIOA},
+    pwm::{DRV_PWM_TIM3_RUNTIME_RESOURCES, TIM3PWM},
     wch,
 };
 use embassy_executor::Spawner;
@@ -21,11 +21,11 @@ fn panic(_info: &PanicInfo<'_>) -> ! {
 
 #[embassy_executor::main(entry = "riscv_rt::entry")]
 async fn main(_spawner: Spawner) -> ! {
-    let gpioa = GPIOA::new(DRV_GPIOA_RESOURCES).unwrap();
+    let gpioa = GPIOA::new(DRV_GPIOA_RUNTIME_RESOURCES).unwrap();
     gpioa.enable_clock().unwrap();
     gpioa.release_reset().unwrap();
 
-    let tim3 = TIM3PWM::new(DRV_PWM_TIM3_RESOURCES).unwrap();
+    let tim3 = TIM3PWM::new(DRV_PWM_TIM3_RUNTIME_RESOURCES).unwrap();
     tim3.enable_clock().unwrap();
     tim3.release_reset().unwrap();
     tim3.enable_auto_reload_preload().unwrap();

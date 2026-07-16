@@ -4,8 +4,8 @@
 use core::hint::spin_loop;
 use core::ptr::read_volatile;
 
-use esp32c3fn4_generated::interrupt::{DRV_IRQ_RESOURCES, InterruptMatrix};
-use esp32c3fn4_generated::uart::{DRV_UART0_RESOURCES, Uart0};
+use esp32c3fn4_generated::interrupt::{DRV_IRQ_RUNTIME_RESOURCES, InterruptMatrix};
+use esp32c3fn4_generated::uart::{DRV_UART0_RUNTIME_RESOURCES, Uart0};
 use panic_halt as _;
 use riscv_rt::entry;
 
@@ -41,7 +41,7 @@ fn expect(uart: &Uart0, label: &str, condition: bool) {
 }
 
 fn init_uart0() -> Uart0 {
-    let uart = Uart0::new(DRV_UART0_RESOURCES).unwrap();
+    let uart = Uart0::new(DRV_UART0_RUNTIME_RESOURCES).unwrap();
     uart.enable_clock().unwrap();
     uart.assert_reset().unwrap();
     uart.release_reset().unwrap();
@@ -54,8 +54,8 @@ fn init_uart0() -> Uart0 {
 
 fn smoke_interrupts(uart: &Uart0) {
     note(uart, "smoke_interrupts:start\r\n");
-    let interrupt = InterruptMatrix::new(DRV_IRQ_RESOURCES).unwrap();
-    let routes = interrupt.bind();
+    let _interrupt = InterruptMatrix::new(DRV_IRQ_RUNTIME_RESOURCES).unwrap();
+    let routes = InterruptMatrix::interrupt_routes();
     expect(uart, "interrupt route count", routes.len() == 12);
     expect(
         uart,

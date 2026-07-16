@@ -522,7 +522,12 @@ pub const DRV_GPIO_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_GPIO_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct GPIOPortResources {
+pub struct GPIOPortRuntimeResources {}
+
+pub const DRV_GPIO_RUNTIME_RESOURCES: GPIOPortRuntimeResources = GPIOPortRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct GPIOPortMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -537,7 +542,7 @@ pub struct GPIOPortResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_GPIO_RESOURCES: GPIOPortResources = GPIOPortResources {
+pub const DRV_GPIO_METADATA_RESOURCES: GPIOPortMetadataResources = GPIOPortMetadataResources {
     clocks: DRV_GPIO_CLOCK_BINDINGS,
     resets: DRV_GPIO_RESET_BINDINGS,
     interrupt_sources: DRV_GPIO_INTERRUPT_SOURCES,
@@ -553,23 +558,20 @@ pub const DRV_GPIO_RESOURCES: GPIOPortResources = GPIOPortResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct GPIOPort {
-    resources: GPIOPortResources,
-}
+pub struct GPIOPort;
 
 impl GPIOPort {
-    pub fn new(resources: GPIOPortResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: GPIOPortRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> GPIOPortResources {
-        self.resources
+    pub fn metadata_resources() -> GPIOPortMetadataResources {
+        DRV_GPIO_METADATA_RESOURCES
     }
     /// Access the GPIO0 pin on GPIOPort.
     pub fn gpio0(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[0],
             pin_name: "GPIO0",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -595,8 +597,6 @@ impl GPIOPort {
     /// Access the GPIO1 pin on GPIOPort.
     pub fn gpio1(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[1],
             pin_name: "GPIO1",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -622,8 +622,6 @@ impl GPIOPort {
     /// Access the GPIO2 pin on GPIOPort.
     pub fn gpio2(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[2],
             pin_name: "GPIO2",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -649,8 +647,6 @@ impl GPIOPort {
     /// Access the GPIO3 pin on GPIOPort.
     pub fn gpio3(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[3],
             pin_name: "GPIO3",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -676,8 +672,6 @@ impl GPIOPort {
     /// Access the GPIO4 pin on GPIOPort.
     pub fn gpio4(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[4],
             pin_name: "GPIO4",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -703,8 +697,6 @@ impl GPIOPort {
     /// Access the GPIO5 pin on GPIOPort.
     pub fn gpio5(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[5],
             pin_name: "GPIO5",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -730,8 +722,6 @@ impl GPIOPort {
     /// Access the GPIO6 pin on GPIOPort.
     pub fn gpio6(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[6],
             pin_name: "GPIO6",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -757,8 +747,6 @@ impl GPIOPort {
     /// Access the GPIO7 pin on GPIOPort.
     pub fn gpio7(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[7],
             pin_name: "GPIO7",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -784,8 +772,6 @@ impl GPIOPort {
     /// Access the GPIO8 pin on GPIOPort.
     pub fn gpio8(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[8],
             pin_name: "GPIO8",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -811,8 +797,6 @@ impl GPIOPort {
     /// Access the GPIO9 pin on GPIOPort.
     pub fn gpio9(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[9],
             pin_name: "GPIO9",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -838,8 +822,6 @@ impl GPIOPort {
     /// Access the GPIO10 pin on GPIOPort.
     pub fn gpio10(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[10],
             pin_name: "GPIO10",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -865,8 +847,6 @@ impl GPIOPort {
     /// Access the GPIO11 pin on GPIOPort.
     pub fn gpio11(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[11],
             pin_name: "GPIO11",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -892,8 +872,6 @@ impl GPIOPort {
     /// Access the GPIO12 pin on GPIOPort.
     pub fn gpio12(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[12],
             pin_name: "GPIO12",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -919,8 +897,6 @@ impl GPIOPort {
     /// Access the GPIO13 pin on GPIOPort.
     pub fn gpio13(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[13],
             pin_name: "GPIO13",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -946,8 +922,6 @@ impl GPIOPort {
     /// Access the GPIO14 pin on GPIOPort.
     pub fn gpio14(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[14],
             pin_name: "GPIO14",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -973,8 +947,6 @@ impl GPIOPort {
     /// Access the GPIO15 pin on GPIOPort.
     pub fn gpio15(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[15],
             pin_name: "GPIO15",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -1000,8 +972,6 @@ impl GPIOPort {
     /// Access the GPIO16 pin on GPIOPort.
     pub fn gpio16(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[16],
             pin_name: "GPIO16",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -1027,8 +997,6 @@ impl GPIOPort {
     /// Access the GPIO17 pin on GPIOPort.
     pub fn gpio17(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[17],
             pin_name: "GPIO17",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -1054,8 +1022,6 @@ impl GPIOPort {
     /// Access the GPIO18 pin on GPIOPort.
     pub fn gpio18(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[18],
             pin_name: "GPIO18",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -1081,8 +1047,6 @@ impl GPIOPort {
     /// Access the GPIO19 pin on GPIOPort.
     pub fn gpio19(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[19],
             pin_name: "GPIO19",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -1108,8 +1072,6 @@ impl GPIOPort {
     /// Access the GPIO20 pin on GPIOPort.
     pub fn gpio20(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[20],
             pin_name: "GPIO20",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -1135,8 +1097,6 @@ impl GPIOPort {
     /// Access the GPIO21 pin on GPIOPort.
     pub fn gpio21(&self) -> GPIOPortFlex {
         GPIOPortFlex {
-            resources: self.resources,
-            role: &self.resources.pins[21],
             pin_name: "GPIO21",
             out_addr: 0x60004004u64,
             out_w1ts_addr: 0x60004008u64,
@@ -1162,8 +1122,6 @@ impl GPIOPort {
 
 #[derive(Debug, Clone)]
 pub struct GPIOPortFlex {
-    resources: GPIOPortResources,
-    role: &'static metadata::PinRole,
     pin_name: &'static str,
     out_addr: u64,
     out_w1ts_addr: u64,
@@ -1196,14 +1154,6 @@ pub struct GPIOPortOutput {
 }
 
 impl GPIOPortFlex {
-    pub fn resources(&self) -> GPIOPortResources {
-        self.resources
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.role
-    }
-
     pub fn pin_name(&self) -> &'static str {
         self.pin_name
     }
@@ -1318,10 +1268,6 @@ impl GPIOPortInput {
         self.pin.pin_name()
     }
 
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
-    }
-
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {
         self.pin.set_pull(pull)
     }
@@ -1346,10 +1292,6 @@ impl GPIOPortOutput {
 
     pub fn pin_name(&self) -> &'static str {
         self.pin.pin_name()
-    }
-
-    pub fn role(&self) -> &'static metadata::PinRole {
-        self.pin.role()
     }
 
     pub fn set_pull(&self, pull: Pull) -> Result<(), metadata::Error> {

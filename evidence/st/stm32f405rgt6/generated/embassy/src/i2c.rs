@@ -261,7 +261,12 @@ pub const DRV_I2C1_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_I2C1_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct I2C1Resources {
+pub struct I2C1RuntimeResources {}
+
+pub const DRV_I2C1_RUNTIME_RESOURCES: I2C1RuntimeResources = I2C1RuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct I2C1MetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -276,7 +281,7 @@ pub struct I2C1Resources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_I2C1_RESOURCES: I2C1Resources = I2C1Resources {
+pub const DRV_I2C1_METADATA_RESOURCES: I2C1MetadataResources = I2C1MetadataResources {
     clocks: DRV_I2C1_CLOCK_BINDINGS,
     resets: DRV_I2C1_RESET_BINDINGS,
     interrupt_sources: DRV_I2C1_INTERRUPT_SOURCES,
@@ -292,17 +297,16 @@ pub const DRV_I2C1_RESOURCES: I2C1Resources = I2C1Resources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct I2C1 {
-    resources: I2C1Resources,
-}
+pub struct I2C1;
 
 impl I2C1 {
-    pub fn new(resources: I2C1Resources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: I2C1RuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> I2C1Resources {
-        self.resources
+    pub fn metadata_resources() -> I2C1MetadataResources {
+        DRV_I2C1_METADATA_RESOURCES
     }
     /// Enable the I2C1 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -462,7 +466,12 @@ pub const DRV_I2C2_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_I2C2_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct I2C2Resources {
+pub struct I2C2RuntimeResources {}
+
+pub const DRV_I2C2_RUNTIME_RESOURCES: I2C2RuntimeResources = I2C2RuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct I2C2MetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -477,7 +486,7 @@ pub struct I2C2Resources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_I2C2_RESOURCES: I2C2Resources = I2C2Resources {
+pub const DRV_I2C2_METADATA_RESOURCES: I2C2MetadataResources = I2C2MetadataResources {
     clocks: DRV_I2C2_CLOCK_BINDINGS,
     resets: DRV_I2C2_RESET_BINDINGS,
     interrupt_sources: DRV_I2C2_INTERRUPT_SOURCES,
@@ -493,17 +502,16 @@ pub const DRV_I2C2_RESOURCES: I2C2Resources = I2C2Resources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct I2C2 {
-    resources: I2C2Resources,
-}
+pub struct I2C2;
 
 impl I2C2 {
-    pub fn new(resources: I2C2Resources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: I2C2RuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> I2C2Resources {
-        self.resources
+    pub fn metadata_resources() -> I2C2MetadataResources {
+        DRV_I2C2_METADATA_RESOURCES
     }
     /// Enable the I2C2 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -663,7 +671,12 @@ pub const DRV_I2C3_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_I2C3_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct I2C3Resources {
+pub struct I2C3RuntimeResources {}
+
+pub const DRV_I2C3_RUNTIME_RESOURCES: I2C3RuntimeResources = I2C3RuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct I2C3MetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -678,7 +691,7 @@ pub struct I2C3Resources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_I2C3_RESOURCES: I2C3Resources = I2C3Resources {
+pub const DRV_I2C3_METADATA_RESOURCES: I2C3MetadataResources = I2C3MetadataResources {
     clocks: DRV_I2C3_CLOCK_BINDINGS,
     resets: DRV_I2C3_RESET_BINDINGS,
     interrupt_sources: DRV_I2C3_INTERRUPT_SOURCES,
@@ -694,17 +707,16 @@ pub const DRV_I2C3_RESOURCES: I2C3Resources = I2C3Resources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct I2C3 {
-    resources: I2C3Resources,
-}
+pub struct I2C3;
 
 impl I2C3 {
-    pub fn new(resources: I2C3Resources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: I2C3RuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> I2C3Resources {
-        self.resources
+    pub fn metadata_resources() -> I2C3MetadataResources {
+        DRV_I2C3_METADATA_RESOURCES
     }
     /// Enable the I2C3 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {

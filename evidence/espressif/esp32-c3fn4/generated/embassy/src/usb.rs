@@ -275,7 +275,13 @@ pub const DRV_USB_DEVICE_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[]
 pub const DRV_USB_DEVICE_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct UsbSerialJtagResources {
+pub struct UsbSerialJtagRuntimeResources {}
+
+pub const DRV_USB_DEVICE_RUNTIME_RESOURCES: UsbSerialJtagRuntimeResources =
+    UsbSerialJtagRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct UsbSerialJtagMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -290,33 +296,33 @@ pub struct UsbSerialJtagResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_USB_DEVICE_RESOURCES: UsbSerialJtagResources = UsbSerialJtagResources {
-    clocks: DRV_USB_DEVICE_CLOCK_BINDINGS,
-    resets: DRV_USB_DEVICE_RESET_BINDINGS,
-    interrupt_sources: DRV_USB_DEVICE_INTERRUPT_SOURCES,
-    interrupts: DRV_USB_DEVICE_INTERRUPT_ROUTES,
-    dma_channels: DRV_USB_DEVICE_DMA_CHANNELS,
-    dma: DRV_USB_DEVICE_DMA_ROUTES,
-    pins: DRV_USB_DEVICE_PIN_ROLES,
-    init_operations: DRV_USB_DEVICE_INIT_OPERATIONS,
-    state_machines: DRV_USB_DEVICE_STATE_MACHINES,
-    lowering_pattern: Some("serial-jtag-preserve-link"),
-    time_driver_source: None,
-    capability_tags: DRV_USB_DEVICE_CAPABILITY_TAGS,
-};
+pub const DRV_USB_DEVICE_METADATA_RESOURCES: UsbSerialJtagMetadataResources =
+    UsbSerialJtagMetadataResources {
+        clocks: DRV_USB_DEVICE_CLOCK_BINDINGS,
+        resets: DRV_USB_DEVICE_RESET_BINDINGS,
+        interrupt_sources: DRV_USB_DEVICE_INTERRUPT_SOURCES,
+        interrupts: DRV_USB_DEVICE_INTERRUPT_ROUTES,
+        dma_channels: DRV_USB_DEVICE_DMA_CHANNELS,
+        dma: DRV_USB_DEVICE_DMA_ROUTES,
+        pins: DRV_USB_DEVICE_PIN_ROLES,
+        init_operations: DRV_USB_DEVICE_INIT_OPERATIONS,
+        state_machines: DRV_USB_DEVICE_STATE_MACHINES,
+        lowering_pattern: Some("serial-jtag-preserve-link"),
+        time_driver_source: None,
+        capability_tags: DRV_USB_DEVICE_CAPABILITY_TAGS,
+    };
 
 #[derive(Debug, Clone, Copy)]
-pub struct UsbSerialJtag {
-    resources: UsbSerialJtagResources,
-}
+pub struct UsbSerialJtag;
 
 impl UsbSerialJtag {
-    pub fn new(resources: UsbSerialJtagResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: UsbSerialJtagRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> UsbSerialJtagResources {
-        self.resources
+    pub fn metadata_resources() -> UsbSerialJtagMetadataResources {
+        DRV_USB_DEVICE_METADATA_RESOURCES
     }
     /// Return whether the UsbSerialJtag Serial IN endpoint can accept another byte.
     pub fn serial_in_ready(&self) -> Result<bool, metadata::Error> {

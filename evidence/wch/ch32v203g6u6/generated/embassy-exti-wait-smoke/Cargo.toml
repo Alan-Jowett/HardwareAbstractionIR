@@ -1,13 +1,15 @@
 [package]
-name = "embassy-pwm-smoke"
+name = "embassy-exti-wait-smoke"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ch32v203g6u6_embassy_hal = { package = "ch32v203g6u6-embassy-hal", path = "../embassy", features = ["gpio", "pwm", "wch-runtime"] }
+ch32v203g6u6_embassy_hal = { package = "ch32v203g6u6-embassy-hal", path = "../embassy", features = ["gpio", "gpio-async-wait", "rcc", "usb", "wch-runtime"] }
 embassy-executor = { version = "0.7.0", features = ["arch-spin", "executor-thread"] }
 embassy-time = { version = "0.5.1", features = ["tick-hz-1_000"] }
-embedded-hal = "1.0"
+embassy-usb = "0.6.0"
+embedded-hal-async = "1.0.0"
+heapless = "0.8.0"
 riscv = { version = "0.12", features = ["critical-section-single-hart"] }
 riscv-rt = "0.13"
 

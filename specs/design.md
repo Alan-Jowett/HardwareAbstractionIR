@@ -174,7 +174,9 @@ machines.
 
 The design intent is explicit: generated APIs are derived from approved
 lowering inputs, not from a fixed placeholder method list per `driverKind`.
-The profile also preserves a structured metadata surface for downstream use.
+The profile also preserves a structured metadata surface for downstream use,
+but that metadata surface is not required to be the same API shape used by
+runtime constructors and normal peripheral operations.
 The same contract must accommodate more than one hardware-lowering family for a
 given driver kind. In particular, GPIO lowering may come either from a classic
 single-block register layout or from a composite route/control path such as
@@ -183,6 +185,18 @@ the emitted behavior structurally reachable without guesswork. Likewise,
 interrupt-driven and DMA-backed UART/I2C/SPI/ADC behavior is part of the
 supported subset only when the driver instance names the full interrupt, DMA,
 pin, and semantic closure required for real lowering.
+
+GPIO async wait lowering follows the same explicit-contract rule. A `gpio-port`
+driver instance may implement the full `embedded_hal_async::digital::Wait`
+surface only when the approved HAIR contract closes both halves of that API:
+level waits through the existing GPIO input-sample path, and edge waits through
+an explicit EXTI-backed closure. The profile therefore uses capability tag
+`embedded-hal-async-wait` plus `gpioExtiWaitBindings` on the same driver
+instance to name the exact AFIO/IO-mux line selector, EXTI mask/trigger fields,
+pending flag, pending-clear operation, and interrupt route for each supported
+pin. That binding map is also where shared-vector families stay auditable: when
+several lines share one IRQ, the contract still binds one route per line so the
+generator and host runtime never guess which pending source woke a future.
 
 USB device lowering follows the same evidence-bounded rule. A `usb-device`
 driver instance may expose endpoint-oriented helpers, serial-style byte-stream
@@ -458,6 +472,28 @@ silently rename emitted SVD peripherals, registers, or fields.
 generation model, and emits a multi-file Rust crate rooted at `--output-dir`.
 It generates `Cargo.toml`, `src\lib.rs`, `src\metadata.rs`, and one or more
 module files derived from the resolved driver set.
+
+The generated embedded crate's `Cargo.toml` is also part of the executable
+lowering contract. The generator must partition emitted code by peripheral
+family behind opt-in Cargo features, leave the default feature set empty, and
+ensure those features gate both public module exports and any family-specific
+runtime/support code that would otherwise be retained by shared interrupt or
+runtime initialization paths. In other words, a consumer that does not opt
+into GPIO async wait, DMA async completion, USB support, or another generated
+family/capability must not pay flash for the corresponding helper tables,
+vector handlers, or runtime wiring merely because some other generated module
+exists in the same crate.
+
+The generated embedded crate's public Rust API is part of that same size and
+traceability contract. Driver constructors and runtime handles must use lean
+resource records that contain only the data needed to execute the approved
+lowering. Richer metadata records may still be emitted for inspection,
+downstream tooling, or metadata-aware smokes, but they must be exposed through
+separate constants, accessors, or wrapper types so firmware that stays on the
+lean API does not retain the full metadata graph accidentally. In other words,
+the generated crate must not require a consumer to enable or disable a
+secondary metadata feature flag just to avoid pulling descriptive metadata into
+normal embedded runtime paths.
 
 The generator enforces driver-kind support, scope checks, reference
 resolution, and profile-specific failure contracts before writing output. Its

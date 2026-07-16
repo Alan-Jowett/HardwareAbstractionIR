@@ -4,8 +4,8 @@
 use core::{panic::PanicInfo, ptr::addr_of_mut};
 
 use ch32v203g6u6_embassy_hal::{
-    rcc::{DRV_RCC_RESOURCES, RCC},
-    usb::{DRV_USBD_RESOURCES, USBD, USBDUsbDriver},
+    rcc::{DRV_RCC_RUNTIME_RESOURCES, RCC},
+    usb::{DRV_USBD_RUNTIME_RESOURCES, USBD, USBDUsbDriver},
     wch,
 };
 use embassy_executor::Spawner;
@@ -37,11 +37,11 @@ async fn usb_task(mut device: UsbDevice<'static, USBDUsbDriver>) -> ! {
 
 #[embassy_executor::main(entry = "riscv_rt::entry")]
 async fn main(spawner: Spawner) -> ! {
-    let rcc = RCC::new(DRV_RCC_RESOURCES).unwrap();
+    let rcc = RCC::new(DRV_RCC_RUNTIME_RESOURCES).unwrap();
     rcc.configure_usb_fsdev_clock_48mhz().unwrap();
     wch::init_embassy_time_runtime().unwrap();
 
-    let usbd = USBD::new(DRV_USBD_RESOURCES).unwrap();
+    let usbd = USBD::new(DRV_USBD_RUNTIME_RESOURCES).unwrap();
     let driver = usbd.embassy_usb_driver();
 
     let mut config = Config::new(0xCAFE, 0x4004);

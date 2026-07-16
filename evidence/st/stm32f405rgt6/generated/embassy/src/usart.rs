@@ -331,7 +331,12 @@ pub const DRV_USART1_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_USART1_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct Usart1Resources {
+pub struct Usart1RuntimeResources {}
+
+pub const DRV_USART1_RUNTIME_RESOURCES: Usart1RuntimeResources = Usart1RuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct Usart1MetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -346,7 +351,7 @@ pub struct Usart1Resources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_USART1_RESOURCES: Usart1Resources = Usart1Resources {
+pub const DRV_USART1_METADATA_RESOURCES: Usart1MetadataResources = Usart1MetadataResources {
     clocks: DRV_USART1_CLOCK_BINDINGS,
     resets: DRV_USART1_RESET_BINDINGS,
     interrupt_sources: DRV_USART1_INTERRUPT_SOURCES,
@@ -362,17 +367,16 @@ pub const DRV_USART1_RESOURCES: Usart1Resources = Usart1Resources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct Usart1 {
-    resources: Usart1Resources,
-}
+pub struct Usart1;
 
 impl Usart1 {
-    pub fn new(resources: Usart1Resources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: Usart1RuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> Usart1Resources {
-        self.resources
+    pub fn metadata_resources() -> Usart1MetadataResources {
+        DRV_USART1_METADATA_RESOURCES
     }
     /// Enable the USART1 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -730,7 +734,12 @@ pub const DRV_USART2_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_USART2_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct Usart2Resources {
+pub struct Usart2RuntimeResources {}
+
+pub const DRV_USART2_RUNTIME_RESOURCES: Usart2RuntimeResources = Usart2RuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct Usart2MetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -745,7 +754,7 @@ pub struct Usart2Resources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_USART2_RESOURCES: Usart2Resources = Usart2Resources {
+pub const DRV_USART2_METADATA_RESOURCES: Usart2MetadataResources = Usart2MetadataResources {
     clocks: DRV_USART2_CLOCK_BINDINGS,
     resets: DRV_USART2_RESET_BINDINGS,
     interrupt_sources: DRV_USART2_INTERRUPT_SOURCES,
@@ -761,17 +770,16 @@ pub const DRV_USART2_RESOURCES: Usart2Resources = Usart2Resources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct Usart2 {
-    resources: Usart2Resources,
-}
+pub struct Usart2;
 
 impl Usart2 {
-    pub fn new(resources: Usart2Resources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: Usart2RuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> Usart2Resources {
-        self.resources
+    pub fn metadata_resources() -> Usart2MetadataResources {
+        DRV_USART2_METADATA_RESOURCES
     }
     /// Enable the USART2 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -1098,7 +1106,12 @@ pub const DRV_USART3_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_USART3_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct Usart3Resources {
+pub struct Usart3RuntimeResources {}
+
+pub const DRV_USART3_RUNTIME_RESOURCES: Usart3RuntimeResources = Usart3RuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct Usart3MetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -1113,7 +1126,7 @@ pub struct Usart3Resources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_USART3_RESOURCES: Usart3Resources = Usart3Resources {
+pub const DRV_USART3_METADATA_RESOURCES: Usart3MetadataResources = Usart3MetadataResources {
     clocks: DRV_USART3_CLOCK_BINDINGS,
     resets: DRV_USART3_RESET_BINDINGS,
     interrupt_sources: DRV_USART3_INTERRUPT_SOURCES,
@@ -1129,17 +1142,16 @@ pub const DRV_USART3_RESOURCES: Usart3Resources = Usart3Resources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct Usart3 {
-    resources: Usart3Resources,
-}
+pub struct Usart3;
 
 impl Usart3 {
-    pub fn new(resources: Usart3Resources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: Usart3RuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> Usart3Resources {
-        self.resources
+    pub fn metadata_resources() -> Usart3MetadataResources {
+        DRV_USART3_METADATA_RESOURCES
     }
     /// Enable the USART3 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {
@@ -1388,7 +1400,12 @@ pub const DRV_USART6_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_USART6_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct Usart6Resources {
+pub struct Usart6RuntimeResources {}
+
+pub const DRV_USART6_RUNTIME_RESOURCES: Usart6RuntimeResources = Usart6RuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct Usart6MetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -1403,7 +1420,7 @@ pub struct Usart6Resources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_USART6_RESOURCES: Usart6Resources = Usart6Resources {
+pub const DRV_USART6_METADATA_RESOURCES: Usart6MetadataResources = Usart6MetadataResources {
     clocks: DRV_USART6_CLOCK_BINDINGS,
     resets: DRV_USART6_RESET_BINDINGS,
     interrupt_sources: DRV_USART6_INTERRUPT_SOURCES,
@@ -1419,17 +1436,16 @@ pub const DRV_USART6_RESOURCES: Usart6Resources = Usart6Resources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct Usart6 {
-    resources: Usart6Resources,
-}
+pub struct Usart6;
 
 impl Usart6 {
-    pub fn new(resources: Usart6Resources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: Usart6RuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> Usart6Resources {
-        self.resources
+    pub fn metadata_resources() -> Usart6MetadataResources {
+        DRV_USART6_METADATA_RESOURCES
     }
     /// Enable the USART6 clock gate.
     pub fn enable_clock(&self) -> Result<(), metadata::Error> {

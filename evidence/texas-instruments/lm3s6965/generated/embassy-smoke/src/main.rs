@@ -8,20 +8,20 @@ use cortex_m_semihosting::{debug, hprintln};
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Ticker, Timer};
 use lm3s6965_embassy_hal::gpio::{
-    DRV_GPIOA_RESOURCES, DRV_GPIOB_RESOURCES, DRV_GPIOC_RESOURCES, DRV_GPIOD_RESOURCES,
-    DRV_GPIOE_RESOURCES, DRV_GPIOF_RESOURCES, GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF, Level,
+    DRV_GPIOA_RUNTIME_RESOURCES, DRV_GPIOB_RUNTIME_RESOURCES, DRV_GPIOC_RUNTIME_RESOURCES, DRV_GPIOD_RUNTIME_RESOURCES,
+    DRV_GPIOE_RUNTIME_RESOURCES, DRV_GPIOF_RUNTIME_RESOURCES, GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF, Level,
     Pull,
 };
-use lm3s6965_embassy_hal::i2c::{DRV_I2C0_RESOURCES, I2C0};
-use lm3s6965_embassy_hal::interrupt::{DRV_NVIC_RESOURCES, Irq, NVIC};
-use lm3s6965_embassy_hal::rcc::{DRV_RCC_RESOURCES, SYSCTL};
-use lm3s6965_embassy_hal::spi::{DRV_SSI0_RESOURCES, SSI0};
-use lm3s6965_embassy_hal::time::{DRV_TIME_RESOURCES, Time};
+use lm3s6965_embassy_hal::i2c::{DRV_I2C0_RUNTIME_RESOURCES, I2C0};
+use lm3s6965_embassy_hal::interrupt::{DRV_NVIC_RUNTIME_RESOURCES, Irq, NVIC};
+use lm3s6965_embassy_hal::rcc::{DRV_RCC_RUNTIME_RESOURCES, SYSCTL};
+use lm3s6965_embassy_hal::spi::{DRV_SSI0_RUNTIME_RESOURCES, SSI0};
+use lm3s6965_embassy_hal::time::{DRV_TIME_RUNTIME_RESOURCES, Time};
 use lm3s6965_embassy_hal::timer::{
-    DRV_TIMER0_RESOURCES, DRV_TIMER1_RESOURCES, DRV_TIMER2_RESOURCES, DRV_TIMER3_RESOURCES, TIMER0,
+    DRV_TIMER0_RUNTIME_RESOURCES, DRV_TIMER1_RUNTIME_RESOURCES, DRV_TIMER2_RUNTIME_RESOURCES, DRV_TIMER3_RUNTIME_RESOURCES, TIMER0,
     TIMER1, TIMER2, TIMER3,
 };
-use lm3s6965_embassy_hal::uart::{DRV_UART0_RESOURCES, DRV_UART1_RESOURCES, UART0, UART1};
+use lm3s6965_embassy_hal::uart::{DRV_UART0_RUNTIME_RESOURCES, DRV_UART1_RUNTIME_RESOURCES, UART0, UART1};
 use panic_halt as _;
 
 const SYSCTL_RCGC2: u32 = 0x400F_E100;
@@ -208,11 +208,11 @@ fn smoke_memory() {
 }
 
 fn smoke_nvic_and_systick() {
-    let nvic = NVIC::new(DRV_NVIC_RESOURCES).unwrap();
-    expect("nvic route count", nvic.bind().len() == 22);
+    let _nvic = NVIC::new(DRV_NVIC_RUNTIME_RESOURCES).unwrap();
+    expect("nvic route count", NVIC::interrupt_routes().len() == 22);
     expect(
         "nvic includes uart0 route",
-        nvic.bind()
+        NVIC::interrupt_routes()
             .iter()
             .any(|route| route.interrupt_ref == "int.uart0"),
     );
@@ -220,11 +220,11 @@ fn smoke_nvic_and_systick() {
 }
 
 async fn smoke_embassy_time() {
-    let time = Time::new(DRV_TIME_RESOURCES).unwrap();
-    expect("time route count", time.bind().len() == 1);
+    let time = Time::new(DRV_TIME_RUNTIME_RESOURCES).unwrap();
+    expect("time route count", Time::interrupt_routes().len() == 1);
     expect(
         "time uses systick route",
-        time.bind()[0].interrupt_ref == "int.systick",
+        Time::interrupt_routes()[0].interrupt_ref == "int.systick",
     );
     time.init_time_driver().unwrap();
 
@@ -236,7 +236,7 @@ async fn smoke_embassy_time() {
 }
 
 fn smoke_rcc() {
-    let rcc = SYSCTL::new(DRV_RCC_RESOURCES).unwrap();
+    let rcc = SYSCTL::new(DRV_RCC_RUNTIME_RESOURCES).unwrap();
 
     rcc.enable_watchdog0_clock().unwrap();
     rcc.disable_watchdog0_clock().unwrap();
@@ -283,7 +283,7 @@ fn smoke_gpio() {
     smoke_gpio_port!(
         "gpioa",
         GPIOA,
-        DRV_GPIOA_RESOURCES,
+        DRV_GPIOA_RUNTIME_RESOURCES,
         pa0,
         0x4000_4000,
         1 << 0
@@ -291,7 +291,7 @@ fn smoke_gpio() {
     smoke_gpio_port!(
         "gpiob",
         GPIOB,
-        DRV_GPIOB_RESOURCES,
+        DRV_GPIOB_RUNTIME_RESOURCES,
         pb0,
         0x4000_5000,
         1 << 0
@@ -299,7 +299,7 @@ fn smoke_gpio() {
     smoke_gpio_port!(
         "gpioc",
         GPIOC,
-        DRV_GPIOC_RESOURCES,
+        DRV_GPIOC_RUNTIME_RESOURCES,
         pc0,
         0x4000_6000,
         1 << 0
@@ -307,7 +307,7 @@ fn smoke_gpio() {
     smoke_gpio_port!(
         "gpiod",
         GPIOD,
-        DRV_GPIOD_RESOURCES,
+        DRV_GPIOD_RUNTIME_RESOURCES,
         pd0,
         0x4000_7000,
         1 << 0
@@ -315,7 +315,7 @@ fn smoke_gpio() {
     smoke_gpio_port!(
         "gpioe",
         GPIOE,
-        DRV_GPIOE_RESOURCES,
+        DRV_GPIOE_RUNTIME_RESOURCES,
         pe0,
         0x4002_4000,
         1 << 0
@@ -323,7 +323,7 @@ fn smoke_gpio() {
     smoke_gpio_port!(
         "gpiof",
         GPIOF,
-        DRV_GPIOF_RESOURCES,
+        DRV_GPIOF_RUNTIME_RESOURCES,
         pf0,
         0x4002_5000,
         1 << 0
@@ -354,8 +354,8 @@ fn uart_write_bytes(base: u32, bytes: &[u8]) {
 }
 
 fn smoke_uart() {
-    let uart0 = UART0::new(DRV_UART0_RESOURCES).unwrap();
-    let uart1 = UART1::new(DRV_UART1_RESOURCES).unwrap();
+    let uart0 = UART0::new(DRV_UART0_RUNTIME_RESOURCES).unwrap();
+    let uart1 = UART1::new(DRV_UART1_RUNTIME_RESOURCES).unwrap();
     uart0.enable_clock().unwrap();
     uart0.assert_reset().unwrap();
     uart0.release_reset().unwrap();
@@ -408,7 +408,7 @@ fn smoke_uart() {
 }
 
 fn smoke_ssi0() {
-    let ssi0 = SSI0::new(DRV_SSI0_RESOURCES).unwrap();
+    let ssi0 = SSI0::new(DRV_SSI0_RUNTIME_RESOURCES).unwrap();
     ssi0.enable_clock().unwrap();
     ssi0.assert_reset().unwrap();
     ssi0.release_reset().unwrap();
@@ -439,7 +439,7 @@ fn smoke_ssi0() {
 }
 
 fn smoke_i2c0() {
-    let i2c0 = I2C0::new(DRV_I2C0_RESOURCES).unwrap();
+    let i2c0 = I2C0::new(DRV_I2C0_RUNTIME_RESOURCES).unwrap();
     i2c0.enable_clock().unwrap();
     i2c0.assert_reset().unwrap();
     i2c0.release_reset().unwrap();
@@ -501,10 +501,10 @@ fn smoke_one_timer(base: u32, label: &str, enable: impl FnOnce()) {
 }
 
 fn smoke_timers() {
-    let timer0 = TIMER0::new(DRV_TIMER0_RESOURCES).unwrap();
-    let timer1 = TIMER1::new(DRV_TIMER1_RESOURCES).unwrap();
-    let timer2 = TIMER2::new(DRV_TIMER2_RESOURCES).unwrap();
-    let timer3 = TIMER3::new(DRV_TIMER3_RESOURCES).unwrap();
+    let timer0 = TIMER0::new(DRV_TIMER0_RUNTIME_RESOURCES).unwrap();
+    let timer1 = TIMER1::new(DRV_TIMER1_RUNTIME_RESOURCES).unwrap();
+    let timer2 = TIMER2::new(DRV_TIMER2_RUNTIME_RESOURCES).unwrap();
+    let timer3 = TIMER3::new(DRV_TIMER3_RUNTIME_RESOURCES).unwrap();
 
     timer0.enable_clock().unwrap();
     timer0.assert_reset().unwrap();
@@ -556,7 +556,7 @@ fn smoke_timers() {
 }
 
 fn smoke_watchdog() {
-    let rcc = SYSCTL::new(DRV_RCC_RESOURCES).unwrap();
+    let rcc = SYSCTL::new(DRV_RCC_RUNTIME_RESOURCES).unwrap();
     rcc.enable_watchdog0_clock().unwrap();
 
     write_u32(WATCHDOG_LOAD, 0x0000_1000);

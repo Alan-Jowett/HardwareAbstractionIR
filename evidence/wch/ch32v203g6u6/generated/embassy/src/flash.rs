@@ -206,7 +206,12 @@ pub const DRV_FLASH_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_FLASH_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct FLASHResources {
+pub struct FLASHRuntimeResources {}
+
+pub const DRV_FLASH_RUNTIME_RESOURCES: FLASHRuntimeResources = FLASHRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct FLASHMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -221,7 +226,7 @@ pub struct FLASHResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_FLASH_RESOURCES: FLASHResources = FLASHResources {
+pub const DRV_FLASH_METADATA_RESOURCES: FLASHMetadataResources = FLASHMetadataResources {
     clocks: DRV_FLASH_CLOCK_BINDINGS,
     resets: DRV_FLASH_RESET_BINDINGS,
     interrupt_sources: DRV_FLASH_INTERRUPT_SOURCES,
@@ -237,17 +242,16 @@ pub const DRV_FLASH_RESOURCES: FLASHResources = FLASHResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct FLASH {
-    resources: FLASHResources,
-}
+pub struct FLASH;
 
 impl FLASH {
-    pub fn new(resources: FLASHResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: FLASHRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> FLASHResources {
-        self.resources
+    pub fn metadata_resources() -> FLASHMetadataResources {
+        DRV_FLASH_METADATA_RESOURCES
     }
     pub fn unlock(&self) -> Result<(), metadata::Error> {
         self.apply_unlock()?;

@@ -175,7 +175,12 @@ pub const DRV_IWDG_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
 pub const DRV_IWDG_CAPABILITY_TAGS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
-pub struct IWDGResources {
+pub struct IWDGRuntimeResources {}
+
+pub const DRV_IWDG_RUNTIME_RESOURCES: IWDGRuntimeResources = IWDGRuntimeResources {};
+
+#[derive(Debug, Clone, Copy)]
+pub struct IWDGMetadataResources {
     pub clocks: &'static [metadata::ClockBinding],
     pub resets: &'static [metadata::ResetBinding],
     pub interrupt_sources: &'static [metadata::InterruptSource],
@@ -190,7 +195,7 @@ pub struct IWDGResources {
     pub capability_tags: &'static [&'static str],
 }
 
-pub const DRV_IWDG_RESOURCES: IWDGResources = IWDGResources {
+pub const DRV_IWDG_METADATA_RESOURCES: IWDGMetadataResources = IWDGMetadataResources {
     clocks: DRV_IWDG_CLOCK_BINDINGS,
     resets: DRV_IWDG_RESET_BINDINGS,
     interrupt_sources: DRV_IWDG_INTERRUPT_SOURCES,
@@ -206,17 +211,16 @@ pub const DRV_IWDG_RESOURCES: IWDGResources = IWDGResources {
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct IWDG {
-    resources: IWDGResources,
-}
+pub struct IWDG;
 
 impl IWDG {
-    pub fn new(resources: IWDGResources) -> Result<Self, metadata::Error> {
-        Ok(Self { resources })
+    pub fn new(resources: IWDGRuntimeResources) -> Result<Self, metadata::Error> {
+        let _ = resources;
+        Ok(Self)
     }
 
-    pub fn resources(&self) -> IWDGResources {
-        self.resources
+    pub fn metadata_resources() -> IWDGMetadataResources {
+        DRV_IWDG_METADATA_RESOURCES
     }
     pub fn unlock(&self) -> Result<(), metadata::Error> {
         self.apply_unlock()

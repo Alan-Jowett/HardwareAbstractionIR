@@ -101,6 +101,7 @@ cargo run -- generate embassy evidence\texas-instruments\lm3s6965\hair.json --ou
 cargo run -- generate embassy evidence\wch\ch32v203c8t6\hair.json --output-dir <crate-output-dir>
 cargo run -- generate embassy evidence\wch\ch32v203g6u6\hair.json --output-dir <crate-output-dir>
 cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-dir <crate-output-dir>
+cargo run -- generate embassy-host evidence\wch\ch32v203c8t6\hair.json --output-dir <crate-output-dir>
 ```
 
 **Expected result**
@@ -108,6 +109,15 @@ cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-
 - The emitted crate contains `Cargo.toml`, `src\lib.rs`, `src\metadata.rs`,
   and generated driver modules justified by the reference document's profile
   scope.
+- The emitted embedded crate's `Cargo.toml` exposes opt-in peripheral-family
+  features with an empty default set, and disabling a generated family feature
+  suppresses the corresponding public module export plus any family-specific
+  runtime or interrupt glue that would otherwise be retained in the image.
+- The emitted embedded crate separates lean runtime constructor inputs from any
+  richer metadata-inspection surface. A consumer that instantiates generated
+  drivers through the lean runtime API only must not retain the same
+  descriptive metadata tables solely because those metadata constants also
+  exist in the crate.
 - The CH32V203G6U6 reference bundle succeeds only when the approved HAIR inputs
   justify both the rtc-backed `embassy-time-driver` path and any emitted
   HAL-specific raw RTC control helpers from the same explicit RTC
@@ -155,6 +165,23 @@ cargo run -- generate embassy evidence\espressif\esp32-c3fn4\hair.json --output-
   `dmaAsyncBindings` plus the matching DMA-channel interrupt routes, and the
   generated HAL exposes those waits only for the channels named by that binding
   map.
+- If the CH32V203C8T6 reference bundle claims capability tag
+  `embedded-hal-async-wait` on a `gpio-port` driver instance, both
+  `generate embassy` and `generate embassy-host` succeed only when the same
+  driver instance also carries explicit `gpioExtiWaitBindings` for every pin
+  that exposes EXTI-backed edge waits. Those bindings must name the exact
+  port-select, interrupt-mask, rising-trigger, falling-trigger, pending-flag,
+  pending-clear, and interrupt-route handles for that pin's EXTI line. The
+  generated crates may implement `wait_for_high` / `wait_for_low` only from the
+  approved GPIO input-sample path, and may implement edge waits only for the
+  explicitly bound lines; shared vectors such as `EXTI9_5` and `EXTI15_10` must
+  remain attributable through per-line interrupt routes rather than inferred
+  pending-bit scans alone.
+- The host-emulated CH32V203C8T6 crate must preserve the same wait contract
+  deterministically: driving a bound GPIO input line in host state must wake the
+  corresponding generated wait future through the approved EXTI route/clear path
+  rather than through a host-only shortcut that the embedded lowering cannot
+  justify.
 - If a generated ADC bring-up helper depends on calibration or ready-status
   flags clearing before later sampling can succeed, generation succeeds only
   when the approved init operation models those waits explicitly and the
@@ -276,6 +303,7 @@ repository contracts.
 - `evidence\wch\ch32v203g6u6\generated\pac\`
 - `evidence\wch\ch32v203g6u6\generated\embassy\`
 - `evidence\wch\ch32v203g6u6\generated\embassy-smoke\`
+- `evidence\wch\ch32v203g6u6\generated\embassy-exti-wait-smoke\`
 - `evidence\wch\ch32v203g6u6\generated\embassy-pwm-smoke\`
 - `evidence\wch\ch32v203g6u6\generated\embassy-rtc-smoke\`
 - `evidence\espressif\esp32-c3fn4\`
@@ -619,6 +647,42 @@ powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\emb
 - The destructive test scope is intentionally bounded to the last 4 KB flash
   page, and the firmware shall restore the original contents before reporting
   success.
+
+### V-021 Hardware smoke packaging for the CH32V203G6U6 GPIO EXTI wait example
+
+**Purpose:** provide a hardware-flashable EXTI wait smoke image for the
+CH32V203G6U6 reference bundle that exercises the generated
+`embedded_hal_async::digital::Wait` implementation on `PA7` using the physical
+EXTI path and operator-supplied external stimulus.
+
+**Command**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\embassy-exti-wait-smoke\build-smoke-bin.ps1 -Release
+```
+
+**Expected result**
+- The smoke firmware builds for `riscv32imc-unknown-none-elf`.
+- The packaging step writes a flashable `.bin` beside the release ELF.
+- When flashed to the physical device, the firmware enumerates USB CDC, waits
+  for a host connection plus DTR assertion, and only then starts the smoke
+  sequence.
+- With a clean digital-compatible square wave or equivalent edge-producing
+  signal generator wired into `PA7`, the firmware logs successful completion of
+  `wait_for_high()`, `wait_for_low()`, `wait_for_rising_edge()`,
+  `wait_for_falling_edge()`, and `wait_for_any_edge()` over USB CDC.
+- If the expected signal level or edge does not arrive within the documented
+  timeout window, the firmware logs a clear failure message over USB CDC
+  instead of silently hanging.
+
+**Note**
+- This is a hardware-dependent smoke check, not a universal repository
+  precondition.
+- The smoke application shall consume the generated Embassy HAL crate through
+  normal Rust package boundaries for GPIO, EXTI wait lowering, Embassy time,
+  and USB CDC support.
+- The host-gated start is required so an operator can connect a serial monitor
+  before the edge-driven sequence begins.
 
 ## 6. Requirement-specific validation coverage
 
