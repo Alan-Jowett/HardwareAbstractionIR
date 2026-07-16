@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-esp32c3fn4_generated = { package = "esp32c3fn4-generated", path = "../embassy" }
+esp32c3fn4_generated = { package = "esp32c3fn4-generated", path = "../embassy", features = ["interrupt", "uart"] }
 panic-halt = "1.0"
 riscv-rt = "0.13"
 
