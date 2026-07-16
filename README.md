@@ -23,10 +23,13 @@ Today this repository contains:
 
 - a layered JSON Schema set under `schema/`
 - optional `profiles.mcuSoc` and `profiles.embassyHal` specialization layers
+- a seeded canonical-normalization vocabulary under `docs/canonical-terms.md`
 - a Rust crate (`edition = "2024"`) that implements the current CLI
 - governed repository requirements, design, and validation baselines under `specs/`
 - workflow skills under `.github/skills/` for source discovery, extraction, audit, and repository maintenance
-- reference evidence bundles under `evidence/` for real device examples and generated artifacts
+- reference evidence bundles under `evidence/` for five concrete devices across four vendors
+- checked-in generated SVD, PAC, Embassy, and smoke-test artifacts for the bundles that currently anchor regression coverage
+- GitHub Actions workflows that regenerate artifacts, check generated HALs for `rustfmt`/`clippy` cleanliness, and run QEMU smoke where supported
 
 ## Repository layout
 
@@ -148,27 +151,28 @@ Use the workflow docs and generated reports under `evidence/` when you need an e
 
 ## Reference evidence bundles
 
-The current repository includes reference bundles for:
+The repository currently carries five top-level HAIR bundles across four vendors. They exercise different parts of the schema, lowering surface, and evidence/audit workflow.
 
-| Vendor | Device |
-| --- | --- |
-| ST | `stm32f405rgt6` |
-| WCH | `ch32v203c8t6` |
-| Espressif | `esp32-c3fn4` |
-| Texas Instruments | `lm3s6965` |
+| Vendor | Device | Bundle contents today | Validation path in repo |
+| --- | --- | --- | --- |
+| ST | `stm32f405rgt6` | `hair.json`, evidence reports, generated SVD/PAC/Embassy crates, `embassy-smoke` | CI regenerates checked-in artifacts and runs the QEMU smoke harness |
+| WCH | `ch32v203c8t6` | `hair.json`, evidence reports, audit report | Reference HAIR-only bundle today; no checked-in generated artifacts or smoke harnesses |
+| WCH | `ch32v203g6u6` | `hair.json`, evidence reports, audit report, generated SVD/PAC/Embassy crates, `embassy-smoke`, `embassy-pwm-smoke`, `embassy-rtc-smoke`, `embassy-adc-dma-smoke`, `embassy-watchdog-smoke`, `embassy-flash-smoke`, `embassy-neopixel-smoke`, `embassy-usb-cdc-smoke` | CI regenerates checked-in artifacts and builds every smoke harness; runtime smoke remains hardware-oriented and is intentionally not run in hosted CI |
+| Espressif | `esp32-c3fn4` | `hair.json`, evidence reports, generated Embassy crate, `embassy-smoke`, `embassy-usb-smoke` | CI builds and lints the checked-in HAL plus smoke harnesses; `run-qemu-smoke.ps1` covers QEMU execution manually |
+| Texas Instruments | `lm3s6965` | `hair.json`, evidence reports, generated SVD/PAC/Embassy crates, `embassy-smoke` | CI regenerates checked-in artifacts and runs the QEMU smoke harness |
 
-These bundles are used to exercise different parts of the schema, generator surface, and workflow/audit process. Some bundles also include checked-in generated artifacts and smoke-test projects.
+### Validated peripheral coverage
 
-### Current MCU bundle matrix
+This table summarizes **executable smoke coverage that exists today**, not every
+driver kind modeled in each bundle.
 
-The table below summarizes the checked-in device bundles that currently include a top-level `hair.json`, along with the peripheral driver kinds modeled in each bundle's current `profiles.embassyHal` surface and the QEMU smoke coverage currently wired in this repository.
-
-| Vendor | Device | HAIR JSON | Supported peripherals | QEMU-tested today |
-| --- | --- | --- | --- | --- |
-| ST | `stm32f405rgt6` | `evidence/st/stm32f405rgt6/hair.json` | `gpio-port`, `i2c`, `spi`, `uart`, `usart`, `interrupt` | CI runs the checked-in Embassy smoke with `qemu-system-arm -M netduinoplus2 -nographic -semihosting -kernel "$SMOKE_BINARY"`; the smoke source exercises GPIOA APIs, USART1, and Embassy time, but does not assert GPIO state transitions because QEMU readback is unreliable |
-| WCH | `ch32v203c8t6` | `evidence/wch/ch32v203c8t6/hair.json` | `rcc`, `gpio-port`, `uart`, `usart`, `spi`, `i2c`, `timer`, `pwm`, `adc`, `dma`, `flash`, `interrupt` | None documented |
-| Espressif | `esp32-c3fn4` | `evidence/espressif/esp32-c3fn4/hair.json` | `rcc`, `gpio-port`, `interrupt`, `uart`, `i2c`, `spi`, `adc` | Manual `run-qemu-smoke.ps1` uses the pinned containerized `esp32c3` QEMU path and checks boot/UART/interrupt smoke plus `PASS`; the current smoke firmware does not exercise GPIO |
-| Texas Instruments | `lm3s6965` | `evidence/texas-instruments/lm3s6965/hair.json` | `rcc`, `gpio-port`, `uart`, `spi`, `i2c`, `timer`, `interrupt` | CI runs the checked-in Embassy smoke with `qemu-system-arm -M lm3s6965evb -display none -monitor none -serial stdio -semihosting-config enable=on,target=native -kernel "$SMOKE_BINARY"`; the harness prints to UART0 stdio and exercises RCC, GPIO, SSI, I2C, timers, watchdog, flash, NVIC/SysTick, and Embassy time |
+| Device | Validation mode | Peripherals or surfaces exercised |
+| --- | --- | --- |
+| `stm32f405rgt6` | QEMU in CI | `gpio` API surface on `GPIOA` (without reliable state readback), `usart`, `embassy-time` |
+| `ch32v203c8t6` | None today | No checked-in runtime smoke coverage yet |
+| `ch32v203g6u6` | Hardware smoke packaging + device run | `rcc`, `gpio`, `embassy-time`, `pwm`, `rtc`, `adc` + `dma`, `watchdog`, `flash`, `usb-device`/USB CDC, NeoPixel-style GPIO data path |
+| `esp32-c3fn4` | QEMU smoke via `run-qemu-smoke.ps1` | `uart`, `interrupt`; boot path is also observed, but GPIO state is not asserted in QEMU |
+| `lm3s6965` | QEMU in CI | `rcc`, `gpio`, `uart`, `spi`, `i2c`, `timer`, `watchdog`, `flash`, `interrupt`, `embassy-time` |
 
 ## Current boundaries
 
@@ -184,6 +188,7 @@ These are important limits of the current baseline:
 Start with these documents:
 
 - `docs/schema.md` — layered schema overview
+- `docs/canonical-terms.md` — repository-owned canonical normalization seed vocabulary
 - `docs/mcu-profile.md` — MCU/SoC profile contract
 - `docs/embassy-hal-profile.md` — Embassy HAL generation contract
 - `docs/cli.md` — current CLI contract
