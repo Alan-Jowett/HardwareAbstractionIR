@@ -126,10 +126,14 @@ Normative consequences:
 5. simulated time, interrupt delivery, DMA completion, and similar emulated
    side effects must progress under explicit test control in the first cut so
    host execution stays deterministic and auditable
-6. host mode must not invent emulator behavior that the embedded lowering could
+6. when a generated `gpio-port` surface claims capability tag
+   `embedded-hal-async-wait`, host mode must drive those waits through the same
+   approved GPIO input-sample plus EXTI route/pending-clear contract rather than
+   through a host-only shortcut
+7. host mode must not invent emulator behavior that the embedded lowering could
    not justify from the approved HAIR topology, semantics, and reachable
    register/field data
-7. if a generated HAL-visible device would lack a paired emulator/state handle,
+8. if a generated HAL-visible device would lack a paired emulator/state handle,
    host generation must fail explicitly rather than silently emitting a
    partially emulated crate
 
@@ -139,6 +143,7 @@ expose:
 
 - register and field state inspection
 - explicit interrupt triggering and acknowledgement
+- deterministic GPIO input/EXTI wake stimulation for generated wait-capable pins
 - deterministic DMA progress and completion injection
 - transmit/receive queues for USART/UART- and SPI-like paths
 - controller/target state for I2C-style transactions
@@ -298,7 +303,7 @@ The first Embassy generator cut is expected to support this driver subset:
 | `driverKind` | First-cut status | Notes |
 | --- | --- | --- |
 | `rcc` | supported | Generates clock/reset bring-up support from `clockResetTopology` and referenced operations. |
-| `gpio-port` | supported | Generates a canonical per-pin GPIO API from a `gpio-port` driver instance. The first cut covers input/output mode, pull configuration, output writes, and level/state reads when those behaviors are backed by explicit lowering inputs; alternate-function setup and EXTI remain out of scope. |
+| `gpio-port` | supported | Generates a canonical per-pin GPIO API from a `gpio-port` driver instance. The first cut covers input/output mode, pull configuration, output writes, level/state reads, and — when the profile explicitly claims capability tag `embedded-hal-async-wait` plus `gpioExtiWaitBindings` — the full `embedded_hal_async::digital::Wait` trait for GPIO inputs. Alternate-function setup remains out of scope. |
 | `uart` / `usart` | supported | Requires explicit pin-routing data. Interrupt and DMA routes are required for async DMA-backed transfers and may be omitted for pure polling-mode instances. |
 | `spi` | supported | Requires explicit pin-routing data and any claimed DMA bindings. |
 | `i2c` | supported | Requires explicit pin-routing data and any claimed interrupt/DMA bindings. |
@@ -334,7 +339,7 @@ hoc name matching.
 | `driverKind` | Minimum required supporting data |
 | --- | --- |
 | `rcc` | `profiles.mcuSoc.clockResetTopology`; referenced `clockBindingRefs` / `resetBindingRefs`; binding `controlRefs` plus field-level structure for emitted clock/reset helpers; and referenced semantic operations for any additional emitted RCC operation helpers |
-| `gpio-port` | `profiles.mcuSoc.pinTopology.routes`; clock and/or reset bindings for emitted bring-up helpers in the first cut; and any referenced route `controlRefs` plus structural register/field data for emitted per-pin input/output/pull helpers and output/input readback. The reachable lowering path may be a classic single-block GPIO layout or a composite path through explicit routing/control fabrics such as ESP32-C3 GPIO + IO MUX + GPIO Matrix. For STM32-class lowering paths, the reachable structure typically includes mode, output-latch, output-write, input-sample, and pull-configuration registers/fields (for example `MODER`, `ODR`, `BSRR`, `IDR`, and `PUPDR` when the emitted API claims them). |
+| `gpio-port` | `profiles.mcuSoc.pinTopology.routes`; clock and/or reset bindings for emitted bring-up helpers in the first cut; and any referenced route `controlRefs` plus structural register/field data for emitted per-pin input/output/pull helpers and output/input readback. The reachable lowering path may be a classic single-block GPIO layout or a composite path through explicit routing/control fabrics such as ESP32-C3 GPIO + IO MUX + GPIO Matrix. For STM32-class lowering paths, the reachable structure typically includes mode, output-latch, output-write, input-sample, and pull-configuration registers/fields (for example `MODER`, `ODR`, `BSRR`, `IDR`, and `PUPDR` when the emitted API claims them). If the same driver instance claims capability tag `embedded-hal-async-wait`, level waits may reuse that explicit input-sample path, but edge-triggered waits additionally require explicit `gpioExtiWaitBindings` naming the exact line-local port-select, interrupt-mask, rising/falling-trigger, pending-flag, pending-clear, and interrupt-route handles used by the EXTI-backed wake path. Shared EXTI vectors must still bind one explicit route per line so the generator does not guess which pending source woke a wait future. |
 | `uart` / `usart` | `pinTopology.routes` always; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted enable/configure/read/write path; `interruptTopology.routes` and `dmaTopology.routes` only for emitted interrupt-driven or DMA-backed APIs |
 | `spi` | `pinTopology.routes`; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted configuration or transfer path; interrupt/DMA routes only when the emitted API claims them |
 | `i2c` | `pinTopology.routes`; clock/reset support for emitted bring-up helpers; explicit operations and/or control refs for any emitted bus transaction path; interrupt/DMA routes only when the emitted API claims them |
@@ -356,7 +361,7 @@ exact naming contract:
 | `driverKind` | Intended emitted API categories |
 | --- | --- |
 | `rcc` | Per-binding clock-enable / clock-disable / reset-assert / reset-release helpers when justified by the resolved topology and lowering inputs |
-| `gpio-port` | Clock/reset bring-up helpers plus per-pin `Input` / `Output` / `Flex`-style configuration and state helpers only for the behaviors that can be lowered from explicit route controls plus register/field structure. In the first cut that means input/output mode selection, pull configuration, output set/clear, output-state reads, and input-level reads; alternate-function setup and EXTI helpers remain out of scope. The same API category may be justified either by a conventional GPIO block or by a composite routing/control path when the approved HAIR records make the effective writes and reads explicit. |
+| `gpio-port` | Clock/reset bring-up helpers plus per-pin `Input` / `Output` / `Flex`-style configuration and state helpers only for the behaviors that can be lowered from explicit route controls plus register/field structure. In the first cut that means input/output mode selection, pull configuration, output set/clear, output-state reads, and input-level reads. When the same driver instance explicitly claims capability tag `embedded-hal-async-wait` plus `gpioExtiWaitBindings`, the generated input surface may also implement the full `embedded_hal_async::digital::Wait` trait: `wait_for_high` / `wait_for_low` remain grounded in the approved input-sample path, while `wait_for_rising_edge` / `wait_for_falling_edge` / `wait_for_any_edge` must remain traceable to the approved EXTI selector, trigger, pending-clear, and interrupt-route closure for that exact pin. Alternate-function setup remains out of scope. The same API category may be justified either by a conventional GPIO block or by a composite routing/control path when the approved HAIR records make the effective writes and reads explicit. |
 | `uart` / `usart` | Bring-up helpers and only those polling / interrupt / DMA TX/RX methods whose control/data paths are explicitly modeled |
 | `spi` | Bring-up helpers and only those transfer/control methods whose clocking, enable, and data paths are explicitly modeled |
 | `i2c` | Bring-up helpers and only those bus transaction methods whose start/address/data/stop behavior is explicitly modeled |

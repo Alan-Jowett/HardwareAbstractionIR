@@ -13,6 +13,12 @@ pub enum Error {
     InvalidReference(&'static str),
 }
 
+impl embedded_hal::digital::Error for Error {
+    fn kind(&self) -> embedded_hal::digital::ErrorKind {
+        embedded_hal::digital::ErrorKind::Other
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ValueLiteral {
     Integer(i64),

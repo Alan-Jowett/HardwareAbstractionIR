@@ -204,6 +204,18 @@ Embassy profile contract.
 - Async and DMA-backed generated APIs are allowed only when the document
   carries the interrupt, DMA, pin-routing, and semantic-operation/state-machine
   facts needed to lower those behaviors deterministically.
+- If a `gpio-port` driver instance claims capability tag
+  `embedded-hal-async-wait`, the same profile entry shall carry explicit
+  `gpioExtiWaitBindings` naming the exact per-line port-select,
+  interrupt-mask, rising-trigger, falling-trigger, pending-flag,
+  pending-clear, and interrupt-route handles used by EXTI-backed edge waits.
+  The generator may lower `wait_for_high` / `wait_for_low` only from the same
+  approved GPIO input-sample path already used for input reads, and shall fail
+  explicitly rather than infer EXTI line routing, shared-vector attribution, or
+  pending-clear semantics from vendor register names alone. When the same
+  profile is lowered through `hair generate embassy-host`, the host-emulated
+  crate shall preserve that same wait contract deterministically rather than
+  widening it with host-only wake behavior.
 - When a generated bring-up or calibration helper depends on hardware status
   reaching a ready state before later writes or sampling can succeed, the
   approved semantic operation shall model that requirement explicitly with

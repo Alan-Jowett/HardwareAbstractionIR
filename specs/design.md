@@ -184,6 +184,18 @@ interrupt-driven and DMA-backed UART/I2C/SPI/ADC behavior is part of the
 supported subset only when the driver instance names the full interrupt, DMA,
 pin, and semantic closure required for real lowering.
 
+GPIO async wait lowering follows the same explicit-contract rule. A `gpio-port`
+driver instance may implement the full `embedded_hal_async::digital::Wait`
+surface only when the approved HAIR contract closes both halves of that API:
+level waits through the existing GPIO input-sample path, and edge waits through
+an explicit EXTI-backed closure. The profile therefore uses capability tag
+`embedded-hal-async-wait` plus `gpioExtiWaitBindings` on the same driver
+instance to name the exact AFIO/IO-mux line selector, EXTI mask/trigger fields,
+pending flag, pending-clear operation, and interrupt route for each supported
+pin. That binding map is also where shared-vector families stay auditable: when
+several lines share one IRQ, the contract still binds one route per line so the
+generator and host runtime never guess which pending source woke a future.
+
 USB device lowering follows the same evidence-bounded rule. A `usb-device`
 driver instance may expose endpoint-oriented helpers, serial-style byte-stream
 helpers, or both, but only for the subset whose control and data paths are

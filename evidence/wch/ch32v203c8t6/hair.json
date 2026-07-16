@@ -72218,6 +72218,518 @@
           "status": "verified",
           "confidence": 0.9
         }
+      },
+      {
+        "id": "op.exti.clear_line0_pending",
+        "name": "Clear EXTI line 0 pending flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.exti"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.exti.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Set INTF_INTF0 = 1"
+            },
+            "description": "Acknowledge the EXTI pending state for line 0."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.exti.clear_line1_pending",
+        "name": "Clear EXTI line 1 pending flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.exti"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.exti.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Set INTF_INTF1 = 1"
+            },
+            "description": "Acknowledge the EXTI pending state for line 1."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.exti.clear_line2_pending",
+        "name": "Clear EXTI line 2 pending flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.exti"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.exti.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Set INTF_INTF2 = 1"
+            },
+            "description": "Acknowledge the EXTI pending state for line 2."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.exti.clear_line3_pending",
+        "name": "Clear EXTI line 3 pending flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.exti"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.exti.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Set INTF_INTF3 = 1"
+            },
+            "description": "Acknowledge the EXTI pending state for line 3."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.exti.clear_line4_pending",
+        "name": "Clear EXTI line 4 pending flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.exti"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.exti.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Set INTF_INTF4 = 1"
+            },
+            "description": "Acknowledge the EXTI pending state for line 4."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.exti.clear_line5_pending",
+        "name": "Clear EXTI line 5 pending flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.exti"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.exti.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Set INTF_INTF5 = 1"
+            },
+            "description": "Acknowledge the EXTI pending state for line 5."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.exti.clear_line6_pending",
+        "name": "Clear EXTI line 6 pending flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.exti"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.exti.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Set INTF_INTF6 = 1"
+            },
+            "description": "Acknowledge the EXTI pending state for line 6."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.exti.clear_line7_pending",
+        "name": "Clear EXTI line 7 pending flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.exti"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.exti.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Set INTF_INTF7 = 1"
+            },
+            "description": "Acknowledge the EXTI pending state for line 7."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.exti.clear_line8_pending",
+        "name": "Clear EXTI line 8 pending flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.exti"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.exti.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Set INTF_INTF8 = 1"
+            },
+            "description": "Acknowledge the EXTI pending state for line 8."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.exti.clear_line9_pending",
+        "name": "Clear EXTI line 9 pending flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.exti"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.exti.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Set INTF_INTF9 = 1"
+            },
+            "description": "Acknowledge the EXTI pending state for line 9."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.exti.clear_line10_pending",
+        "name": "Clear EXTI line 10 pending flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.exti"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.exti.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Set INTF_INTF10 = 1"
+            },
+            "description": "Acknowledge the EXTI pending state for line 10."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.exti.clear_line11_pending",
+        "name": "Clear EXTI line 11 pending flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.exti"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.exti.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Set INTF_INTF11 = 1"
+            },
+            "description": "Acknowledge the EXTI pending state for line 11."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.exti.clear_line12_pending",
+        "name": "Clear EXTI line 12 pending flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.exti"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.exti.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Set INTF_INTF12 = 1"
+            },
+            "description": "Acknowledge the EXTI pending state for line 12."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.exti.clear_line13_pending",
+        "name": "Clear EXTI line 13 pending flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.exti"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.exti.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Set INTF_INTF13 = 1"
+            },
+            "description": "Acknowledge the EXTI pending state for line 13."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.exti.clear_line14_pending",
+        "name": "Clear EXTI line 14 pending flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.exti"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.exti.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Set INTF_INTF14 = 1"
+            },
+            "description": "Acknowledge the EXTI pending state for line 14."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.72
+        }
+      },
+      {
+        "id": "op.exti.clear_line15_pending",
+        "name": "Clear EXTI line 15 pending flag",
+        "kind": "mode-transition",
+        "targetRefs": [
+          "periph.exti"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.exti.intfr",
+            "expression": {
+              "language": "plain",
+              "text": "Set INTF_INTF15 = 1"
+            },
+            "description": "Acknowledge the EXTI pending state for line 15."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-header",
+            "wch-ch32fv2x-v3x-rm"
+          ],
+          "evidenceRefs": [
+            "e_header_register_bitdefs",
+            "e_rm_rtc_register_model"
+          ],
+          "status": "inferred",
+          "confidence": 0.72
+        }
       }
     ],
     "stateMachines": [
@@ -77676,6 +78188,390 @@
               "status": "verified",
               "confidence": 0.84
             }
+          },
+          {
+            "id": "isrc.exti.line0",
+            "name": "EXTI line 0 interrupt source",
+            "sourceRef": "periph.exti",
+            "kind": "peripheral",
+            "flagRefs": [
+              "field.exti_intfr.intf_intf0"
+            ],
+            "clearOperationRefs": [
+              "op.exti.clear_line0_pending"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "isrc.exti.line1",
+            "name": "EXTI line 1 interrupt source",
+            "sourceRef": "periph.exti",
+            "kind": "peripheral",
+            "flagRefs": [
+              "field.exti_intfr.intf_intf1"
+            ],
+            "clearOperationRefs": [
+              "op.exti.clear_line1_pending"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "isrc.exti.line2",
+            "name": "EXTI line 2 interrupt source",
+            "sourceRef": "periph.exti",
+            "kind": "peripheral",
+            "flagRefs": [
+              "field.exti_intfr.intf_intf2"
+            ],
+            "clearOperationRefs": [
+              "op.exti.clear_line2_pending"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "isrc.exti.line3",
+            "name": "EXTI line 3 interrupt source",
+            "sourceRef": "periph.exti",
+            "kind": "peripheral",
+            "flagRefs": [
+              "field.exti_intfr.intf_intf3"
+            ],
+            "clearOperationRefs": [
+              "op.exti.clear_line3_pending"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "isrc.exti.line4",
+            "name": "EXTI line 4 interrupt source",
+            "sourceRef": "periph.exti",
+            "kind": "peripheral",
+            "flagRefs": [
+              "field.exti_intfr.intf_intf4"
+            ],
+            "clearOperationRefs": [
+              "op.exti.clear_line4_pending"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "isrc.exti.line5",
+            "name": "EXTI line 5 interrupt source",
+            "sourceRef": "periph.exti",
+            "kind": "peripheral",
+            "flagRefs": [
+              "field.exti_intfr.intf_intf5"
+            ],
+            "clearOperationRefs": [
+              "op.exti.clear_line5_pending"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "isrc.exti.line6",
+            "name": "EXTI line 6 interrupt source",
+            "sourceRef": "periph.exti",
+            "kind": "peripheral",
+            "flagRefs": [
+              "field.exti_intfr.intf_intf6"
+            ],
+            "clearOperationRefs": [
+              "op.exti.clear_line6_pending"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "isrc.exti.line7",
+            "name": "EXTI line 7 interrupt source",
+            "sourceRef": "periph.exti",
+            "kind": "peripheral",
+            "flagRefs": [
+              "field.exti_intfr.intf_intf7"
+            ],
+            "clearOperationRefs": [
+              "op.exti.clear_line7_pending"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "isrc.exti.line8",
+            "name": "EXTI line 8 interrupt source",
+            "sourceRef": "periph.exti",
+            "kind": "peripheral",
+            "flagRefs": [
+              "field.exti_intfr.intf_intf8"
+            ],
+            "clearOperationRefs": [
+              "op.exti.clear_line8_pending"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "isrc.exti.line9",
+            "name": "EXTI line 9 interrupt source",
+            "sourceRef": "periph.exti",
+            "kind": "peripheral",
+            "flagRefs": [
+              "field.exti_intfr.intf_intf9"
+            ],
+            "clearOperationRefs": [
+              "op.exti.clear_line9_pending"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "isrc.exti.line10",
+            "name": "EXTI line 10 interrupt source",
+            "sourceRef": "periph.exti",
+            "kind": "peripheral",
+            "flagRefs": [
+              "field.exti_intfr.intf_intf10"
+            ],
+            "clearOperationRefs": [
+              "op.exti.clear_line10_pending"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "isrc.exti.line11",
+            "name": "EXTI line 11 interrupt source",
+            "sourceRef": "periph.exti",
+            "kind": "peripheral",
+            "flagRefs": [
+              "field.exti_intfr.intf_intf11"
+            ],
+            "clearOperationRefs": [
+              "op.exti.clear_line11_pending"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "isrc.exti.line12",
+            "name": "EXTI line 12 interrupt source",
+            "sourceRef": "periph.exti",
+            "kind": "peripheral",
+            "flagRefs": [
+              "field.exti_intfr.intf_intf12"
+            ],
+            "clearOperationRefs": [
+              "op.exti.clear_line12_pending"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "isrc.exti.line13",
+            "name": "EXTI line 13 interrupt source",
+            "sourceRef": "periph.exti",
+            "kind": "peripheral",
+            "flagRefs": [
+              "field.exti_intfr.intf_intf13"
+            ],
+            "clearOperationRefs": [
+              "op.exti.clear_line13_pending"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "isrc.exti.line14",
+            "name": "EXTI line 14 interrupt source",
+            "sourceRef": "periph.exti",
+            "kind": "peripheral",
+            "flagRefs": [
+              "field.exti_intfr.intf_intf14"
+            ],
+            "clearOperationRefs": [
+              "op.exti.clear_line14_pending"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "isrc.exti.line15",
+            "name": "EXTI line 15 interrupt source",
+            "sourceRef": "periph.exti",
+            "kind": "peripheral",
+            "flagRefs": [
+              "field.exti_intfr.intf_intf15"
+            ],
+            "clearOperationRefs": [
+              "op.exti.clear_line15_pending"
+            ],
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
           }
         ],
         "routes": [
@@ -78358,6 +79254,353 @@
               "status": "verified",
               "confidence": 0.86
             }
+          },
+          {
+            "id": "iroute.exti.line0",
+            "name": "EXTI line 0 interrupt route",
+            "sourceRef": "isrc.exti.line0",
+            "interruptRef": "int.exti0",
+            "controllerRef": "block.pfic",
+            "lineIndex": 0,
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "iroute.exti.line1",
+            "name": "EXTI line 1 interrupt route",
+            "sourceRef": "isrc.exti.line1",
+            "interruptRef": "int.exti1",
+            "controllerRef": "block.pfic",
+            "lineIndex": 1,
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "iroute.exti.line2",
+            "name": "EXTI line 2 interrupt route",
+            "sourceRef": "isrc.exti.line2",
+            "interruptRef": "int.exti2",
+            "controllerRef": "block.pfic",
+            "lineIndex": 2,
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "iroute.exti.line3",
+            "name": "EXTI line 3 interrupt route",
+            "sourceRef": "isrc.exti.line3",
+            "interruptRef": "int.exti3",
+            "controllerRef": "block.pfic",
+            "lineIndex": 3,
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "iroute.exti.line4",
+            "name": "EXTI line 4 interrupt route",
+            "sourceRef": "isrc.exti.line4",
+            "interruptRef": "int.exti4",
+            "controllerRef": "block.pfic",
+            "lineIndex": 4,
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            }
+          },
+          {
+            "id": "iroute.exti.line5",
+            "name": "EXTI line 5 interrupt route",
+            "sourceRef": "isrc.exti.line5",
+            "interruptRef": "int.exti95",
+            "controllerRef": "block.pfic",
+            "lineIndex": 5,
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            },
+            "sharedGroup": "exti9_5"
+          },
+          {
+            "id": "iroute.exti.line6",
+            "name": "EXTI line 6 interrupt route",
+            "sourceRef": "isrc.exti.line6",
+            "interruptRef": "int.exti95",
+            "controllerRef": "block.pfic",
+            "lineIndex": 6,
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            },
+            "sharedGroup": "exti9_5"
+          },
+          {
+            "id": "iroute.exti.line7",
+            "name": "EXTI line 7 interrupt route",
+            "sourceRef": "isrc.exti.line7",
+            "interruptRef": "int.exti95",
+            "controllerRef": "block.pfic",
+            "lineIndex": 7,
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            },
+            "sharedGroup": "exti9_5"
+          },
+          {
+            "id": "iroute.exti.line8",
+            "name": "EXTI line 8 interrupt route",
+            "sourceRef": "isrc.exti.line8",
+            "interruptRef": "int.exti95",
+            "controllerRef": "block.pfic",
+            "lineIndex": 8,
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            },
+            "sharedGroup": "exti9_5"
+          },
+          {
+            "id": "iroute.exti.line9",
+            "name": "EXTI line 9 interrupt route",
+            "sourceRef": "isrc.exti.line9",
+            "interruptRef": "int.exti95",
+            "controllerRef": "block.pfic",
+            "lineIndex": 9,
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            },
+            "sharedGroup": "exti9_5"
+          },
+          {
+            "id": "iroute.exti.line10",
+            "name": "EXTI line 10 interrupt route",
+            "sourceRef": "isrc.exti.line10",
+            "interruptRef": "int.exti1510",
+            "controllerRef": "block.pfic",
+            "lineIndex": 10,
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            },
+            "sharedGroup": "exti15_10"
+          },
+          {
+            "id": "iroute.exti.line11",
+            "name": "EXTI line 11 interrupt route",
+            "sourceRef": "isrc.exti.line11",
+            "interruptRef": "int.exti1510",
+            "controllerRef": "block.pfic",
+            "lineIndex": 11,
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            },
+            "sharedGroup": "exti15_10"
+          },
+          {
+            "id": "iroute.exti.line12",
+            "name": "EXTI line 12 interrupt route",
+            "sourceRef": "isrc.exti.line12",
+            "interruptRef": "int.exti1510",
+            "controllerRef": "block.pfic",
+            "lineIndex": 12,
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            },
+            "sharedGroup": "exti15_10"
+          },
+          {
+            "id": "iroute.exti.line13",
+            "name": "EXTI line 13 interrupt route",
+            "sourceRef": "isrc.exti.line13",
+            "interruptRef": "int.exti1510",
+            "controllerRef": "block.pfic",
+            "lineIndex": 13,
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            },
+            "sharedGroup": "exti15_10"
+          },
+          {
+            "id": "iroute.exti.line14",
+            "name": "EXTI line 14 interrupt route",
+            "sourceRef": "isrc.exti.line14",
+            "interruptRef": "int.exti1510",
+            "controllerRef": "block.pfic",
+            "lineIndex": 14,
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            },
+            "sharedGroup": "exti15_10"
+          },
+          {
+            "id": "iroute.exti.line15",
+            "name": "EXTI line 15 interrupt route",
+            "sourceRef": "isrc.exti.line15",
+            "interruptRef": "int.exti1510",
+            "controllerRef": "block.pfic",
+            "lineIndex": 15,
+            "routeType": "hardwired",
+            "provenance": {
+              "sourceRefs": [
+                "openwch-ch32v20x-header",
+                "openwch-ch32v20x-startup-d6"
+              ],
+              "evidenceRefs": [
+                "e_header_register_bitdefs",
+                "e_startup_vector"
+              ],
+              "status": "inferred",
+              "confidence": 0.84
+            },
+            "sharedGroup": "exti15_10"
           }
         ]
       },
@@ -82434,6 +83677,207 @@
             ],
             "status": "verified",
             "confidence": 0.9
+          },
+          "capabilityTags": [
+            "embedded-hal-async-wait"
+          ],
+          "interruptRouteRefs": [
+            "iroute.exti.line0",
+            "iroute.exti.line1",
+            "iroute.exti.line2",
+            "iroute.exti.line3",
+            "iroute.exti.line4",
+            "iroute.exti.line5",
+            "iroute.exti.line6",
+            "iroute.exti.line7",
+            "iroute.exti.line8",
+            "iroute.exti.line9",
+            "iroute.exti.line10",
+            "iroute.exti.line11",
+            "iroute.exti.line12",
+            "iroute.exti.line13",
+            "iroute.exti.line14",
+            "iroute.exti.line15"
+          ],
+          "gpioExtiWaitBindings": {
+            "lines": [
+              {
+                "pinRef": "pin.pa0",
+                "lineIndex": 0,
+                "portSelectRef": "field.afio_exticr1.exti0",
+                "interruptMaskRef": "field.exti_intenr.mr0",
+                "risingTriggerRef": "field.exti_rtenr.tr0",
+                "fallingTriggerRef": "field.exti_ftenr.tr0",
+                "pendingFlagRef": "field.exti_intfr.intf_intf0",
+                "pendingClearOperationRef": "op.exti.clear_line0_pending",
+                "interruptRouteRef": "iroute.exti.line0"
+              },
+              {
+                "pinRef": "pin.pa1",
+                "lineIndex": 1,
+                "portSelectRef": "field.afio_exticr1.exti1",
+                "interruptMaskRef": "field.exti_intenr.mr1",
+                "risingTriggerRef": "field.exti_rtenr.tr1",
+                "fallingTriggerRef": "field.exti_ftenr.tr1",
+                "pendingFlagRef": "field.exti_intfr.intf_intf1",
+                "pendingClearOperationRef": "op.exti.clear_line1_pending",
+                "interruptRouteRef": "iroute.exti.line1"
+              },
+              {
+                "pinRef": "pin.pa2",
+                "lineIndex": 2,
+                "portSelectRef": "field.afio_exticr1.exti2",
+                "interruptMaskRef": "field.exti_intenr.mr2",
+                "risingTriggerRef": "field.exti_rtenr.tr2",
+                "fallingTriggerRef": "field.exti_ftenr.tr2",
+                "pendingFlagRef": "field.exti_intfr.intf_intf2",
+                "pendingClearOperationRef": "op.exti.clear_line2_pending",
+                "interruptRouteRef": "iroute.exti.line2"
+              },
+              {
+                "pinRef": "pin.pa3",
+                "lineIndex": 3,
+                "portSelectRef": "field.afio_exticr1.exti3",
+                "interruptMaskRef": "field.exti_intenr.mr3",
+                "risingTriggerRef": "field.exti_rtenr.tr3",
+                "fallingTriggerRef": "field.exti_ftenr.tr3",
+                "pendingFlagRef": "field.exti_intfr.intf_intf3",
+                "pendingClearOperationRef": "op.exti.clear_line3_pending",
+                "interruptRouteRef": "iroute.exti.line3"
+              },
+              {
+                "pinRef": "pin.pa4",
+                "lineIndex": 4,
+                "portSelectRef": "field.afio_exticr2.exti4",
+                "interruptMaskRef": "field.exti_intenr.mr4",
+                "risingTriggerRef": "field.exti_rtenr.tr4",
+                "fallingTriggerRef": "field.exti_ftenr.tr4",
+                "pendingFlagRef": "field.exti_intfr.intf_intf4",
+                "pendingClearOperationRef": "op.exti.clear_line4_pending",
+                "interruptRouteRef": "iroute.exti.line4"
+              },
+              {
+                "pinRef": "pin.pa5",
+                "lineIndex": 5,
+                "portSelectRef": "field.afio_exticr2.exti5",
+                "interruptMaskRef": "field.exti_intenr.mr5",
+                "risingTriggerRef": "field.exti_rtenr.tr5",
+                "fallingTriggerRef": "field.exti_ftenr.tr5",
+                "pendingFlagRef": "field.exti_intfr.intf_intf5",
+                "pendingClearOperationRef": "op.exti.clear_line5_pending",
+                "interruptRouteRef": "iroute.exti.line5"
+              },
+              {
+                "pinRef": "pin.pa6",
+                "lineIndex": 6,
+                "portSelectRef": "field.afio_exticr2.exti6",
+                "interruptMaskRef": "field.exti_intenr.mr6",
+                "risingTriggerRef": "field.exti_rtenr.tr6",
+                "fallingTriggerRef": "field.exti_ftenr.tr6",
+                "pendingFlagRef": "field.exti_intfr.intf_intf6",
+                "pendingClearOperationRef": "op.exti.clear_line6_pending",
+                "interruptRouteRef": "iroute.exti.line6"
+              },
+              {
+                "pinRef": "pin.pa7",
+                "lineIndex": 7,
+                "portSelectRef": "field.afio_exticr2.exti7",
+                "interruptMaskRef": "field.exti_intenr.mr7",
+                "risingTriggerRef": "field.exti_rtenr.tr7",
+                "fallingTriggerRef": "field.exti_ftenr.tr7",
+                "pendingFlagRef": "field.exti_intfr.intf_intf7",
+                "pendingClearOperationRef": "op.exti.clear_line7_pending",
+                "interruptRouteRef": "iroute.exti.line7"
+              },
+              {
+                "pinRef": "pin.pa8",
+                "lineIndex": 8,
+                "portSelectRef": "field.afio_exticr3.exti8",
+                "interruptMaskRef": "field.exti_intenr.mr8",
+                "risingTriggerRef": "field.exti_rtenr.tr8",
+                "fallingTriggerRef": "field.exti_ftenr.tr8",
+                "pendingFlagRef": "field.exti_intfr.intf_intf8",
+                "pendingClearOperationRef": "op.exti.clear_line8_pending",
+                "interruptRouteRef": "iroute.exti.line8"
+              },
+              {
+                "pinRef": "pin.pa9",
+                "lineIndex": 9,
+                "portSelectRef": "field.afio_exticr3.exti9",
+                "interruptMaskRef": "field.exti_intenr.mr9",
+                "risingTriggerRef": "field.exti_rtenr.tr9",
+                "fallingTriggerRef": "field.exti_ftenr.tr9",
+                "pendingFlagRef": "field.exti_intfr.intf_intf9",
+                "pendingClearOperationRef": "op.exti.clear_line9_pending",
+                "interruptRouteRef": "iroute.exti.line9"
+              },
+              {
+                "pinRef": "pin.pa10",
+                "lineIndex": 10,
+                "portSelectRef": "field.afio_exticr3.exti10",
+                "interruptMaskRef": "field.exti_intenr.mr10",
+                "risingTriggerRef": "field.exti_rtenr.tr10",
+                "fallingTriggerRef": "field.exti_ftenr.tr10",
+                "pendingFlagRef": "field.exti_intfr.intf_intf10",
+                "pendingClearOperationRef": "op.exti.clear_line10_pending",
+                "interruptRouteRef": "iroute.exti.line10"
+              },
+              {
+                "pinRef": "pin.pa11",
+                "lineIndex": 11,
+                "portSelectRef": "field.afio_exticr3.exti11",
+                "interruptMaskRef": "field.exti_intenr.mr11",
+                "risingTriggerRef": "field.exti_rtenr.tr11",
+                "fallingTriggerRef": "field.exti_ftenr.tr11",
+                "pendingFlagRef": "field.exti_intfr.intf_intf11",
+                "pendingClearOperationRef": "op.exti.clear_line11_pending",
+                "interruptRouteRef": "iroute.exti.line11"
+              },
+              {
+                "pinRef": "pin.pa12",
+                "lineIndex": 12,
+                "portSelectRef": "field.afio_exticr4.exti12",
+                "interruptMaskRef": "field.exti_intenr.mr12",
+                "risingTriggerRef": "field.exti_rtenr.tr12",
+                "fallingTriggerRef": "field.exti_ftenr.tr12",
+                "pendingFlagRef": "field.exti_intfr.intf_intf12",
+                "pendingClearOperationRef": "op.exti.clear_line12_pending",
+                "interruptRouteRef": "iroute.exti.line12"
+              },
+              {
+                "pinRef": "pin.pa13",
+                "lineIndex": 13,
+                "portSelectRef": "field.afio_exticr4.exti13",
+                "interruptMaskRef": "field.exti_intenr.mr13",
+                "risingTriggerRef": "field.exti_rtenr.tr13",
+                "fallingTriggerRef": "field.exti_ftenr.tr13",
+                "pendingFlagRef": "field.exti_intfr.intf_intf13",
+                "pendingClearOperationRef": "op.exti.clear_line13_pending",
+                "interruptRouteRef": "iroute.exti.line13"
+              },
+              {
+                "pinRef": "pin.pa14",
+                "lineIndex": 14,
+                "portSelectRef": "field.afio_exticr4.exti14",
+                "interruptMaskRef": "field.exti_intenr.mr14",
+                "risingTriggerRef": "field.exti_rtenr.tr14",
+                "fallingTriggerRef": "field.exti_ftenr.tr14",
+                "pendingFlagRef": "field.exti_intfr.intf_intf14",
+                "pendingClearOperationRef": "op.exti.clear_line14_pending",
+                "interruptRouteRef": "iroute.exti.line14"
+              },
+              {
+                "pinRef": "pin.pa15",
+                "lineIndex": 15,
+                "portSelectRef": "field.afio_exticr4.exti15",
+                "interruptMaskRef": "field.exti_intenr.mr15",
+                "risingTriggerRef": "field.exti_rtenr.tr15",
+                "fallingTriggerRef": "field.exti_ftenr.tr15",
+                "pendingFlagRef": "field.exti_intfr.intf_intf15",
+                "pendingClearOperationRef": "op.exti.clear_line15_pending",
+                "interruptRouteRef": "iroute.exti.line15"
+              }
+            ]
           }
         },
         {
@@ -82587,6 +84031,207 @@
             ],
             "status": "verified",
             "confidence": 0.9
+          },
+          "capabilityTags": [
+            "embedded-hal-async-wait"
+          ],
+          "interruptRouteRefs": [
+            "iroute.exti.line0",
+            "iroute.exti.line1",
+            "iroute.exti.line2",
+            "iroute.exti.line3",
+            "iroute.exti.line4",
+            "iroute.exti.line5",
+            "iroute.exti.line6",
+            "iroute.exti.line7",
+            "iroute.exti.line8",
+            "iroute.exti.line9",
+            "iroute.exti.line10",
+            "iroute.exti.line11",
+            "iroute.exti.line12",
+            "iroute.exti.line13",
+            "iroute.exti.line14",
+            "iroute.exti.line15"
+          ],
+          "gpioExtiWaitBindings": {
+            "lines": [
+              {
+                "pinRef": "pin.pb0",
+                "lineIndex": 0,
+                "portSelectRef": "field.afio_exticr1.exti0_pb",
+                "interruptMaskRef": "field.exti_intenr.mr0",
+                "risingTriggerRef": "field.exti_rtenr.tr0",
+                "fallingTriggerRef": "field.exti_ftenr.tr0",
+                "pendingFlagRef": "field.exti_intfr.intf_intf0",
+                "pendingClearOperationRef": "op.exti.clear_line0_pending",
+                "interruptRouteRef": "iroute.exti.line0"
+              },
+              {
+                "pinRef": "pin.pb1",
+                "lineIndex": 1,
+                "portSelectRef": "field.afio_exticr1.exti1_pb",
+                "interruptMaskRef": "field.exti_intenr.mr1",
+                "risingTriggerRef": "field.exti_rtenr.tr1",
+                "fallingTriggerRef": "field.exti_ftenr.tr1",
+                "pendingFlagRef": "field.exti_intfr.intf_intf1",
+                "pendingClearOperationRef": "op.exti.clear_line1_pending",
+                "interruptRouteRef": "iroute.exti.line1"
+              },
+              {
+                "pinRef": "pin.pb2",
+                "lineIndex": 2,
+                "portSelectRef": "field.afio_exticr1.exti2_pb",
+                "interruptMaskRef": "field.exti_intenr.mr2",
+                "risingTriggerRef": "field.exti_rtenr.tr2",
+                "fallingTriggerRef": "field.exti_ftenr.tr2",
+                "pendingFlagRef": "field.exti_intfr.intf_intf2",
+                "pendingClearOperationRef": "op.exti.clear_line2_pending",
+                "interruptRouteRef": "iroute.exti.line2"
+              },
+              {
+                "pinRef": "pin.pb3",
+                "lineIndex": 3,
+                "portSelectRef": "field.afio_exticr1.exti3_pb",
+                "interruptMaskRef": "field.exti_intenr.mr3",
+                "risingTriggerRef": "field.exti_rtenr.tr3",
+                "fallingTriggerRef": "field.exti_ftenr.tr3",
+                "pendingFlagRef": "field.exti_intfr.intf_intf3",
+                "pendingClearOperationRef": "op.exti.clear_line3_pending",
+                "interruptRouteRef": "iroute.exti.line3"
+              },
+              {
+                "pinRef": "pin.pb4",
+                "lineIndex": 4,
+                "portSelectRef": "field.afio_exticr2.exti4_pb",
+                "interruptMaskRef": "field.exti_intenr.mr4",
+                "risingTriggerRef": "field.exti_rtenr.tr4",
+                "fallingTriggerRef": "field.exti_ftenr.tr4",
+                "pendingFlagRef": "field.exti_intfr.intf_intf4",
+                "pendingClearOperationRef": "op.exti.clear_line4_pending",
+                "interruptRouteRef": "iroute.exti.line4"
+              },
+              {
+                "pinRef": "pin.pb5",
+                "lineIndex": 5,
+                "portSelectRef": "field.afio_exticr2.exti5_pb",
+                "interruptMaskRef": "field.exti_intenr.mr5",
+                "risingTriggerRef": "field.exti_rtenr.tr5",
+                "fallingTriggerRef": "field.exti_ftenr.tr5",
+                "pendingFlagRef": "field.exti_intfr.intf_intf5",
+                "pendingClearOperationRef": "op.exti.clear_line5_pending",
+                "interruptRouteRef": "iroute.exti.line5"
+              },
+              {
+                "pinRef": "pin.pb6",
+                "lineIndex": 6,
+                "portSelectRef": "field.afio_exticr2.exti6_pb",
+                "interruptMaskRef": "field.exti_intenr.mr6",
+                "risingTriggerRef": "field.exti_rtenr.tr6",
+                "fallingTriggerRef": "field.exti_ftenr.tr6",
+                "pendingFlagRef": "field.exti_intfr.intf_intf6",
+                "pendingClearOperationRef": "op.exti.clear_line6_pending",
+                "interruptRouteRef": "iroute.exti.line6"
+              },
+              {
+                "pinRef": "pin.pb7",
+                "lineIndex": 7,
+                "portSelectRef": "field.afio_exticr2.exti7_pb",
+                "interruptMaskRef": "field.exti_intenr.mr7",
+                "risingTriggerRef": "field.exti_rtenr.tr7",
+                "fallingTriggerRef": "field.exti_ftenr.tr7",
+                "pendingFlagRef": "field.exti_intfr.intf_intf7",
+                "pendingClearOperationRef": "op.exti.clear_line7_pending",
+                "interruptRouteRef": "iroute.exti.line7"
+              },
+              {
+                "pinRef": "pin.pb8",
+                "lineIndex": 8,
+                "portSelectRef": "field.afio_exticr3.exti8_pb",
+                "interruptMaskRef": "field.exti_intenr.mr8",
+                "risingTriggerRef": "field.exti_rtenr.tr8",
+                "fallingTriggerRef": "field.exti_ftenr.tr8",
+                "pendingFlagRef": "field.exti_intfr.intf_intf8",
+                "pendingClearOperationRef": "op.exti.clear_line8_pending",
+                "interruptRouteRef": "iroute.exti.line8"
+              },
+              {
+                "pinRef": "pin.pb9",
+                "lineIndex": 9,
+                "portSelectRef": "field.afio_exticr3.exti9_pb",
+                "interruptMaskRef": "field.exti_intenr.mr9",
+                "risingTriggerRef": "field.exti_rtenr.tr9",
+                "fallingTriggerRef": "field.exti_ftenr.tr9",
+                "pendingFlagRef": "field.exti_intfr.intf_intf9",
+                "pendingClearOperationRef": "op.exti.clear_line9_pending",
+                "interruptRouteRef": "iroute.exti.line9"
+              },
+              {
+                "pinRef": "pin.pb10",
+                "lineIndex": 10,
+                "portSelectRef": "field.afio_exticr3.exti10_pb",
+                "interruptMaskRef": "field.exti_intenr.mr10",
+                "risingTriggerRef": "field.exti_rtenr.tr10",
+                "fallingTriggerRef": "field.exti_ftenr.tr10",
+                "pendingFlagRef": "field.exti_intfr.intf_intf10",
+                "pendingClearOperationRef": "op.exti.clear_line10_pending",
+                "interruptRouteRef": "iroute.exti.line10"
+              },
+              {
+                "pinRef": "pin.pb11",
+                "lineIndex": 11,
+                "portSelectRef": "field.afio_exticr3.exti11_pb",
+                "interruptMaskRef": "field.exti_intenr.mr11",
+                "risingTriggerRef": "field.exti_rtenr.tr11",
+                "fallingTriggerRef": "field.exti_ftenr.tr11",
+                "pendingFlagRef": "field.exti_intfr.intf_intf11",
+                "pendingClearOperationRef": "op.exti.clear_line11_pending",
+                "interruptRouteRef": "iroute.exti.line11"
+              },
+              {
+                "pinRef": "pin.pb12",
+                "lineIndex": 12,
+                "portSelectRef": "field.afio_exticr4.exti12_pb",
+                "interruptMaskRef": "field.exti_intenr.mr12",
+                "risingTriggerRef": "field.exti_rtenr.tr12",
+                "fallingTriggerRef": "field.exti_ftenr.tr12",
+                "pendingFlagRef": "field.exti_intfr.intf_intf12",
+                "pendingClearOperationRef": "op.exti.clear_line12_pending",
+                "interruptRouteRef": "iroute.exti.line12"
+              },
+              {
+                "pinRef": "pin.pb13",
+                "lineIndex": 13,
+                "portSelectRef": "field.afio_exticr4.exti13_pb",
+                "interruptMaskRef": "field.exti_intenr.mr13",
+                "risingTriggerRef": "field.exti_rtenr.tr13",
+                "fallingTriggerRef": "field.exti_ftenr.tr13",
+                "pendingFlagRef": "field.exti_intfr.intf_intf13",
+                "pendingClearOperationRef": "op.exti.clear_line13_pending",
+                "interruptRouteRef": "iroute.exti.line13"
+              },
+              {
+                "pinRef": "pin.pb14",
+                "lineIndex": 14,
+                "portSelectRef": "field.afio_exticr4.exti14_pb",
+                "interruptMaskRef": "field.exti_intenr.mr14",
+                "risingTriggerRef": "field.exti_rtenr.tr14",
+                "fallingTriggerRef": "field.exti_ftenr.tr14",
+                "pendingFlagRef": "field.exti_intfr.intf_intf14",
+                "pendingClearOperationRef": "op.exti.clear_line14_pending",
+                "interruptRouteRef": "iroute.exti.line14"
+              },
+              {
+                "pinRef": "pin.pb15",
+                "lineIndex": 15,
+                "portSelectRef": "field.afio_exticr4.exti15_pb",
+                "interruptMaskRef": "field.exti_intenr.mr15",
+                "risingTriggerRef": "field.exti_rtenr.tr15",
+                "fallingTriggerRef": "field.exti_ftenr.tr15",
+                "pendingFlagRef": "field.exti_intfr.intf_intf15",
+                "pendingClearOperationRef": "op.exti.clear_line15_pending",
+                "interruptRouteRef": "iroute.exti.line15"
+              }
+            ]
           }
         },
         {
@@ -82636,6 +84281,51 @@
             ],
             "status": "verified",
             "confidence": 0.9
+          },
+          "capabilityTags": [
+            "embedded-hal-async-wait"
+          ],
+          "interruptRouteRefs": [
+            "iroute.exti.line13",
+            "iroute.exti.line14",
+            "iroute.exti.line15"
+          ],
+          "gpioExtiWaitBindings": {
+            "lines": [
+              {
+                "pinRef": "pin.pc13",
+                "lineIndex": 13,
+                "portSelectRef": "field.afio_exticr4.exti13_pc",
+                "interruptMaskRef": "field.exti_intenr.mr13",
+                "risingTriggerRef": "field.exti_rtenr.tr13",
+                "fallingTriggerRef": "field.exti_ftenr.tr13",
+                "pendingFlagRef": "field.exti_intfr.intf_intf13",
+                "pendingClearOperationRef": "op.exti.clear_line13_pending",
+                "interruptRouteRef": "iroute.exti.line13"
+              },
+              {
+                "pinRef": "pin.pc14",
+                "lineIndex": 14,
+                "portSelectRef": "field.afio_exticr4.exti14_pc",
+                "interruptMaskRef": "field.exti_intenr.mr14",
+                "risingTriggerRef": "field.exti_rtenr.tr14",
+                "fallingTriggerRef": "field.exti_ftenr.tr14",
+                "pendingFlagRef": "field.exti_intfr.intf_intf14",
+                "pendingClearOperationRef": "op.exti.clear_line14_pending",
+                "interruptRouteRef": "iroute.exti.line14"
+              },
+              {
+                "pinRef": "pin.pc15",
+                "lineIndex": 15,
+                "portSelectRef": "field.afio_exticr4.exti15_pc",
+                "interruptMaskRef": "field.exti_intenr.mr15",
+                "risingTriggerRef": "field.exti_rtenr.tr15",
+                "fallingTriggerRef": "field.exti_ftenr.tr15",
+                "pendingFlagRef": "field.exti_intfr.intf_intf15",
+                "pendingClearOperationRef": "op.exti.clear_line15_pending",
+                "interruptRouteRef": "iroute.exti.line15"
+              }
+            ]
           }
         },
         {
@@ -82677,6 +84367,39 @@
             ],
             "status": "verified",
             "confidence": 0.9
+          },
+          "capabilityTags": [
+            "embedded-hal-async-wait"
+          ],
+          "interruptRouteRefs": [
+            "iroute.exti.line0",
+            "iroute.exti.line1"
+          ],
+          "gpioExtiWaitBindings": {
+            "lines": [
+              {
+                "pinRef": "pin.pd0",
+                "lineIndex": 0,
+                "portSelectRef": "field.afio_exticr1.exti0_pd",
+                "interruptMaskRef": "field.exti_intenr.mr0",
+                "risingTriggerRef": "field.exti_rtenr.tr0",
+                "fallingTriggerRef": "field.exti_ftenr.tr0",
+                "pendingFlagRef": "field.exti_intfr.intf_intf0",
+                "pendingClearOperationRef": "op.exti.clear_line0_pending",
+                "interruptRouteRef": "iroute.exti.line0"
+              },
+              {
+                "pinRef": "pin.pd1",
+                "lineIndex": 1,
+                "portSelectRef": "field.afio_exticr1.exti1_pd",
+                "interruptMaskRef": "field.exti_intenr.mr1",
+                "risingTriggerRef": "field.exti_rtenr.tr1",
+                "fallingTriggerRef": "field.exti_ftenr.tr1",
+                "pendingFlagRef": "field.exti_intfr.intf_intf1",
+                "pendingClearOperationRef": "op.exti.clear_line1_pending",
+                "interruptRouteRef": "iroute.exti.line1"
+              }
+            ]
           }
         },
         {

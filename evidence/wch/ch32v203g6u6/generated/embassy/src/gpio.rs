@@ -135,8 +135,340 @@ pub const DRV_GPIOA_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::Rese
     assert_operation_refs: &[],
     release_operation_refs: &[],
 }];
-pub const DRV_GPIOA_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];
-pub const DRV_GPIOA_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];
+pub const DRV_GPIOA_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[
+    metadata::InterruptSource {
+        id: "isrc.exti.line0",
+        name: "EXTI line 0 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf0"],
+        clear_operation_refs: &["op.exti.clear_line0_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line1",
+        name: "EXTI line 1 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf1"],
+        clear_operation_refs: &["op.exti.clear_line1_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line2",
+        name: "EXTI line 2 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf2"],
+        clear_operation_refs: &["op.exti.clear_line2_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line3",
+        name: "EXTI line 3 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf3"],
+        clear_operation_refs: &["op.exti.clear_line3_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line4",
+        name: "EXTI line 4 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf4"],
+        clear_operation_refs: &["op.exti.clear_line4_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line5",
+        name: "EXTI line 5 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf5"],
+        clear_operation_refs: &["op.exti.clear_line5_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line6",
+        name: "EXTI line 6 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf6"],
+        clear_operation_refs: &["op.exti.clear_line6_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line7",
+        name: "EXTI line 7 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf7"],
+        clear_operation_refs: &["op.exti.clear_line7_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line9",
+        name: "EXTI line 9 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf9"],
+        clear_operation_refs: &["op.exti.clear_line9_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line10",
+        name: "EXTI line 10 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf10"],
+        clear_operation_refs: &["op.exti.clear_line10_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line11",
+        name: "EXTI line 11 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf11"],
+        clear_operation_refs: &["op.exti.clear_line11_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line12",
+        name: "EXTI line 12 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf12"],
+        clear_operation_refs: &["op.exti.clear_line12_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line13",
+        name: "EXTI line 13 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf13"],
+        clear_operation_refs: &["op.exti.clear_line13_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line14",
+        name: "EXTI line 14 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf14"],
+        clear_operation_refs: &["op.exti.clear_line14_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line15",
+        name: "EXTI line 15 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf15"],
+        clear_operation_refs: &["op.exti.clear_line15_pending"],
+    },
+];
+pub const DRV_GPIOA_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[
+    metadata::InterruptRoute {
+        id: "iroute.exti.line0",
+        name: "EXTI line 0 interrupt route",
+        source_ref: "isrc.exti.line0",
+        interrupt_ref: "int.exti0",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(0),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: None,
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line1",
+        name: "EXTI line 1 interrupt route",
+        source_ref: "isrc.exti.line1",
+        interrupt_ref: "int.exti1",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(1),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: None,
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line2",
+        name: "EXTI line 2 interrupt route",
+        source_ref: "isrc.exti.line2",
+        interrupt_ref: "int.exti2",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(2),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: None,
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line3",
+        name: "EXTI line 3 interrupt route",
+        source_ref: "isrc.exti.line3",
+        interrupt_ref: "int.exti3",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(3),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: None,
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line4",
+        name: "EXTI line 4 interrupt route",
+        source_ref: "isrc.exti.line4",
+        interrupt_ref: "int.exti4",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(4),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: None,
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line5",
+        name: "EXTI line 5 interrupt route",
+        source_ref: "isrc.exti.line5",
+        interrupt_ref: "int.exti95",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(5),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: Some("exti9_5"),
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line6",
+        name: "EXTI line 6 interrupt route",
+        source_ref: "isrc.exti.line6",
+        interrupt_ref: "int.exti95",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(6),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: Some("exti9_5"),
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line7",
+        name: "EXTI line 7 interrupt route",
+        source_ref: "isrc.exti.line7",
+        interrupt_ref: "int.exti95",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(7),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: Some("exti9_5"),
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line9",
+        name: "EXTI line 9 interrupt route",
+        source_ref: "isrc.exti.line9",
+        interrupt_ref: "int.exti95",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(9),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: Some("exti9_5"),
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line10",
+        name: "EXTI line 10 interrupt route",
+        source_ref: "isrc.exti.line10",
+        interrupt_ref: "int.exti1510",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(10),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: Some("exti15_10"),
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line11",
+        name: "EXTI line 11 interrupt route",
+        source_ref: "isrc.exti.line11",
+        interrupt_ref: "int.exti1510",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(11),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: Some("exti15_10"),
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line12",
+        name: "EXTI line 12 interrupt route",
+        source_ref: "isrc.exti.line12",
+        interrupt_ref: "int.exti1510",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(12),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: Some("exti15_10"),
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line13",
+        name: "EXTI line 13 interrupt route",
+        source_ref: "isrc.exti.line13",
+        interrupt_ref: "int.exti1510",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(13),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: Some("exti15_10"),
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line14",
+        name: "EXTI line 14 interrupt route",
+        source_ref: "isrc.exti.line14",
+        interrupt_ref: "int.exti1510",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(14),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: Some("exti15_10"),
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line15",
+        name: "EXTI line 15 interrupt route",
+        source_ref: "isrc.exti.line15",
+        interrupt_ref: "int.exti1510",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(15),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: Some("exti15_10"),
+    },
+];
 pub const DRV_GPIOA_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_GPIOA_DMA_ROUTES: &[metadata::DmaRoute] = &[];
 pub const DRV_GPIOA_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
@@ -413,7 +745,7 @@ pub const DRV_GPIOA_PIN_ROLES: &[metadata::PinRole] = &[
 ];
 pub const DRV_GPIOA_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_GPIOA_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
-pub const DRV_GPIOA_CAPABILITY_TAGS: &[&str] = &[];
+pub const DRV_GPIOA_CAPABILITY_TAGS: &[&str] = &["embedded-hal-async-wait"];
 
 #[derive(Debug, Clone, Copy)]
 pub struct GPIOAResources {
@@ -498,6 +830,7 @@ impl GPIOA {
             idr_mask: 0x00000001u32,
             odr_addr: 0x4001080Cu64,
             odr_mask: 0x00000001u32,
+            exti_line_index: 0u32,
         }
     }
 
@@ -516,6 +849,7 @@ impl GPIOA {
             idr_mask: 0x00000002u32,
             odr_addr: 0x4001080Cu64,
             odr_mask: 0x00000002u32,
+            exti_line_index: 1u32,
         }
     }
 
@@ -534,6 +868,7 @@ impl GPIOA {
             idr_mask: 0x00000400u32,
             odr_addr: 0x4001080Cu64,
             odr_mask: 0x00000400u32,
+            exti_line_index: 10u32,
         }
     }
 
@@ -552,6 +887,7 @@ impl GPIOA {
             idr_mask: 0x00000800u32,
             odr_addr: 0x4001080Cu64,
             odr_mask: 0x00000800u32,
+            exti_line_index: 11u32,
         }
     }
 
@@ -570,6 +906,7 @@ impl GPIOA {
             idr_mask: 0x00001000u32,
             odr_addr: 0x4001080Cu64,
             odr_mask: 0x00001000u32,
+            exti_line_index: 12u32,
         }
     }
 
@@ -588,6 +925,7 @@ impl GPIOA {
             idr_mask: 0x00002000u32,
             odr_addr: 0x4001080Cu64,
             odr_mask: 0x00002000u32,
+            exti_line_index: 13u32,
         }
     }
 
@@ -606,6 +944,7 @@ impl GPIOA {
             idr_mask: 0x00004000u32,
             odr_addr: 0x4001080Cu64,
             odr_mask: 0x00004000u32,
+            exti_line_index: 14u32,
         }
     }
 
@@ -624,6 +963,7 @@ impl GPIOA {
             idr_mask: 0x00008000u32,
             odr_addr: 0x4001080Cu64,
             odr_mask: 0x00008000u32,
+            exti_line_index: 15u32,
         }
     }
 
@@ -642,6 +982,7 @@ impl GPIOA {
             idr_mask: 0x00000004u32,
             odr_addr: 0x4001080Cu64,
             odr_mask: 0x00000004u32,
+            exti_line_index: 2u32,
         }
     }
 
@@ -660,6 +1001,7 @@ impl GPIOA {
             idr_mask: 0x00000008u32,
             odr_addr: 0x4001080Cu64,
             odr_mask: 0x00000008u32,
+            exti_line_index: 3u32,
         }
     }
 
@@ -678,6 +1020,7 @@ impl GPIOA {
             idr_mask: 0x00000010u32,
             odr_addr: 0x4001080Cu64,
             odr_mask: 0x00000010u32,
+            exti_line_index: 4u32,
         }
     }
 
@@ -696,6 +1039,7 @@ impl GPIOA {
             idr_mask: 0x00000020u32,
             odr_addr: 0x4001080Cu64,
             odr_mask: 0x00000020u32,
+            exti_line_index: 5u32,
         }
     }
 
@@ -714,6 +1058,7 @@ impl GPIOA {
             idr_mask: 0x00000040u32,
             odr_addr: 0x4001080Cu64,
             odr_mask: 0x00000040u32,
+            exti_line_index: 6u32,
         }
     }
 
@@ -732,6 +1077,7 @@ impl GPIOA {
             idr_mask: 0x00000080u32,
             odr_addr: 0x4001080Cu64,
             odr_mask: 0x00000080u32,
+            exti_line_index: 7u32,
         }
     }
 
@@ -750,6 +1096,7 @@ impl GPIOA {
             idr_mask: 0x00000200u32,
             odr_addr: 0x4001080Cu64,
             odr_mask: 0x00000200u32,
+            exti_line_index: 9u32,
         }
     }
 }
@@ -768,6 +1115,7 @@ pub struct GPIOAFlex {
     idr_mask: u32,
     odr_addr: u64,
     odr_mask: u32,
+    exti_line_index: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -912,6 +1260,9 @@ impl GPIOAInput {
     pub fn get_level(&self) -> Result<Level, metadata::Error> {
         self.pin.get_level()
     }
+    pub fn exti_line_index(&self) -> u32 {
+        self.pin.exti_line_index
+    }
 }
 
 impl GPIOAOutput {
@@ -955,6 +1306,508 @@ impl GPIOAOutput {
         self.pin.get_output_level()
     }
 }
+
+#[derive(Debug)]
+struct GPIOAInputWaitState {
+    waker: Option<core::task::Waker>,
+}
+
+impl GPIOAInputWaitState {
+    const fn new() -> Self {
+        Self { waker: None }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct GPIOAInputWaitLineConfig {
+    line_index: u32,
+    port_select_addr: u64,
+    port_select_clear_mask: u32,
+    port_select_set_mask: u32,
+    interrupt_mask_addr: u64,
+    interrupt_mask_mask: u32,
+    rising_trigger_addr: u64,
+    rising_trigger_mask: u32,
+    falling_trigger_addr: u64,
+    falling_trigger_mask: u32,
+    pending_addr: u64,
+    pending_mask: u32,
+}
+
+const GENERATED_DRV_GPIOA_GPIO_WAIT_UNSUPPORTED: &str =
+    "GPIO async wait is not bound for the requested pin";
+const GENERATED_DRV_GPIOA_GPIO_WAIT_LINES: &[GPIOAInputWaitLineConfig] = &[
+    GPIOAInputWaitLineConfig {
+        line_index: 0u32,
+        port_select_addr: 0x40010008u64,
+        port_select_clear_mask: 0x0000000Fu32,
+        port_select_set_mask: 0x00000000u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000001u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000001u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000001u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000001u32,
+    },
+    GPIOAInputWaitLineConfig {
+        line_index: 1u32,
+        port_select_addr: 0x40010008u64,
+        port_select_clear_mask: 0x000000F0u32,
+        port_select_set_mask: 0x00000000u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000002u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000002u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000002u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000002u32,
+    },
+    GPIOAInputWaitLineConfig {
+        line_index: 2u32,
+        port_select_addr: 0x40010008u64,
+        port_select_clear_mask: 0x00000F00u32,
+        port_select_set_mask: 0x00000000u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000004u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000004u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000004u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000004u32,
+    },
+    GPIOAInputWaitLineConfig {
+        line_index: 3u32,
+        port_select_addr: 0x40010008u64,
+        port_select_clear_mask: 0x0000F000u32,
+        port_select_set_mask: 0x00000000u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000008u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000008u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000008u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000008u32,
+    },
+    GPIOAInputWaitLineConfig {
+        line_index: 4u32,
+        port_select_addr: 0x4001000Cu64,
+        port_select_clear_mask: 0x0000000Fu32,
+        port_select_set_mask: 0x00000000u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000010u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000010u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000010u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000010u32,
+    },
+    GPIOAInputWaitLineConfig {
+        line_index: 5u32,
+        port_select_addr: 0x4001000Cu64,
+        port_select_clear_mask: 0x000000F0u32,
+        port_select_set_mask: 0x00000000u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000020u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000020u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000020u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000020u32,
+    },
+    GPIOAInputWaitLineConfig {
+        line_index: 6u32,
+        port_select_addr: 0x4001000Cu64,
+        port_select_clear_mask: 0x00000F00u32,
+        port_select_set_mask: 0x00000000u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000040u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000040u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000040u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000040u32,
+    },
+    GPIOAInputWaitLineConfig {
+        line_index: 7u32,
+        port_select_addr: 0x4001000Cu64,
+        port_select_clear_mask: 0x0000F000u32,
+        port_select_set_mask: 0x00000000u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000080u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000080u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000080u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000080u32,
+    },
+    GPIOAInputWaitLineConfig {
+        line_index: 9u32,
+        port_select_addr: 0x40010010u64,
+        port_select_clear_mask: 0x000000F0u32,
+        port_select_set_mask: 0x00000000u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000200u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000200u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000200u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000200u32,
+    },
+    GPIOAInputWaitLineConfig {
+        line_index: 10u32,
+        port_select_addr: 0x40010010u64,
+        port_select_clear_mask: 0x00000F00u32,
+        port_select_set_mask: 0x00000000u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000400u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000400u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000400u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000400u32,
+    },
+    GPIOAInputWaitLineConfig {
+        line_index: 11u32,
+        port_select_addr: 0x40010010u64,
+        port_select_clear_mask: 0x0000F000u32,
+        port_select_set_mask: 0x00000000u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000800u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000800u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000800u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000800u32,
+    },
+    GPIOAInputWaitLineConfig {
+        line_index: 12u32,
+        port_select_addr: 0x40010014u64,
+        port_select_clear_mask: 0x0000000Fu32,
+        port_select_set_mask: 0x00000000u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00001000u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00001000u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00001000u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00001000u32,
+    },
+    GPIOAInputWaitLineConfig {
+        line_index: 13u32,
+        port_select_addr: 0x40010014u64,
+        port_select_clear_mask: 0x000000F0u32,
+        port_select_set_mask: 0x00000000u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00002000u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00002000u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00002000u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00002000u32,
+    },
+    GPIOAInputWaitLineConfig {
+        line_index: 14u32,
+        port_select_addr: 0x40010014u64,
+        port_select_clear_mask: 0x00000F00u32,
+        port_select_set_mask: 0x00000000u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00004000u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00004000u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00004000u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00004000u32,
+    },
+    GPIOAInputWaitLineConfig {
+        line_index: 15u32,
+        port_select_addr: 0x40010014u64,
+        port_select_clear_mask: 0x0000F000u32,
+        port_select_set_mask: 0x00000000u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00008000u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00008000u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00008000u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00008000u32,
+    },
+];
+static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_0: critical_section::Mutex<
+    core::cell::RefCell<GPIOAInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_1: critical_section::Mutex<
+    core::cell::RefCell<GPIOAInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_2: critical_section::Mutex<
+    core::cell::RefCell<GPIOAInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_3: critical_section::Mutex<
+    core::cell::RefCell<GPIOAInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_4: critical_section::Mutex<
+    core::cell::RefCell<GPIOAInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_5: critical_section::Mutex<
+    core::cell::RefCell<GPIOAInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_6: critical_section::Mutex<
+    core::cell::RefCell<GPIOAInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_7: critical_section::Mutex<
+    core::cell::RefCell<GPIOAInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_9: critical_section::Mutex<
+    core::cell::RefCell<GPIOAInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_10: critical_section::Mutex<
+    core::cell::RefCell<GPIOAInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_11: critical_section::Mutex<
+    core::cell::RefCell<GPIOAInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_12: critical_section::Mutex<
+    core::cell::RefCell<GPIOAInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_13: critical_section::Mutex<
+    core::cell::RefCell<GPIOAInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_14: critical_section::Mutex<
+    core::cell::RefCell<GPIOAInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+static GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_15: critical_section::Mutex<
+    core::cell::RefCell<GPIOAInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOAInputWaitState::new()));
+fn generated_drv_gpioa_gpio_wait_config(
+    line_index: u32,
+) -> Option<&'static GPIOAInputWaitLineConfig> {
+    GENERATED_DRV_GPIOA_GPIO_WAIT_LINES
+        .iter()
+        .find(|config| config.line_index == line_index)
+}
+
+fn generated_drv_gpioa_gpio_wait_state(
+    line_index: u32,
+) -> Option<&'static critical_section::Mutex<core::cell::RefCell<GPIOAInputWaitState>>> {
+    match line_index {
+        0 => Some(&GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_0),
+        1 => Some(&GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_1),
+        2 => Some(&GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_2),
+        3 => Some(&GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_3),
+        4 => Some(&GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_4),
+        5 => Some(&GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_5),
+        6 => Some(&GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_6),
+        7 => Some(&GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_7),
+        9 => Some(&GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_9),
+        10 => Some(&GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_10),
+        11 => Some(&GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_11),
+        12 => Some(&GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_12),
+        13 => Some(&GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_13),
+        14 => Some(&GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_14),
+        15 => Some(&GENERATED_DRV_GPIOA_GPIO_EXTI_WAIT_LINE_15),
+        _ => None,
+    }
+}
+
+fn generated_drv_gpioa_clear_gpio_wait_pending(
+    config: &GPIOAInputWaitLineConfig,
+) -> Result<(), metadata::Error> {
+    modify_u32(
+        config.pending_addr,
+        config.pending_mask,
+        config.pending_mask,
+    )
+}
+
+fn generated_drv_gpioa_prepare_gpio_wait(
+    line_index: u32,
+    rising: bool,
+    falling: bool,
+) -> Result<(), metadata::Error> {
+    let config = generated_drv_gpioa_gpio_wait_config(line_index).ok_or(
+        metadata::Error::InvalidReference(GENERATED_DRV_GPIOA_GPIO_WAIT_UNSUPPORTED),
+    )?;
+    let state = generated_drv_gpioa_gpio_wait_state(line_index).ok_or(
+        metadata::Error::InvalidReference(GENERATED_DRV_GPIOA_GPIO_WAIT_UNSUPPORTED),
+    )?;
+    critical_section::with(|cs| {
+        let mut state = state.borrow(cs).borrow_mut();
+        state.waker = None;
+    });
+    modify_u32(
+        config.port_select_addr,
+        config.port_select_clear_mask,
+        config.port_select_set_mask,
+    )?;
+    modify_u32(
+        config.interrupt_mask_addr,
+        config.interrupt_mask_mask,
+        0x00000000u32,
+    )?;
+    modify_u32(
+        config.rising_trigger_addr,
+        config.rising_trigger_mask,
+        if rising {
+            config.rising_trigger_mask
+        } else {
+            0x00000000u32
+        },
+    )?;
+    modify_u32(
+        config.falling_trigger_addr,
+        config.falling_trigger_mask,
+        if falling {
+            config.falling_trigger_mask
+        } else {
+            0x00000000u32
+        },
+    )?;
+    generated_drv_gpioa_clear_gpio_wait_pending(config)?;
+    modify_u32(
+        config.interrupt_mask_addr,
+        config.interrupt_mask_mask,
+        config.interrupt_mask_mask,
+    )?;
+    Ok(())
+}
+
+fn generated_drv_gpioa_poll_gpio_wait(
+    line_index: u32,
+    cx: &core::task::Context<'_>,
+) -> core::task::Poll<Result<(), metadata::Error>> {
+    let config = match generated_drv_gpioa_gpio_wait_config(line_index) {
+        Some(config) => config,
+        None => {
+            return core::task::Poll::Ready(Err(metadata::Error::InvalidReference(
+                GENERATED_DRV_GPIOA_GPIO_WAIT_UNSUPPORTED,
+            )));
+        }
+    };
+    let state = match generated_drv_gpioa_gpio_wait_state(line_index) {
+        Some(state) => state,
+        None => {
+            return core::task::Poll::Ready(Err(metadata::Error::InvalidReference(
+                GENERATED_DRV_GPIOA_GPIO_WAIT_UNSUPPORTED,
+            )));
+        }
+    };
+    if let Ok(pending) = read_u32(config.pending_addr) {
+        if (pending & config.pending_mask) != 0 {
+            if let Err(err) = modify_u32(
+                config.interrupt_mask_addr,
+                config.interrupt_mask_mask,
+                0x00000000u32,
+            ) {
+                return core::task::Poll::Ready(Err(err));
+            }
+            if let Err(err) = generated_drv_gpioa_clear_gpio_wait_pending(config) {
+                return core::task::Poll::Ready(Err(err));
+            }
+            return core::task::Poll::Ready(Ok(()));
+        }
+    } else if let Err(err) = read_u32(config.pending_addr) {
+        return core::task::Poll::Ready(Err(err));
+    }
+    critical_section::with(|cs| {
+        let mut state = state.borrow(cs).borrow_mut();
+        state.waker = Some(cx.waker().clone());
+    });
+    match read_u32(config.pending_addr) {
+        Ok(pending) if (pending & config.pending_mask) != 0 => {
+            critical_section::with(|cs| {
+                let mut state = state.borrow(cs).borrow_mut();
+                state.waker = None;
+            });
+            if let Err(err) = modify_u32(
+                config.interrupt_mask_addr,
+                config.interrupt_mask_mask,
+                0x00000000u32,
+            ) {
+                return core::task::Poll::Ready(Err(err));
+            }
+            if let Err(err) = generated_drv_gpioa_clear_gpio_wait_pending(config) {
+                return core::task::Poll::Ready(Err(err));
+            }
+            core::task::Poll::Ready(Ok(()))
+        }
+        Ok(_) => core::task::Poll::Pending,
+        Err(err) => core::task::Poll::Ready(Err(err)),
+    }
+}
+
+pub(crate) fn generated_drv_gpioa_signal_gpio_wait(line_index: u32) -> Result<(), metadata::Error> {
+    let state = generated_drv_gpioa_gpio_wait_state(line_index).ok_or(
+        metadata::Error::InvalidReference(GENERATED_DRV_GPIOA_GPIO_WAIT_UNSUPPORTED),
+    )?;
+    let waker = critical_section::with(|cs| {
+        let mut state = state.borrow(cs).borrow_mut();
+        state.waker.take()
+    });
+    if let Some(waker) = waker {
+        waker.wake();
+    }
+    Ok(())
+}
+
+async fn generated_drv_gpioa_wait_gpio_edge(
+    line_index: u32,
+    rising: bool,
+    falling: bool,
+) -> Result<(), metadata::Error> {
+    generated_drv_gpioa_prepare_gpio_wait(line_index, rising, falling)?;
+    core::future::poll_fn(|cx| generated_drv_gpioa_poll_gpio_wait(line_index, cx)).await
+}
+
+impl embedded_hal::digital::ErrorType for GPIOAInput {
+    type Error = metadata::Error;
+}
+
+impl embedded_hal_async::digital::Wait for GPIOAInput {
+    async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+        loop {
+            if self.is_high()? {
+                return Ok(());
+            }
+            generated_drv_gpioa_wait_gpio_edge(self.pin.exti_line_index, true, false).await?;
+        }
+    }
+
+    async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+        loop {
+            if self.is_low()? {
+                return Ok(());
+            }
+            generated_drv_gpioa_wait_gpio_edge(self.pin.exti_line_index, false, true).await?;
+        }
+    }
+
+    async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+        generated_drv_gpioa_wait_gpio_edge(self.pin.exti_line_index, true, false).await
+    }
+
+    async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+        generated_drv_gpioa_wait_gpio_edge(self.pin.exti_line_index, false, true).await
+    }
+
+    async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+        generated_drv_gpioa_wait_gpio_edge(self.pin.exti_line_index, true, true).await
+    }
+}
 // Driver instance: GPIOB (gpio-port) from canonical block block.gpiob -> gpio-port
 pub const DRV_GPIOB_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding {
     id: "clk.gpiob",
@@ -978,8 +1831,164 @@ pub const DRV_GPIOB_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::Rese
     assert_operation_refs: &[],
     release_operation_refs: &[],
 }];
-pub const DRV_GPIOB_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];
-pub const DRV_GPIOB_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];
+pub const DRV_GPIOB_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[
+    metadata::InterruptSource {
+        id: "isrc.exti.line0",
+        name: "EXTI line 0 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf0"],
+        clear_operation_refs: &["op.exti.clear_line0_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line1",
+        name: "EXTI line 1 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf1"],
+        clear_operation_refs: &["op.exti.clear_line1_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line3",
+        name: "EXTI line 3 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf3"],
+        clear_operation_refs: &["op.exti.clear_line3_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line4",
+        name: "EXTI line 4 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf4"],
+        clear_operation_refs: &["op.exti.clear_line4_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line5",
+        name: "EXTI line 5 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf5"],
+        clear_operation_refs: &["op.exti.clear_line5_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line6",
+        name: "EXTI line 6 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf6"],
+        clear_operation_refs: &["op.exti.clear_line6_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line7",
+        name: "EXTI line 7 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf7"],
+        clear_operation_refs: &["op.exti.clear_line7_pending"],
+    },
+];
+pub const DRV_GPIOB_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[
+    metadata::InterruptRoute {
+        id: "iroute.exti.line0",
+        name: "EXTI line 0 interrupt route",
+        source_ref: "isrc.exti.line0",
+        interrupt_ref: "int.exti0",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(0),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: None,
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line1",
+        name: "EXTI line 1 interrupt route",
+        source_ref: "isrc.exti.line1",
+        interrupt_ref: "int.exti1",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(1),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: None,
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line3",
+        name: "EXTI line 3 interrupt route",
+        source_ref: "isrc.exti.line3",
+        interrupt_ref: "int.exti3",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(3),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: None,
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line4",
+        name: "EXTI line 4 interrupt route",
+        source_ref: "isrc.exti.line4",
+        interrupt_ref: "int.exti4",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(4),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: None,
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line5",
+        name: "EXTI line 5 interrupt route",
+        source_ref: "isrc.exti.line5",
+        interrupt_ref: "int.exti95",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(5),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: Some("exti9_5"),
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line6",
+        name: "EXTI line 6 interrupt route",
+        source_ref: "isrc.exti.line6",
+        interrupt_ref: "int.exti95",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(6),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: Some("exti9_5"),
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line7",
+        name: "EXTI line 7 interrupt route",
+        source_ref: "isrc.exti.line7",
+        interrupt_ref: "int.exti95",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(7),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: Some("exti9_5"),
+    },
+];
 pub const DRV_GPIOB_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_GPIOB_DMA_ROUTES: &[metadata::DmaRoute] = &[];
 pub const DRV_GPIOB_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
@@ -1112,7 +2121,7 @@ pub const DRV_GPIOB_PIN_ROLES: &[metadata::PinRole] = &[
 ];
 pub const DRV_GPIOB_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_GPIOB_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
-pub const DRV_GPIOB_CAPABILITY_TAGS: &[&str] = &[];
+pub const DRV_GPIOB_CAPABILITY_TAGS: &[&str] = &["embedded-hal-async-wait"];
 
 #[derive(Debug, Clone, Copy)]
 pub struct GPIOBResources {
@@ -1197,6 +2206,7 @@ impl GPIOB {
             idr_mask: 0x00000001u32,
             odr_addr: 0x40010C0Cu64,
             odr_mask: 0x00000001u32,
+            exti_line_index: 0u32,
         }
     }
 
@@ -1215,6 +2225,7 @@ impl GPIOB {
             idr_mask: 0x00000002u32,
             odr_addr: 0x40010C0Cu64,
             odr_mask: 0x00000002u32,
+            exti_line_index: 1u32,
         }
     }
 
@@ -1233,6 +2244,7 @@ impl GPIOB {
             idr_mask: 0x00000008u32,
             odr_addr: 0x40010C0Cu64,
             odr_mask: 0x00000008u32,
+            exti_line_index: 3u32,
         }
     }
 
@@ -1251,6 +2263,7 @@ impl GPIOB {
             idr_mask: 0x00000010u32,
             odr_addr: 0x40010C0Cu64,
             odr_mask: 0x00000010u32,
+            exti_line_index: 4u32,
         }
     }
 
@@ -1269,6 +2282,7 @@ impl GPIOB {
             idr_mask: 0x00000020u32,
             odr_addr: 0x40010C0Cu64,
             odr_mask: 0x00000020u32,
+            exti_line_index: 5u32,
         }
     }
 
@@ -1287,6 +2301,7 @@ impl GPIOB {
             idr_mask: 0x00000040u32,
             odr_addr: 0x40010C0Cu64,
             odr_mask: 0x00000040u32,
+            exti_line_index: 6u32,
         }
     }
 
@@ -1305,6 +2320,7 @@ impl GPIOB {
             idr_mask: 0x00000080u32,
             odr_addr: 0x40010C0Cu64,
             odr_mask: 0x00000080u32,
+            exti_line_index: 7u32,
         }
     }
 }
@@ -1323,6 +2339,7 @@ pub struct GPIOBFlex {
     idr_mask: u32,
     odr_addr: u64,
     odr_mask: u32,
+    exti_line_index: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -1467,6 +2484,9 @@ impl GPIOBInput {
     pub fn get_level(&self) -> Result<Level, metadata::Error> {
         self.pin.get_level()
     }
+    pub fn exti_line_index(&self) -> u32 {
+        self.pin.exti_line_index
+    }
 }
 
 impl GPIOBOutput {
@@ -1510,6 +2530,364 @@ impl GPIOBOutput {
         self.pin.get_output_level()
     }
 }
+
+#[derive(Debug)]
+struct GPIOBInputWaitState {
+    waker: Option<core::task::Waker>,
+}
+
+impl GPIOBInputWaitState {
+    const fn new() -> Self {
+        Self { waker: None }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct GPIOBInputWaitLineConfig {
+    line_index: u32,
+    port_select_addr: u64,
+    port_select_clear_mask: u32,
+    port_select_set_mask: u32,
+    interrupt_mask_addr: u64,
+    interrupt_mask_mask: u32,
+    rising_trigger_addr: u64,
+    rising_trigger_mask: u32,
+    falling_trigger_addr: u64,
+    falling_trigger_mask: u32,
+    pending_addr: u64,
+    pending_mask: u32,
+}
+
+const GENERATED_DRV_GPIOB_GPIO_WAIT_UNSUPPORTED: &str =
+    "GPIO async wait is not bound for the requested pin";
+const GENERATED_DRV_GPIOB_GPIO_WAIT_LINES: &[GPIOBInputWaitLineConfig] = &[
+    GPIOBInputWaitLineConfig {
+        line_index: 0u32,
+        port_select_addr: 0x40010008u64,
+        port_select_clear_mask: 0x0000000Fu32,
+        port_select_set_mask: 0x00000001u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000001u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000001u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000001u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000001u32,
+    },
+    GPIOBInputWaitLineConfig {
+        line_index: 1u32,
+        port_select_addr: 0x40010008u64,
+        port_select_clear_mask: 0x000000F0u32,
+        port_select_set_mask: 0x00000010u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000002u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000002u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000002u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000002u32,
+    },
+    GPIOBInputWaitLineConfig {
+        line_index: 3u32,
+        port_select_addr: 0x40010008u64,
+        port_select_clear_mask: 0x0000F000u32,
+        port_select_set_mask: 0x00001000u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000008u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000008u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000008u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000008u32,
+    },
+    GPIOBInputWaitLineConfig {
+        line_index: 4u32,
+        port_select_addr: 0x4001000Cu64,
+        port_select_clear_mask: 0x0000000Fu32,
+        port_select_set_mask: 0x00000001u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000010u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000010u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000010u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000010u32,
+    },
+    GPIOBInputWaitLineConfig {
+        line_index: 5u32,
+        port_select_addr: 0x4001000Cu64,
+        port_select_clear_mask: 0x000000F0u32,
+        port_select_set_mask: 0x00000010u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000020u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000020u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000020u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000020u32,
+    },
+    GPIOBInputWaitLineConfig {
+        line_index: 6u32,
+        port_select_addr: 0x4001000Cu64,
+        port_select_clear_mask: 0x00000F00u32,
+        port_select_set_mask: 0x00000100u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000040u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000040u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000040u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000040u32,
+    },
+    GPIOBInputWaitLineConfig {
+        line_index: 7u32,
+        port_select_addr: 0x4001000Cu64,
+        port_select_clear_mask: 0x0000F000u32,
+        port_select_set_mask: 0x00001000u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000080u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000080u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000080u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000080u32,
+    },
+];
+static GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_0: critical_section::Mutex<
+    core::cell::RefCell<GPIOBInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOBInputWaitState::new()));
+static GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_1: critical_section::Mutex<
+    core::cell::RefCell<GPIOBInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOBInputWaitState::new()));
+static GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_3: critical_section::Mutex<
+    core::cell::RefCell<GPIOBInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOBInputWaitState::new()));
+static GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_4: critical_section::Mutex<
+    core::cell::RefCell<GPIOBInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOBInputWaitState::new()));
+static GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_5: critical_section::Mutex<
+    core::cell::RefCell<GPIOBInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOBInputWaitState::new()));
+static GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_6: critical_section::Mutex<
+    core::cell::RefCell<GPIOBInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOBInputWaitState::new()));
+static GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_7: critical_section::Mutex<
+    core::cell::RefCell<GPIOBInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIOBInputWaitState::new()));
+fn generated_drv_gpiob_gpio_wait_config(
+    line_index: u32,
+) -> Option<&'static GPIOBInputWaitLineConfig> {
+    GENERATED_DRV_GPIOB_GPIO_WAIT_LINES
+        .iter()
+        .find(|config| config.line_index == line_index)
+}
+
+fn generated_drv_gpiob_gpio_wait_state(
+    line_index: u32,
+) -> Option<&'static critical_section::Mutex<core::cell::RefCell<GPIOBInputWaitState>>> {
+    match line_index {
+        0 => Some(&GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_0),
+        1 => Some(&GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_1),
+        3 => Some(&GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_3),
+        4 => Some(&GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_4),
+        5 => Some(&GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_5),
+        6 => Some(&GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_6),
+        7 => Some(&GENERATED_DRV_GPIOB_GPIO_EXTI_WAIT_LINE_7),
+        _ => None,
+    }
+}
+
+fn generated_drv_gpiob_clear_gpio_wait_pending(
+    config: &GPIOBInputWaitLineConfig,
+) -> Result<(), metadata::Error> {
+    modify_u32(
+        config.pending_addr,
+        config.pending_mask,
+        config.pending_mask,
+    )
+}
+
+fn generated_drv_gpiob_prepare_gpio_wait(
+    line_index: u32,
+    rising: bool,
+    falling: bool,
+) -> Result<(), metadata::Error> {
+    let config = generated_drv_gpiob_gpio_wait_config(line_index).ok_or(
+        metadata::Error::InvalidReference(GENERATED_DRV_GPIOB_GPIO_WAIT_UNSUPPORTED),
+    )?;
+    let state = generated_drv_gpiob_gpio_wait_state(line_index).ok_or(
+        metadata::Error::InvalidReference(GENERATED_DRV_GPIOB_GPIO_WAIT_UNSUPPORTED),
+    )?;
+    critical_section::with(|cs| {
+        let mut state = state.borrow(cs).borrow_mut();
+        state.waker = None;
+    });
+    modify_u32(
+        config.port_select_addr,
+        config.port_select_clear_mask,
+        config.port_select_set_mask,
+    )?;
+    modify_u32(
+        config.interrupt_mask_addr,
+        config.interrupt_mask_mask,
+        0x00000000u32,
+    )?;
+    modify_u32(
+        config.rising_trigger_addr,
+        config.rising_trigger_mask,
+        if rising {
+            config.rising_trigger_mask
+        } else {
+            0x00000000u32
+        },
+    )?;
+    modify_u32(
+        config.falling_trigger_addr,
+        config.falling_trigger_mask,
+        if falling {
+            config.falling_trigger_mask
+        } else {
+            0x00000000u32
+        },
+    )?;
+    generated_drv_gpiob_clear_gpio_wait_pending(config)?;
+    modify_u32(
+        config.interrupt_mask_addr,
+        config.interrupt_mask_mask,
+        config.interrupt_mask_mask,
+    )?;
+    Ok(())
+}
+
+fn generated_drv_gpiob_poll_gpio_wait(
+    line_index: u32,
+    cx: &core::task::Context<'_>,
+) -> core::task::Poll<Result<(), metadata::Error>> {
+    let config = match generated_drv_gpiob_gpio_wait_config(line_index) {
+        Some(config) => config,
+        None => {
+            return core::task::Poll::Ready(Err(metadata::Error::InvalidReference(
+                GENERATED_DRV_GPIOB_GPIO_WAIT_UNSUPPORTED,
+            )));
+        }
+    };
+    let state = match generated_drv_gpiob_gpio_wait_state(line_index) {
+        Some(state) => state,
+        None => {
+            return core::task::Poll::Ready(Err(metadata::Error::InvalidReference(
+                GENERATED_DRV_GPIOB_GPIO_WAIT_UNSUPPORTED,
+            )));
+        }
+    };
+    if let Ok(pending) = read_u32(config.pending_addr) {
+        if (pending & config.pending_mask) != 0 {
+            if let Err(err) = modify_u32(
+                config.interrupt_mask_addr,
+                config.interrupt_mask_mask,
+                0x00000000u32,
+            ) {
+                return core::task::Poll::Ready(Err(err));
+            }
+            if let Err(err) = generated_drv_gpiob_clear_gpio_wait_pending(config) {
+                return core::task::Poll::Ready(Err(err));
+            }
+            return core::task::Poll::Ready(Ok(()));
+        }
+    } else if let Err(err) = read_u32(config.pending_addr) {
+        return core::task::Poll::Ready(Err(err));
+    }
+    critical_section::with(|cs| {
+        let mut state = state.borrow(cs).borrow_mut();
+        state.waker = Some(cx.waker().clone());
+    });
+    match read_u32(config.pending_addr) {
+        Ok(pending) if (pending & config.pending_mask) != 0 => {
+            critical_section::with(|cs| {
+                let mut state = state.borrow(cs).borrow_mut();
+                state.waker = None;
+            });
+            if let Err(err) = modify_u32(
+                config.interrupt_mask_addr,
+                config.interrupt_mask_mask,
+                0x00000000u32,
+            ) {
+                return core::task::Poll::Ready(Err(err));
+            }
+            if let Err(err) = generated_drv_gpiob_clear_gpio_wait_pending(config) {
+                return core::task::Poll::Ready(Err(err));
+            }
+            core::task::Poll::Ready(Ok(()))
+        }
+        Ok(_) => core::task::Poll::Pending,
+        Err(err) => core::task::Poll::Ready(Err(err)),
+    }
+}
+
+pub(crate) fn generated_drv_gpiob_signal_gpio_wait(line_index: u32) -> Result<(), metadata::Error> {
+    let state = generated_drv_gpiob_gpio_wait_state(line_index).ok_or(
+        metadata::Error::InvalidReference(GENERATED_DRV_GPIOB_GPIO_WAIT_UNSUPPORTED),
+    )?;
+    let waker = critical_section::with(|cs| {
+        let mut state = state.borrow(cs).borrow_mut();
+        state.waker.take()
+    });
+    if let Some(waker) = waker {
+        waker.wake();
+    }
+    Ok(())
+}
+
+async fn generated_drv_gpiob_wait_gpio_edge(
+    line_index: u32,
+    rising: bool,
+    falling: bool,
+) -> Result<(), metadata::Error> {
+    generated_drv_gpiob_prepare_gpio_wait(line_index, rising, falling)?;
+    core::future::poll_fn(|cx| generated_drv_gpiob_poll_gpio_wait(line_index, cx)).await
+}
+
+impl embedded_hal::digital::ErrorType for GPIOBInput {
+    type Error = metadata::Error;
+}
+
+impl embedded_hal_async::digital::Wait for GPIOBInput {
+    async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+        loop {
+            if self.is_high()? {
+                return Ok(());
+            }
+            generated_drv_gpiob_wait_gpio_edge(self.pin.exti_line_index, true, false).await?;
+        }
+    }
+
+    async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+        loop {
+            if self.is_low()? {
+                return Ok(());
+            }
+            generated_drv_gpiob_wait_gpio_edge(self.pin.exti_line_index, false, true).await?;
+        }
+    }
+
+    async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+        generated_drv_gpiob_wait_gpio_edge(self.pin.exti_line_index, true, false).await
+    }
+
+    async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+        generated_drv_gpiob_wait_gpio_edge(self.pin.exti_line_index, false, true).await
+    }
+
+    async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+        generated_drv_gpiob_wait_gpio_edge(self.pin.exti_line_index, true, true).await
+    }
+}
 // Driver instance: GPIOD (gpio-port) from canonical block block.gpiod -> gpio-port
 pub const DRV_GPIOD_CLOCK_BINDINGS: &[metadata::ClockBinding] = &[metadata::ClockBinding {
     id: "clk.gpiod",
@@ -1533,8 +2911,54 @@ pub const DRV_GPIOD_RESET_BINDINGS: &[metadata::ResetBinding] = &[metadata::Rese
     assert_operation_refs: &[],
     release_operation_refs: &[],
 }];
-pub const DRV_GPIOD_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[];
-pub const DRV_GPIOD_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[];
+pub const DRV_GPIOD_INTERRUPT_SOURCES: &[metadata::InterruptSource] = &[
+    metadata::InterruptSource {
+        id: "isrc.exti.line0",
+        name: "EXTI line 0 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf0"],
+        clear_operation_refs: &["op.exti.clear_line0_pending"],
+    },
+    metadata::InterruptSource {
+        id: "isrc.exti.line1",
+        name: "EXTI line 1 interrupt source",
+        source_ref: "periph.exti",
+        producer_ref: None,
+        kind: "peripheral",
+        flag_refs: &["field.exti_intfr.intf_intf1"],
+        clear_operation_refs: &["op.exti.clear_line1_pending"],
+    },
+];
+pub const DRV_GPIOD_INTERRUPT_ROUTES: &[metadata::InterruptRoute] = &[
+    metadata::InterruptRoute {
+        id: "iroute.exti.line0",
+        name: "EXTI line 0 interrupt route",
+        source_ref: "isrc.exti.line0",
+        interrupt_ref: "int.exti0",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(0),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: None,
+    },
+    metadata::InterruptRoute {
+        id: "iroute.exti.line1",
+        name: "EXTI line 1 interrupt route",
+        source_ref: "isrc.exti.line1",
+        interrupt_ref: "int.exti1",
+        controller_ref: "block.pfic",
+        cpu_target_ref: None,
+        line_index: Some(1),
+        route_type: "hardwired",
+        control_refs: &[],
+        acknowledge_operation_refs: &[],
+        shared_group: None,
+    },
+];
 pub const DRV_GPIOD_DMA_CHANNELS: &[metadata::DmaChannel] = &[];
 pub const DRV_GPIOD_DMA_ROUTES: &[metadata::DmaRoute] = &[];
 pub const DRV_GPIOD_PIN_ROLE_0_ROUTES: &[metadata::PinRoute] = &[metadata::PinRoute {
@@ -1577,7 +3001,7 @@ pub const DRV_GPIOD_PIN_ROLES: &[metadata::PinRole] = &[
 ];
 pub const DRV_GPIOD_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[];
 pub const DRV_GPIOD_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
-pub const DRV_GPIOD_CAPABILITY_TAGS: &[&str] = &[];
+pub const DRV_GPIOD_CAPABILITY_TAGS: &[&str] = &["embedded-hal-async-wait"];
 
 #[derive(Debug, Clone, Copy)]
 pub struct GPIODResources {
@@ -1662,6 +3086,7 @@ impl GPIOD {
             idr_mask: 0x00000001u32,
             odr_addr: 0x4001140Cu64,
             odr_mask: 0x00000001u32,
+            exti_line_index: 0u32,
         }
     }
 
@@ -1680,6 +3105,7 @@ impl GPIOD {
             idr_mask: 0x00000002u32,
             odr_addr: 0x4001140Cu64,
             odr_mask: 0x00000002u32,
+            exti_line_index: 1u32,
         }
     }
 }
@@ -1698,6 +3124,7 @@ pub struct GPIODFlex {
     idr_mask: u32,
     odr_addr: u64,
     odr_mask: u32,
+    exti_line_index: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -1842,6 +3269,9 @@ impl GPIODInput {
     pub fn get_level(&self) -> Result<Level, metadata::Error> {
         self.pin.get_level()
     }
+    pub fn exti_line_index(&self) -> u32 {
+        self.pin.exti_line_index
+    }
 }
 
 impl GPIODOutput {
@@ -1883,5 +3313,273 @@ impl GPIODOutput {
 
     pub fn get_output_level(&self) -> Result<Level, metadata::Error> {
         self.pin.get_output_level()
+    }
+}
+
+#[derive(Debug)]
+struct GPIODInputWaitState {
+    waker: Option<core::task::Waker>,
+}
+
+impl GPIODInputWaitState {
+    const fn new() -> Self {
+        Self { waker: None }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct GPIODInputWaitLineConfig {
+    line_index: u32,
+    port_select_addr: u64,
+    port_select_clear_mask: u32,
+    port_select_set_mask: u32,
+    interrupt_mask_addr: u64,
+    interrupt_mask_mask: u32,
+    rising_trigger_addr: u64,
+    rising_trigger_mask: u32,
+    falling_trigger_addr: u64,
+    falling_trigger_mask: u32,
+    pending_addr: u64,
+    pending_mask: u32,
+}
+
+const GENERATED_DRV_GPIOD_GPIO_WAIT_UNSUPPORTED: &str =
+    "GPIO async wait is not bound for the requested pin";
+const GENERATED_DRV_GPIOD_GPIO_WAIT_LINES: &[GPIODInputWaitLineConfig] = &[
+    GPIODInputWaitLineConfig {
+        line_index: 0u32,
+        port_select_addr: 0x40010008u64,
+        port_select_clear_mask: 0x0000000Fu32,
+        port_select_set_mask: 0x00000003u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000001u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000001u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000001u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000001u32,
+    },
+    GPIODInputWaitLineConfig {
+        line_index: 1u32,
+        port_select_addr: 0x40010008u64,
+        port_select_clear_mask: 0x000000F0u32,
+        port_select_set_mask: 0x00000030u32,
+        interrupt_mask_addr: 0x40010400u64,
+        interrupt_mask_mask: 0x00000002u32,
+        rising_trigger_addr: 0x40010408u64,
+        rising_trigger_mask: 0x00000002u32,
+        falling_trigger_addr: 0x4001040Cu64,
+        falling_trigger_mask: 0x00000002u32,
+        pending_addr: 0x40010414u64,
+        pending_mask: 0x00000002u32,
+    },
+];
+static GENERATED_DRV_GPIOD_GPIO_EXTI_WAIT_LINE_0: critical_section::Mutex<
+    core::cell::RefCell<GPIODInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIODInputWaitState::new()));
+static GENERATED_DRV_GPIOD_GPIO_EXTI_WAIT_LINE_1: critical_section::Mutex<
+    core::cell::RefCell<GPIODInputWaitState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(GPIODInputWaitState::new()));
+fn generated_drv_gpiod_gpio_wait_config(
+    line_index: u32,
+) -> Option<&'static GPIODInputWaitLineConfig> {
+    GENERATED_DRV_GPIOD_GPIO_WAIT_LINES
+        .iter()
+        .find(|config| config.line_index == line_index)
+}
+
+fn generated_drv_gpiod_gpio_wait_state(
+    line_index: u32,
+) -> Option<&'static critical_section::Mutex<core::cell::RefCell<GPIODInputWaitState>>> {
+    match line_index {
+        0 => Some(&GENERATED_DRV_GPIOD_GPIO_EXTI_WAIT_LINE_0),
+        1 => Some(&GENERATED_DRV_GPIOD_GPIO_EXTI_WAIT_LINE_1),
+        _ => None,
+    }
+}
+
+fn generated_drv_gpiod_clear_gpio_wait_pending(
+    config: &GPIODInputWaitLineConfig,
+) -> Result<(), metadata::Error> {
+    modify_u32(
+        config.pending_addr,
+        config.pending_mask,
+        config.pending_mask,
+    )
+}
+
+fn generated_drv_gpiod_prepare_gpio_wait(
+    line_index: u32,
+    rising: bool,
+    falling: bool,
+) -> Result<(), metadata::Error> {
+    let config = generated_drv_gpiod_gpio_wait_config(line_index).ok_or(
+        metadata::Error::InvalidReference(GENERATED_DRV_GPIOD_GPIO_WAIT_UNSUPPORTED),
+    )?;
+    let state = generated_drv_gpiod_gpio_wait_state(line_index).ok_or(
+        metadata::Error::InvalidReference(GENERATED_DRV_GPIOD_GPIO_WAIT_UNSUPPORTED),
+    )?;
+    critical_section::with(|cs| {
+        let mut state = state.borrow(cs).borrow_mut();
+        state.waker = None;
+    });
+    modify_u32(
+        config.port_select_addr,
+        config.port_select_clear_mask,
+        config.port_select_set_mask,
+    )?;
+    modify_u32(
+        config.interrupt_mask_addr,
+        config.interrupt_mask_mask,
+        0x00000000u32,
+    )?;
+    modify_u32(
+        config.rising_trigger_addr,
+        config.rising_trigger_mask,
+        if rising {
+            config.rising_trigger_mask
+        } else {
+            0x00000000u32
+        },
+    )?;
+    modify_u32(
+        config.falling_trigger_addr,
+        config.falling_trigger_mask,
+        if falling {
+            config.falling_trigger_mask
+        } else {
+            0x00000000u32
+        },
+    )?;
+    generated_drv_gpiod_clear_gpio_wait_pending(config)?;
+    modify_u32(
+        config.interrupt_mask_addr,
+        config.interrupt_mask_mask,
+        config.interrupt_mask_mask,
+    )?;
+    Ok(())
+}
+
+fn generated_drv_gpiod_poll_gpio_wait(
+    line_index: u32,
+    cx: &core::task::Context<'_>,
+) -> core::task::Poll<Result<(), metadata::Error>> {
+    let config = match generated_drv_gpiod_gpio_wait_config(line_index) {
+        Some(config) => config,
+        None => {
+            return core::task::Poll::Ready(Err(metadata::Error::InvalidReference(
+                GENERATED_DRV_GPIOD_GPIO_WAIT_UNSUPPORTED,
+            )));
+        }
+    };
+    let state = match generated_drv_gpiod_gpio_wait_state(line_index) {
+        Some(state) => state,
+        None => {
+            return core::task::Poll::Ready(Err(metadata::Error::InvalidReference(
+                GENERATED_DRV_GPIOD_GPIO_WAIT_UNSUPPORTED,
+            )));
+        }
+    };
+    if let Ok(pending) = read_u32(config.pending_addr) {
+        if (pending & config.pending_mask) != 0 {
+            if let Err(err) = modify_u32(
+                config.interrupt_mask_addr,
+                config.interrupt_mask_mask,
+                0x00000000u32,
+            ) {
+                return core::task::Poll::Ready(Err(err));
+            }
+            if let Err(err) = generated_drv_gpiod_clear_gpio_wait_pending(config) {
+                return core::task::Poll::Ready(Err(err));
+            }
+            return core::task::Poll::Ready(Ok(()));
+        }
+    } else if let Err(err) = read_u32(config.pending_addr) {
+        return core::task::Poll::Ready(Err(err));
+    }
+    critical_section::with(|cs| {
+        let mut state = state.borrow(cs).borrow_mut();
+        state.waker = Some(cx.waker().clone());
+    });
+    match read_u32(config.pending_addr) {
+        Ok(pending) if (pending & config.pending_mask) != 0 => {
+            critical_section::with(|cs| {
+                let mut state = state.borrow(cs).borrow_mut();
+                state.waker = None;
+            });
+            if let Err(err) = modify_u32(
+                config.interrupt_mask_addr,
+                config.interrupt_mask_mask,
+                0x00000000u32,
+            ) {
+                return core::task::Poll::Ready(Err(err));
+            }
+            if let Err(err) = generated_drv_gpiod_clear_gpio_wait_pending(config) {
+                return core::task::Poll::Ready(Err(err));
+            }
+            core::task::Poll::Ready(Ok(()))
+        }
+        Ok(_) => core::task::Poll::Pending,
+        Err(err) => core::task::Poll::Ready(Err(err)),
+    }
+}
+
+pub(crate) fn generated_drv_gpiod_signal_gpio_wait(line_index: u32) -> Result<(), metadata::Error> {
+    let state = generated_drv_gpiod_gpio_wait_state(line_index).ok_or(
+        metadata::Error::InvalidReference(GENERATED_DRV_GPIOD_GPIO_WAIT_UNSUPPORTED),
+    )?;
+    let waker = critical_section::with(|cs| {
+        let mut state = state.borrow(cs).borrow_mut();
+        state.waker.take()
+    });
+    if let Some(waker) = waker {
+        waker.wake();
+    }
+    Ok(())
+}
+
+async fn generated_drv_gpiod_wait_gpio_edge(
+    line_index: u32,
+    rising: bool,
+    falling: bool,
+) -> Result<(), metadata::Error> {
+    generated_drv_gpiod_prepare_gpio_wait(line_index, rising, falling)?;
+    core::future::poll_fn(|cx| generated_drv_gpiod_poll_gpio_wait(line_index, cx)).await
+}
+
+impl embedded_hal::digital::ErrorType for GPIODInput {
+    type Error = metadata::Error;
+}
+
+impl embedded_hal_async::digital::Wait for GPIODInput {
+    async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+        loop {
+            if self.is_high()? {
+                return Ok(());
+            }
+            generated_drv_gpiod_wait_gpio_edge(self.pin.exti_line_index, true, false).await?;
+        }
+    }
+
+    async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+        loop {
+            if self.is_low()? {
+                return Ok(());
+            }
+            generated_drv_gpiod_wait_gpio_edge(self.pin.exti_line_index, false, true).await?;
+        }
+    }
+
+    async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+        generated_drv_gpiod_wait_gpio_edge(self.pin.exti_line_index, true, false).await
+    }
+
+    async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+        generated_drv_gpiod_wait_gpio_edge(self.pin.exti_line_index, false, true).await
+    }
+
+    async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+        generated_drv_gpiod_wait_gpio_edge(self.pin.exti_line_index, true, true).await
     }
 }
