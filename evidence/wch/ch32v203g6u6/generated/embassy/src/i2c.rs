@@ -1567,6 +1567,8 @@ impl I2C1Slave {
             if ((u32::from(read_u16(0x40005414u64)?) & 0x00000002u32) >> 1) != 0u32 {
                 let observed_transmit =
                     ((u32::from(read_u16(0x40005418u64)?) & 0x00000004u32) >> 2) != 0u32;
+                let _ = u32::from(read_u16(0x40005414u64)?);
+                let _ = u32::from(read_u16(0x40005418u64)?);
                 if observed_transmit != expect_transmit {
                     return Err(metadata::Error::Unsupported(if expect_transmit {
                         "I2C slave packet matched RX-from-master while waiting for TX-to-master"
@@ -1574,8 +1576,6 @@ impl I2C1Slave {
                         "I2C slave packet matched TX-to-master while waiting for RX-from-master"
                     }));
                 }
-                let _ = u32::from(read_u16(0x40005414u64)?);
-                let _ = u32::from(read_u16(0x40005418u64)?);
                 return Ok(());
             }
             core::hint::spin_loop();
@@ -1712,15 +1712,14 @@ impl I2C1Slave {
             Ok(((u32::from(read_u16(0x40005414u64)?) & 0x00000002u32) >> 1) != 0u32)
         })
         .await?;
-        if self.generated_read_slave_packet_direction()?
-            != I2C1SlavePacketDirection::ReceiveFromMaster
-        {
+        let direction = self.generated_read_slave_packet_direction()?;
+        let _ = u32::from(read_u16(0x40005414u64)?);
+        let _ = u32::from(read_u16(0x40005418u64)?);
+        if direction != I2C1SlavePacketDirection::ReceiveFromMaster {
             return Err(metadata::Error::Unsupported(
                 "I2C slave packet matched TX-to-master while waiting for RX-from-master",
             ));
         }
-        let _ = u32::from(read_u16(0x40005414u64)?);
-        let _ = u32::from(read_u16(0x40005418u64)?);
         let mut received = 0usize;
         loop {
             self.generated_check_and_clear_i2c_slave_error_flags(false)?;
@@ -1763,15 +1762,14 @@ impl I2C1Slave {
             Ok(((u32::from(read_u16(0x40005414u64)?) & 0x00000002u32) >> 1) != 0u32)
         })
         .await?;
-        if self.generated_read_slave_packet_direction()?
-            != I2C1SlavePacketDirection::TransmitToMaster
-        {
+        let direction = self.generated_read_slave_packet_direction()?;
+        let _ = u32::from(read_u16(0x40005414u64)?);
+        let _ = u32::from(read_u16(0x40005418u64)?);
+        if direction != I2C1SlavePacketDirection::TransmitToMaster {
             return Err(metadata::Error::Unsupported(
                 "I2C slave packet matched RX-from-master while waiting for TX-to-master",
             ));
         }
-        let _ = u32::from(read_u16(0x40005414u64)?);
-        let _ = u32::from(read_u16(0x40005418u64)?);
         let mut written = 0usize;
         loop {
             self.generated_check_and_clear_i2c_slave_error_flags(true)?;
@@ -1823,6 +1821,7 @@ impl I2C1Slave {
             ));
         }
         generated_drv_i2c1_slave_configure_i2c_slave_isr_dispatch(buffer, callback);
+        self.generated_enable_i2c_async_interrupts()?;
         Ok(())
     }
 
@@ -1909,9 +1908,11 @@ async fn generated_drv_i2c1_slave_wait_i2c_async() -> Result<(), metadata::Error
 
 #[cfg(feature = "i2c-async")]
 pub(crate) fn generated_drv_i2c1_slave_signal_i2c_async() -> Result<(), metadata::Error> {
-    modify_u16(0x40005404u64, 0x0200u16, 0x0000u16)?;
-    modify_u16(0x40005404u64, 0x0400u16, 0x0000u16)?;
-    modify_u16(0x40005404u64, 0x0100u16, 0x0000u16)?;
+    if !generated_drv_i2c1_slave_i2c_slave_isr_dispatch_enabled() {
+        modify_u16(0x40005404u64, 0x0200u16, 0x0000u16)?;
+        modify_u16(0x40005404u64, 0x0400u16, 0x0000u16)?;
+        modify_u16(0x40005404u64, 0x0100u16, 0x0000u16)?;
+    }
     let waker = critical_section::with(|cs| {
         let mut state = GENERATED_DRV_I2C1_SLAVE_I2C_ASYNC_STATE
             .borrow(cs)

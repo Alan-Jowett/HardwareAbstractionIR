@@ -11566,7 +11566,7 @@ fn render_i2c_slave_methods(
         "    fn generated_read_slave_packet_direction(&self) -> Result<{type_name}PacketDirection, metadata::Error> {{\n        Ok(if ({direction_expr}) != 0u32 {{\n            {type_name}PacketDirection::TransmitToMaster\n        }} else {{\n            {type_name}PacketDirection::ReceiveFromMaster\n        }})\n    }}\n\n"
     ));
     methods.push_str(&format!(
-        "    fn generated_wait_for_slave_direction(&self, expect_transmit: bool) -> Result<(), metadata::Error> {{\n        loop {{\n            self.generated_check_and_clear_i2c_slave_error_flags(false)?;\n            if ({address_matched_expr}) != 0u32 {{\n                let observed_transmit = ({direction_expr}) != 0u32;\n                if observed_transmit != expect_transmit {{\n                    return Err(metadata::Error::Unsupported(if expect_transmit {{\n                        \"I2C slave packet matched RX-from-master while waiting for TX-to-master\"\n                    }} else {{\n                        \"I2C slave packet matched TX-to-master while waiting for RX-from-master\"\n                    }}));\n                }}\n{clear_address_statements}                return Ok(());\n            }}\n            core::hint::spin_loop();\n        }}\n    }}\n\n"
+        "    fn generated_wait_for_slave_direction(&self, expect_transmit: bool) -> Result<(), metadata::Error> {{\n        loop {{\n            self.generated_check_and_clear_i2c_slave_error_flags(false)?;\n            if ({address_matched_expr}) != 0u32 {{\n                let observed_transmit = ({direction_expr}) != 0u32;\n{clear_address_statements}                if observed_transmit != expect_transmit {{\n                    return Err(metadata::Error::Unsupported(if expect_transmit {{\n                        \"I2C slave packet matched RX-from-master while waiting for TX-to-master\"\n                    }} else {{\n                        \"I2C slave packet matched TX-to-master while waiting for RX-from-master\"\n                    }}));\n                }}\n                return Ok(());\n            }}\n            core::hint::spin_loop();\n        }}\n    }}\n\n"
     ));
     if !init_calls.is_empty() {
         methods.push_str(&format!(
@@ -11619,15 +11619,15 @@ fn render_i2c_slave_methods(
             "    #[cfg(feature = \"i2c-async\")]\n    pub async fn wait_packet_direction_async(&self) -> Result<{type_name}PacketDirection, metadata::Error> {{\n        self.generated_wait_i2c_async_until(false, |_| Ok(({address_matched_expr}) != 0u32)).await?;\n        self.generated_read_slave_packet_direction()\n    }}\n\n"
         ));
         methods.push_str(&format!(
-            "    #[cfg(feature = \"i2c-async\")]\n    pub async fn read_packet_async(&self, read: &mut [u8]) -> Result<usize, metadata::Error> {{\n        self.generated_wait_i2c_async_until(false, |_| Ok(({address_matched_expr}) != 0u32)).await?;\n        if self.generated_read_slave_packet_direction()? != {type_name}PacketDirection::ReceiveFromMaster {{\n            return Err(metadata::Error::Unsupported(\"I2C slave packet matched TX-to-master while waiting for RX-from-master\"));\n        }}\n{clear_address_statements}        let mut received = 0usize;\n        loop {{\n            self.generated_check_and_clear_i2c_slave_error_flags(false)?;\n            if ({rxne_expr}) != 0u32 {{\n                let value = {data_read_expr};\n                let value = u8::try_from(value).map_err(|_| metadata::Error::Unsupported(\"generated I2C data field exceeds u8\"))?;\n                if received >= read.len() {{\n                    return Err(metadata::Error::Unsupported(\"provided I2C slave RX buffer is too small for the completed packet\"));\n                }}\n                read[received] = value;\n                received += 1;\n                continue;\n            }}\n            if ({packet_boundary_expr}) != 0u32 {{\n{clear_packet_boundary_statements}                return Ok(received);\n            }}\n            if ({address_matched_expr}) != 0u32 {{\n                return Ok(received);\n            }}\n            self.generated_wait_i2c_async_until(false, |_| Ok({rx_ready_expr})).await?;\n        }}\n    }}\n\n"
+            "    #[cfg(feature = \"i2c-async\")]\n    pub async fn read_packet_async(&self, read: &mut [u8]) -> Result<usize, metadata::Error> {{\n        self.generated_wait_i2c_async_until(false, |_| Ok(({address_matched_expr}) != 0u32)).await?;\n        let direction = self.generated_read_slave_packet_direction()?;\n{clear_address_statements}        if direction != {type_name}PacketDirection::ReceiveFromMaster {{\n            return Err(metadata::Error::Unsupported(\"I2C slave packet matched TX-to-master while waiting for RX-from-master\"));\n        }}\n        let mut received = 0usize;\n        loop {{\n            self.generated_check_and_clear_i2c_slave_error_flags(false)?;\n            if ({rxne_expr}) != 0u32 {{\n                let value = {data_read_expr};\n                let value = u8::try_from(value).map_err(|_| metadata::Error::Unsupported(\"generated I2C data field exceeds u8\"))?;\n                if received >= read.len() {{\n                    return Err(metadata::Error::Unsupported(\"provided I2C slave RX buffer is too small for the completed packet\"));\n                }}\n                read[received] = value;\n                received += 1;\n                continue;\n            }}\n            if ({packet_boundary_expr}) != 0u32 {{\n{clear_packet_boundary_statements}                return Ok(received);\n            }}\n            if ({address_matched_expr}) != 0u32 {{\n                return Ok(received);\n            }}\n            self.generated_wait_i2c_async_until(false, |_| Ok({rx_ready_expr})).await?;\n        }}\n    }}\n\n"
         ));
         methods.push_str(&format!(
-            "    #[cfg(feature = \"i2c-async\")]\n    pub async fn write_packet_async(&self, write: &[u8]) -> Result<usize, metadata::Error> {{\n        self.generated_wait_i2c_async_until(false, |_| Ok(({address_matched_expr}) != 0u32)).await?;\n        if self.generated_read_slave_packet_direction()? != {type_name}PacketDirection::TransmitToMaster {{\n            return Err(metadata::Error::Unsupported(\"I2C slave packet matched RX-from-master while waiting for TX-to-master\"));\n        }}\n{clear_address_statements}        let mut written = 0usize;\n        loop {{\n            self.generated_check_and_clear_i2c_slave_error_flags(true)?;\n            if ({packet_boundary_expr}) != 0u32 {{\n{clear_packet_boundary_statements}                return Ok(written);\n            }}\n            if ({address_matched_expr}) != 0u32 {{\n                return Ok(written);\n            }}\n{tx_ack_end}            if ({txe_expr}) != 0u32 && written < write.len() {{\n                let value = write[written];\n{byte_write}{transmit_byte_finished_wait_async}                written += 1;\n                continue;\n            }}\n            self.generated_wait_i2c_async_until(true, |_| Ok({tx_ready_expr})).await?;\n        }}\n    }}\n\n"
+            "    #[cfg(feature = \"i2c-async\")]\n    pub async fn write_packet_async(&self, write: &[u8]) -> Result<usize, metadata::Error> {{\n        self.generated_wait_i2c_async_until(false, |_| Ok(({address_matched_expr}) != 0u32)).await?;\n        let direction = self.generated_read_slave_packet_direction()?;\n{clear_address_statements}        if direction != {type_name}PacketDirection::TransmitToMaster {{\n            return Err(metadata::Error::Unsupported(\"I2C slave packet matched RX-from-master while waiting for TX-to-master\"));\n        }}\n        let mut written = 0usize;\n        loop {{\n            self.generated_check_and_clear_i2c_slave_error_flags(true)?;\n            if ({packet_boundary_expr}) != 0u32 {{\n{clear_packet_boundary_statements}                return Ok(written);\n            }}\n            if ({address_matched_expr}) != 0u32 {{\n                return Ok(written);\n            }}\n{tx_ack_end}            if ({txe_expr}) != 0u32 && written < write.len() {{\n                let value = write[written];\n{byte_write}{transmit_byte_finished_wait_async}                written += 1;\n                continue;\n            }}\n            self.generated_wait_i2c_async_until(true, |_| Ok({tx_ready_expr})).await?;\n        }}\n    }}\n\n"
         ));
     }
     if has_i2c_slave_isr_dispatch_tag(&driver.capability_tags) {
         methods.push_str(&format!(
-            "    #[cfg(feature = \"i2c-async\")]\n    pub fn enable_rx_packet_isr_dispatch(&self, buffer: &'static mut [u8], callback: {type_name}RxPacketIsrCallback) -> Result<(), metadata::Error> {{\n        if buffer.is_empty() {{\n            return Err(metadata::Error::Unsupported(\"I2C slave ISR dispatch requires a non-empty static buffer\"));\n        }}\n        generated_{prefix}_configure_i2c_slave_isr_dispatch(buffer, callback);\n        Ok(())\n    }}\n\n"
+            "    #[cfg(feature = \"i2c-async\")]\n    pub fn enable_rx_packet_isr_dispatch(&self, buffer: &'static mut [u8], callback: {type_name}RxPacketIsrCallback) -> Result<(), metadata::Error> {{\n        if buffer.is_empty() {{\n            return Err(metadata::Error::Unsupported(\"I2C slave ISR dispatch requires a non-empty static buffer\"));\n        }}\n        generated_{prefix}_configure_i2c_slave_isr_dispatch(buffer, callback);\n        self.generated_enable_i2c_async_interrupts()?;\n        Ok(())\n    }}\n\n"
         ));
         methods.push_str(&format!(
             "    #[cfg(feature = \"i2c-async\")]\n    pub fn disable_rx_packet_isr_dispatch(&self) {{\n        generated_{prefix}_disable_i2c_slave_isr_dispatch();\n    }}\n\n"
@@ -13048,6 +13048,15 @@ pub enum {type_name}PacketDirection {{
                 )?);
             }
         }
+        let signal_disable_interrupts = if disable_interrupts.is_empty() {
+            String::new()
+        } else if has_i2c_slave_isr_dispatch_tag(&driver.capability_tags) {
+            format!(
+                "    if !generated_{prefix}_i2c_slave_isr_dispatch_enabled() {{\n{disable_interrupts}    }}\n"
+            )
+        } else {
+            disable_interrupts.clone()
+        };
         out.push_str(&format!(
             r#"
 #[cfg(feature = "i2c-async")]
@@ -13102,7 +13111,7 @@ async fn generated_{prefix}_wait_i2c_async() -> Result<(), metadata::Error> {{
 
 #[cfg(feature = "i2c-async")]
 pub(crate) fn generated_{prefix}_signal_i2c_async() -> Result<(), metadata::Error> {{
-{disable_interrupts}    let waker = critical_section::with(|cs| {{
+{signal_disable_interrupts}    let waker = critical_section::with(|cs| {{
         let mut state = GENERATED_{const_prefix}_I2C_ASYNC_STATE.borrow(cs).borrow_mut();
         state.ready = true;
         state.waker.take()
@@ -23612,6 +23621,20 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(i2c_rs.contains("pub fn enable_rx_packet_isr_dispatch("));
         assert!(i2c_rs.contains("generated_drv_i2c1_slave_on_i2c_slave_interrupt"));
         assert!(i2c_rs.contains("generated_drv_i2c1_slave_configure_i2c_slave_isr_dispatch"));
+        assert!(i2c_rs.contains("let observed_transmit ="));
+        assert!(i2c_rs.contains(
+            "let _ = u32::from(read_u16(0x40005414u64)?);\n                let _ = u32::from(read_u16(0x40005418u64)?);\n                if observed_transmit != expect_transmit {"
+        ));
+        assert!(i2c_rs.contains(
+            "let direction = self.generated_read_slave_packet_direction()?;\n        let _ = u32::from(read_u16(0x40005414u64)?);\n        let _ = u32::from(read_u16(0x40005418u64)?);\n        if direction != I2C1SlavePacketDirection::ReceiveFromMaster {"
+        ));
+        assert!(i2c_rs.contains(
+            "let direction = self.generated_read_slave_packet_direction()?;\n        let _ = u32::from(read_u16(0x40005414u64)?);\n        let _ = u32::from(read_u16(0x40005418u64)?);\n        if direction != I2C1SlavePacketDirection::TransmitToMaster {"
+        ));
+        assert!(i2c_rs.contains("self.generated_enable_i2c_async_interrupts()?;"));
+        assert!(i2c_rs.contains(
+            "if !generated_drv_i2c1_slave_i2c_slave_isr_dispatch_enabled() {\n        modify_u16(0x40005404u64, 0x0200u16, 0x0000u16)?;\n        modify_u16(0x40005404u64, 0x0400u16, 0x0000u16)?;\n        modify_u16(0x40005404u64, 0x0100u16, 0x0000u16)?;\n    }"
+        ));
         assert!(i2c_rs.contains(
             "    {\n        let _ = u32::from(read_u16(0x40005414u64)?);\n        let _ = u32::from(read_u16(0x40005418u64)?);\n        generated_drv_i2c1_slave_dispatch_completed_i2c_slave_packet();\n        return generated_drv_i2c1_slave_signal_i2c_async();\n    }\n"
         ));
