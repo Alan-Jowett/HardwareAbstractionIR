@@ -13394,7 +13394,7 @@ pub(crate) fn generated_{prefix}_on_i2c_slave_interrupt() -> Result<(), metadata
         return generated_{prefix}_signal_i2c_async();
     }}
     if generated_{prefix}_i2c_slave_isr_dispatch_active() && ({address_matched_expr}) != 0u32 {{
-        generated_{prefix}_dispatch_completed_i2c_slave_packet();
+{clear_address_statements}        generated_{prefix}_dispatch_completed_i2c_slave_packet();
         return generated_{prefix}_signal_i2c_async();
     }}
     if generated_{prefix}_i2c_slave_isr_dispatch_enabled()
@@ -23612,6 +23612,9 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(i2c_rs.contains("pub fn enable_rx_packet_isr_dispatch("));
         assert!(i2c_rs.contains("generated_drv_i2c1_slave_on_i2c_slave_interrupt"));
         assert!(i2c_rs.contains("generated_drv_i2c1_slave_configure_i2c_slave_isr_dispatch"));
+        assert!(i2c_rs.contains(
+            "    {\n        let _ = u32::from(read_u16(0x40005414u64)?);\n        let _ = u32::from(read_u16(0x40005418u64)?);\n        generated_drv_i2c1_slave_dispatch_completed_i2c_slave_packet();\n        return generated_drv_i2c1_slave_signal_i2c_async();\n    }\n"
+        ));
         assert!(i2c_rs.contains("u16::from(address)"));
         assert!(i2c_rs.contains("u16::from((address >> 6) & 0x01u8)"));
         assert!(wch_rs.contains("generated_drv_i2c1_slave_on_i2c_slave_interrupt();"));

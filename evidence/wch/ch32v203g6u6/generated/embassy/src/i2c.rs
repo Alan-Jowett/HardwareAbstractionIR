@@ -2117,6 +2117,8 @@ pub(crate) fn generated_drv_i2c1_slave_on_i2c_slave_interrupt() -> Result<(), me
     if generated_drv_i2c1_slave_i2c_slave_isr_dispatch_active()
         && ((u32::from(read_u16(0x40005414u64)?) & 0x00000002u32) >> 1) != 0u32
     {
+        let _ = u32::from(read_u16(0x40005414u64)?);
+        let _ = u32::from(read_u16(0x40005418u64)?);
         generated_drv_i2c1_slave_dispatch_completed_i2c_slave_packet();
         return generated_drv_i2c1_slave_signal_i2c_async();
     }
