@@ -1968,6 +1968,44 @@ struct EmbassyI2cMasterBindings {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct EmbassyI2cSlaveBindings {
+    own_address_bit_refs: Vec<String>,
+    #[serde(default)]
+    own_address_enable_ref: Option<String>,
+    #[serde(default)]
+    own_address_apply_operation_refs: Vec<String>,
+    data_register_ref: String,
+    address_matched_flag_ref: String,
+    transfer_direction_flag_ref: String,
+    receive_buffer_not_empty_flag_ref: String,
+    transmit_buffer_empty_flag_ref: String,
+    #[serde(default)]
+    byte_transfer_finished_flag_ref: Option<String>,
+    packet_boundary_flag_ref: String,
+    #[serde(default)]
+    acknowledge_failure_flag_ref: Option<String>,
+    #[serde(default)]
+    overrun_flag_ref: Option<String>,
+    #[serde(default)]
+    bus_error_flag_ref: Option<String>,
+    clear_address_operation_refs: Vec<String>,
+    clear_packet_boundary_operation_ref: String,
+    #[serde(default)]
+    clear_acknowledge_failure_operation_ref: Option<String>,
+    #[serde(default)]
+    clear_overrun_operation_ref: Option<String>,
+    #[serde(default)]
+    clear_bus_error_operation_ref: Option<String>,
+    #[serde(default)]
+    event_interrupt_enable_ref: Option<String>,
+    #[serde(default)]
+    buffer_interrupt_enable_ref: Option<String>,
+    #[serde(default)]
+    error_interrupt_enable_ref: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct EmbassyDriverInstance {
     id: String,
     name: String,
@@ -1992,6 +2030,8 @@ struct EmbassyDriverInstance {
     gpio_exti_wait_bindings: Option<EmbassyGpioExtiWaitBindings>,
     #[serde(default)]
     i2c_master_bindings: Option<EmbassyI2cMasterBindings>,
+    #[serde(default)]
+    i2c_slave_bindings: Option<EmbassyI2cSlaveBindings>,
     #[serde(default)]
     clock_binding_refs: Vec<String>,
     #[serde(default)]
@@ -2051,6 +2091,7 @@ struct ResolvedDriverInstance {
     dma_async_bindings: Option<EmbassyDmaAsyncBindings>,
     gpio_exti_wait_bindings: Option<EmbassyGpioExtiWaitBindings>,
     i2c_master_bindings: Option<EmbassyI2cMasterBindings>,
+    i2c_slave_bindings: Option<EmbassyI2cSlaveBindings>,
     target: McuCanonicalBlock,
     clock_bindings: Vec<McuClockBinding>,
     reset_bindings: Vec<McuResetBinding>,
@@ -2087,6 +2128,8 @@ struct DriverResourceScopeInputs<'a> {
 const EMBASSY_TIME_DRIVER_TAG: &str = "embassy-time-driver";
 const EMBEDDED_HAL_ASYNC_WAIT_TAG: &str = "embedded-hal-async-wait";
 const EMBEDDED_HAL_ASYNC_I2C_MASTER_TAG: &str = "embedded-hal-async-i2c-master";
+const EMBASSY_ASYNC_I2C_SLAVE_TAG: &str = "embassy-async-i2c-slave";
+const EMBASSY_I2C_SLAVE_ISR_DISPATCH_TAG: &str = "embassy-i2c-slave-isr-dispatch";
 const EMBASSY_TIME_DRIVER_SOURCE_SYSTICK: &str = "systick";
 const EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER: &str = "hardware-timer";
 const EMBASSY_TIME_DRIVER_SOURCE_RTC: &str = "rtc";
@@ -2095,6 +2138,7 @@ const EMBASSY_EXECUTOR_IDLE_STRATEGY_SPIN: &str = "spin";
 const ADC_LOWERING_REGULAR_SEQUENCE_DMA: &str = "regular-sequence-adc-dma";
 const FLASH_LOWERING_STM32F1_PAGE_FLASH: &str = "stm32f1-page-flash";
 const I2C_LOWERING_LEGACY_EVENT_MASTER: &str = "legacy-event-i2c-master";
+const I2C_LOWERING_LEGACY_EVENT_SLAVE: &str = "legacy-event-i2c-slave";
 const TIMER_LOWERING_COUNTER_COMPARE: &str = "counter-compare-timer";
 const USB_LOWERING_FSDEV_PMA_BTABLE: &str = "fsdev-pma-btable";
 const USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK: &str = "serial-jtag-preserve-link";
@@ -2115,6 +2159,15 @@ fn has_gpio_async_wait_tag(tags: &[String]) -> bool {
 fn has_i2c_async_master_tag(tags: &[String]) -> bool {
     tags.iter()
         .any(|tag| tag == EMBEDDED_HAL_ASYNC_I2C_MASTER_TAG)
+}
+
+fn has_i2c_async_slave_tag(tags: &[String]) -> bool {
+    tags.iter().any(|tag| tag == EMBASSY_ASYNC_I2C_SLAVE_TAG)
+}
+
+fn has_i2c_slave_isr_dispatch_tag(tags: &[String]) -> bool {
+    tags.iter()
+        .any(|tag| tag == EMBASSY_I2C_SLAVE_ISR_DISPATCH_TAG)
 }
 
 fn time_driver_source(driver: &ResolvedDriverInstance) -> Option<&str> {
@@ -2147,12 +2200,20 @@ fn i2c_master_bindings(driver: &ResolvedDriverInstance) -> Option<&EmbassyI2cMas
     driver.i2c_master_bindings.as_ref()
 }
 
+fn i2c_slave_bindings(driver: &ResolvedDriverInstance) -> Option<&EmbassyI2cSlaveBindings> {
+    driver.i2c_slave_bindings.as_ref()
+}
+
 fn has_regular_sequence_adc_dma_lowering(pattern: Option<&str>) -> bool {
     matches!(pattern, Some(ADC_LOWERING_REGULAR_SEQUENCE_DMA))
 }
 
 fn has_legacy_event_i2c_master_lowering(pattern: Option<&str>) -> bool {
     matches!(pattern, Some(I2C_LOWERING_LEGACY_EVENT_MASTER))
+}
+
+fn has_legacy_event_i2c_slave_lowering(pattern: Option<&str>) -> bool {
+    matches!(pattern, Some(I2C_LOWERING_LEGACY_EVENT_SLAVE))
 }
 
 fn has_usb_preserve_link_lowering(pattern: Option<&str>) -> bool {
@@ -2177,6 +2238,10 @@ fn driver_uses_regular_sequence_adc_dma_lowering(driver: &ResolvedDriverInstance
 
 fn driver_uses_legacy_event_i2c_master_lowering(driver: &ResolvedDriverInstance) -> bool {
     has_legacy_event_i2c_master_lowering(driver.lowering_pattern.as_deref())
+}
+
+fn driver_uses_legacy_event_i2c_slave_lowering(driver: &ResolvedDriverInstance) -> bool {
+    has_legacy_event_i2c_slave_lowering(driver.lowering_pattern.as_deref())
 }
 
 fn driver_uses_usb_fsdev_pma_btable_lowering(driver: &ResolvedDriverInstance) -> bool {
@@ -2501,6 +2566,13 @@ impl EmbassyGenerationModel {
                 &driver_interrupt_sources,
                 &interrupt_routes,
             )?;
+            validate_i2c_slave_bindings(
+                &registers,
+                &operations,
+                driver,
+                &driver_interrupt_sources,
+                &interrupt_routes,
+            )?;
             validate_driver_lowering_pattern(driver, &init_operations)?;
 
             drivers.push(ResolvedDriverInstance {
@@ -2518,6 +2590,7 @@ impl EmbassyGenerationModel {
                 dma_async_bindings: driver.dma_async_bindings.clone(),
                 gpio_exti_wait_bindings: driver.gpio_exti_wait_bindings.clone(),
                 i2c_master_bindings: driver.i2c_master_bindings.clone(),
+                i2c_slave_bindings: driver.i2c_slave_bindings.clone(),
                 target,
                 clock_bindings,
                 reset_bindings,
@@ -2641,8 +2714,10 @@ fn embassy_has_i2c_master(model: &EmbassyGenerationModel) -> bool {
 
 fn embassy_has_i2c_async(model: &EmbassyGenerationModel) -> bool {
     model.drivers.iter().any(|driver| {
-        driver_uses_legacy_event_i2c_master_lowering(driver)
-            && has_i2c_async_master_tag(&driver.capability_tags)
+        (driver_uses_legacy_event_i2c_master_lowering(driver)
+            && has_i2c_async_master_tag(&driver.capability_tags))
+            || (driver_uses_legacy_event_i2c_slave_lowering(driver)
+                && has_i2c_async_slave_tag(&driver.capability_tags))
     })
 }
 
@@ -3008,6 +3083,15 @@ fn validate_driver_module_scope(driver: &EmbassyDriverInstance, module_name: &st
             I2C_LOWERING_LEGACY_EVENT_MASTER
         );
     }
+    if driver.i2c_slave_bindings.is_some()
+        && !has_legacy_event_i2c_slave_lowering(driver.lowering_pattern.as_deref())
+    {
+        bail!(
+            "driver {} declares i2cSlaveBindings without loweringPattern {}",
+            driver.id,
+            I2C_LOWERING_LEGACY_EVENT_SLAVE
+        );
+    }
     Ok(())
 }
 
@@ -3343,6 +3427,65 @@ fn validate_capability_tag_contracts(drivers: &[ResolvedDriverInstance]) -> Resu
                     EMBEDDED_HAL_ASYNC_I2C_MASTER_TAG
                 );
             }
+        }
+    }
+    for driver in drivers {
+        let has_i2c_async_tag = has_i2c_async_slave_tag(&driver.capability_tags);
+        let has_isr_dispatch_tag = has_i2c_slave_isr_dispatch_tag(&driver.capability_tags);
+        let has_i2c_bindings = driver.i2c_slave_bindings.is_some();
+        if !has_i2c_async_tag && !has_isr_dispatch_tag && !has_i2c_bindings {
+            continue;
+        }
+        if driver.driver_kind != "i2c" {
+            bail!(
+                "driver {} claims capability tag {} or i2cSlaveBindings but has unsupported driver kind {}; only i2c drivers may expose generated I2C slave support",
+                driver.id,
+                EMBASSY_ASYNC_I2C_SLAVE_TAG,
+                driver.driver_kind
+            );
+        }
+        if !has_legacy_event_i2c_slave_lowering(driver.lowering_pattern.as_deref()) {
+            bail!(
+                "driver {} claims capability tag {} or i2cSlaveBindings without loweringPattern {}",
+                driver.id,
+                EMBASSY_ASYNC_I2C_SLAVE_TAG,
+                I2C_LOWERING_LEGACY_EVENT_SLAVE
+            );
+        }
+        let bindings = i2c_slave_bindings(driver).ok_or_else(|| {
+            anyhow!(
+                "driver {} claims capability tag {} or {} but omits required i2cSlaveBindings",
+                driver.id,
+                EMBASSY_ASYNC_I2C_SLAVE_TAG,
+                EMBASSY_I2C_SLAVE_ISR_DISPATCH_TAG
+            )
+        })?;
+        if has_i2c_async_tag {
+            if driver.interrupt_routes.is_empty() {
+                bail!(
+                    "driver {} claims capability tag {} but omits required interruptRouteRefs",
+                    driver.id,
+                    EMBASSY_ASYNC_I2C_SLAVE_TAG
+                );
+            }
+            if bindings.event_interrupt_enable_ref.is_none()
+                || bindings.buffer_interrupt_enable_ref.is_none()
+                || bindings.error_interrupt_enable_ref.is_none()
+            {
+                bail!(
+                    "driver {} claims capability tag {} but i2cSlaveBindings must provide eventInterruptEnableRef, bufferInterruptEnableRef, and errorInterruptEnableRef",
+                    driver.id,
+                    EMBASSY_ASYNC_I2C_SLAVE_TAG
+                );
+            }
+        }
+        if has_isr_dispatch_tag && !has_i2c_async_tag {
+            bail!(
+                "driver {} claims capability tag {} but omits required {}",
+                driver.id,
+                EMBASSY_I2C_SLAVE_ISR_DISPATCH_TAG,
+                EMBASSY_ASYNC_I2C_SLAVE_TAG
+            );
         }
     }
     Ok(())
@@ -4120,6 +4263,7 @@ fn validate_driver_lowering_pattern(
         ADC_LOWERING_REGULAR_SEQUENCE_DMA => validate_regular_sequence_adc_dma_lowering(driver)?,
         FLASH_LOWERING_STM32F1_PAGE_FLASH => validate_stm32f1_page_flash_lowering(driver)?,
         I2C_LOWERING_LEGACY_EVENT_MASTER => validate_legacy_event_i2c_master_lowering(driver)?,
+        I2C_LOWERING_LEGACY_EVENT_SLAVE => validate_legacy_event_i2c_slave_lowering(driver)?,
         USB_LOWERING_SERIAL_JTAG_PRESERVE_LINK => {
             if driver.driver_kind != "usb-device" {
                 bail!(
@@ -4247,6 +4391,38 @@ fn validate_legacy_event_i2c_master_lowering(driver: &EmbassyDriverInstance) -> 
             "driver {} uses loweringPattern {} but i2cMasterBindings.clearAddressOperationRefs is empty",
             driver.id,
             I2C_LOWERING_LEGACY_EVENT_MASTER
+        );
+    }
+    Ok(())
+}
+
+fn validate_legacy_event_i2c_slave_lowering(driver: &EmbassyDriverInstance) -> Result<()> {
+    if driver.driver_kind != "i2c" {
+        bail!(
+            "driver {} uses loweringPattern {} but that lowering is only supported on i2c drivers",
+            driver.id,
+            I2C_LOWERING_LEGACY_EVENT_SLAVE
+        );
+    }
+    let bindings = driver.i2c_slave_bindings.as_ref().ok_or_else(|| {
+        anyhow!(
+            "driver {} uses loweringPattern {} but omits required i2cSlaveBindings",
+            driver.id,
+            I2C_LOWERING_LEGACY_EVENT_SLAVE
+        )
+    })?;
+    if bindings.own_address_bit_refs.len() != 7 {
+        bail!(
+            "driver {} uses loweringPattern {} but i2cSlaveBindings.ownAddressBitRefs must contain exactly 7 refs",
+            driver.id,
+            I2C_LOWERING_LEGACY_EVENT_SLAVE
+        );
+    }
+    if bindings.clear_address_operation_refs.is_empty() {
+        bail!(
+            "driver {} uses loweringPattern {} but i2cSlaveBindings.clearAddressOperationRefs is empty",
+            driver.id,
+            I2C_LOWERING_LEGACY_EVENT_SLAVE
         );
     }
     Ok(())
@@ -4676,6 +4852,205 @@ fn validate_i2c_master_bindings(
                 driver.id,
                 EMBEDDED_HAL_ASYNC_I2C_MASTER_TAG,
                 I2C_LOWERING_LEGACY_EVENT_MASTER
+            );
+        }
+    }
+    Ok(())
+}
+
+fn validate_i2c_slave_bindings(
+    registers: &HashMap<String, ResolvedRegister>,
+    operations: &HashMap<&str, SemanticOperation>,
+    driver: &EmbassyDriverInstance,
+    interrupt_sources: &[McuInterruptSource],
+    driver_interrupt_routes: &[McuInterruptRoute],
+) -> Result<()> {
+    let Some(bindings) = driver.i2c_slave_bindings.as_ref() else {
+        return Ok(());
+    };
+    if driver.driver_kind != "i2c" {
+        bail!(
+            "driver {} declares i2cSlaveBindings but that contract is only supported on i2c drivers",
+            driver.id
+        );
+    }
+
+    for field_ref in &bindings.own_address_bit_refs {
+        let Some(register) = registers
+            .values()
+            .find(|register| register.fields.iter().any(|field| field.id == *field_ref))
+        else {
+            bail!(
+                "driver {} i2cSlaveBindings ownAddressBitRef {} does not resolve to a modeled register field",
+                driver.id,
+                field_ref
+            );
+        };
+        let field = register
+            .fields
+            .iter()
+            .find(|field| field.id == *field_ref)
+            .expect("field already located");
+        if field.msb != field.lsb {
+            bail!(
+                "driver {} i2cSlaveBindings ownAddressBitRef {} must resolve to a single-bit field",
+                driver.id,
+                field_ref
+            );
+        }
+    }
+
+    for (field_ref, usage) in [
+        (&bindings.data_register_ref, "dataRegisterRef"),
+        (&bindings.address_matched_flag_ref, "addressMatchedFlagRef"),
+        (
+            &bindings.transfer_direction_flag_ref,
+            "transferDirectionFlagRef",
+        ),
+        (
+            &bindings.receive_buffer_not_empty_flag_ref,
+            "receiveBufferNotEmptyFlagRef",
+        ),
+        (
+            &bindings.transmit_buffer_empty_flag_ref,
+            "transmitBufferEmptyFlagRef",
+        ),
+        (&bindings.packet_boundary_flag_ref, "packetBoundaryFlagRef"),
+    ] {
+        if !registers
+            .values()
+            .any(|register| register.fields.iter().any(|field| field.id == *field_ref))
+        {
+            bail!(
+                "driver {} i2cSlaveBindings {} {} does not resolve to a modeled register field",
+                driver.id,
+                usage,
+                field_ref
+            );
+        }
+    }
+    for (field_ref, usage) in [
+        (
+            bindings.own_address_enable_ref.as_deref(),
+            "ownAddressEnableRef",
+        ),
+        (
+            bindings.byte_transfer_finished_flag_ref.as_deref(),
+            "byteTransferFinishedFlagRef",
+        ),
+        (
+            bindings.acknowledge_failure_flag_ref.as_deref(),
+            "acknowledgeFailureFlagRef",
+        ),
+        (bindings.overrun_flag_ref.as_deref(), "overrunFlagRef"),
+        (bindings.bus_error_flag_ref.as_deref(), "busErrorFlagRef"),
+        (
+            bindings.event_interrupt_enable_ref.as_deref(),
+            "eventInterruptEnableRef",
+        ),
+        (
+            bindings.buffer_interrupt_enable_ref.as_deref(),
+            "bufferInterruptEnableRef",
+        ),
+        (
+            bindings.error_interrupt_enable_ref.as_deref(),
+            "errorInterruptEnableRef",
+        ),
+    ] {
+        if let Some(field_ref) = field_ref
+            && !registers
+                .values()
+                .any(|register| register.fields.iter().any(|field| field.id == field_ref))
+        {
+            bail!(
+                "driver {} i2cSlaveBindings {} {} does not resolve to a modeled register field",
+                driver.id,
+                usage,
+                field_ref
+            );
+        }
+    }
+
+    for operation_ref in bindings
+        .own_address_apply_operation_refs
+        .iter()
+        .chain(bindings.clear_address_operation_refs.iter())
+        .chain(std::iter::once(
+            &bindings.clear_packet_boundary_operation_ref,
+        ))
+    {
+        let operation = operations.get(operation_ref.as_str()).ok_or_else(|| {
+            anyhow!(
+                "driver {} i2cSlaveBindings operation ref {} could not be resolved",
+                driver.id,
+                operation_ref
+            )
+        })?;
+        if operation.steps.is_empty() {
+            bail!(
+                "driver {} i2cSlaveBindings operation ref {} must contain at least one step",
+                driver.id,
+                operation_ref
+            );
+        }
+    }
+    for (operation_ref, usage) in [
+        (
+            bindings.clear_acknowledge_failure_operation_ref.as_deref(),
+            "clearAcknowledgeFailureOperationRef",
+        ),
+        (
+            bindings.clear_overrun_operation_ref.as_deref(),
+            "clearOverrunOperationRef",
+        ),
+        (
+            bindings.clear_bus_error_operation_ref.as_deref(),
+            "clearBusErrorOperationRef",
+        ),
+    ] {
+        if let Some(operation_ref) = operation_ref {
+            let operation = operations.get(operation_ref).ok_or_else(|| {
+                anyhow!(
+                    "driver {} i2cSlaveBindings {} {} could not be resolved",
+                    driver.id,
+                    usage,
+                    operation_ref
+                )
+            })?;
+            if operation.steps.is_empty() {
+                bail!(
+                    "driver {} i2cSlaveBindings {} {} must contain at least one step",
+                    driver.id,
+                    usage,
+                    operation_ref
+                );
+            }
+        }
+    }
+
+    if has_i2c_async_slave_tag(&driver.capability_tags) {
+        if driver_interrupt_routes.is_empty() {
+            bail!(
+                "driver {} i2cSlaveBindings requires interruptRouteRefs for async slave support",
+                driver.id
+            );
+        }
+        let event_route = driver_interrupt_routes.iter().any(|route| {
+            interrupt_sources
+                .iter()
+                .any(|source| source.id == route.source_ref && source.id.ends_with(".ev"))
+        });
+        let error_route = driver_interrupt_routes.iter().any(|route| {
+            interrupt_sources
+                .iter()
+                .any(|source| source.id == route.source_ref && source.id.ends_with(".er"))
+        });
+        if !event_route || !error_route {
+            bail!(
+                "driver {} claims capability tag {} but must reference both event and error interrupt routes for {}",
+                driver.id,
+                EMBASSY_ASYNC_I2C_SLAVE_TAG,
+                I2C_LOWERING_LEGACY_EVENT_SLAVE
             );
         }
     }
@@ -6788,6 +7163,66 @@ fn generated_wch_runtime_vector_handlers(
                 import_line: Some(import_line.clone()),
                 helper_items: String::new(),
                 rust_handler_body: format!("    let _ = generated_{prefix}_signal_i2c_async();\n"),
+            });
+        }
+    }
+    for driver in &model.drivers {
+        if !has_i2c_async_slave_tag(&driver.capability_tags) {
+            continue;
+        }
+        let prefix = to_rust_method_name(&driver.id);
+        let import_line = format!(
+            "use crate::{}::generated_{}_on_i2c_slave_interrupt;",
+            driver.module_name, prefix
+        );
+        for route in driver
+            .interrupt_routes
+            .iter()
+            .filter(|route| route.source_ref.ends_with(".ev") || route.source_ref.ends_with(".er"))
+        {
+            if route.controller_ref != inputs.interrupt_driver.target.id {
+                bail!(
+                    "driver {} i2c async slave route {} uses interrupt controller {} instead of WCH runtime controller {}",
+                    driver.id,
+                    route.id,
+                    route.controller_ref,
+                    inputs.interrupt_driver.target.id
+                );
+            }
+            let interrupt = model
+                .interrupts
+                .iter()
+                .find(|interrupt| interrupt.id == route.interrupt_ref)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "driver {} i2c async slave route {} references unknown interrupt {}",
+                        driver.id,
+                        route.id,
+                        route.interrupt_ref
+                    )
+                })?;
+            validate_wch_runtime_interrupt_number(numbering, interrupt)?;
+            let vector_slot = render_wch_vector_slot(numbering, interrupt.number)?;
+            let handler_slug = format!(
+                "{}_{}",
+                to_rust_const_name(&driver.id).to_lowercase(),
+                to_rust_const_name(&interrupt.name).to_lowercase()
+            );
+            handlers.push(GeneratedWchRuntimeVectorHandler {
+                vector_slot,
+                irq_variant: to_rust_type_name(&interrupt.name),
+                vector_const_name: format!(
+                    "WCH_RUNTIME_{}_HANDLER_VECTOR",
+                    to_rust_const_name(&handler_slug)
+                ),
+                vector_symbol_name: format!("__hair_wch_{}_vector", handler_slug),
+                rust_handler_name: format!("__hair_wch_{}_irq_rust", handler_slug),
+                cfg_feature: Some(format!("feature = \"{}\"", EMBASSY_FEATURE_I2C_ASYNC)),
+                import_line: Some(import_line.clone()),
+                helper_items: String::new(),
+                rust_handler_body: format!(
+                    "    let _ = generated_{prefix}_on_i2c_slave_interrupt();\n"
+                ),
             });
         }
     }
@@ -10097,6 +10532,31 @@ struct ResolvedI2cMasterLowering {
     error_interrupt_enable: Option<ResolvedFieldTarget>,
 }
 
+#[derive(Debug, Clone)]
+struct ResolvedI2cSlaveLowering {
+    own_address_bits: Vec<ResolvedFieldTarget>,
+    own_address_enable: Option<ResolvedFieldTarget>,
+    own_address_apply_operation_refs: Vec<String>,
+    data_register: ResolvedFieldTarget,
+    address_matched: ResolvedFieldTarget,
+    transfer_direction: ResolvedFieldTarget,
+    receive_buffer_not_empty: ResolvedFieldTarget,
+    transmit_buffer_empty: ResolvedFieldTarget,
+    byte_transfer_finished: Option<ResolvedFieldTarget>,
+    packet_boundary: ResolvedFieldTarget,
+    acknowledge_failure: Option<ResolvedFieldTarget>,
+    overrun: Option<ResolvedFieldTarget>,
+    bus_error: Option<ResolvedFieldTarget>,
+    clear_address_operation_refs: Vec<String>,
+    clear_packet_boundary_operation_ref: String,
+    clear_acknowledge_failure_operation_ref: Option<String>,
+    clear_overrun_operation_ref: Option<String>,
+    clear_bus_error_operation_ref: Option<String>,
+    event_interrupt_enable: Option<ResolvedFieldTarget>,
+    buffer_interrupt_enable: Option<ResolvedFieldTarget>,
+    error_interrupt_enable: Option<ResolvedFieldTarget>,
+}
+
 fn resolve_i2c_binding_field(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
@@ -10130,7 +10590,7 @@ fn resolve_i2c_optional_binding_field(
         .transpose()
 }
 
-fn resolve_i2c_lowering(
+fn resolve_i2c_master_lowering(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
 ) -> Result<Option<ResolvedI2cMasterLowering>> {
@@ -10219,6 +10679,126 @@ fn resolve_i2c_lowering(
             .clear_acknowledge_failure_operation_ref
             .clone(),
         clear_arbitration_lost_operation_ref: bindings.clear_arbitration_lost_operation_ref.clone(),
+        clear_bus_error_operation_ref: bindings.clear_bus_error_operation_ref.clone(),
+        event_interrupt_enable: resolve_i2c_optional_binding_field(
+            model,
+            driver,
+            bindings.event_interrupt_enable_ref.as_deref(),
+            "eventInterruptEnableRef",
+        )?,
+        buffer_interrupt_enable: resolve_i2c_optional_binding_field(
+            model,
+            driver,
+            bindings.buffer_interrupt_enable_ref.as_deref(),
+            "bufferInterruptEnableRef",
+        )?,
+        error_interrupt_enable: resolve_i2c_optional_binding_field(
+            model,
+            driver,
+            bindings.error_interrupt_enable_ref.as_deref(),
+            "errorInterruptEnableRef",
+        )?,
+    }))
+}
+
+fn resolve_i2c_slave_lowering(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Option<ResolvedI2cSlaveLowering>> {
+    if driver.driver_kind != "i2c" || !driver_uses_legacy_event_i2c_slave_lowering(driver) {
+        return Ok(None);
+    }
+    let bindings = driver.i2c_slave_bindings.as_ref().ok_or_else(|| {
+        anyhow!(
+            "i2c driver {} requires i2cSlaveBindings for loweringPattern {}",
+            driver.id,
+            I2C_LOWERING_LEGACY_EVENT_SLAVE
+        )
+    })?;
+    let mut own_address_bits = Vec::with_capacity(bindings.own_address_bit_refs.len());
+    for field_ref in &bindings.own_address_bit_refs {
+        own_address_bits.push(resolve_i2c_binding_field(
+            model,
+            driver,
+            field_ref,
+            "ownAddressBitRefs",
+        )?);
+    }
+    Ok(Some(ResolvedI2cSlaveLowering {
+        own_address_bits,
+        own_address_enable: resolve_i2c_optional_binding_field(
+            model,
+            driver,
+            bindings.own_address_enable_ref.as_deref(),
+            "ownAddressEnableRef",
+        )?,
+        own_address_apply_operation_refs: bindings.own_address_apply_operation_refs.clone(),
+        data_register: resolve_i2c_binding_field(
+            model,
+            driver,
+            &bindings.data_register_ref,
+            "dataRegisterRef",
+        )?,
+        address_matched: resolve_i2c_binding_field(
+            model,
+            driver,
+            &bindings.address_matched_flag_ref,
+            "addressMatchedFlagRef",
+        )?,
+        transfer_direction: resolve_i2c_binding_field(
+            model,
+            driver,
+            &bindings.transfer_direction_flag_ref,
+            "transferDirectionFlagRef",
+        )?,
+        receive_buffer_not_empty: resolve_i2c_binding_field(
+            model,
+            driver,
+            &bindings.receive_buffer_not_empty_flag_ref,
+            "receiveBufferNotEmptyFlagRef",
+        )?,
+        transmit_buffer_empty: resolve_i2c_binding_field(
+            model,
+            driver,
+            &bindings.transmit_buffer_empty_flag_ref,
+            "transmitBufferEmptyFlagRef",
+        )?,
+        byte_transfer_finished: resolve_i2c_optional_binding_field(
+            model,
+            driver,
+            bindings.byte_transfer_finished_flag_ref.as_deref(),
+            "byteTransferFinishedFlagRef",
+        )?,
+        packet_boundary: resolve_i2c_binding_field(
+            model,
+            driver,
+            &bindings.packet_boundary_flag_ref,
+            "packetBoundaryFlagRef",
+        )?,
+        acknowledge_failure: resolve_i2c_optional_binding_field(
+            model,
+            driver,
+            bindings.acknowledge_failure_flag_ref.as_deref(),
+            "acknowledgeFailureFlagRef",
+        )?,
+        overrun: resolve_i2c_optional_binding_field(
+            model,
+            driver,
+            bindings.overrun_flag_ref.as_deref(),
+            "overrunFlagRef",
+        )?,
+        bus_error: resolve_i2c_optional_binding_field(
+            model,
+            driver,
+            bindings.bus_error_flag_ref.as_deref(),
+            "busErrorFlagRef",
+        )?,
+        clear_address_operation_refs: bindings.clear_address_operation_refs.clone(),
+        clear_packet_boundary_operation_ref: bindings.clear_packet_boundary_operation_ref.clone(),
+        clear_acknowledge_failure_operation_ref: bindings
+            .clear_acknowledge_failure_operation_ref
+            .clone(),
+        clear_overrun_operation_ref: bindings.clear_overrun_operation_ref.clone(),
         clear_bus_error_operation_ref: bindings.clear_bus_error_operation_ref.clone(),
         event_interrupt_enable: resolve_i2c_optional_binding_field(
             model,
@@ -10374,7 +10954,20 @@ fn render_i2c_methods(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
 ) -> Result<Vec<GeneratedMethod>> {
-    let Some(lowering) = resolve_i2c_lowering(model, driver)? else {
+    if driver_uses_legacy_event_i2c_master_lowering(driver) {
+        return render_i2c_master_methods(model, driver);
+    }
+    if driver_uses_legacy_event_i2c_slave_lowering(driver) {
+        return render_i2c_slave_methods(model, driver);
+    }
+    Ok(Vec::new())
+}
+
+fn render_i2c_master_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    let Some(lowering) = resolve_i2c_master_lowering(model, driver)? else {
         return Ok(Vec::new());
     };
     let prefix = to_rust_method_name(&driver.id);
@@ -10697,6 +11290,352 @@ fn render_i2c_methods(
 
     Ok(vec![GeneratedMethod {
         name: "i2c_master_lowering".to_string(),
+        code: methods,
+    }])
+}
+
+fn render_i2c_slave_methods(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<Vec<GeneratedMethod>> {
+    let Some(lowering) = resolve_i2c_slave_lowering(model, driver)? else {
+        return Ok(Vec::new());
+    };
+    let prefix = to_rust_method_name(&driver.id);
+    let type_name = driver.type_name.as_str();
+    let data_register =
+        i2c_register_for_target(model, driver, &lowering.data_register, "dataRegisterRef")?;
+    let address_matched_register = i2c_register_for_target(
+        model,
+        driver,
+        &lowering.address_matched,
+        "addressMatchedFlagRef",
+    )?;
+    let transfer_direction_register = i2c_register_for_target(
+        model,
+        driver,
+        &lowering.transfer_direction,
+        "transferDirectionFlagRef",
+    )?;
+    let receive_buffer_not_empty_register = i2c_register_for_target(
+        model,
+        driver,
+        &lowering.receive_buffer_not_empty,
+        "receiveBufferNotEmptyFlagRef",
+    )?;
+    let transmit_buffer_empty_register = i2c_register_for_target(
+        model,
+        driver,
+        &lowering.transmit_buffer_empty,
+        "transmitBufferEmptyFlagRef",
+    )?;
+    let packet_boundary_register = i2c_register_for_target(
+        model,
+        driver,
+        &lowering.packet_boundary,
+        "packetBoundaryFlagRef",
+    )?;
+    if field_value_mask(&lowering.data_register.field)? > u64::from(u8::MAX) {
+        bail!(
+            "i2c driver {} dataRegisterRef field {} exceeds the supported 8-bit data width",
+            driver.id,
+            lowering.data_register.field.id
+        );
+    }
+    for target in &lowering.own_address_bits {
+        if field_value_mask(&target.field)? != 1 {
+            bail!(
+                "i2c driver {} ownAddressBitRef {} must resolve to a single-bit field",
+                driver.id,
+                target.field.id
+            );
+        }
+    }
+
+    let address_matched_expr = render_register_field_value_read_expression(
+        &address_matched_register,
+        &lowering.address_matched.field,
+    )?;
+    let direction_expr = render_register_field_value_read_expression(
+        &transfer_direction_register,
+        &lowering.transfer_direction.field,
+    )?;
+    let rxne_expr = render_register_field_value_read_expression(
+        &receive_buffer_not_empty_register,
+        &lowering.receive_buffer_not_empty.field,
+    )?;
+    let txe_expr = render_register_field_value_read_expression(
+        &transmit_buffer_empty_register,
+        &lowering.transmit_buffer_empty.field,
+    )?;
+    let packet_boundary_expr = render_register_field_value_read_expression(
+        &packet_boundary_register,
+        &lowering.packet_boundary.field,
+    )?;
+    let data_read_expr =
+        render_register_field_value_read_expression(&data_register, &lowering.data_register.field)?;
+    let byte_write_expr = render_i2c_field_write_expr(&data_register, "value");
+    let clear_address_statements = render_i2c_operation_ref_statements(
+        model,
+        driver,
+        &lowering.clear_address_operation_refs,
+        "clearAddressOperationRefs",
+        "        ",
+    )?;
+    let clear_packet_boundary_statements = render_i2c_operation_ref_statements(
+        model,
+        driver,
+        std::slice::from_ref(&lowering.clear_packet_boundary_operation_ref),
+        "clearPacketBoundaryOperationRef",
+        "            ",
+    )?;
+    let clear_ack_statements =
+        if let Some(operation_ref) = &lowering.clear_acknowledge_failure_operation_ref {
+            render_i2c_operation_ref_statements(
+                model,
+                driver,
+                std::slice::from_ref(operation_ref),
+                "clearAcknowledgeFailureOperationRef",
+                "            ",
+            )?
+        } else {
+            String::new()
+        };
+    let clear_overrun_statements =
+        if let Some(operation_ref) = &lowering.clear_overrun_operation_ref {
+            render_i2c_operation_ref_statements(
+                model,
+                driver,
+                std::slice::from_ref(operation_ref),
+                "clearOverrunOperationRef",
+                "            ",
+            )?
+        } else {
+            String::new()
+        };
+    let clear_bus_error_statements =
+        if let Some(operation_ref) = &lowering.clear_bus_error_operation_ref {
+            render_i2c_operation_ref_statements(
+                model,
+                driver,
+                std::slice::from_ref(operation_ref),
+                "clearBusErrorOperationRef",
+                "            ",
+            )?
+        } else {
+            String::new()
+        };
+    let mut own_address_writes = String::new();
+    for (index, target) in lowering.own_address_bits.iter().enumerate() {
+        let register = i2c_register_for_target(model, driver, target, "ownAddressBitRefs")?;
+        let bit_expr = if index == 0 {
+            "address".to_string()
+        } else {
+            format!("(address >> {index}) & 0x01u8")
+        };
+        own_address_writes.push_str(&render_register_write_expression_statement(
+            &register,
+            &target.field,
+            &render_i2c_field_write_expr(&register, &bit_expr),
+            "        ",
+        )?);
+    }
+    if let Some(target) = &lowering.own_address_enable {
+        let register = i2c_register_for_target(model, driver, target, "ownAddressEnableRef")?;
+        own_address_writes.push_str(&render_register_write_statement(
+            &register,
+            &target.field,
+            1,
+            "        ",
+        )?);
+    }
+    own_address_writes.push_str(&render_i2c_operation_ref_statements(
+        model,
+        driver,
+        &lowering.own_address_apply_operation_refs,
+        "ownAddressApplyOperationRefs",
+        "        ",
+    )?);
+    let transmit_byte_finished_wait = if let Some(target) = &lowering.byte_transfer_finished {
+        let register =
+            i2c_register_for_target(model, driver, target, "byteTransferFinishedFlagRef")?;
+        let expr = render_register_field_value_read_expression(&register, &target.field)?;
+        format!(
+            "                while ({expr}) == 0u32 {{\n                    self.generated_check_and_clear_i2c_slave_error_flags(true)?;\n                    core::hint::spin_loop();\n                }}\n"
+        )
+    } else {
+        String::new()
+    };
+    let transmit_byte_finished_wait_async = if let Some(target) = &lowering.byte_transfer_finished {
+        let register =
+            i2c_register_for_target(model, driver, target, "byteTransferFinishedFlagRef")?;
+        let expr = render_register_field_value_read_expression(&register, &target.field)?;
+        format!(
+            "                self.generated_wait_i2c_async_until(true, |_| Ok(({expr}) != 0u32)).await?;\n"
+        )
+    } else {
+        String::new()
+    };
+    let byte_write = render_register_write_expression_statement(
+        &data_register,
+        &lowering.data_register.field,
+        &byte_write_expr,
+        "                ",
+    )?;
+    let mut init_calls = String::new();
+    for operation in &driver.init_operations {
+        init_calls.push_str(&format!(
+            "        self.apply_{}()?;\n",
+            operation_method_slug(operation)
+        ));
+    }
+
+    let mut error_checks = String::new();
+    if let Some(target) = &lowering.acknowledge_failure {
+        let register = i2c_register_for_target(model, driver, target, "acknowledgeFailureFlagRef")?;
+        let expr = render_register_field_value_read_expression(&register, &target.field)?;
+        error_checks.push_str(&format!(
+            "        if !ignore_ack_failure && ({expr}) != 0u32 {{\n{clear_ack_statements}            return Err(metadata::Error::NoAcknowledge);\n        }}\n"
+        ));
+    }
+    if let Some(target) = &lowering.overrun {
+        let register = i2c_register_for_target(model, driver, target, "overrunFlagRef")?;
+        let expr = render_register_field_value_read_expression(&register, &target.field)?;
+        error_checks.push_str(&format!(
+            "        if ({expr}) != 0u32 {{\n{clear_overrun_statements}            return Err(metadata::Error::Overrun);\n        }}\n"
+        ));
+    }
+    if let Some(target) = &lowering.bus_error {
+        let register = i2c_register_for_target(model, driver, target, "busErrorFlagRef")?;
+        let expr = render_register_field_value_read_expression(&register, &target.field)?;
+        error_checks.push_str(&format!(
+            "        if ({expr}) != 0u32 {{\n{clear_bus_error_statements}            return Err(metadata::Error::Bus);\n        }}\n"
+        ));
+    }
+    let tx_ack_end = if let Some(target) = &lowering.acknowledge_failure {
+        let register = i2c_register_for_target(model, driver, target, "acknowledgeFailureFlagRef")?;
+        let expr = render_register_field_value_read_expression(&register, &target.field)?;
+        format!(
+            "            if ({expr}) != 0u32 {{\n{clear_ack_statements}                return Ok(written);\n            }}\n"
+        )
+    } else {
+        String::new()
+    };
+    let rx_ready_expr = format!(
+        "({rxne_expr}) != 0u32 || ({packet_boundary_expr}) != 0u32 || ({address_matched_expr}) != 0u32"
+    );
+    let tx_ready_expr = if tx_ack_end.is_empty() {
+        format!(
+            "({txe_expr}) != 0u32 || ({packet_boundary_expr}) != 0u32 || ({address_matched_expr}) != 0u32"
+        )
+    } else {
+        format!(
+            "({txe_expr}) != 0u32 || ({packet_boundary_expr}) != 0u32 || ({address_matched_expr}) != 0u32 || ({}) != 0u32",
+            render_register_field_value_read_expression(
+                &i2c_register_for_target(
+                    model,
+                    driver,
+                    lowering
+                        .acknowledge_failure
+                        .as_ref()
+                        .expect("ack state present when tx_ack_end populated"),
+                    "acknowledgeFailureFlagRef",
+                )?,
+                &lowering
+                    .acknowledge_failure
+                    .as_ref()
+                    .expect("ack state present when tx_ack_end populated")
+                    .field,
+            )?
+        )
+    };
+
+    let async_prepare_fn = format!("generated_{prefix}_prepare_i2c_async_wait");
+    let async_wait_fn = format!("generated_{prefix}_wait_i2c_async");
+    let mut methods = String::new();
+    methods.push_str(
+        "    fn generated_validate_7bit_own_address(&self, address: u8) -> Result<u8, metadata::Error> {\n        if address > 0x7Fu8 {\n            return Err(metadata::Error::Unsupported(\"I2C own address exceeds the modeled 7-bit slave subset\"));\n        }\n        Ok(address)\n    }\n\n",
+    );
+    methods.push_str(&format!(
+        "    fn generated_program_own_address_7bit(&self, address: u8) -> Result<(), metadata::Error> {{\n        let address = self.generated_validate_7bit_own_address(address)?;\n{own_address_writes}        Ok(())\n    }}\n\n"
+    ));
+    methods.push_str(&format!(
+        "    fn generated_check_and_clear_i2c_slave_error_flags(&self, ignore_ack_failure: bool) -> Result<(), metadata::Error> {{\n{error_checks}        Ok(())\n    }}\n\n"
+    ));
+    methods.push_str(&format!(
+        "    fn generated_read_slave_packet_direction(&self) -> Result<{type_name}PacketDirection, metadata::Error> {{\n        Ok(if ({direction_expr}) != 0u32 {{\n            {type_name}PacketDirection::TransmitToMaster\n        }} else {{\n            {type_name}PacketDirection::ReceiveFromMaster\n        }})\n    }}\n\n"
+    ));
+    methods.push_str(&format!(
+        "    fn generated_wait_for_slave_direction(&self, expect_transmit: bool) -> Result<(), metadata::Error> {{\n        loop {{\n            self.generated_check_and_clear_i2c_slave_error_flags(false)?;\n            if ({address_matched_expr}) != 0u32 {{\n                let observed_transmit = ({direction_expr}) != 0u32;\n{clear_address_statements}                if observed_transmit != expect_transmit {{\n                    return Err(metadata::Error::Unsupported(if expect_transmit {{\n                        \"I2C slave packet matched RX-from-master while waiting for TX-to-master\"\n                    }} else {{\n                        \"I2C slave packet matched TX-to-master while waiting for RX-from-master\"\n                    }}));\n                }}\n                return Ok(());\n            }}\n            core::hint::spin_loop();\n        }}\n    }}\n\n"
+    ));
+    if !init_calls.is_empty() {
+        methods.push_str(&format!(
+            "    pub fn init_slave(&self) -> Result<(), metadata::Error> {{\n{init_calls}        Ok(())\n    }}\n\n"
+        ));
+    }
+    methods.push_str(
+        "    pub fn set_own_address_7bit(&self, address: u8) -> Result<(), metadata::Error> {\n        self.generated_program_own_address_7bit(address)\n    }\n\n",
+    );
+    methods.push_str(&format!(
+        "    pub fn blocking_wait_packet_direction(&self) -> Result<{type_name}PacketDirection, metadata::Error> {{\n        loop {{\n            self.generated_check_and_clear_i2c_slave_error_flags(false)?;\n            if ({address_matched_expr}) != 0u32 {{\n                return self.generated_read_slave_packet_direction();\n            }}\n            core::hint::spin_loop();\n        }}\n    }}\n\n"
+    ));
+    methods.push_str(&format!(
+        "    pub fn blocking_read_packet(&self, read: &mut [u8]) -> Result<usize, metadata::Error> {{\n        self.generated_wait_for_slave_direction(false)?;\n        let mut received = 0usize;\n        loop {{\n            self.generated_check_and_clear_i2c_slave_error_flags(false)?;\n            if ({rxne_expr}) != 0u32 {{\n                let value = {data_read_expr};\n                let value = u8::try_from(value).map_err(|_| metadata::Error::Unsupported(\"generated I2C data field exceeds u8\"))?;\n                if received >= read.len() {{\n                    return Err(metadata::Error::Unsupported(\"provided I2C slave RX buffer is too small for the completed packet\"));\n                }}\n                read[received] = value;\n                received += 1;\n                continue;\n            }}\n            if ({packet_boundary_expr}) != 0u32 {{\n{clear_packet_boundary_statements}                return Ok(received);\n            }}\n            if ({address_matched_expr}) != 0u32 {{\n                return Ok(received);\n            }}\n            core::hint::spin_loop();\n        }}\n    }}\n\n"
+    ));
+    methods.push_str(&format!(
+        "    pub fn blocking_write_packet(&self, write: &[u8]) -> Result<usize, metadata::Error> {{\n        self.generated_wait_for_slave_direction(true)?;\n        let mut written = 0usize;\n        loop {{\n            self.generated_check_and_clear_i2c_slave_error_flags(true)?;\n            if ({packet_boundary_expr}) != 0u32 {{\n{clear_packet_boundary_statements}                return Ok(written);\n            }}\n            if ({address_matched_expr}) != 0u32 {{\n                return Ok(written);\n            }}\n{tx_ack_end}            if ({txe_expr}) != 0u32 && written < write.len() {{\n                let value = write[written];\n{byte_write}{transmit_byte_finished_wait}                written += 1;\n                continue;\n            }}\n            core::hint::spin_loop();\n        }}\n    }}\n\n"
+    ));
+    if has_i2c_async_slave_tag(&driver.capability_tags) {
+        methods.push_str(
+            &format!(
+                "    #[cfg(feature = \"i2c-async\")]\n    async fn generated_wait_i2c_async_until<F>(&self, ignore_ack_failure: bool, mut ready: F) -> Result<(), metadata::Error>\n    where\n        F: FnMut(&Self) -> Result<bool, metadata::Error>,\n    {{\n        loop {{\n            {async_prepare_fn}();\n            self.generated_check_and_clear_i2c_slave_error_flags(ignore_ack_failure)?;\n            if ready(self)? {{\n                return Ok(());\n            }}\n            self.generated_enable_i2c_async_interrupts()?;\n            {async_wait_fn}().await?;\n        }}\n    }}\n\n",
+            ),
+        );
+        methods.push_str(&format!(
+            "    #[cfg(feature = \"i2c-async\")]\n    fn generated_enable_i2c_async_interrupts(&self) -> Result<(), metadata::Error> {{\n{event_enable}{buffer_enable}{error_enable}        Ok(())\n    }}\n\n",
+            event_enable = if let Some(target) = &lowering.event_interrupt_enable {
+                let register =
+                    i2c_register_for_target(model, driver, target, "eventInterruptEnableRef")?;
+                render_register_write_statement(&register, &target.field, 1, "        ")?
+            } else {
+                String::new()
+            },
+            buffer_enable = if let Some(target) = &lowering.buffer_interrupt_enable {
+                let register =
+                    i2c_register_for_target(model, driver, target, "bufferInterruptEnableRef")?;
+                render_register_write_statement(&register, &target.field, 1, "        ")?
+            } else {
+                String::new()
+            },
+            error_enable = if let Some(target) = &lowering.error_interrupt_enable {
+                let register =
+                    i2c_register_for_target(model, driver, target, "errorInterruptEnableRef")?;
+                render_register_write_statement(&register, &target.field, 1, "        ")?
+            } else {
+                String::new()
+            },
+        ));
+        methods.push_str(&format!(
+            "    #[cfg(feature = \"i2c-async\")]\n    pub async fn wait_packet_direction_async(&self) -> Result<{type_name}PacketDirection, metadata::Error> {{\n        self.generated_wait_i2c_async_until(false, |_| Ok(({address_matched_expr}) != 0u32)).await?;\n        self.generated_read_slave_packet_direction()\n    }}\n\n"
+        ));
+        methods.push_str(&format!(
+            "    #[cfg(feature = \"i2c-async\")]\n    pub async fn read_packet_async(&self, read: &mut [u8]) -> Result<usize, metadata::Error> {{\n        self.generated_wait_i2c_async_until(false, |_| Ok(({address_matched_expr}) != 0u32)).await?;\n        let direction = self.generated_read_slave_packet_direction()?;\n{clear_address_statements}        if direction != {type_name}PacketDirection::ReceiveFromMaster {{\n            return Err(metadata::Error::Unsupported(\"I2C slave packet matched TX-to-master while waiting for RX-from-master\"));\n        }}\n        let mut received = 0usize;\n        loop {{\n            self.generated_check_and_clear_i2c_slave_error_flags(false)?;\n            if ({rxne_expr}) != 0u32 {{\n                let value = {data_read_expr};\n                let value = u8::try_from(value).map_err(|_| metadata::Error::Unsupported(\"generated I2C data field exceeds u8\"))?;\n                if received >= read.len() {{\n                    return Err(metadata::Error::Unsupported(\"provided I2C slave RX buffer is too small for the completed packet\"));\n                }}\n                read[received] = value;\n                received += 1;\n                continue;\n            }}\n            if ({packet_boundary_expr}) != 0u32 {{\n{clear_packet_boundary_statements}                return Ok(received);\n            }}\n            if ({address_matched_expr}) != 0u32 {{\n                return Ok(received);\n            }}\n            self.generated_wait_i2c_async_until(false, |_| Ok({rx_ready_expr})).await?;\n        }}\n    }}\n\n"
+        ));
+        methods.push_str(&format!(
+            "    #[cfg(feature = \"i2c-async\")]\n    pub async fn write_packet_async(&self, write: &[u8]) -> Result<usize, metadata::Error> {{\n        self.generated_wait_i2c_async_until(false, |_| Ok(({address_matched_expr}) != 0u32)).await?;\n        let direction = self.generated_read_slave_packet_direction()?;\n{clear_address_statements}        if direction != {type_name}PacketDirection::TransmitToMaster {{\n            return Err(metadata::Error::Unsupported(\"I2C slave packet matched RX-from-master while waiting for TX-to-master\"));\n        }}\n        let mut written = 0usize;\n        loop {{\n            self.generated_check_and_clear_i2c_slave_error_flags(true)?;\n            if ({packet_boundary_expr}) != 0u32 {{\n{clear_packet_boundary_statements}                return Ok(written);\n            }}\n            if ({address_matched_expr}) != 0u32 {{\n                return Ok(written);\n            }}\n{tx_ack_end}            if ({txe_expr}) != 0u32 && written < write.len() {{\n                let value = write[written];\n{byte_write}{transmit_byte_finished_wait_async}                written += 1;\n                continue;\n            }}\n            self.generated_wait_i2c_async_until(true, |_| Ok({tx_ready_expr})).await?;\n        }}\n    }}\n\n"
+        ));
+    }
+    if has_i2c_slave_isr_dispatch_tag(&driver.capability_tags) {
+        methods.push_str(&format!(
+            "    #[cfg(feature = \"i2c-async\")]\n    pub fn enable_rx_packet_isr_dispatch(&self, buffer: &'static mut [u8], callback: {type_name}RxPacketIsrCallback) -> Result<(), metadata::Error> {{\n        if buffer.is_empty() {{\n            return Err(metadata::Error::Unsupported(\"I2C slave ISR dispatch requires a non-empty static buffer\"));\n        }}\n        generated_{prefix}_configure_i2c_slave_isr_dispatch(buffer, callback);\n        self.generated_enable_i2c_async_interrupts()?;\n        Ok(())\n    }}\n\n"
+        ));
+        methods.push_str(&format!(
+            "    #[cfg(feature = \"i2c-async\")]\n    pub fn disable_rx_packet_isr_dispatch(&self) {{\n        generated_{prefix}_disable_i2c_slave_isr_dispatch();\n    }}\n\n"
+        ));
+    }
+
+    Ok(vec![GeneratedMethod {
+        name: "i2c_slave_lowering".to_string(),
         code: methods,
     }])
 }
@@ -11890,7 +12829,20 @@ fn render_i2c_support_items(
     model: &EmbassyGenerationModel,
     driver: &ResolvedDriverInstance,
 ) -> Result<String> {
-    let Some(lowering) = resolve_i2c_lowering(model, driver)? else {
+    if driver_uses_legacy_event_i2c_master_lowering(driver) {
+        return render_i2c_master_support_items(model, driver);
+    }
+    if driver_uses_legacy_event_i2c_slave_lowering(driver) {
+        return render_i2c_slave_support_items(model, driver);
+    }
+    Ok(String::new())
+}
+
+fn render_i2c_master_support_items(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    let Some(lowering) = resolve_i2c_master_lowering(model, driver)? else {
         return Ok(String::new());
     };
     let type_name = driver.type_name.as_str();
@@ -12006,13 +12958,13 @@ async fn generated_{prefix}_wait_i2c_async() -> Result<(), metadata::Error> {{
 
 #[cfg(feature = "i2c-async")]
 pub(crate) fn generated_{prefix}_signal_i2c_async() -> Result<(), metadata::Error> {{
-{disable_interrupts}    let waker = critical_section::with(|cs| {{
+    let waker = critical_section::with(|cs| {{
         let mut state = GENERATED_{const_prefix}_I2C_ASYNC_STATE.borrow(cs).borrow_mut();
         state.ready = true;
         state.waker.take()
     }});
     if let Some(waker) = waker {{
-        waker.wake();
+{disable_interrupts}        waker.wake();
     }}
     Ok(())
 }}
@@ -12047,6 +12999,445 @@ impl embedded_hal_async::i2c::I2c<embedded_hal::i2c::SevenBitAddress> for {type_
 "#,
             const_prefix = to_rust_const_name(&driver.id),
         ));
+    }
+    Ok(out)
+}
+
+fn render_i2c_slave_support_items(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    let Some(lowering) = resolve_i2c_slave_lowering(model, driver)? else {
+        return Ok(String::new());
+    };
+    let type_name = driver.type_name.as_str();
+    let prefix = to_rust_method_name(&driver.id);
+    let const_prefix = to_rust_const_name(&driver.id);
+    let mut out = format!(
+        r#"
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum {type_name}PacketDirection {{
+    ReceiveFromMaster,
+    TransmitToMaster,
+}}
+"#
+    );
+    if has_i2c_async_slave_tag(&driver.capability_tags) {
+        let mut disable_interrupts = String::new();
+        for (target, usage) in [
+            (
+                lowering.event_interrupt_enable.as_ref(),
+                "eventInterruptEnableRef",
+            ),
+            (
+                lowering.buffer_interrupt_enable.as_ref(),
+                "bufferInterruptEnableRef",
+            ),
+            (
+                lowering.error_interrupt_enable.as_ref(),
+                "errorInterruptEnableRef",
+            ),
+        ] {
+            if let Some(target) = target {
+                let register = i2c_register_for_target(model, driver, target, usage)?;
+                disable_interrupts.push_str(&render_register_write_statement(
+                    &register,
+                    &target.field,
+                    0,
+                    "    ",
+                )?);
+            }
+        }
+        let signal_disable_interrupts = if disable_interrupts.is_empty() {
+            String::new()
+        } else if has_i2c_slave_isr_dispatch_tag(&driver.capability_tags) {
+            format!(
+                "    if !generated_{prefix}_i2c_slave_isr_dispatch_enabled() {{\n{disable_interrupts}    }}\n"
+            )
+        } else {
+            disable_interrupts.clone()
+        };
+        out.push_str(&format!(
+            r#"
+#[cfg(feature = "i2c-async")]
+#[derive(Debug)]
+struct Generated{type_name}I2cAsyncState {{
+    ready: bool,
+    waker: Option<core::task::Waker>,
+}}
+
+#[cfg(feature = "i2c-async")]
+impl Generated{type_name}I2cAsyncState {{
+    const fn new() -> Self {{
+        Self {{
+            ready: false,
+            waker: None,
+        }}
+    }}
+}}
+
+#[cfg(feature = "i2c-async")]
+static GENERATED_{const_prefix}_I2C_ASYNC_STATE: critical_section::Mutex<
+    core::cell::RefCell<Generated{type_name}I2cAsyncState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(
+    Generated{type_name}I2cAsyncState::new(),
+));
+
+#[cfg(feature = "i2c-async")]
+fn generated_{prefix}_prepare_i2c_async_wait() {{
+    critical_section::with(|cs| {{
+        let mut state = GENERATED_{const_prefix}_I2C_ASYNC_STATE.borrow(cs).borrow_mut();
+        state.ready = false;
+        state.waker = None;
+    }});
+}}
+
+#[cfg(feature = "i2c-async")]
+async fn generated_{prefix}_wait_i2c_async() -> Result<(), metadata::Error> {{
+    core::future::poll_fn(|cx| {{
+        critical_section::with(|cs| {{
+            let mut state = GENERATED_{const_prefix}_I2C_ASYNC_STATE.borrow(cs).borrow_mut();
+            if state.ready {{
+                state.ready = false;
+                core::task::Poll::Ready(Ok(()))
+            }} else {{
+                state.waker = Some(cx.waker().clone());
+                core::task::Poll::Pending
+            }}
+        }})
+    }})
+    .await
+}}
+
+#[cfg(feature = "i2c-async")]
+pub(crate) fn generated_{prefix}_signal_i2c_async() -> Result<(), metadata::Error> {{
+{signal_disable_interrupts}    let waker = critical_section::with(|cs| {{
+        let mut state = GENERATED_{const_prefix}_I2C_ASYNC_STATE.borrow(cs).borrow_mut();
+        state.ready = true;
+        state.waker.take()
+    }});
+    if let Some(waker) = waker {{
+        waker.wake();
+    }}
+    Ok(())
+}}
+"#
+        ));
+        if has_i2c_slave_isr_dispatch_tag(&driver.capability_tags) {
+            let data_register =
+                i2c_register_for_target(model, driver, &lowering.data_register, "dataRegisterRef")?;
+            let address_matched_register = i2c_register_for_target(
+                model,
+                driver,
+                &lowering.address_matched,
+                "addressMatchedFlagRef",
+            )?;
+            let direction_register = i2c_register_for_target(
+                model,
+                driver,
+                &lowering.transfer_direction,
+                "transferDirectionFlagRef",
+            )?;
+            let rxne_register = i2c_register_for_target(
+                model,
+                driver,
+                &lowering.receive_buffer_not_empty,
+                "receiveBufferNotEmptyFlagRef",
+            )?;
+            let packet_boundary_register = i2c_register_for_target(
+                model,
+                driver,
+                &lowering.packet_boundary,
+                "packetBoundaryFlagRef",
+            )?;
+            let address_matched_expr = render_register_field_value_read_expression(
+                &address_matched_register,
+                &lowering.address_matched.field,
+            )?;
+            let direction_expr = render_register_field_value_read_expression(
+                &direction_register,
+                &lowering.transfer_direction.field,
+            )?;
+            let rxne_expr = render_register_field_value_read_expression(
+                &rxne_register,
+                &lowering.receive_buffer_not_empty.field,
+            )?;
+            let packet_boundary_expr = render_register_field_value_read_expression(
+                &packet_boundary_register,
+                &lowering.packet_boundary.field,
+            )?;
+            let data_read_expr = render_register_field_value_read_expression(
+                &data_register,
+                &lowering.data_register.field,
+            )?;
+            let clear_address_statements = render_i2c_operation_ref_statements(
+                model,
+                driver,
+                &lowering.clear_address_operation_refs,
+                "clearAddressOperationRefs",
+                "        ",
+            )?;
+            let clear_packet_boundary_statements = render_i2c_operation_ref_statements(
+                model,
+                driver,
+                std::slice::from_ref(&lowering.clear_packet_boundary_operation_ref),
+                "clearPacketBoundaryOperationRef",
+                "            ",
+            )?;
+            let clear_overrun_statements =
+                if let Some(operation_ref) = &lowering.clear_overrun_operation_ref {
+                    render_i2c_operation_ref_statements(
+                        model,
+                        driver,
+                        std::slice::from_ref(operation_ref),
+                        "clearOverrunOperationRef",
+                        "            ",
+                    )?
+                } else {
+                    String::new()
+                };
+            let clear_bus_error_statements =
+                if let Some(operation_ref) = &lowering.clear_bus_error_operation_ref {
+                    render_i2c_operation_ref_statements(
+                        model,
+                        driver,
+                        std::slice::from_ref(operation_ref),
+                        "clearBusErrorOperationRef",
+                        "            ",
+                    )?
+                } else {
+                    String::new()
+                };
+            let mut cancel_on_error = String::new();
+            if let Some(target) = &lowering.overrun {
+                let register = i2c_register_for_target(model, driver, target, "overrunFlagRef")?;
+                let expr = render_register_field_value_read_expression(&register, &target.field)?;
+                cancel_on_error.push_str(&format!(
+                    "    if ({expr}) != 0u32 {{\n{clear_overrun_statements}        generated_{prefix}_cancel_i2c_slave_isr_dispatch();\n    }}\n"
+                ));
+            }
+            if let Some(target) = &lowering.bus_error {
+                let register = i2c_register_for_target(model, driver, target, "busErrorFlagRef")?;
+                let expr = render_register_field_value_read_expression(&register, &target.field)?;
+                cancel_on_error.push_str(&format!(
+                    "    if ({expr}) != 0u32 {{\n{clear_bus_error_statements}        generated_{prefix}_cancel_i2c_slave_isr_dispatch();\n    }}\n"
+                ));
+            }
+            out.push_str(&format!(
+                r#"
+#[cfg(feature = "i2c-async")]
+pub type {type_name}RxPacketIsrCallback = fn(&[u8], bool);
+
+#[cfg(feature = "i2c-async")]
+#[derive(Debug, Clone, Copy)]
+struct Generated{type_name}I2cSlaveIsrDispatchState {{
+    buffer_ptr: Option<usize>,
+    buffer_len: usize,
+    callback: Option<{type_name}RxPacketIsrCallback>,
+    active: bool,
+    received: usize,
+    truncated: bool,
+}}
+
+#[cfg(feature = "i2c-async")]
+impl Generated{type_name}I2cSlaveIsrDispatchState {{
+    const fn new() -> Self {{
+        Self {{
+            buffer_ptr: None,
+            buffer_len: 0,
+            callback: None,
+            active: false,
+            received: 0,
+            truncated: false,
+        }}
+    }}
+}}
+
+#[cfg(feature = "i2c-async")]
+static GENERATED_{const_prefix}_I2C_SLAVE_ISR_DISPATCH_STATE: critical_section::Mutex<
+    core::cell::RefCell<Generated{type_name}I2cSlaveIsrDispatchState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(
+    Generated{type_name}I2cSlaveIsrDispatchState::new(),
+));
+
+#[cfg(feature = "i2c-async")]
+fn generated_{prefix}_configure_i2c_slave_isr_dispatch(
+    buffer: &'static mut [u8],
+    callback: {type_name}RxPacketIsrCallback,
+) {{
+    critical_section::with(|cs| {{
+        let mut state = GENERATED_{const_prefix}_I2C_SLAVE_ISR_DISPATCH_STATE
+            .borrow(cs)
+            .borrow_mut();
+        state.buffer_ptr = Some(buffer.as_mut_ptr() as usize);
+        state.buffer_len = buffer.len();
+        state.callback = Some(callback);
+        state.active = false;
+        state.received = 0;
+        state.truncated = false;
+    }});
+}}
+
+#[cfg(feature = "i2c-async")]
+fn generated_{prefix}_disable_i2c_slave_isr_dispatch() {{
+    critical_section::with(|cs| {{
+        let mut state = GENERATED_{const_prefix}_I2C_SLAVE_ISR_DISPATCH_STATE
+            .borrow(cs)
+            .borrow_mut();
+        state.active = false;
+        state.received = 0;
+        state.truncated = false;
+        state.callback = None;
+        state.buffer_ptr = None;
+        state.buffer_len = 0;
+    }});
+}}
+
+#[cfg(feature = "i2c-async")]
+fn generated_{prefix}_i2c_slave_isr_dispatch_enabled() -> bool {{
+    critical_section::with(|cs| {{
+        let state = GENERATED_{const_prefix}_I2C_SLAVE_ISR_DISPATCH_STATE
+            .borrow(cs)
+            .borrow();
+        state.callback.is_some() && state.buffer_ptr.is_some() && state.buffer_len != 0
+    }})
+}}
+
+#[cfg(feature = "i2c-async")]
+fn generated_{prefix}_i2c_slave_isr_dispatch_active() -> bool {{
+    critical_section::with(|cs| {{
+        GENERATED_{const_prefix}_I2C_SLAVE_ISR_DISPATCH_STATE
+            .borrow(cs)
+            .borrow()
+            .active
+    }})
+}}
+
+#[cfg(feature = "i2c-async")]
+fn generated_{prefix}_start_i2c_slave_isr_dispatch() {{
+    critical_section::with(|cs| {{
+        let mut state = GENERATED_{const_prefix}_I2C_SLAVE_ISR_DISPATCH_STATE
+            .borrow(cs)
+            .borrow_mut();
+        if state.callback.is_some() && state.buffer_ptr.is_some() && state.buffer_len != 0 {{
+            state.active = true;
+            state.received = 0;
+            state.truncated = false;
+        }}
+    }});
+}}
+
+#[cfg(feature = "i2c-async")]
+fn generated_{prefix}_cancel_i2c_slave_isr_dispatch() {{
+    critical_section::with(|cs| {{
+        let mut state = GENERATED_{const_prefix}_I2C_SLAVE_ISR_DISPATCH_STATE
+            .borrow(cs)
+            .borrow_mut();
+        state.active = false;
+        state.received = 0;
+        state.truncated = false;
+    }});
+}}
+
+#[cfg(feature = "i2c-async")]
+fn generated_{prefix}_push_i2c_slave_isr_dispatch_byte(value: u8) {{
+    critical_section::with(|cs| {{
+        let mut state = GENERATED_{const_prefix}_I2C_SLAVE_ISR_DISPATCH_STATE
+            .borrow(cs)
+            .borrow_mut();
+        if !state.active {{
+            return;
+        }}
+        if let Some(buffer_ptr) = state.buffer_ptr {{
+            if state.received < state.buffer_len {{
+                // SAFETY: enable_rx_packet_isr_dispatch hands over a 'static buffer pointer
+                // for ISR-owned packet capture while dispatch remains configured.
+                unsafe {{
+                    (buffer_ptr as *mut u8).add(state.received).write(value);
+                }}
+            }} else {{
+                state.truncated = true;
+            }}
+            state.received = state.received.saturating_add(1);
+        }}
+    }});
+}}
+
+#[cfg(feature = "i2c-async")]
+fn generated_{prefix}_take_i2c_slave_isr_dispatch_packet(
+) -> Option<(usize, usize, {type_name}RxPacketIsrCallback, bool)> {{
+    critical_section::with(|cs| {{
+        let mut state = GENERATED_{const_prefix}_I2C_SLAVE_ISR_DISPATCH_STATE
+            .borrow(cs)
+            .borrow_mut();
+        let callback = state.callback?;
+        let buffer_ptr = state.buffer_ptr?;
+        if !state.active {{
+            return None;
+        }}
+        let received = state.received.min(state.buffer_len);
+        let truncated = state.truncated;
+        state.active = false;
+        state.received = 0;
+        state.truncated = false;
+        Some((buffer_ptr, received, callback, truncated))
+    }})
+}}
+
+#[cfg(feature = "i2c-async")]
+fn generated_{prefix}_dispatch_completed_i2c_slave_packet() {{
+    if let Some((buffer_ptr, received, callback, truncated)) =
+        generated_{prefix}_take_i2c_slave_isr_dispatch_packet()
+    {{
+        // SAFETY: the stored pointer comes from enable_rx_packet_isr_dispatch and remains
+        // valid for the duration of dispatch configuration.
+        let bytes = unsafe {{ core::slice::from_raw_parts(buffer_ptr as *const u8, received) }};
+        callback(bytes, truncated);
+    }}
+}}
+
+#[cfg(feature = "i2c-async")]
+pub(crate) fn generated_{prefix}_on_i2c_slave_interrupt() -> Result<(), metadata::Error> {{
+{cancel_on_error}    if generated_{prefix}_i2c_slave_isr_dispatch_active() && ({packet_boundary_expr}) != 0u32 {{
+{clear_packet_boundary_statements}        generated_{prefix}_dispatch_completed_i2c_slave_packet();
+        return generated_{prefix}_signal_i2c_async();
+    }}
+    if generated_{prefix}_i2c_slave_isr_dispatch_active() && ({address_matched_expr}) != 0u32 {{
+{clear_address_statements}        generated_{prefix}_dispatch_completed_i2c_slave_packet();
+        return generated_{prefix}_signal_i2c_async();
+    }}
+    if generated_{prefix}_i2c_slave_isr_dispatch_enabled()
+        && !generated_{prefix}_i2c_slave_isr_dispatch_active()
+        && ({address_matched_expr}) != 0u32
+        && ({direction_expr}) == 0u32
+    {{
+{clear_address_statements}        generated_{prefix}_start_i2c_slave_isr_dispatch();
+    }}
+    if generated_{prefix}_i2c_slave_isr_dispatch_active() {{
+        while ({rxne_expr}) != 0u32 {{
+            let value = {data_read_expr};
+            let value = u8::try_from(value)
+                .map_err(|_| metadata::Error::Unsupported("generated I2C data field exceeds u8"))?;
+            generated_{prefix}_push_i2c_slave_isr_dispatch_byte(value);
+        }}
+        if ({packet_boundary_expr}) != 0u32 {{
+{clear_packet_boundary_statements}            generated_{prefix}_dispatch_completed_i2c_slave_packet();
+        }}
+    }}
+    generated_{prefix}_signal_i2c_async()
+}}
+"#
+            ));
+        } else {
+            out.push_str(&format!(
+                r#"
+#[cfg(feature = "i2c-async")]
+pub(crate) fn generated_{prefix}_on_i2c_slave_interrupt() -> Result<(), metadata::Error> {{
+    generated_{prefix}_signal_i2c_async()
+}}
+"#
+            ));
+        }
     }
     Ok(out)
 }
@@ -16497,6 +17888,64 @@ fn collect_embassy_register_scope(
                 );
             }
         }
+        if let Some(bindings) = &driver.i2c_slave_bindings {
+            for binding_ref in &bindings.own_address_bit_refs {
+                collect_semantic_target_peripheral(
+                    &mut required,
+                    scope.register_owners,
+                    Some(binding_ref.as_str()),
+                );
+            }
+            for binding_ref in [
+                Some(bindings.data_register_ref.as_str()),
+                Some(bindings.address_matched_flag_ref.as_str()),
+                Some(bindings.transfer_direction_flag_ref.as_str()),
+                Some(bindings.receive_buffer_not_empty_flag_ref.as_str()),
+                Some(bindings.transmit_buffer_empty_flag_ref.as_str()),
+                Some(bindings.packet_boundary_flag_ref.as_str()),
+                bindings.own_address_enable_ref.as_deref(),
+                bindings.byte_transfer_finished_flag_ref.as_deref(),
+                bindings.acknowledge_failure_flag_ref.as_deref(),
+                bindings.overrun_flag_ref.as_deref(),
+                bindings.bus_error_flag_ref.as_deref(),
+                bindings.event_interrupt_enable_ref.as_deref(),
+                bindings.buffer_interrupt_enable_ref.as_deref(),
+                bindings.error_interrupt_enable_ref.as_deref(),
+            ] {
+                collect_semantic_target_peripheral(
+                    &mut required,
+                    scope.register_owners,
+                    binding_ref,
+                );
+            }
+            for operation_ref in bindings
+                .own_address_apply_operation_refs
+                .iter()
+                .chain(bindings.clear_address_operation_refs.iter())
+                .chain(std::iter::once(
+                    &bindings.clear_packet_boundary_operation_ref,
+                ))
+                .chain(bindings.clear_acknowledge_failure_operation_ref.iter())
+                .chain(bindings.clear_overrun_operation_ref.iter())
+                .chain(bindings.clear_bus_error_operation_ref.iter())
+            {
+                let operation = scope
+                    .operations
+                    .get(operation_ref.as_str())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "operation reference {} on driver {} could not be resolved",
+                            operation_ref,
+                            driver.id
+                        )
+                    })?;
+                collect_operation_target_peripherals(
+                    &mut required,
+                    scope.register_owners,
+                    operation,
+                );
+            }
+        }
     }
     Ok(required)
 }
@@ -16714,6 +18163,49 @@ fn collect_embassy_field_scope(
                 .iter()
                 .chain(bindings.clear_acknowledge_failure_operation_ref.iter())
                 .chain(bindings.clear_arbitration_lost_operation_ref.iter())
+                .chain(bindings.clear_bus_error_operation_ref.iter())
+            {
+                let operation = operations.get(operation_ref.as_str()).ok_or_else(|| {
+                    anyhow!(
+                        "operation reference {} on driver {} could not be resolved",
+                        operation_ref,
+                        driver.id
+                    )
+                })?;
+                collect_operation_field_refs(&mut required, operation);
+            }
+        }
+        if let Some(bindings) = &driver.i2c_slave_bindings {
+            for binding_ref in &bindings.own_address_bit_refs {
+                collect_semantic_field_ref(&mut required, Some(binding_ref.as_str()));
+            }
+            for binding_ref in [
+                Some(bindings.data_register_ref.as_str()),
+                Some(bindings.address_matched_flag_ref.as_str()),
+                Some(bindings.transfer_direction_flag_ref.as_str()),
+                Some(bindings.receive_buffer_not_empty_flag_ref.as_str()),
+                Some(bindings.transmit_buffer_empty_flag_ref.as_str()),
+                Some(bindings.packet_boundary_flag_ref.as_str()),
+                bindings.own_address_enable_ref.as_deref(),
+                bindings.byte_transfer_finished_flag_ref.as_deref(),
+                bindings.acknowledge_failure_flag_ref.as_deref(),
+                bindings.overrun_flag_ref.as_deref(),
+                bindings.bus_error_flag_ref.as_deref(),
+                bindings.event_interrupt_enable_ref.as_deref(),
+                bindings.buffer_interrupt_enable_ref.as_deref(),
+                bindings.error_interrupt_enable_ref.as_deref(),
+            ] {
+                collect_semantic_field_ref(&mut required, binding_ref);
+            }
+            for operation_ref in bindings
+                .own_address_apply_operation_refs
+                .iter()
+                .chain(bindings.clear_address_operation_refs.iter())
+                .chain(std::iter::once(
+                    &bindings.clear_packet_boundary_operation_ref,
+                ))
+                .chain(bindings.clear_acknowledge_failure_operation_ref.iter())
+                .chain(bindings.clear_overrun_operation_ref.iter())
                 .chain(bindings.clear_bus_error_operation_ref.iter())
             {
                 let operation = operations.get(operation_ref.as_str()).ok_or_else(|| {
@@ -22090,7 +23582,68 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(i2c_rs.contains("generated_drv_i2c1_signal_i2c_async"));
         assert!(i2c_rs.contains("let _ = u32::from(read_u16(0x40005414u64)?);"));
         assert!(i2c_rs.contains("let _ = u32::from(read_u16(0x40005418u64)?);"));
+        assert!(i2c_rs.contains(
+            "if let Some(waker) = waker {\n        modify_u16(0x40005404u64, 0x0200u16, 0x0000u16)?;\n        modify_u16(0x40005404u64, 0x0400u16, 0x0000u16)?;\n        modify_u16(0x40005404u64, 0x0100u16, 0x0000u16)?;\n        waker.wake();\n    }"
+        ));
         assert!(wch_rs.contains("generated_drv_i2c1_signal_i2c_async();"));
+    }
+
+    #[test]
+    fn generate_embassy_emits_i2c_slave_helpers_for_ch32v203g6u6() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let input = repo_root
+            .join("evidence")
+            .join("wch")
+            .join("ch32v203g6u6")
+            .join("hair.json");
+        let document = load_validated_hair_document(&input, &repo_root)
+            .expect("reference hair document should validate");
+        let output_dir = tempdir().expect("tempdir");
+
+        generate_embassy_crate(&document, output_dir.path()).expect("embassy generation");
+
+        let cargo_toml =
+            std::fs::read_to_string(output_dir.path().join("Cargo.toml")).expect("Cargo.toml");
+        let i2c_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("i2c.rs")).expect("i2c.rs");
+        let wch_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("wch.rs")).expect("wch.rs");
+
+        assert!(cargo_toml.contains("i2c = ["));
+        assert!(cargo_toml.contains("i2c-async = ["));
+        assert!(i2c_rs.contains("pub enum I2C1SlavePacketDirection"));
+        assert!(i2c_rs.contains("pub fn init_slave(&self) -> Result<(), metadata::Error>"));
+        assert!(i2c_rs.contains("self.apply_init_slave()?;"));
+        assert!(i2c_rs.contains("pub fn set_own_address_7bit(&self, address: u8)"));
+        assert!(i2c_rs.contains("pub fn blocking_wait_packet_direction("));
+        assert!(i2c_rs.contains("pub fn blocking_read_packet(&self, read: &mut [u8])"));
+        assert!(i2c_rs.contains("pub fn blocking_write_packet(&self, write: &[u8])"));
+        assert!(i2c_rs.contains("pub async fn read_packet_async(&self, read: &mut [u8])"));
+        assert!(i2c_rs.contains("pub async fn write_packet_async(&self, write: &[u8])"));
+        assert!(i2c_rs.contains("pub type I2C1SlaveRxPacketIsrCallback = fn(&[u8], bool);"));
+        assert!(i2c_rs.contains("pub fn enable_rx_packet_isr_dispatch("));
+        assert!(i2c_rs.contains("generated_drv_i2c1_slave_on_i2c_slave_interrupt"));
+        assert!(i2c_rs.contains("generated_drv_i2c1_slave_configure_i2c_slave_isr_dispatch"));
+        assert!(i2c_rs.contains("let observed_transmit ="));
+        assert!(i2c_rs.contains(
+            "let _ = u32::from(read_u16(0x40005414u64)?);\n                let _ = u32::from(read_u16(0x40005418u64)?);\n                if observed_transmit != expect_transmit {"
+        ));
+        assert!(i2c_rs.contains(
+            "let direction = self.generated_read_slave_packet_direction()?;\n        let _ = u32::from(read_u16(0x40005414u64)?);\n        let _ = u32::from(read_u16(0x40005418u64)?);\n        if direction != I2C1SlavePacketDirection::ReceiveFromMaster {"
+        ));
+        assert!(i2c_rs.contains(
+            "let direction = self.generated_read_slave_packet_direction()?;\n        let _ = u32::from(read_u16(0x40005414u64)?);\n        let _ = u32::from(read_u16(0x40005418u64)?);\n        if direction != I2C1SlavePacketDirection::TransmitToMaster {"
+        ));
+        assert!(i2c_rs.contains("self.generated_enable_i2c_async_interrupts()?;"));
+        assert!(i2c_rs.contains(
+            "if !generated_drv_i2c1_slave_i2c_slave_isr_dispatch_enabled() {\n        modify_u16(0x40005404u64, 0x0200u16, 0x0000u16)?;\n        modify_u16(0x40005404u64, 0x0400u16, 0x0000u16)?;\n        modify_u16(0x40005404u64, 0x0100u16, 0x0000u16)?;\n    }"
+        ));
+        assert!(i2c_rs.contains(
+            "    {\n        let _ = u32::from(read_u16(0x40005414u64)?);\n        let _ = u32::from(read_u16(0x40005418u64)?);\n        generated_drv_i2c1_slave_dispatch_completed_i2c_slave_packet();\n        return generated_drv_i2c1_slave_signal_i2c_async();\n    }\n"
+        ));
+        assert!(i2c_rs.contains("u16::from(address)"));
+        assert!(i2c_rs.contains("u16::from((address >> 6) & 0x01u8)"));
+        assert!(wch_rs.contains("generated_drv_i2c1_slave_on_i2c_slave_interrupt();"));
     }
 
     #[test]

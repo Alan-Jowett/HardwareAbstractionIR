@@ -225,6 +225,44 @@ transaction state machine. That async surface does not authorize slave mode,
 SMBus behavior, 10-bit addressing, or unrelated vendor-specific transaction
 helpers.
 
+Slave lowering uses a separate explicit family, `legacy-event-i2c-slave`,
+rather than stretching the master contract into target/slave semantics it was
+not designed to express. That family models one configured 7-bit own address
+on one driver instance, packet-bounded addressed transactions whose boundary is
+the completed STOP or repeated-START closure, and both RX-from-master and
+TX-to-master behavior. The same driver instance must carry an explicit
+`i2cSlaveBindings` map naming the direct own-address programming,
+address-match, direction, RXNE/TXE-style data-flow, packet-boundary, clear, and
+optional error/interrupt-enable roles needed to realize that packet path. For
+families such as CH32V203 that split the primary own address across multiple
+single-bit fields, runtime reconfiguration must use an explicit multi-step
+programming contract rather than a single inferred field binding. This keeps
+the generated slave lowering auditable and prevents the generator from silently
+rediscovering legacy slave sequencing from vendor register names.
+
+Because Embassy and `embedded-hal` do not define a standard portable I2C slave
+trait, the generated slave surface is HAL-specific. Its naming and overall API
+shape should still stay as close as practical to the generated master surface:
+blocking and async packet-oriented methods should remain parallel where the
+hardware model allows, while slave-specific concepts such as own-address setup,
+matched-direction reporting, packet readiness, and ISR-level dispatch remain
+explicitly named HAL concepts.
+
+Async I2C slave lowering sits on top of that same explicit packet contract. A
+driver instance may expose async HAL-specific slave waits or packet acquisition
+only when it additionally claims capability tag `embassy-async-i2c-slave`
+and names the exact event/error interrupt-route closure plus any
+controller-local interrupt-enable handles needed to wake packet progress on the
+same approved slave state machine. A further opt-in capability tag,
+`embassy-i2c-slave-isr-dispatch`, may expose an ISR-level completed RX-packet
+callback path with a user-supplied static buffer on top of that async slave
+contract for mode-switch or recovery behavior tied to packets written by the
+controller/master. The first cut does not attempt fully autonomous repeated-start
+packet stitching or generic byte-stream callbacks; normal blocking/async packet
+calls remain the primary general-purpose API. Neither async opt-in authorizes
+general-call, dual-address, SMBus, 10-bit, or byte-level callback-driven slave
+families.
+
 USB device lowering follows the same evidence-bounded rule. A `usb-device`
 driver instance may expose endpoint-oriented helpers, serial-style byte-stream
 helpers, or both, but only for the subset whose control and data paths are

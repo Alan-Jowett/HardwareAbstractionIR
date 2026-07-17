@@ -66,14 +66,15 @@
     },
     "loweringPattern": {
       "type": "string",
-      "description": "Optional generator-facing lowering selector for cases where one supported driver kind has more than one approved evidence-backed lowering family with materially different bring-up behavior. Reserved values currently include `serial-jtag-preserve-link`, which selects a USB Serial/JTAG-style lowering that preserves an already boot-established link instead of synthesizing a reset-and-reattach sequence; `fsdev-pma-btable`, which selects a controller-level full-speed USB device family built around PMA/BTABLE-style endpoint state and attach/reset servicing; `counter-compare-timer`, which selects a timer-backed Embassy async timing family built around an explicitly modeled free-running counter plus compare/alarm path; `regular-sequence-adc-dma`, which selects a software-started regular-group buffered ADC sampling family backed by one explicit DMA path; `stm32f1-page-flash`, which selects an STM32F1-class memory-mapped internal flash sequencer with explicit unlock, page-erase, program, busy/error, and flag-clear bindings; and `legacy-event-i2c-master`, which selects a legacy event/status-flag-driven I2C controller-master family whose portable lowering is limited to 7-bit master transactions backed by explicit control/status/data bindings. Generators must fail explicitly if a selected lowering pattern lacks the referenced semantic inputs it requires.",
+      "description": "Optional generator-facing lowering selector for cases where one supported driver kind has more than one approved evidence-backed lowering family with materially different bring-up behavior. Reserved values currently include `serial-jtag-preserve-link`, which selects a USB Serial/JTAG-style lowering that preserves an already boot-established link instead of synthesizing a reset-and-reattach sequence; `fsdev-pma-btable`, which selects a controller-level full-speed USB device family built around PMA/BTABLE-style endpoint state and attach/reset servicing; `counter-compare-timer`, which selects a timer-backed Embassy async timing family built around an explicitly modeled free-running counter plus compare/alarm path; `regular-sequence-adc-dma`, which selects a software-started regular-group buffered ADC sampling family backed by one explicit DMA path; `stm32f1-page-flash`, which selects an STM32F1-class memory-mapped internal flash sequencer with explicit unlock, page-erase, program, busy/error, and flag-clear bindings; `legacy-event-i2c-master`, which selects a legacy event/status-flag-driven I2C controller-master family whose portable lowering is limited to 7-bit master transactions backed by explicit control/status/data bindings; and `legacy-event-i2c-slave`, which selects a legacy event/status-flag-driven I2C single-own-address slave family whose first-cut lowering is limited to 7-bit packet-bounded slave transactions backed by explicit own-address, status, packet-boundary, and data bindings. Generators must fail explicitly if a selected lowering pattern lacks the referenced semantic inputs it requires.",
       "enum": [
         "serial-jtag-preserve-link",
         "fsdev-pma-btable",
         "counter-compare-timer",
         "regular-sequence-adc-dma",
         "stm32f1-page-flash",
-        "legacy-event-i2c-master"
+        "legacy-event-i2c-master",
+        "legacy-event-i2c-slave"
       ]
     },
     "timeDriverSource": {
@@ -386,6 +387,123 @@
         "receiveBufferNotEmptyFlagRef",
         "byteTransferFinishedFlagRef",
         "clearAddressOperationRefs"
+      ],
+      "additionalProperties": false
+    },
+    "i2cSlaveBindings": {
+      "type": "object",
+      "description": "Optional explicit slave-transaction lowering bindings for `i2c` driver instances that select a family such as `legacy-event-i2c-slave`. These bindings name the exact own-address programming, status, packet-boundary, and data handles used by the generated HAL-specific 7-bit slave packet path. When the same driver instance also claims capability tag `embassy-async-i2c-slave`, the binding map may additionally name the interrupt-enable handles used to wake packet progress from the same approved event/error route closure. Runtime own-address reconfiguration remains limited to the same explicit multi-step programming contract plus any named apply operations. Generators must fail explicitly rather than inferring these roles from vendor register names when the selected lowering family requires them.",
+      "properties": {
+        "ownAddressBitRefs": {
+          "description": "Entity refs for the seven direct register fields that carry the runtime-programmable 7-bit own address, ordered from least-significant address bit to most-significant address bit.",
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "minItems": 7,
+          "maxItems": 7,
+          "uniqueItems": true
+        },
+        "ownAddressEnableRef": {
+          "description": "Optional entity ref for a control field that explicitly enables response to the configured own address when the selected family exposes that control separately from init/apply operations.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "ownAddressApplyOperationRefs": {
+          "description": "Optional semantic operations that must run after programming `ownAddressBitRefs` during generated runtime own-address reconfiguration before the new address is guaranteed live. These operations may also force fixed family-required mode bits such as 7-bit-address selection.",
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "uniqueItems": true
+        },
+        "dataRegisterRef": {
+          "description": "Entity ref for the data register field used for both slave-receive and slave-transmit payload bytes on the selected packet path.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "addressMatchedFlagRef": {
+          "description": "Entity ref for the status flag that reports completion of the addressed slave match phase before any family-specific clear sequence is applied.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "transferDirectionFlagRef": {
+          "description": "Entity ref for the status flag or direction indicator that distinguishes slave-receive from slave-transmit mode for the matched packet.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "receiveBufferNotEmptyFlagRef": {
+          "description": "Entity ref for the status flag that reports receive-buffer not-empty state for the selected slave path.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "transmitBufferEmptyFlagRef": {
+          "description": "Entity ref for the status flag that reports transmit-buffer empty or data-register-ready state for the selected slave path.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "byteTransferFinishedFlagRef": {
+          "description": "Optional entity ref for the byte-transfer-finished flag used to confirm the last slave-transmit byte has drained from the shift path before end-of-packet completion is reported.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "packetBoundaryFlagRef": {
+          "description": "Entity ref for the status flag or equivalent boundary indicator that marks completion of one addressed slave packet on the selected family after STOP or repeated-START closure.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "acknowledgeFailureFlagRef": {
+          "description": "Optional entity ref for the status flag that reports NACK / acknowledge-failure state while serving the selected slave packet path.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "overrunFlagRef": {
+          "description": "Optional entity ref for the status flag that reports receive overrun or transmit underrun state on the selected slave packet path.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "busErrorFlagRef": {
+          "description": "Optional entity ref for the status flag that reports a bus-error condition on the selected slave family.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "clearAddressOperationRefs": {
+          "description": "Semantic operations that perform the family-specific slave address-match clear or acknowledge sequence required after the address-matched flag is observed and before packet payload transfer may continue.",
+          "type": "array",
+          "items": {
+            "$ref": "../common.json#/$defs/entityRef"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "clearPacketBoundaryOperationRef": {
+          "description": "Entity ref for the semantic operation that acknowledges or clears the selected family's completed-packet boundary condition.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "clearAcknowledgeFailureOperationRef": {
+          "description": "Optional entity ref for the semantic operation that acknowledges or clears the selected family's NACK / acknowledge-failure condition.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "clearOverrunOperationRef": {
+          "description": "Optional entity ref for the semantic operation that acknowledges or clears the selected family's receive-overrun or transmit-underrun condition.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "clearBusErrorOperationRef": {
+          "description": "Optional entity ref for the semantic operation that acknowledges or clears bus-error state on the selected slave family.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "eventInterruptEnableRef": {
+          "description": "Optional entity ref for the control field that enables the controller's event interrupt path for async slave packet handling.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "bufferInterruptEnableRef": {
+          "description": "Optional entity ref for the control field that enables buffer-ready interrupts for async slave packet handling when the selected family exposes them separately from event interrupts.",
+          "$ref": "../common.json#/$defs/entityRef"
+        },
+        "errorInterruptEnableRef": {
+          "description": "Optional entity ref for the control field that enables the controller's error interrupt path for async slave packet handling.",
+          "$ref": "../common.json#/$defs/entityRef"
+        }
+      },
+      "required": [
+        "ownAddressBitRefs",
+        "dataRegisterRef",
+        "addressMatchedFlagRef",
+        "transferDirectionFlagRef",
+        "receiveBufferNotEmptyFlagRef",
+        "transmitBufferEmptyFlagRef",
+        "packetBoundaryFlagRef",
+        "clearAddressOperationRefs",
+        "clearPacketBoundaryOperationRef"
       ],
       "additionalProperties": false
     },
@@ -739,6 +857,9 @@
             "i2cMasterBindings": {
               "$ref": "#/$defs/i2cMasterBindings"
             },
+            "i2cSlaveBindings": {
+              "$ref": "#/$defs/i2cSlaveBindings"
+            },
             "flashBindings": {
               "$ref": "#/$defs/flashBindings"
             },
@@ -799,7 +920,7 @@
               "uniqueItems": true
             },
             "capabilityTags": {
-              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support, `embedded-hal-async-wait` to mark `gpio-port` driver instances that may expose the `embedded_hal_async::digital::Wait` contract when explicit EXTI-backed wait bindings are also present, and `embedded-hal-async-i2c-master` to mark `i2c` driver instances that may expose the async `embedded_hal_async::i2c::I2c<SevenBitAddress>` master surface when explicit master bindings plus the required interrupt-route closure are present. The accompanying `timeDriverSource` selector determines whether that support is the existing SysTick-backed interrupt path, an explicitly modeled hardware-timer-backed path, or an explicitly modeled rtc-backed path; `timeDriverTickHz` fixes the Embassy tick rate for modeled non-SysTick sources; `timeDriverBindings` names the exact non-SysTick lowering handles when that path is used; `adcDmaBindings` names the exact direct roles for `regular-sequence-adc-dma` buffered sampling when that ADC family is selected; `dmaAsyncBindings` names the exact channel-local interrupt/flag handles for generated DMA completion futures; `gpioExtiWaitBindings` names the exact line-local selector, trigger, pending, clear, and interrupt-route handles for EXTI-backed GPIO waits; `i2cMasterBindings` names the exact legacy-I2C control/status/data roles and optional interrupt-enable handles for portable blocking and async 7-bit master transactions; and `flashBindings` names the managed region, geometry, control/status bindings, and required semantic operations for a portable internal-flash NOR surface.",
+              "description": "Generator-facing capability annotations. Capability tags do not authorize the generator to emit behavior that is unsupported by the referenced topology and semantic lowering inputs. The first-cut profile reserves `embassy-time-driver` to mark the unique driver instance that provides generated Embassy async timing support, `embedded-hal-async-wait` to mark `gpio-port` driver instances that may expose the `embedded_hal_async::digital::Wait` contract when explicit EXTI-backed wait bindings are also present, `embedded-hal-async-i2c-master` to mark `i2c` driver instances that may expose the async `embedded_hal_async::i2c::I2c<SevenBitAddress>` master surface when explicit master bindings plus the required interrupt-route closure are present, `embassy-async-i2c-slave` to mark `i2c` driver instances that may expose the async HAL-specific 7-bit slave packet surface when explicit slave bindings plus the required interrupt-route closure are present, and `embassy-i2c-slave-isr-dispatch` to mark `i2c` driver instances that may additionally expose a completed RX-packet interrupt callback path with a user-supplied static buffer on top of that async slave contract. The accompanying `timeDriverSource` selector determines whether that support is the existing SysTick-backed interrupt path, an explicitly modeled hardware-timer-backed path, or an explicitly modeled rtc-backed path; `timeDriverTickHz` fixes the Embassy tick rate for modeled non-SysTick sources; `timeDriverBindings` names the exact non-SysTick lowering handles when that path is used; `adcDmaBindings` names the exact direct roles for `regular-sequence-adc-dma` buffered sampling when that ADC family is selected; `dmaAsyncBindings` names the exact channel-local interrupt/flag handles for generated DMA completion futures; `gpioExtiWaitBindings` names the exact line-local selector, trigger, pending, clear, and interrupt-route handles for EXTI-backed GPIO waits; `i2cMasterBindings` names the exact legacy-I2C control/status/data roles and optional interrupt-enable handles for portable blocking and async 7-bit master transactions; `i2cSlaveBindings` names the exact legacy-I2C own-address programming, status, packet-boundary, data, and optional interrupt-enable handles for HAL-specific blocking and async 7-bit slave packet transactions; and `flashBindings` names the managed region, geometry, control/status bindings, and required semantic operations for a portable internal-flash NOR surface.",
               "type": "array",
               "items": {
                 "type": "string"
