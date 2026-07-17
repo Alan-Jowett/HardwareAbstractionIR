@@ -1069,15 +1069,15 @@ async fn generated_drv_i2c1_wait_i2c_async() -> Result<(), metadata::Error> {
 
 #[cfg(feature = "i2c-async")]
 pub(crate) fn generated_drv_i2c1_signal_i2c_async() -> Result<(), metadata::Error> {
-    modify_u16(0x40005404u64, 0x0200u16, 0x0000u16)?;
-    modify_u16(0x40005404u64, 0x0400u16, 0x0000u16)?;
-    modify_u16(0x40005404u64, 0x0100u16, 0x0000u16)?;
     let waker = critical_section::with(|cs| {
         let mut state = GENERATED_DRV_I2C1_I2C_ASYNC_STATE.borrow(cs).borrow_mut();
         state.ready = true;
         state.waker.take()
     });
     if let Some(waker) = waker {
+        modify_u16(0x40005404u64, 0x0200u16, 0x0000u16)?;
+        modify_u16(0x40005404u64, 0x0400u16, 0x0000u16)?;
+        modify_u16(0x40005404u64, 0x0100u16, 0x0000u16)?;
         waker.wake();
     }
     Ok(())

@@ -12958,13 +12958,13 @@ async fn generated_{prefix}_wait_i2c_async() -> Result<(), metadata::Error> {{
 
 #[cfg(feature = "i2c-async")]
 pub(crate) fn generated_{prefix}_signal_i2c_async() -> Result<(), metadata::Error> {{
-{disable_interrupts}    let waker = critical_section::with(|cs| {{
+    let waker = critical_section::with(|cs| {{
         let mut state = GENERATED_{const_prefix}_I2C_ASYNC_STATE.borrow(cs).borrow_mut();
         state.ready = true;
         state.waker.take()
     }});
     if let Some(waker) = waker {{
-        waker.wake();
+{disable_interrupts}        waker.wake();
     }}
     Ok(())
 }}
@@ -23582,6 +23582,9 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(i2c_rs.contains("generated_drv_i2c1_signal_i2c_async"));
         assert!(i2c_rs.contains("let _ = u32::from(read_u16(0x40005414u64)?);"));
         assert!(i2c_rs.contains("let _ = u32::from(read_u16(0x40005418u64)?);"));
+        assert!(i2c_rs.contains(
+            "if let Some(waker) = waker {\n        modify_u16(0x40005404u64, 0x0200u16, 0x0000u16)?;\n        modify_u16(0x40005404u64, 0x0400u16, 0x0000u16)?;\n        modify_u16(0x40005404u64, 0x0100u16, 0x0000u16)?;\n        waker.wake();\n    }"
+        ));
         assert!(wch_rs.contains("generated_drv_i2c1_signal_i2c_async();"));
     }
 
