@@ -872,7 +872,10 @@ impl I2C1 {
         if write.is_empty() {
             return Ok(());
         }
-        self.generated_wait_until_bus_free()?;
+        self.generated_wait_i2c_async_until(|_| {
+            Ok(((u32::from(read_u16(0x40005418u64)?) & 0x00000002u32) >> 1) == 0u32)
+        })
+        .await?;
         self.generated_write_frame_async(address, write, true, true)
             .await
     }
@@ -886,7 +889,10 @@ impl I2C1 {
         if read.is_empty() {
             return Ok(());
         }
-        self.generated_wait_until_bus_free()?;
+        self.generated_wait_i2c_async_until(|_| {
+            Ok(((u32::from(read_u16(0x40005418u64)?) & 0x00000002u32) >> 1) == 0u32)
+        })
+        .await?;
         self.generated_read_frame_async(address, read, true, true, true)
             .await
     }
@@ -904,7 +910,10 @@ impl I2C1 {
         if read.is_empty() {
             return self.write_async_7bit(address, write).await;
         }
-        self.generated_wait_until_bus_free()?;
+        self.generated_wait_i2c_async_until(|_| {
+            Ok(((u32::from(read_u16(0x40005418u64)?) & 0x00000002u32) >> 1) == 0u32)
+        })
+        .await?;
         self.generated_write_frame_async(address, write, true, false)
             .await?;
         self.generated_read_frame_async(address, read, true, true, true)
@@ -931,7 +940,10 @@ impl I2C1 {
         let Some(last_non_empty_index) = last_non_empty_index else {
             return Ok(());
         };
-        self.generated_wait_until_bus_free()?;
+        self.generated_wait_i2c_async_until(|_| {
+            Ok(((u32::from(read_u16(0x40005418u64)?) & 0x00000002u32) >> 1) == 0u32)
+        })
+        .await?;
         for index in 0..operations.len() {
             let current_kind = match &operations[index] {
                 embedded_hal::i2c::Operation::Write(write) if !write.is_empty() => Some(false),
@@ -1303,11 +1315,11 @@ pub const DRV_I2C1_SLAVE_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[
                 target_ref: Some("reg.i2c1.oaddr1"),
                 expression: Some(metadata::SemanticExpression {
                     language: Some("plain"),
-                    text: "Set ADD0 = 1",
+                    text: "Clear ADD0",
                 }),
                 value: None,
                 description: Some(
-                    "Force the 7-bit own-address layout's fixed low-order mode bit before runtime address programming.",
+                    "Keep the 7-bit own-address layout's low-order bit clear before runtime address programming.",
                 ),
             },
             metadata::SemanticOperationStep {
@@ -1368,11 +1380,11 @@ pub const DRV_I2C1_SLAVE_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[
                 target_ref: Some("reg.i2c1.ctlr1"),
                 expression: Some(metadata::SemanticExpression {
                     language: Some("plain"),
-                    text: "Set ACK = 1",
+                    text: "Set PE = 1",
                 }),
                 value: None,
                 description: Some(
-                    "Enable address/data acknowledge for the generated slave packet path.",
+                    "Re-enable the peripheral before enabling slave address/data acknowledgement.",
                 ),
             },
             metadata::SemanticOperationStep {
@@ -1381,11 +1393,11 @@ pub const DRV_I2C1_SLAVE_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[
                 target_ref: Some("reg.i2c1.ctlr1"),
                 expression: Some(metadata::SemanticExpression {
                     language: Some("plain"),
-                    text: "Set PE = 1",
+                    text: "Set ACK = 1",
                 }),
                 value: None,
                 description: Some(
-                    "Re-enable the peripheral after the fixed slave-side control profile is loaded.",
+                    "Enable address/data acknowledgement after the peripheral is enabled.",
                 ),
             },
         ],
@@ -1517,7 +1529,7 @@ impl I2C1Slave {
             0x0080u16,
             ((u16::from((address >> 6) & 0x01u8)) & 0x0001u16) << 7,
         )?;
-        modify_u16(0x40005408u64, 0x0001u16, 0x0001u16)?;
+        modify_u16(0x40005408u64, 0x0001u16, 0x0000u16)?;
         modify_u16(0x40005408u64, 0x0100u16, 0x0000u16)?;
         modify_u16(0x40005408u64, 0x0200u16, 0x0000u16)?;
         modify_u16(0x40005408u64, 0x8000u16, 0x0000u16)?;
@@ -1835,13 +1847,13 @@ impl I2C1Slave {
         modify_u16(0x40005400u64, 0x8000u16, 0x8000u16)?;
         modify_u16(0x40005400u64, 0x8000u16, 0x0000u16)?;
         modify_u16(0x40005404u64, 0x003Fu16, 0x0024u16)?;
-        modify_u16(0x40005408u64, 0x0001u16, 0x0001u16)?;
+        modify_u16(0x40005408u64, 0x0001u16, 0x0000u16)?;
         modify_u16(0x40005408u64, 0x0100u16, 0x0000u16)?;
         modify_u16(0x40005408u64, 0x0200u16, 0x0000u16)?;
         modify_u16(0x40005408u64, 0x8000u16, 0x0000u16)?;
         modify_u16(0x4000540Cu64, 0x0001u16, 0x0000u16)?;
-        modify_u16(0x40005400u64, 0x0400u16, 0x0400u16)?;
         modify_u16(0x40005400u64, 0x0001u16, 0x0001u16)?;
+        modify_u16(0x40005400u64, 0x0400u16, 0x0400u16)?;
         Ok(())
     }
 }
