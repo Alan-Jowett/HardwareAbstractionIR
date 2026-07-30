@@ -940,7 +940,10 @@ impl I2C1 {
         let Some(last_non_empty_index) = last_non_empty_index else {
             return Ok(());
         };
-        self.generated_wait_until_bus_free()?;
+        self.generated_wait_i2c_async_until(|_| {
+            Ok(((u32::from(read_u16(0x40005418u64)?) & 0x00000002u32) >> 1) == 0u32)
+        })
+        .await?;
         for index in 0..operations.len() {
             let current_kind = match &operations[index] {
                 embedded_hal::i2c::Operation::Write(write) if !write.is_empty() => Some(false),
