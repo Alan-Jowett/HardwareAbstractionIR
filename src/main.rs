@@ -11274,15 +11274,15 @@ fn render_i2c_master_methods(
         methods.push_str(&format!(
             "    #[cfg(feature = \"i2c-async\")]\n    async fn generated_read_frame_async(&self, address: u8, read: &mut [u8], send_start: bool, send_nack: bool, send_stop: bool) -> Result<(), metadata::Error> {{\n        if read.is_empty() {{\n            return Ok(());\n        }}\n        let Some((last, prefix)) = read.split_last_mut() else {{\n            return Ok(());\n        }};\n        if send_start {{\n{ack_position_setup}            self.generated_set_ack(true)?;\n            self.generated_send_start_async().await?;\n            self.generated_send_address_async(address, true).await?;\n        }}\n        for value in prefix {{\n            *value = self.generated_receive_data_byte_async().await?;\n        }}\n        if send_nack {{\n            self.generated_set_ack(false)?;\n        }}\n        if send_stop {{\n            self.generated_send_stop()?;\n        }}\n        *last = self.generated_receive_data_byte_async().await?;\n        Ok(())\n    }}\n\n"
         ));
-        methods.push_str(
-            "    #[cfg(feature = \"i2c-async\")]\n    pub async fn write_async_7bit(&self, address: u8, write: &[u8]) -> Result<(), metadata::Error> {\n        if write.is_empty() {\n            return Ok(());\n        }\n        self.generated_wait_until_bus_free()?;\n        self.generated_write_frame_async(address, write, true, true).await\n    }\n\n",
-        );
-        methods.push_str(
-            "    #[cfg(feature = \"i2c-async\")]\n    pub async fn read_async_7bit(&self, address: u8, read: &mut [u8]) -> Result<(), metadata::Error> {\n        if read.is_empty() {\n            return Ok(());\n        }\n        self.generated_wait_until_bus_free()?;\n        self.generated_read_frame_async(address, read, true, true, true).await\n    }\n\n",
-        );
-        methods.push_str(
-            "    #[cfg(feature = \"i2c-async\")]\n    pub async fn write_read_async_7bit(&self, address: u8, write: &[u8], read: &mut [u8]) -> Result<(), metadata::Error> {\n        if write.is_empty() {\n            return self.read_async_7bit(address, read).await;\n        }\n        if read.is_empty() {\n            return self.write_async_7bit(address, write).await;\n        }\n        self.generated_wait_until_bus_free()?;\n        self.generated_write_frame_async(address, write, true, false).await?;\n        self.generated_read_frame_async(address, read, true, true, true).await\n    }\n\n",
-        );
+        methods.push_str(&format!(
+            "    #[cfg(feature = \"i2c-async\")]\n    pub async fn write_async_7bit(&self, address: u8, write: &[u8]) -> Result<(), metadata::Error> {{\n        if write.is_empty() {{\n            return Ok(());\n        }}\n        self.generated_wait_i2c_async_until(|_| Ok(({busy_expr}) == 0u32)).await?;\n        self.generated_write_frame_async(address, write, true, true).await\n    }}\n\n"
+        ));
+        methods.push_str(&format!(
+            "    #[cfg(feature = \"i2c-async\")]\n    pub async fn read_async_7bit(&self, address: u8, read: &mut [u8]) -> Result<(), metadata::Error> {{\n        if read.is_empty() {{\n            return Ok(());\n        }}\n        self.generated_wait_i2c_async_until(|_| Ok(({busy_expr}) == 0u32)).await?;\n        self.generated_read_frame_async(address, read, true, true, true).await\n    }}\n\n"
+        ));
+        methods.push_str(&format!(
+            "    #[cfg(feature = \"i2c-async\")]\n    pub async fn write_read_async_7bit(&self, address: u8, write: &[u8], read: &mut [u8]) -> Result<(), metadata::Error> {{\n        if write.is_empty() {{\n            return self.read_async_7bit(address, read).await;\n        }}\n        if read.is_empty() {{\n            return self.write_async_7bit(address, write).await;\n        }}\n        self.generated_wait_i2c_async_until(|_| Ok(({busy_expr}) == 0u32)).await?;\n        self.generated_write_frame_async(address, write, true, false).await?;\n        self.generated_read_frame_async(address, read, true, true, true).await\n    }}\n\n"
+        ));
         methods.push_str(
             "    #[cfg(feature = \"i2c-async\")]\n    pub async fn transaction_async_7bit(&self, address: u8, operations: &mut [embedded_hal::i2c::Operation<'_>]) -> Result<(), metadata::Error> {\n        let mut previous_kind: Option<bool> = None;\n        let mut last_non_empty_index = None;\n        for (index, operation) in operations.iter().enumerate() {\n            let is_empty = match operation {\n                embedded_hal::i2c::Operation::Write(write) => write.is_empty(),\n                embedded_hal::i2c::Operation::Read(read) => read.is_empty(),\n            };\n            if !is_empty {\n                last_non_empty_index = Some(index);\n            }\n        }\n        let Some(last_non_empty_index) = last_non_empty_index else {\n            return Ok(());\n        };\n        self.generated_wait_until_bus_free()?;\n        for index in 0..operations.len() {\n            let current_kind = match &operations[index] {\n                embedded_hal::i2c::Operation::Write(write) if !write.is_empty() => Some(false),\n                embedded_hal::i2c::Operation::Read(read) if !read.is_empty() => Some(true),\n                _ => None,\n            };\n            let Some(current_kind) = current_kind else {\n                continue;\n            };\n            let send_start = previous_kind != Some(current_kind);\n            let is_last = index == last_non_empty_index;\n            let next_kind = operations[index + 1..].iter().find_map(|operation| match operation {\n                embedded_hal::i2c::Operation::Write(write) if !write.is_empty() => Some(false),\n                embedded_hal::i2c::Operation::Read(read) if !read.is_empty() => Some(true),\n                _ => None,\n            });\n            let next_changes_kind = next_kind != Some(current_kind);\n            match &mut operations[index] {\n                embedded_hal::i2c::Operation::Write(write) => {\n                    self.generated_write_frame_async(address, write, send_start, is_last).await?;\n                }\n                embedded_hal::i2c::Operation::Read(read) => {\n                    self.generated_read_frame_async(address, read, send_start, next_changes_kind, is_last).await?;\n                }\n            }\n            previous_kind = Some(current_kind);\n        }\n        Ok(())\n    }\n\n",
         );
@@ -23579,6 +23579,7 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(i2c_rs.contains("let mut last_non_empty_index = None;"));
         assert!(i2c_rs.contains("return self.blocking_read_7bit(address, read);"));
         assert!(i2c_rs.contains("return self.write_async_7bit(address, write).await;"));
+        assert!(!i2c_rs.contains("{busy_expr}"));
         assert!(i2c_rs.contains("generated_drv_i2c1_signal_i2c_async"));
         assert!(i2c_rs.contains("let _ = u32::from(read_u16(0x40005414u64)?);"));
         assert!(i2c_rs.contains("let _ = u32::from(read_u16(0x40005418u64)?);"));
@@ -23643,6 +23644,8 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         ));
         assert!(i2c_rs.contains("u16::from(address)"));
         assert!(i2c_rs.contains("u16::from((address >> 6) & 0x01u8)"));
+        assert!(i2c_rs.contains("modify_u16(0x40005408u64, 0x0001u16, 0x0000u16)?;"));
+        assert!(!i2c_rs.contains("modify_u16(0x40005408u64, 0x0001u16, 0x0001u16)?;"));
         assert!(wch_rs.contains("generated_drv_i2c1_slave_on_i2c_slave_interrupt();"));
     }
 

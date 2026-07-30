@@ -65328,9 +65328,9 @@
             "targetRef": "reg.i2c1.oaddr1",
             "expression": {
               "language": "plain",
-              "text": "Set ADD0 = 1"
+              "text": "Clear ADD0"
             },
-            "description": "Force the 7-bit own-address layout's fixed low-order mode bit before runtime address programming."
+            "description": "Keep the 7-bit own-address layout's low-order bit clear before runtime address programming."
           },
           {
             "index": 5,
@@ -65378,9 +65378,9 @@
             "targetRef": "reg.i2c1.ctlr1",
             "expression": {
               "language": "plain",
-              "text": "Set ACK = 1"
+              "text": "Set PE = 1"
             },
-            "description": "Enable address/data acknowledge for the generated slave packet path."
+            "description": "Re-enable the peripheral before enabling slave address/data acknowledgement."
           },
           {
             "index": 10,
@@ -65388,9 +65388,9 @@
             "targetRef": "reg.i2c1.ctlr1",
             "expression": {
               "language": "plain",
-              "text": "Set PE = 1"
+              "text": "Set ACK = 1"
             },
-            "description": "Re-enable the peripheral after the fixed slave-side control profile is loaded."
+            "description": "Enable address/data acknowledgement after the peripheral is enabled."
           }
         ],
         "provenance": {
@@ -65419,9 +65419,9 @@
             "targetRef": "reg.i2c1.oaddr1",
             "expression": {
               "language": "plain",
-              "text": "Set ADD0 = 1"
+              "text": "Clear ADD0"
             },
-            "description": "Force the fixed low-order mode bit used by the approved 7-bit own-address layout."
+            "description": "Keep the low-order mode bit clear for the approved 7-bit own-address layout."
           },
           {
             "index": 1,
