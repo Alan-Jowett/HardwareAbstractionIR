@@ -43,6 +43,14 @@
         "publisher": "WCH"
       },
       {
+        "id": "openwch-ch32v20x-i2c-header",
+        "name": "ch32v20x_i2c.h",
+        "kind": "vendor-header",
+        "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Peripheral/inc/ch32v20x_i2c.h",
+        "version": "V1.0.0",
+        "publisher": "WCH"
+      },
+      {
         "id": "openwch-ch32v20x-startup-d6",
         "name": "startup_ch32v20x_D6.S",
         "kind": "source-code",
@@ -246,6 +254,17 @@
         },
         "extractionMethod": "imported",
         "confidence": 0.92
+      },
+      {
+        "id": "e_i2c_slave_transmitter_event",
+        "name": "I2C slave transmitter address-match event",
+        "sourceRef": "openwch-ch32v20x-i2c-header",
+        "normalizedClaim": "The published WCH I2C header defines slave-transmitter address match as TRA, BUSY, TXE, and ADDR simultaneously, and defines acknowledge failure as the terminal slave-transmitter event.",
+        "locator": {
+          "fragment": "EVT/EXAM/SRC/Peripheral/inc/ch32v20x_i2c.h: I2C_EVENT_SLAVE_TRANSMITTER_ADDRESS_MATCHED and I2C_EVENT_SLAVE_ACK_FAILURE"
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.99
       },
       {
         "id": "e_startup_vector",
@@ -76586,11 +76605,13 @@
           ],
           "provenance": {
             "sourceRefs": [
-              "ch32-rs-ch32v203g6u6-yaml"
+              "ch32-rs-ch32v203g6u6-yaml",
+              "openwch-ch32v20x-i2c-header"
             ],
             "evidenceRefs": [
               "e_ch32rs_ch32v203g6u6_yaml_variant",
-              "e_ch32rs_ch32v203g6u6_yaml_pin_topology"
+              "e_ch32rs_ch32v203g6u6_yaml_pin_topology",
+              "e_i2c_slave_transmitter_event"
             ],
             "status": "verified",
             "confidence": 0.86
@@ -76924,7 +76945,8 @@
           ],
           "capabilityTags": [
             "embassy-async-i2c-slave",
-            "embassy-i2c-slave-isr-dispatch"
+            "embassy-i2c-slave-isr-dispatch",
+            "embassy-i2c-slave-isr-tx-dispatch"
           ],
           "interruptRouteRefs": [
             "iroute.i2c1.er",

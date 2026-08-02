@@ -258,6 +258,14 @@ Embassy profile contract.
   or recovery behavior tied to packets written by the controller/master. That
   opt-in does not authorize byte-level callback APIs, general-call,
   SMBus, dual-address, or 10-bit slave behavior.
+- If the same `i2c` driver instance additionally claims capability tag
+  `embassy-i2c-slave-isr-tx-dispatch`, it shall also claim
+  `embassy-i2c-slave-isr-dispatch`. The approved bindings shall establish that
+  a slave-transmit address match exposes the direction, address-match,
+  transmit-ready, data, and acknowledge-failure roles needed to clear the
+  address match and load the first response byte in the event ISR. The
+  generated ISR shall handle following transmit-ready events and the master's
+  terminal NACK without deferring either to task context.
 - A generated embedded Embassy HAL crate shall expose opt-in Cargo features
   for the emitted peripheral families rather than forcing every generated
   family and runtime hook into every consumer image. Those features shall be

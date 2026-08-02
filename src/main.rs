@@ -2130,6 +2130,7 @@ const EMBEDDED_HAL_ASYNC_WAIT_TAG: &str = "embedded-hal-async-wait";
 const EMBEDDED_HAL_ASYNC_I2C_MASTER_TAG: &str = "embedded-hal-async-i2c-master";
 const EMBASSY_ASYNC_I2C_SLAVE_TAG: &str = "embassy-async-i2c-slave";
 const EMBASSY_I2C_SLAVE_ISR_DISPATCH_TAG: &str = "embassy-i2c-slave-isr-dispatch";
+const EMBASSY_I2C_SLAVE_ISR_TX_DISPATCH_TAG: &str = "embassy-i2c-slave-isr-tx-dispatch";
 const EMBASSY_TIME_DRIVER_SOURCE_SYSTICK: &str = "systick";
 const EMBASSY_TIME_DRIVER_SOURCE_HARDWARE_TIMER: &str = "hardware-timer";
 const EMBASSY_TIME_DRIVER_SOURCE_RTC: &str = "rtc";
@@ -2168,6 +2169,11 @@ fn has_i2c_async_slave_tag(tags: &[String]) -> bool {
 fn has_i2c_slave_isr_dispatch_tag(tags: &[String]) -> bool {
     tags.iter()
         .any(|tag| tag == EMBASSY_I2C_SLAVE_ISR_DISPATCH_TAG)
+}
+
+fn has_i2c_slave_isr_tx_dispatch_tag(tags: &[String]) -> bool {
+    tags.iter()
+        .any(|tag| tag == EMBASSY_I2C_SLAVE_ISR_TX_DISPATCH_TAG)
 }
 
 fn time_driver_source(driver: &ResolvedDriverInstance) -> Option<&str> {
@@ -3432,8 +3438,13 @@ fn validate_capability_tag_contracts(drivers: &[ResolvedDriverInstance]) -> Resu
     for driver in drivers {
         let has_i2c_async_tag = has_i2c_async_slave_tag(&driver.capability_tags);
         let has_isr_dispatch_tag = has_i2c_slave_isr_dispatch_tag(&driver.capability_tags);
+        let has_isr_tx_dispatch_tag = has_i2c_slave_isr_tx_dispatch_tag(&driver.capability_tags);
         let has_i2c_bindings = driver.i2c_slave_bindings.is_some();
-        if !has_i2c_async_tag && !has_isr_dispatch_tag && !has_i2c_bindings {
+        if !has_i2c_async_tag
+            && !has_isr_dispatch_tag
+            && !has_isr_tx_dispatch_tag
+            && !has_i2c_bindings
+        {
             continue;
         }
         if driver.driver_kind != "i2c" {
@@ -3485,6 +3496,14 @@ fn validate_capability_tag_contracts(drivers: &[ResolvedDriverInstance]) -> Resu
                 driver.id,
                 EMBASSY_I2C_SLAVE_ISR_DISPATCH_TAG,
                 EMBASSY_ASYNC_I2C_SLAVE_TAG
+            );
+        }
+        if has_isr_tx_dispatch_tag && !has_isr_dispatch_tag {
+            bail!(
+                "driver {} claims capability tag {} but omits required {}",
+                driver.id,
+                EMBASSY_I2C_SLAVE_ISR_TX_DISPATCH_TAG,
+                EMBASSY_I2C_SLAVE_ISR_DISPATCH_TAG
             );
         }
     }
@@ -11283,9 +11302,8 @@ fn render_i2c_master_methods(
         methods.push_str(&format!(
             "    #[cfg(feature = \"i2c-async\")]\n    pub async fn write_read_async_7bit(&self, address: u8, write: &[u8], read: &mut [u8]) -> Result<(), metadata::Error> {{\n        if write.is_empty() {{\n            return self.read_async_7bit(address, read).await;\n        }}\n        if read.is_empty() {{\n            return self.write_async_7bit(address, write).await;\n        }}\n        self.generated_wait_i2c_async_until(|_| Ok(({busy_expr}) == 0u32)).await?;\n        self.generated_write_frame_async(address, write, true, false).await?;\n        self.generated_read_frame_async(address, read, true, true, true).await\n    }}\n\n"
         ));
-        let async_bus_free_wait = format!(
-            "self.generated_wait_i2c_async_until(|_| Ok(({busy_expr}) == 0u32)).await?;"
-        );
+        let async_bus_free_wait =
+            format!("self.generated_wait_i2c_async_until(|_| Ok(({busy_expr}) == 0u32)).await?;");
         methods.push_str(
             &"    #[cfg(feature = \"i2c-async\")]\n    pub async fn transaction_async_7bit(&self, address: u8, operations: &mut [embedded_hal::i2c::Operation<'_>]) -> Result<(), metadata::Error> {\n        let mut previous_kind: Option<bool> = None;\n        let mut last_non_empty_index = None;\n        for (index, operation) in operations.iter().enumerate() {\n            let is_empty = match operation {\n                embedded_hal::i2c::Operation::Write(write) => write.is_empty(),\n                embedded_hal::i2c::Operation::Read(read) => read.is_empty(),\n            };\n            if !is_empty {\n                last_non_empty_index = Some(index);\n            }\n        }\n        let Some(last_non_empty_index) = last_non_empty_index else {\n            return Ok(());\n        };\n        self.generated_wait_until_bus_free()?;\n        for index in 0..operations.len() {\n            let current_kind = match &operations[index] {\n                embedded_hal::i2c::Operation::Write(write) if !write.is_empty() => Some(false),\n                embedded_hal::i2c::Operation::Read(read) if !read.is_empty() => Some(true),\n                _ => None,\n            };\n            let Some(current_kind) = current_kind else {\n                continue;\n            };\n            let send_start = previous_kind != Some(current_kind);\n            let is_last = index == last_non_empty_index;\n            let next_kind = operations[index + 1..].iter().find_map(|operation| match operation {\n                embedded_hal::i2c::Operation::Write(write) if !write.is_empty() => Some(false),\n                embedded_hal::i2c::Operation::Read(read) if !read.is_empty() => Some(true),\n                _ => None,\n            });\n            let next_changes_kind = next_kind != Some(current_kind);\n            match &mut operations[index] {\n                embedded_hal::i2c::Operation::Write(write) => {\n                    self.generated_write_frame_async(address, write, send_start, is_last).await?;\n                }\n                embedded_hal::i2c::Operation::Read(read) => {\n                    self.generated_read_frame_async(address, read, send_start, next_changes_kind, is_last).await?;\n                }\n            }\n            previous_kind = Some(current_kind);\n        }\n        Ok(())\n    }\n\n"
                 .replace(
@@ -11585,6 +11603,9 @@ fn render_i2c_slave_methods(
     );
     methods.push_str(&format!(
         "    pub fn blocking_wait_packet_direction(&self) -> Result<{type_name}PacketDirection, metadata::Error> {{\n        loop {{\n            self.generated_check_and_clear_i2c_slave_error_flags(false)?;\n            if ({address_matched_expr}) != 0u32 {{\n                return self.generated_read_slave_packet_direction();\n            }}\n            core::hint::spin_loop();\n        }}\n    }}\n\n"
+    ));
+    methods.push_str(&format!(
+        "    pub fn try_packet_direction(&self) -> Result<Option<{type_name}PacketDirection>, metadata::Error> {{\n        self.generated_check_and_clear_i2c_slave_error_flags(false)?;\n        if ({address_matched_expr}) != 0u32 {{\n            return Ok(Some(self.generated_read_slave_packet_direction()?));\n        }}\n        Ok(None)\n    }}\n\n"
     ));
     methods.push_str(&format!(
         "    pub fn blocking_read_packet(&self, read: &mut [u8]) -> Result<usize, metadata::Error> {{\n        self.generated_wait_for_slave_direction(false)?;\n        let mut received = 0usize;\n        loop {{\n            self.generated_check_and_clear_i2c_slave_error_flags(false)?;\n            if ({rxne_expr}) != 0u32 {{\n                let value = {data_read_expr};\n                let value = u8::try_from(value).map_err(|_| metadata::Error::Unsupported(\"generated I2C data field exceeds u8\"))?;\n                if received >= read.len() {{\n                    return Err(metadata::Error::Unsupported(\"provided I2C slave RX buffer is too small for the completed packet\"));\n                }}\n                read[received] = value;\n                received += 1;\n                continue;\n            }}\n            if ({packet_boundary_expr}) != 0u32 {{\n{clear_packet_boundary_statements}                return Ok(received);\n            }}\n            if ({address_matched_expr}) != 0u32 {{\n                return Ok(received);\n            }}\n            core::hint::spin_loop();\n        }}\n    }}\n\n"
@@ -13177,6 +13198,24 @@ pub(crate) fn generated_{prefix}_signal_i2c_async() -> Result<(), metadata::Erro
                 &data_register,
                 &lowering.data_register.field,
             )?;
+            let has_isr_tx_dispatch = has_i2c_slave_isr_tx_dispatch_tag(&driver.capability_tags);
+            let txe_register = i2c_register_for_target(
+                model,
+                driver,
+                &lowering.transmit_buffer_empty,
+                "transmitBufferEmptyFlagRef",
+            )?;
+            let txe_expr = render_register_field_value_read_expression(
+                &txe_register,
+                &lowering.transmit_buffer_empty.field,
+            )?;
+            let tx_byte_write_expr = render_i2c_field_write_expr(&data_register, "value");
+            let tx_byte_write = render_register_write_expression_statement(
+                &data_register,
+                &lowering.data_register.field,
+                &tx_byte_write_expr,
+                "        ",
+            )?;
             let clear_address_statements = render_i2c_operation_ref_statements(
                 model,
                 driver,
@@ -13230,6 +13269,137 @@ pub(crate) fn generated_{prefix}_signal_i2c_async() -> Result<(), metadata::Erro
                     "    if ({expr}) != 0u32 {{\n{clear_bus_error_statements}        generated_{prefix}_cancel_i2c_slave_isr_dispatch();\n    }}\n"
                 ));
             }
+            let (isr_tx_state_items, isr_tx_ack_failure_handler) = if has_isr_tx_dispatch {
+                let acknowledge_failure = lowering.acknowledge_failure.as_ref().ok_or_else(|| {
+                    anyhow!(
+                        "driver {} claims capability tag {} but i2cSlaveBindings omits acknowledgeFailureFlagRef",
+                        driver.id,
+                        EMBASSY_I2C_SLAVE_ISR_TX_DISPATCH_TAG
+                    )
+                })?;
+                let clear_acknowledge_failure_operation =
+                    lowering.clear_acknowledge_failure_operation_ref.as_ref().ok_or_else(|| {
+                        anyhow!(
+                            "driver {} claims capability tag {} but i2cSlaveBindings omits clearAcknowledgeFailureOperationRef",
+                            driver.id,
+                            EMBASSY_I2C_SLAVE_ISR_TX_DISPATCH_TAG
+                        )
+                    })?;
+                let acknowledge_failure_register = i2c_register_for_target(
+                    model,
+                    driver,
+                    acknowledge_failure,
+                    "acknowledgeFailureFlagRef",
+                )?;
+                let acknowledge_failure_expr = render_register_field_value_read_expression(
+                    &acknowledge_failure_register,
+                    &acknowledge_failure.field,
+                )?;
+                let clear_acknowledge_failure_statements = render_i2c_operation_ref_statements(
+                    model,
+                    driver,
+                    std::slice::from_ref(clear_acknowledge_failure_operation),
+                    "clearAcknowledgeFailureOperationRef",
+                    "        ",
+                )?;
+                (
+                    format!(
+                        r#"
+#[cfg(feature = "i2c-async")]
+const GENERATED_{const_prefix}_I2C_SLAVE_ISR_TX_BUFFER_CAPACITY: usize = 32;
+
+#[cfg(feature = "i2c-async")]
+struct Generated{type_name}I2cSlaveIsrTxState {{
+    buffer: [u8; GENERATED_{const_prefix}_I2C_SLAVE_ISR_TX_BUFFER_CAPACITY],
+    len: usize,
+    next: usize,
+    active: bool,
+}}
+
+#[cfg(feature = "i2c-async")]
+impl Generated{type_name}I2cSlaveIsrTxState {{
+    const fn new() -> Self {{
+        Self {{ buffer: [0; GENERATED_{const_prefix}_I2C_SLAVE_ISR_TX_BUFFER_CAPACITY], len: 0, next: 0, active: false }}
+    }}
+}}
+
+#[cfg(feature = "i2c-async")]
+static GENERATED_{const_prefix}_I2C_SLAVE_ISR_TX_STATE: critical_section::Mutex<
+    core::cell::RefCell<Generated{type_name}I2cSlaveIsrTxState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(Generated{type_name}I2cSlaveIsrTxState::new()));
+
+#[cfg(feature = "i2c-async")]
+pub fn queue_{prefix}_i2c_slave_isr_tx_packet(packet: &[u8]) -> Result<(), metadata::Error> {{
+    if packet.len() > GENERATED_{const_prefix}_I2C_SLAVE_ISR_TX_BUFFER_CAPACITY {{
+        return Err(metadata::Error::Unsupported("I2C slave ISR TX packet exceeds the fixed response buffer"));
+    }}
+    critical_section::with(|cs| {{
+        let mut state = GENERATED_{const_prefix}_I2C_SLAVE_ISR_TX_STATE.borrow(cs).borrow_mut();
+        state.buffer[..packet.len()].copy_from_slice(packet);
+        state.len = packet.len();
+        state.next = 0;
+        state.active = true;
+    }});
+    Ok(())
+}}
+
+#[cfg(feature = "i2c-async")]
+fn generated_{prefix}_take_i2c_slave_isr_tx_byte() -> Option<u8> {{
+    critical_section::with(|cs| {{
+        let mut state = GENERATED_{const_prefix}_I2C_SLAVE_ISR_TX_STATE.borrow(cs).borrow_mut();
+        if !state.active || state.next >= state.len {{
+            state.active = false;
+            return None;
+        }}
+        let value = state.buffer[state.next];
+        state.next += 1;
+        Some(value)
+    }})
+}}
+
+#[cfg(feature = "i2c-async")]
+fn generated_{prefix}_cancel_i2c_slave_isr_tx() {{
+    critical_section::with(|cs| {{
+        let mut state = GENERATED_{const_prefix}_I2C_SLAVE_ISR_TX_STATE.borrow(cs).borrow_mut();
+        state.len = 0;
+        state.next = 0;
+        state.active = false;
+    }});
+}}
+"#
+                    ),
+                    format!(
+                        "    if ({acknowledge_failure_expr}) != 0u32 {{\n{clear_acknowledge_failure_statements}        generated_{prefix}_cancel_i2c_slave_isr_tx();\n        return generated_{prefix}_signal_i2c_async();\n    }}\n"
+                    ),
+                )
+            } else {
+                (String::new(), String::new())
+            };
+            let active_tx_address_handler = if has_isr_tx_dispatch {
+                format!(
+                    "    if generated_{prefix}_i2c_slave_isr_dispatch_active()\n        && ({address_matched_expr}) != 0u32\n        && ({direction_expr}) != 0u32\n    {{\n{clear_address_statements}        generated_{prefix}_dispatch_completed_i2c_slave_packet();\n        let value = generated_{prefix}_take_i2c_slave_isr_tx_byte().unwrap_or(0);\n{tx_byte_write}        return generated_{prefix}_signal_i2c_async();\n    }}\n"
+                )
+            } else {
+                format!(
+                    "    if generated_{prefix}_i2c_slave_isr_dispatch_active()\n        && ({address_matched_expr}) != 0u32\n        && ({direction_expr}) != 0u32\n    {{\n        generated_{prefix}_dispatch_completed_i2c_slave_packet();\n{disable_interrupts}        return generated_{prefix}_signal_i2c_async();\n    }}\n"
+                )
+            };
+            let inactive_tx_address_handler = if has_isr_tx_dispatch {
+                format!(
+                    "    if generated_{prefix}_i2c_slave_isr_dispatch_enabled()\n        && !generated_{prefix}_i2c_slave_isr_dispatch_active()\n        && ({address_matched_expr}) != 0u32\n        && ({direction_expr}) != 0u32\n    {{\n{clear_address_statements}        let value = generated_{prefix}_take_i2c_slave_isr_tx_byte().unwrap_or(0);\n{tx_byte_write}        return generated_{prefix}_signal_i2c_async();\n    }}\n"
+                )
+            } else {
+                format!(
+                    "    if generated_{prefix}_i2c_slave_isr_dispatch_enabled()\n        && !generated_{prefix}_i2c_slave_isr_dispatch_active()\n        && ({address_matched_expr}) != 0u32\n        && ({direction_expr}) != 0u32\n    {{\n{disable_interrupts}        return generated_{prefix}_signal_i2c_async();\n    }}\n"
+                )
+            };
+            let isr_tx_txe_handler = if has_isr_tx_dispatch {
+                format!(
+                    "    if generated_{prefix}_i2c_slave_isr_dispatch_enabled()\n        && ({direction_expr}) != 0u32\n        && ({txe_expr}) != 0u32\n    {{\n        let value = generated_{prefix}_take_i2c_slave_isr_tx_byte().unwrap_or(0);\n{tx_byte_write}        return generated_{prefix}_signal_i2c_async();\n    }}\n"
+                )
+            } else {
+                String::new()
+            };
             out.push_str(&format!(
                 r#"
 #[cfg(feature = "i2c-async")]
@@ -13405,10 +13575,11 @@ fn generated_{prefix}_dispatch_completed_i2c_slave_packet() {{
 
 #[cfg(feature = "i2c-async")]
 pub(crate) fn generated_{prefix}_on_i2c_slave_interrupt() -> Result<(), metadata::Error> {{
-{cancel_on_error}    if generated_{prefix}_i2c_slave_isr_dispatch_active() && ({packet_boundary_expr}) != 0u32 {{
+{isr_tx_ack_failure_handler}{cancel_on_error}    if generated_{prefix}_i2c_slave_isr_dispatch_active() && ({packet_boundary_expr}) != 0u32 {{
 {clear_packet_boundary_statements}        generated_{prefix}_dispatch_completed_i2c_slave_packet();
         return generated_{prefix}_signal_i2c_async();
     }}
+{active_tx_address_handler}
     if generated_{prefix}_i2c_slave_isr_dispatch_active() && ({address_matched_expr}) != 0u32 {{
 {clear_address_statements}        generated_{prefix}_dispatch_completed_i2c_slave_packet();
         return generated_{prefix}_signal_i2c_async();
@@ -13420,6 +13591,8 @@ pub(crate) fn generated_{prefix}_on_i2c_slave_interrupt() -> Result<(), metadata
     {{
 {clear_address_statements}        generated_{prefix}_start_i2c_slave_isr_dispatch();
     }}
+{inactive_tx_address_handler}
+{isr_tx_txe_handler}
     if generated_{prefix}_i2c_slave_isr_dispatch_active() {{
         while ({rxne_expr}) != 0u32 {{
             let value = {data_read_expr};
@@ -13435,6 +13608,7 @@ pub(crate) fn generated_{prefix}_on_i2c_slave_interrupt() -> Result<(), metadata
 }}
 "#
             ));
+            out.push_str(&isr_tx_state_items);
         } else {
             out.push_str(&format!(
                 r#"
@@ -23630,6 +23804,7 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(i2c_rs.contains("self.apply_init_slave()?;"));
         assert!(i2c_rs.contains("pub fn set_own_address_7bit(&self, address: u8)"));
         assert!(i2c_rs.contains("pub fn blocking_wait_packet_direction("));
+        assert!(i2c_rs.contains("pub fn try_packet_direction("));
         assert!(i2c_rs.contains("pub fn blocking_read_packet(&self, read: &mut [u8])"));
         assert!(i2c_rs.contains("pub fn blocking_write_packet(&self, write: &[u8])"));
         assert!(i2c_rs.contains("pub async fn read_packet_async(&self, read: &mut [u8])"));
@@ -23654,6 +23829,17 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         ));
         assert!(i2c_rs.contains(
             "    {\n        let _ = u32::from(read_u16(0x40005414u64)?);\n        let _ = u32::from(read_u16(0x40005418u64)?);\n        generated_drv_i2c1_slave_dispatch_completed_i2c_slave_packet();\n        return generated_drv_i2c1_slave_signal_i2c_async();\n    }\n"
+        ));
+        assert!(
+            i2c_rs.contains("pub fn queue_drv_i2c1_slave_i2c_slave_isr_tx_packet(packet: &[u8])")
+        );
+        assert!(i2c_rs.contains("generated_drv_i2c1_slave_take_i2c_slave_isr_tx_byte()"));
+        assert!(i2c_rs.contains("generated_drv_i2c1_slave_cancel_i2c_slave_isr_tx();"));
+        assert!(i2c_rs.contains(
+            "let value = generated_drv_i2c1_slave_take_i2c_slave_isr_tx_byte().unwrap_or(0);"
+        ));
+        assert!(i2c_rs.contains(
+            "if generated_drv_i2c1_slave_i2c_slave_isr_dispatch_enabled()\n        && ((u32::from(read_u16(0x40005418u64)?) & 0x00000004u32) >> 2) != 0u32\n        && ((u32::from(read_u16(0x40005414u64)?) & 0x00000080u32) >> 7) != 0u32"
         ));
         assert!(i2c_rs.contains("u16::from(address)"));
         assert!(i2c_rs.contains("u16::from((address >> 6) & 0x01u8)"));

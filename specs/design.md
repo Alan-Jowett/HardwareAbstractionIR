@@ -263,6 +263,15 @@ calls remain the primary general-purpose API. Neither async opt-in authorizes
 general-call, dual-address, SMBus, 10-bit, or byte-level callback-driven slave
 families.
 
+Some legacy I2C controllers expose a slave-transmit address match together
+with transmit-ready status. For an opt-in
+`embassy-i2c-slave-isr-tx-dispatch` capability, the event ISR owns that
+time-critical transition: it clears the address match, writes the first queued
+response byte, services following transmit-ready events, and clears the
+master's terminal acknowledge failure. Task context may queue a bounded
+response after an RX packet completes, but it must not be required to release
+the transmit address match or feed an active response.
+
 USB device lowering follows the same evidence-bounded rule. A `usb-device`
 driver instance may expose endpoint-oriented helpers, serial-style byte-stream
 helpers, or both, but only for the subset whose control and data paths are
