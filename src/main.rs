@@ -13395,7 +13395,7 @@ fn generated_{prefix}_cancel_i2c_slave_isr_tx() {{
             };
             let isr_tx_txe_handler = if has_isr_tx_dispatch {
                 format!(
-                    "    if ({txe_expr}) != 0u32 {{\n        let value = generated_{prefix}_take_i2c_slave_isr_tx_byte().unwrap_or(0);\n{tx_byte_write}        return generated_{prefix}_signal_i2c_async();\n    }}\n"
+                    "    if generated_{prefix}_i2c_slave_isr_dispatch_enabled()\n        && ({direction_expr}) != 0u32\n        && ({txe_expr}) != 0u32\n    {{\n        let value = generated_{prefix}_take_i2c_slave_isr_tx_byte().unwrap_or(0);\n{tx_byte_write}        return generated_{prefix}_signal_i2c_async();\n    }}\n"
                 )
             } else {
                 String::new()
@@ -23837,6 +23837,9 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(i2c_rs.contains("generated_drv_i2c1_slave_cancel_i2c_slave_isr_tx();"));
         assert!(i2c_rs.contains(
             "let value = generated_drv_i2c1_slave_take_i2c_slave_isr_tx_byte().unwrap_or(0);"
+        ));
+        assert!(i2c_rs.contains(
+            "if generated_drv_i2c1_slave_i2c_slave_isr_dispatch_enabled()\n        && ((u32::from(read_u16(0x40005418u64)?) & 0x00000004u32) >> 2) != 0u32\n        && ((u32::from(read_u16(0x40005414u64)?) & 0x00000080u32) >> 7) != 0u32"
         ));
         assert!(i2c_rs.contains("u16::from(address)"));
         assert!(i2c_rs.contains("u16::from((address >> 6) & 0x01u8)"));

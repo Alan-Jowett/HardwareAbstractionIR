@@ -2186,7 +2186,10 @@ pub(crate) fn generated_drv_i2c1_slave_on_i2c_slave_interrupt() -> Result<(), me
         return generated_drv_i2c1_slave_signal_i2c_async();
     }
 
-    if ((u32::from(read_u16(0x40005414u64)?) & 0x00000080u32) >> 7) != 0u32 {
+    if generated_drv_i2c1_slave_i2c_slave_isr_dispatch_enabled()
+        && ((u32::from(read_u16(0x40005418u64)?) & 0x00000004u32) >> 2) != 0u32
+        && ((u32::from(read_u16(0x40005414u64)?) & 0x00000080u32) >> 7) != 0u32
+    {
         let value = generated_drv_i2c1_slave_take_i2c_slave_isr_tx_byte().unwrap_or(0);
         modify_u16(0x40005410u64, 0x00FFu16, (u16::from(value)) & 0x00FFu16)?;
         return generated_drv_i2c1_slave_signal_i2c_async();
