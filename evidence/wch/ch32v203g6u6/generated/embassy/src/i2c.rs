@@ -1406,8 +1406,11 @@ pub const DRV_I2C1_SLAVE_INIT_OPERATIONS: &[metadata::SemanticOperation] = &[
     },
 ];
 pub const DRV_I2C1_SLAVE_STATE_MACHINES: &[metadata::SemanticStateMachine] = &[];
-pub const DRV_I2C1_SLAVE_CAPABILITY_TAGS: &[&str] =
-    &["embassy-async-i2c-slave", "embassy-i2c-slave-isr-dispatch"];
+pub const DRV_I2C1_SLAVE_CAPABILITY_TAGS: &[&str] = &[
+    "embassy-async-i2c-slave",
+    "embassy-i2c-slave-isr-dispatch",
+    "embassy-i2c-slave-isr-tx-dispatch",
+];
 
 #[derive(Debug, Clone, Copy)]
 pub struct I2C1SlaveRuntimeResources {}
@@ -1613,6 +1616,16 @@ impl I2C1Slave {
             }
             core::hint::spin_loop();
         }
+    }
+
+    pub fn try_packet_direction(
+        &self,
+    ) -> Result<Option<I2C1SlavePacketDirection>, metadata::Error> {
+        self.generated_check_and_clear_i2c_slave_error_flags(false)?;
+        if ((u32::from(read_u16(0x40005414u64)?) & 0x00000002u32) >> 1) != 0u32 {
+            return Ok(Some(self.generated_read_slave_packet_direction()?));
+        }
+        Ok(None)
     }
 
     pub fn blocking_read_packet(&self, read: &mut [u8]) -> Result<usize, metadata::Error> {
@@ -2111,6 +2124,11 @@ fn generated_drv_i2c1_slave_dispatch_completed_i2c_slave_packet() {
 
 #[cfg(feature = "i2c-async")]
 pub(crate) fn generated_drv_i2c1_slave_on_i2c_slave_interrupt() -> Result<(), metadata::Error> {
+    if ((u32::from(read_u16(0x40005414u64)?) & 0x00000400u32) >> 10) != 0u32 {
+        modify_u16(0x40005414u64, 0x0400u16, 0x0000u16)?;
+        generated_drv_i2c1_slave_cancel_i2c_slave_isr_tx();
+        return generated_drv_i2c1_slave_signal_i2c_async();
+    }
     if ((u32::from(read_u16(0x40005414u64)?) & 0x00000800u32) >> 11) != 0u32 {
         modify_u16(0x40005414u64, 0x0800u16, 0x0000u16)?;
         generated_drv_i2c1_slave_cancel_i2c_slave_isr_dispatch();
@@ -2129,6 +2147,18 @@ pub(crate) fn generated_drv_i2c1_slave_on_i2c_slave_interrupt() -> Result<(), me
     }
     if generated_drv_i2c1_slave_i2c_slave_isr_dispatch_active()
         && ((u32::from(read_u16(0x40005414u64)?) & 0x00000002u32) >> 1) != 0u32
+        && ((u32::from(read_u16(0x40005418u64)?) & 0x00000004u32) >> 2) != 0u32
+    {
+        let _ = u32::from(read_u16(0x40005414u64)?);
+        let _ = u32::from(read_u16(0x40005418u64)?);
+        generated_drv_i2c1_slave_dispatch_completed_i2c_slave_packet();
+        let value = generated_drv_i2c1_slave_take_i2c_slave_isr_tx_byte().unwrap_or(0);
+        modify_u16(0x40005410u64, 0x00FFu16, (u16::from(value)) & 0x00FFu16)?;
+        return generated_drv_i2c1_slave_signal_i2c_async();
+    }
+
+    if generated_drv_i2c1_slave_i2c_slave_isr_dispatch_active()
+        && ((u32::from(read_u16(0x40005414u64)?) & 0x00000002u32) >> 1) != 0u32
     {
         let _ = u32::from(read_u16(0x40005414u64)?);
         let _ = u32::from(read_u16(0x40005418u64)?);
@@ -2144,6 +2174,24 @@ pub(crate) fn generated_drv_i2c1_slave_on_i2c_slave_interrupt() -> Result<(), me
         let _ = u32::from(read_u16(0x40005418u64)?);
         generated_drv_i2c1_slave_start_i2c_slave_isr_dispatch();
     }
+    if generated_drv_i2c1_slave_i2c_slave_isr_dispatch_enabled()
+        && !generated_drv_i2c1_slave_i2c_slave_isr_dispatch_active()
+        && ((u32::from(read_u16(0x40005414u64)?) & 0x00000002u32) >> 1) != 0u32
+        && ((u32::from(read_u16(0x40005418u64)?) & 0x00000004u32) >> 2) != 0u32
+    {
+        let _ = u32::from(read_u16(0x40005414u64)?);
+        let _ = u32::from(read_u16(0x40005418u64)?);
+        let value = generated_drv_i2c1_slave_take_i2c_slave_isr_tx_byte().unwrap_or(0);
+        modify_u16(0x40005410u64, 0x00FFu16, (u16::from(value)) & 0x00FFu16)?;
+        return generated_drv_i2c1_slave_signal_i2c_async();
+    }
+
+    if ((u32::from(read_u16(0x40005414u64)?) & 0x00000080u32) >> 7) != 0u32 {
+        let value = generated_drv_i2c1_slave_take_i2c_slave_isr_tx_byte().unwrap_or(0);
+        modify_u16(0x40005410u64, 0x00FFu16, (u16::from(value)) & 0x00FFu16)?;
+        return generated_drv_i2c1_slave_signal_i2c_async();
+    }
+
     if generated_drv_i2c1_slave_i2c_slave_isr_dispatch_active() {
         while ((u32::from(read_u16(0x40005414u64)?) & 0x00000040u32) >> 6) != 0u32 {
             let value = u32::from(read_u16(0x40005410u64)?) & 0x000000FFu32;
@@ -2158,4 +2206,81 @@ pub(crate) fn generated_drv_i2c1_slave_on_i2c_slave_interrupt() -> Result<(), me
         }
     }
     generated_drv_i2c1_slave_signal_i2c_async()
+}
+
+#[cfg(feature = "i2c-async")]
+const GENERATED_DRV_I2C1_SLAVE_I2C_SLAVE_ISR_TX_BUFFER_CAPACITY: usize = 32;
+
+#[cfg(feature = "i2c-async")]
+struct GeneratedI2C1SlaveI2cSlaveIsrTxState {
+    buffer: [u8; GENERATED_DRV_I2C1_SLAVE_I2C_SLAVE_ISR_TX_BUFFER_CAPACITY],
+    len: usize,
+    next: usize,
+    active: bool,
+}
+
+#[cfg(feature = "i2c-async")]
+impl GeneratedI2C1SlaveI2cSlaveIsrTxState {
+    const fn new() -> Self {
+        Self {
+            buffer: [0; GENERATED_DRV_I2C1_SLAVE_I2C_SLAVE_ISR_TX_BUFFER_CAPACITY],
+            len: 0,
+            next: 0,
+            active: false,
+        }
+    }
+}
+
+#[cfg(feature = "i2c-async")]
+static GENERATED_DRV_I2C1_SLAVE_I2C_SLAVE_ISR_TX_STATE: critical_section::Mutex<
+    core::cell::RefCell<GeneratedI2C1SlaveI2cSlaveIsrTxState>,
+> = critical_section::Mutex::new(core::cell::RefCell::new(
+    GeneratedI2C1SlaveI2cSlaveIsrTxState::new(),
+));
+
+#[cfg(feature = "i2c-async")]
+pub fn queue_drv_i2c1_slave_i2c_slave_isr_tx_packet(packet: &[u8]) -> Result<(), metadata::Error> {
+    if packet.len() > GENERATED_DRV_I2C1_SLAVE_I2C_SLAVE_ISR_TX_BUFFER_CAPACITY {
+        return Err(metadata::Error::Unsupported(
+            "I2C slave ISR TX packet exceeds the fixed response buffer",
+        ));
+    }
+    critical_section::with(|cs| {
+        let mut state = GENERATED_DRV_I2C1_SLAVE_I2C_SLAVE_ISR_TX_STATE
+            .borrow(cs)
+            .borrow_mut();
+        state.buffer[..packet.len()].copy_from_slice(packet);
+        state.len = packet.len();
+        state.next = 0;
+        state.active = true;
+    });
+    Ok(())
+}
+
+#[cfg(feature = "i2c-async")]
+fn generated_drv_i2c1_slave_take_i2c_slave_isr_tx_byte() -> Option<u8> {
+    critical_section::with(|cs| {
+        let mut state = GENERATED_DRV_I2C1_SLAVE_I2C_SLAVE_ISR_TX_STATE
+            .borrow(cs)
+            .borrow_mut();
+        if !state.active || state.next >= state.len {
+            state.active = false;
+            return None;
+        }
+        let value = state.buffer[state.next];
+        state.next += 1;
+        Some(value)
+    })
+}
+
+#[cfg(feature = "i2c-async")]
+fn generated_drv_i2c1_slave_cancel_i2c_slave_isr_tx() {
+    critical_section::with(|cs| {
+        let mut state = GENERATED_DRV_I2C1_SLAVE_I2C_SLAVE_ISR_TX_STATE
+            .borrow(cs)
+            .borrow_mut();
+        state.len = 0;
+        state.next = 0;
+        state.active = false;
+    });
 }

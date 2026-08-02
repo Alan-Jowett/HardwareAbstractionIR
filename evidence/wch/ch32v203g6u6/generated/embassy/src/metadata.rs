@@ -261,6 +261,7 @@ pub const GENERATED_PROVENANCE_SOURCE_IDS: &[&str] = &[
     "wch-ch32fv2x-v3x-rm",
     "openwch-ch32v20x-sdk",
     "openwch-ch32v20x-header",
+    "openwch-ch32v20x-i2c-header",
     "openwch-ch32v20x-startup-d6",
     "openwch-ch32v20x-adc-dma-example",
     "openwch-ch32v20x-tim-dma-example",
@@ -283,6 +284,7 @@ pub const GENERATED_PROVENANCE_EVIDENCE_IDS: &[&str] = &[
     "e_header_d6_group",
     "e_header_base_addresses",
     "e_header_irqs",
+    "e_i2c_slave_transmitter_event",
     "e_startup_vector",
     "e_rm_overview",
     "e_core_manual",
@@ -363,6 +365,12 @@ pub const GENERATED_METADATA: GeneratedMetadata = GeneratedMetadata {
         ProvenanceSource {
             id: "openwch-ch32v20x-header",
             name: "ch32v20x.h",
+            kind: Some("vendor-header"),
+            path: None,
+        },
+        ProvenanceSource {
+            id: "openwch-ch32v20x-i2c-header",
+            name: "ch32v20x_i2c.h",
             kind: Some("vendor-header"),
             path: None,
         },
@@ -542,6 +550,19 @@ pub const GENERATED_METADATA: GeneratedMetadata = GeneratedMetadata {
             extraction_method: Some("imported"),
             confidence: Some(0.92f64),
             locator: Some("fragment=EVT/EXAM/SRC/Peripheral/inc/ch32v20x.h, lines=112-115"),
+        },
+        ProvenanceEvidence {
+            id: "e_i2c_slave_transmitter_event",
+            name: "I2C slave transmitter address-match event",
+            source_ref: "openwch-ch32v20x-i2c-header",
+            normalized_claim: Some(
+                "The published WCH I2C header defines slave-transmitter address match as TRA, BUSY, TXE, and ADDR simultaneously, and defines acknowledge failure as the terminal slave-transmitter event.",
+            ),
+            extraction_method: Some("manual"),
+            confidence: Some(0.99f64),
+            locator: Some(
+                "fragment=EVT/EXAM/SRC/Peripheral/inc/ch32v20x_i2c.h: I2C_EVENT_SLAVE_TRANSMITTER_ADDRESS_MATCHED and I2C_EVENT_SLAVE_ACK_FAILURE",
+            ),
         },
         ProvenanceEvidence {
             id: "e_startup_vector",

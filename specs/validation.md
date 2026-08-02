@@ -202,13 +202,21 @@ cargo run -- generate embassy-host evidence\wch\ch32v203c8t6\hair.json --output-
   smoke flow in which one generated master image drives command/response packet
   exchanges and reports results over USB CDC while one generated slave image
   demonstrates both normal packet handling and the ISR-level dispatch path.
+- If the same I2C driver instance additionally claims capability tag
+  `embassy-i2c-slave-isr-tx-dispatch`, that two-device smoke shall prove an
+  ISR-owned slave response: the slave clears the read-direction address match,
+  serves `[0x30, 0x20, 0x10, 0x03]` through the event ISR, and clears the
+  master's terminal NACK. A PicoScope capture shall show address `0x85` ACK,
+  those response bytes, final NACK, and STOP without an extended SCL-low
+  task-scheduling delay.
 - The checked-in build flows for that two-device CH32V203 slave acceptance are
   `powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\embassy-i2c-slave-master-smoke\build-smoke-bin.ps1 -Release`
   and
   `powershell -ExecutionPolicy Bypass -File evidence\wch\ch32v203g6u6\generated\embassy-i2c-slave-slave-smoke\build-smoke-bin.ps1 -Release`.
-  The master image shall log both the normal request/response exchange and the
-  completed-RX ISR callback path over USB CDC after the host asserts DTR before
-  reporting PASS.
+  After the host asserts DTR, the master image shall write
+  `[0x10, 0x20, 0x30]`, read and verify the deterministic slave response
+  `[0x30, 0x20, 0x10, 0x03]`, log both that normal request/response exchange
+  and the completed-RX ISR callback path over USB CDC, then report PASS.
 - If the reference bundle claims IRQ-driven DMA completion futures, generation
   succeeds only when the same `dma` driver instance carries explicit
   `dmaAsyncBindings` plus the matching DMA-channel interrupt routes, and the
