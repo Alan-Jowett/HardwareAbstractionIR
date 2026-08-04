@@ -2829,12 +2829,22 @@ fn validate_system_reset_operation(
             target_ref
         );
     }
-    if !registers.contains_key(target_ref) {
-        bail!(
+    let register = registers.get(target_ref).ok_or_else(|| {
+        anyhow!(
             "system reset operation {} on driver {} targets unknown register {}",
             operation.id,
             driver.id,
             target_ref
+        )
+    })?;
+    if register.peripheral_ref != target.target_ref {
+        bail!(
+            "system reset operation {} on driver {} writes register {} on {} instead of {}",
+            operation.id,
+            driver.id,
+            target_ref,
+            register.peripheral_ref,
+            target.target_ref
         );
     }
     if step.value.as_ref().and_then(Value::as_u64).is_none() {
@@ -24087,6 +24097,45 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
             error
                 .to_string()
                 .contains("must target a register, got field.pfic.sctlr.sysreset"),
+            "unexpected error: {error:#}"
+        );
+    }
+
+    #[test]
+    fn generate_embassy_rejects_system_reset_writing_another_peripheral() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let input = repo_root
+            .join("evidence")
+            .join("wch")
+            .join("ch32v203g6u6")
+            .join("hair.json");
+        let mut document = load_json_file(&input).expect("reference hair json");
+        let operation = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("semantics")
+            .and_then(Value::as_object_mut)
+            .expect("semantics object")
+            .get_mut("operations")
+            .and_then(Value::as_array_mut)
+            .expect("operations")
+            .iter_mut()
+            .find(|operation| operation["id"] == "op.pfic.system_reset")
+            .and_then(Value::as_object_mut)
+            .expect("PFIC system reset operation");
+        operation["steps"][0]["targetRef"] = serde_json::json!("reg.tim1.ctlr1");
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("schema should permit a register target on another peripheral");
+        let output_dir = tempdir().expect("tempdir");
+
+        let error = generate_embassy_crate(&validated, output_dir.path())
+            .expect_err("generation should reject a reset write to another peripheral");
+        assert!(
+            error
+                .to_string()
+                .contains("writes register reg.tim1.ctlr1 on periph.tim1 instead of periph.pfic"),
             "unexpected error: {error:#}"
         );
     }
