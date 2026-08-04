@@ -118,6 +118,14 @@ cargo run -- generate embassy-host evidence\wch\ch32v203c8t6\hair.json --output-
   drivers through the lean runtime API only must not retain the same
   descriptive metadata tables solely because those metadata constants also
   exist in the crate.
+- A CH32V203 bundle that carries `systemResetOperationRef` on its `interrupt`
+  driver succeeds only when the reference resolves to one explicit,
+  evidence-backed terminal write with a structural target and integer value.
+  The generated embedded interrupt module exposes a non-returning
+  `system_reset() -> !` helper that emits that exact write. Host generation
+  records the same request as a deterministic emulator reset event without
+  terminating the host process. Missing, ambiguous, non-terminal, or
+  non-integer reset operations fail generation explicitly.
 - The CH32V203G6U6 reference bundle succeeds only when the approved HAIR inputs
   justify both the rtc-backed `embassy-time-driver` path and any emitted
   HAL-specific raw RTC control helpers from the same explicit RTC

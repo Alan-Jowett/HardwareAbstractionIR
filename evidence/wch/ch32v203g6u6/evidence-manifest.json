@@ -39,6 +39,13 @@
       "notes": "Official WCH peripheral access header. The CH32V20x_D6 grouping explicitly includes CH32V203G6 and provides IRQ names, TIM4 register layout, base addresses, and peripheral type definitions."
     },
     {
+      "id": "openwch-ch32v20x-core-header",
+      "kind": "vendor-header",
+      "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Core/core_riscv.h",
+      "version": "V1.0.1",
+      "notes": "Official WCH core header defining the PFIC register layout, base address, NVIC_KEY3, and the NVIC_SystemReset write sequence."
+    },
+    {
       "id": "openwch-ch32v20x-startup-d6",
       "kind": "source-code",
       "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Startup/startup_ch32v20x_D6.S",

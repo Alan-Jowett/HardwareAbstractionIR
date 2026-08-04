@@ -186,6 +186,15 @@ interrupt-driven and DMA-backed UART/I2C/SPI/ADC behavior is part of the
 supported subset only when the driver instance names the full interrupt, DMA,
 pin, and semantic closure required for real lowering.
 
+An `interrupt` driver may additionally carry `systemResetOperationRef` for an
+MCU-wide reset path. The referenced semantic operation supplies the exact
+terminal reset write, including its structural target and integer value, so the
+generator can emit a non-returning reset helper without guessing processor-
+specific keys or control bits. This is deliberately distinct from RCC
+peripheral-reset bindings and from a board power cycle. In host generation the
+same request becomes an explicit emulator reset event rather than process
+termination.
+
 GPIO async wait lowering follows the same explicit-contract rule. A `gpio-port`
 driver instance may implement the full `embedded_hal_async::digital::Wait`
 surface only when the approved HAIR contract closes both halves of that API:

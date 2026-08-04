@@ -261,6 +261,7 @@ pub const GENERATED_PROVENANCE_SOURCE_IDS: &[&str] = &[
     "wch-ch32fv2x-v3x-rm",
     "openwch-ch32v20x-sdk",
     "openwch-ch32v20x-header",
+    "openwch-ch32v20x-core-header",
     "openwch-ch32v20x-i2c-header",
     "openwch-ch32v20x-startup-d6",
     "openwch-ch32v20x-adc-dma-example",
@@ -310,6 +311,8 @@ pub const GENERATED_PROVENANCE_EVIDENCE_IDS: &[&str] = &[
     "e_ch32rs_ch32v203g6u6_yaml_pin_topology",
     "e_header_tim_counter_enable",
     "e_header_adc_enable_calibration_bits",
+    "e_core_pfic_layout",
+    "e_svd_pfic_sctlr_sysreset",
     "e_adc_dma_example",
     "e_tim_dma_example",
     "e_flash_library_api",
@@ -365,6 +368,12 @@ pub const GENERATED_METADATA: GeneratedMetadata = GeneratedMetadata {
         ProvenanceSource {
             id: "openwch-ch32v20x-header",
             name: "ch32v20x.h",
+            kind: Some("vendor-header"),
+            path: None,
+        },
+        ProvenanceSource {
+            id: "openwch-ch32v20x-core-header",
+            name: "core_riscv.h",
             kind: Some("vendor-header"),
             path: None,
         },
@@ -850,6 +859,28 @@ pub const GENERATED_METADATA: GeneratedMetadata = GeneratedMetadata {
             extraction_method: Some("manual"),
             confidence: Some(0.9f64),
             locator: Some("fragment=ch32v20x.h, lines=982-985"),
+        },
+        ProvenanceEvidence {
+            id: "e_core_pfic_layout",
+            name: "PFIC layout",
+            source_ref: "openwch-ch32v20x-core-header",
+            normalized_claim: Some(
+                "The official WCH core header defines the PFIC register structure at 0xE000E000; its array and reserved-member layout places SCTLR at offset 0xD10.",
+            ),
+            extraction_method: Some("manual"),
+            confidence: Some(0.98f64),
+            locator: Some("fragment=EVT/EXAM/SRC/Core/core_riscv.h, lines=77-102"),
+        },
+        ProvenanceEvidence {
+            id: "e_svd_pfic_sctlr_sysreset",
+            name: "PFIC SCTLR SYSRESET field",
+            source_ref: "ch32-rs-ch32v203xx-svd",
+            normalized_claim: Some(
+                "The CH32V203 SVD defines the PFIC SCTLR register at offset 0xD10 and its SYSRESET field at bit 31.",
+            ),
+            extraction_method: Some("imported"),
+            confidence: Some(0.8f64),
+            locator: Some("fragment=peripheral PFIC / register SCTLR / field SYSRESET"),
         },
         ProvenanceEvidence {
             id: "e_adc_dma_example",
