@@ -43,6 +43,14 @@
         "publisher": "WCH"
       },
       {
+        "id": "openwch-ch32v20x-core-header",
+        "name": "core_riscv.h",
+        "kind": "vendor-header",
+        "uri": "https://raw.githubusercontent.com/openwch/ch32v20x/804daf39a21af99be64c5abe0ea4bdaf361eb2e4/EVT/EXAM/SRC/Core/core_riscv.h",
+        "version": "V1.0.1",
+        "publisher": "WCH"
+      },
+      {
         "id": "openwch-ch32v20x-i2c-header",
         "name": "ch32v20x_i2c.h",
         "kind": "vendor-header",
@@ -571,6 +579,30 @@
         },
         "extractionMethod": "manual",
         "confidence": 0.9
+      },
+      {
+        "id": "e_core_pfic_layout",
+        "name": "PFIC layout",
+        "sourceRef": "openwch-ch32v20x-core-header",
+        "normalizedClaim": "The official WCH core header defines the PFIC register structure at 0xE000E000; its array and reserved-member layout places SCTLR at offset 0xD10.",
+        "locator": {
+          "fragment": "EVT/EXAM/SRC/Core/core_riscv.h",
+          "lineStart": 77,
+          "lineEnd": 102
+        },
+        "extractionMethod": "manual",
+        "confidence": 0.98
+      },
+      {
+        "id": "e_svd_pfic_sctlr_sysreset",
+        "name": "PFIC SCTLR SYSRESET field",
+        "sourceRef": "ch32-rs-ch32v203xx-svd",
+        "normalizedClaim": "The CH32V203 SVD defines the PFIC SCTLR register at offset 0xD10 and its SYSRESET field at bit 31.",
+        "locator": {
+          "fragment": "peripheral PFIC / register SCTLR / field SYSRESET"
+        },
+        "extractionMethod": "imported",
+        "confidence": 0.8
       },
       {
         "id": "e_adc_dma_example",
@@ -53685,6 +53717,77 @@
           ]
         },
         {
+          "id": "periph.pfic",
+          "name": "PFIC",
+          "description": "Program Fast Interrupt Controller",
+          "kind": "peripheral",
+          "type": "PFIC",
+          "baseAddress": 3758153728,
+          "provenance": {
+            "sourceRefs": [
+              "openwch-ch32v20x-core-header"
+            ],
+            "evidenceRefs": [
+              "e_core_pfic_layout"
+            ],
+            "status": "verified",
+            "confidence": 0.98
+          },
+          "interruptRefs": [],
+          "registers": [
+            {
+              "id": "reg.pfic.sctlr",
+              "name": "SCTLR",
+              "description": "PFIC system control register.",
+              "kind": "register",
+              "offsetBytes": 3344,
+              "widthBits": 32,
+              "access": "read-write",
+              "provenance": {
+                "sourceRefs": [
+                  "openwch-ch32v20x-core-header",
+                  "ch32-rs-ch32v203xx-svd"
+                ],
+                "evidenceRefs": [
+                  "e_core_pfic_layout",
+                  "e_svd_pfic_sctlr_sysreset"
+                ],
+                "status": "verified",
+                "confidence": 0.9
+              },
+              "fields": [
+                {
+                  "id": "field.pfic.sctlr.sysreset",
+                  "name": "SYSRESET",
+                  "description": "Request an MCU-wide software reset.",
+                  "bitRange": {
+                    "lsb": 31,
+                    "msb": 31
+                  },
+                  "access": "read-write",
+                  "provenance": {
+                    "sourceRefs": [
+                      "ch32-rs-ch32v203xx-svd"
+                    ],
+                    "evidenceRefs": [
+                      "e_svd_pfic_sctlr_sysreset"
+                    ],
+                    "status": "imported",
+                    "confidence": 0.8
+                  }
+                }
+              ]
+            }
+          ],
+          "addressBlocks": [
+            {
+              "offsetBytes": 0,
+              "sizeBytes": 3348,
+              "usage": "registers"
+            }
+          ]
+        },
+        {
           "id": "periph.rcc",
           "name": "RCC",
           "description": "Reset and clock control block",
@@ -63986,6 +64089,35 @@
   "semantics": {
     "operations": [
       {
+        "id": "op.pfic.system_reset",
+        "name": "PFIC system reset",
+        "kind": "reset-sequence",
+        "targetRefs": [
+          "periph.pfic"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "action": "write",
+            "targetRef": "reg.pfic.sctlr",
+            "value": 2147483648,
+            "description": "Write the SYSRESET bit to request an MCU-wide software reset."
+          }
+        ],
+        "provenance": {
+          "sourceRefs": [
+            "openwch-ch32v20x-core-header",
+            "ch32-rs-ch32v203xx-svd"
+          ],
+          "evidenceRefs": [
+            "e_core_pfic_layout",
+            "e_svd_pfic_sctlr_sysreset"
+          ],
+          "status": "imported",
+          "confidence": 0.9
+        }
+      },
+      {
         "id": "op.tim1.enable",
         "name": "TIM1 counter enable",
         "kind": "mode-transition",
@@ -69589,17 +69721,19 @@
         {
           "id": "block.pfic",
           "name": "PFIC",
-          "targetRef": "ic.pfic",
+          "targetRef": "periph.pfic",
           "blockClass": "interrupt-controller",
           "functionalDomain": "interrupt",
           "provenance": {
             "sourceRefs": [
               "wch-ch32v203-datasheet",
-              "qingke-v4-processor-manual"
+              "qingke-v4-processor-manual",
+              "openwch-ch32v20x-core-header"
             ],
             "evidenceRefs": [
               "e_architecture",
-              "e_core_manual"
+              "e_core_manual",
+              "e_core_pfic_layout"
             ],
             "status": "verified",
             "confidence": 0.88
@@ -78140,6 +78274,7 @@
           "targetRef": "block.pfic",
           "driverKind": "interrupt",
           "modulePath": "interrupt",
+          "systemResetOperationRef": "op.pfic.system_reset",
           "interruptRouteRefs": [
             "iroute.usart1.global",
             "iroute.usart2.global",

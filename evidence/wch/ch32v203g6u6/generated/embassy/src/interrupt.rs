@@ -932,3 +932,10 @@ fn pfic_register_address(base: u64, irq_index: u32) -> u64 {
 fn pfic_irq_bit(irq_index: u32) -> u32 {
     1u32 << (irq_index % 32)
 }
+
+pub fn system_reset() -> ! {
+    unsafe { write_volatile(0xE000ED10usize as *mut u32, 0x80000000u32) };
+    loop {
+        core::hint::spin_loop();
+    }
+}

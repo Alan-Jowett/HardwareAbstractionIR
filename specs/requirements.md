@@ -204,6 +204,13 @@ Embassy profile contract.
 - Async and DMA-backed generated APIs are allowed only when the document
   carries the interrupt, DMA, pin-routing, and semantic-operation/state-machine
   facts needed to lower those behaviors deterministically.
+- An `interrupt` driver instance may expose an MCU-wide system-reset API only
+  when `systemResetOperationRef` identifies an explicit, evidence-backed
+  semantic operation whose terminal write names both the reset target and
+  integer value. The API shall not return after issuing that write, and the
+  generator shall not infer the reset register, key, bit, or value from vendor
+  names. This API restarts the MCU through its documented reset path; it does
+  not promise to power-cycle or reset external board components.
 - If a `gpio-port` driver instance claims capability tag
   `embedded-hal-async-wait`, the same profile entry shall carry explicit
   `gpioExtiWaitBindings` naming the exact per-line port-select,

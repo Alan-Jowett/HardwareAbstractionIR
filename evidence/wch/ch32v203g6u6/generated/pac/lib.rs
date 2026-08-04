@@ -14919,6 +14919,26 @@
 #[doc = "DMA channel 1 memory address register\n\nYou can [`read`](crate::Reg::read) this register and get [`maddr::R`](R). You can [`write_with_zero`](crate::Reg::write_with_zero) this register using [`maddr::W`](W). You can also [`modify`](crate::Reg::modify) this register. See [API](https://docs.rs/svd2rust/#read--modify--write-api)."] pub struct MaddrSpec ; impl crate :: RegisterSpec for MaddrSpec { type Ux = u32 ; }
 #[doc = "`read()` method returns [`maddr::R`](R) reader structure"] impl crate :: Readable for MaddrSpec { }
 #[doc = "`write(|w| ..)` method takes [`maddr::W`](W) writer structure"] impl crate :: Writable for MaddrSpec { type Safety = crate :: Unsafe ; } } } }
+#[doc = "Program Fast Interrupt Controller"] pub type Pfic = crate :: Periph < pfic :: RegisterBlock , 0xe000_e000 > ; impl core :: fmt :: Debug for Pfic { fn fmt (& self , f : & mut core :: fmt :: Formatter) -> core :: fmt :: Result { f . debug_struct ("Pfic") . finish () } }
+#[doc = "Program Fast Interrupt Controller"] pub mod pfic {
+#[repr (C)]
+#[doc = "Register block"] pub struct RegisterBlock { _reserved0 : [u8 ; 0x0d10] , sctlr : Sctlr , } impl RegisterBlock {
+#[doc = "0xd10 - PFIC system control register."]
+#[inline (always)] pub const fn sctlr (& self) -> & Sctlr { & self . sctlr } }
+#[doc = "SCTLR (rw) register accessor: PFIC system control register.\n\nYou can [`read`](crate::Reg::read) this register and get [`sctlr::R`]. You can [`write_with_zero`](crate::Reg::write_with_zero) this register using [`sctlr::W`]. You can also [`modify`](crate::Reg::modify) this register. See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [`mod@sctlr`] module"]
+#[doc (alias = "SCTLR")] pub type Sctlr = crate :: Reg < sctlr :: SctlrSpec > ;
+#[doc = "PFIC system control register."] pub mod sctlr {
+#[doc = "Register `SCTLR` reader"] pub type R = crate :: R < SctlrSpec > ;
+#[doc = "Register `SCTLR` writer"] pub type W = crate :: W < SctlrSpec > ;
+#[doc = "Field `SYSRESET` reader - Request an MCU-wide software reset."] pub type SysresetR = crate :: BitReader ;
+#[doc = "Field `SYSRESET` writer - Request an MCU-wide software reset."] pub type SysresetW < 'a , REG > = crate :: BitWriter < 'a , REG > ; impl R {
+#[doc = "Bit 31 - Request an MCU-wide software reset."]
+#[inline (always)] pub fn sysreset (& self) -> SysresetR { SysresetR :: new (((self . bits >> 31) & 1) != 0) } } impl W {
+#[doc = "Bit 31 - Request an MCU-wide software reset."]
+#[inline (always)] pub fn sysreset (& mut self) -> SysresetW < '_ , SctlrSpec > { SysresetW :: new (self , 31) } }
+#[doc = "PFIC system control register.\n\nYou can [`read`](crate::Reg::read) this register and get [`sctlr::R`](R). You can [`write_with_zero`](crate::Reg::write_with_zero) this register using [`sctlr::W`](W). You can also [`modify`](crate::Reg::modify) this register. See [API](https://docs.rs/svd2rust/#read--modify--write-api)."] pub struct SctlrSpec ; impl crate :: RegisterSpec for SctlrSpec { type Ux = u32 ; }
+#[doc = "`read()` method returns [`sctlr::R`](R) reader structure"] impl crate :: Readable for SctlrSpec { }
+#[doc = "`write(|w| ..)` method takes [`sctlr::W`](W) writer structure"] impl crate :: Writable for SctlrSpec { type Safety = crate :: Unsafe ; } } }
 #[doc = "Reset and clock control block"] pub type Rcc = crate :: Periph < rcc :: RegisterBlock , 0x4002_1000 > ; impl core :: fmt :: Debug for Rcc { fn fmt (& self , f : & mut core :: fmt :: Formatter) -> core :: fmt :: Result { f . debug_struct ("Rcc") . finish () } }
 #[doc = "Reset and clock control block"] pub mod rcc {
 #[repr (C)]
@@ -17831,6 +17851,7 @@
 #[doc = "SPI1"] pub spi1 : Spi1 ,
 #[doc = "USART1"] pub usart1 : Usart1 ,
 #[doc = "DMA1"] pub dma1 : Dma1 ,
+#[doc = "PFIC"] pub pfic : Pfic ,
 #[doc = "RCC"] pub rcc : Rcc ,
 #[doc = "FLASH"] pub flash : Flash ,
 #[doc = "CRC"] pub crc : Crc ,
@@ -17844,4 +17865,4 @@
 #[doc = r" # Safety"]
 #[doc = r""]
 #[doc = r" Each of the returned peripherals must be used at most once."]
-#[inline] pub unsafe fn steal () -> Self { unsafe { DEVICE_PERIPHERALS = true } Peripherals { tim2 : unsafe { Tim2 :: steal () } , tim3 : unsafe { Tim3 :: steal () } , tim4 : unsafe { Tim4 :: steal () } , rtc : unsafe { Rtc :: steal () } , wwdg : unsafe { Wwdg :: steal () } , iwdg : unsafe { Iwdg :: steal () } , usart2 : unsafe { Usart2 :: steal () } , i2c1 : unsafe { I2c1 :: steal () } , can1 : unsafe { Can1 :: steal () } , bkp : unsafe { Bkp :: steal () } , pwr : unsafe { Pwr :: steal () } , afio : unsafe { Afio :: steal () } , exti : unsafe { Exti :: steal () } , gpioa : unsafe { Gpioa :: steal () } , gpiob : unsafe { Gpiob :: steal () } , gpioc : unsafe { Gpioc :: steal () } , gpiod : unsafe { Gpiod :: steal () } , adc1 : unsafe { Adc1 :: steal () } , adc2 : unsafe { Adc2 :: steal () } , tim1 : unsafe { Tim1 :: steal () } , spi1 : unsafe { Spi1 :: steal () } , usart1 : unsafe { Usart1 :: steal () } , dma1 : unsafe { Dma1 :: steal () } , rcc : unsafe { Rcc :: steal () } , flash : unsafe { Flash :: steal () } , crc : unsafe { Crc :: steal () } , opa : unsafe { Opa :: steal () } , usbd : unsafe { Usbd :: steal () } , } } }
+#[inline] pub unsafe fn steal () -> Self { unsafe { DEVICE_PERIPHERALS = true } Peripherals { tim2 : unsafe { Tim2 :: steal () } , tim3 : unsafe { Tim3 :: steal () } , tim4 : unsafe { Tim4 :: steal () } , rtc : unsafe { Rtc :: steal () } , wwdg : unsafe { Wwdg :: steal () } , iwdg : unsafe { Iwdg :: steal () } , usart2 : unsafe { Usart2 :: steal () } , i2c1 : unsafe { I2c1 :: steal () } , can1 : unsafe { Can1 :: steal () } , bkp : unsafe { Bkp :: steal () } , pwr : unsafe { Pwr :: steal () } , afio : unsafe { Afio :: steal () } , exti : unsafe { Exti :: steal () } , gpioa : unsafe { Gpioa :: steal () } , gpiob : unsafe { Gpiob :: steal () } , gpioc : unsafe { Gpioc :: steal () } , gpiod : unsafe { Gpiod :: steal () } , adc1 : unsafe { Adc1 :: steal () } , adc2 : unsafe { Adc2 :: steal () } , tim1 : unsafe { Tim1 :: steal () } , spi1 : unsafe { Spi1 :: steal () } , usart1 : unsafe { Usart1 :: steal () } , dma1 : unsafe { Dma1 :: steal () } , pfic : unsafe { Pfic :: steal () } , rcc : unsafe { Rcc :: steal () } , flash : unsafe { Flash :: steal () } , crc : unsafe { Crc :: steal () } , opa : unsafe { Opa :: steal () } , usbd : unsafe { Usbd :: steal () } , } } }

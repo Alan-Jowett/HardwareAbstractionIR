@@ -2037,6 +2037,8 @@ struct EmbassyDriverInstance {
     #[serde(default)]
     reset_binding_refs: Vec<String>,
     #[serde(default)]
+    system_reset_operation_ref: Option<String>,
+    #[serde(default)]
     interrupt_route_refs: Vec<String>,
     #[serde(default)]
     dma_route_refs: Vec<String>,
@@ -2095,6 +2097,7 @@ struct ResolvedDriverInstance {
     target: McuCanonicalBlock,
     clock_bindings: Vec<McuClockBinding>,
     reset_bindings: Vec<McuResetBinding>,
+    system_reset_operation: Option<SemanticOperation>,
     interrupt_sources: Vec<McuInterruptSource>,
     interrupt_routes: Vec<McuInterruptRoute>,
     dma_channels: Vec<McuDmaChannel>,
@@ -2515,6 +2518,22 @@ impl EmbassyGenerationModel {
                 "operation",
                 &driver.id,
             )?;
+            let system_reset_operation = driver
+                .system_reset_operation_ref
+                .as_ref()
+                .map(|operation_ref| {
+                    operations
+                        .get(operation_ref.as_str())
+                        .cloned()
+                        .ok_or_else(|| {
+                            anyhow!(
+                                "system reset operation reference {} on driver {} could not be resolved",
+                                operation_ref,
+                                driver.id
+                            )
+                        })
+                })
+                .transpose()?;
             let state_machines = resolve_ref_list(
                 &driver.state_machine_refs,
                 &state_machines,
@@ -2580,6 +2599,12 @@ impl EmbassyGenerationModel {
                 &interrupt_routes,
             )?;
             validate_driver_lowering_pattern(driver, &init_operations)?;
+            validate_system_reset_operation(
+                driver,
+                &target,
+                system_reset_operation.as_ref(),
+                &registers,
+            )?;
 
             drivers.push(ResolvedDriverInstance {
                 id: driver.id.clone(),
@@ -2600,6 +2625,7 @@ impl EmbassyGenerationModel {
                 target,
                 clock_bindings,
                 reset_bindings,
+                system_reset_operation,
                 interrupt_sources: driver_interrupt_sources,
                 interrupt_routes,
                 dma_channels: driver_dma_channels,
@@ -2749,6 +2775,68 @@ fn validate_supported_driver_kind(driver_kind: &str) -> Result<()> {
         "custom" => bail!("driver kind custom is outside the supported first-cut Embassy subset"),
         other => bail!("driver kind {other} is not supported by the first-cut Embassy generator"),
     }
+}
+
+fn validate_system_reset_operation(
+    driver: &EmbassyDriverInstance,
+    target: &McuCanonicalBlock,
+    operation: Option<&SemanticOperation>,
+    registers: &HashMap<String, ResolvedRegister>,
+) -> Result<()> {
+    let Some(operation) = operation else {
+        return Ok(());
+    };
+    if driver.driver_kind != "interrupt" || target.block_class != "interrupt-controller" {
+        bail!(
+            "systemResetOperationRef on driver {} requires an interrupt driver targeting an interrupt-controller block",
+            driver.id
+        );
+    }
+    if !operation.target_refs.contains(&target.target_ref) {
+        bail!(
+            "system reset operation {} on driver {} must target the same interrupt-controller path {}",
+            operation.id,
+            driver.id,
+            target.target_ref
+        );
+    }
+    let step = operation.steps.last().ok_or_else(|| {
+        anyhow!(
+            "system reset operation {} on driver {} must contain a final write step",
+            operation.id,
+            driver.id
+        )
+    })?;
+    if step.action != "write" {
+        bail!(
+            "system reset operation {} on driver {} must end in a write step",
+            operation.id,
+            driver.id
+        );
+    }
+    let target_ref = step.target_ref.as_deref().ok_or_else(|| {
+        anyhow!(
+            "system reset operation {} on driver {} must name its final write target",
+            operation.id,
+            driver.id
+        )
+    })?;
+    if !registers.contains_key(target_ref) {
+        bail!(
+            "system reset operation {} on driver {} targets unknown register {}",
+            operation.id,
+            driver.id,
+            target_ref
+        );
+    }
+    if step.value.as_ref().and_then(Value::as_u64).is_none() {
+        bail!(
+            "system reset operation {} on driver {} must use an integer final write value",
+            operation.id,
+            driver.id
+        );
+    }
+    Ok(())
 }
 
 fn validate_module_name(module_path: &str) -> Result<String> {
@@ -5522,7 +5610,56 @@ fn render_interrupt_module(
     for driver in drivers {
         out.push_str(&render_driver_instance(model, driver)?);
     }
+    if let Some((address, value)) = resolve_system_reset_write(model, drivers)? {
+        out.push_str(&format!(
+            "\npub fn system_reset() -> ! {{\n    unsafe {{ write_volatile(0x{address:X}usize as *mut u32, 0x{value:08X}u32) }};\n    loop {{\n        core::hint::spin_loop();\n    }}\n}}\n"
+        ));
+    }
     Ok(format!("{}\n", out.trim_end()))
+}
+
+fn resolve_system_reset_write(
+    model: &EmbassyGenerationModel,
+    drivers: &[&ResolvedDriverInstance],
+) -> Result<Option<(u64, u32)>> {
+    let mut writes = drivers
+        .iter()
+        .filter_map(|driver| driver.system_reset_operation.as_ref())
+        .map(|operation| {
+            let step = operation
+                .steps
+                .last()
+                .expect("validated system reset operations have a final step");
+            let target_ref = step
+                .target_ref
+                .as_deref()
+                .expect("validated system reset operations have a final target");
+            let register = model
+                .registers
+                .get(target_ref)
+                .expect("validated system reset operations target a known register");
+            let value = step
+                .value
+                .as_ref()
+                .and_then(Value::as_u64)
+                .expect("validated system reset operations use integer values");
+            u32::try_from(value)
+                .map(|value| (register.absolute_address, value))
+                .map_err(|_| {
+                    anyhow!(
+                        "system reset operation {} writes value {} that does not fit in u32",
+                        operation.id,
+                        value
+                    )
+                })
+        });
+    let Some(write) = writes.next() else {
+        return Ok(None);
+    };
+    if writes.next().is_some() {
+        bail!("generated interrupt module has more than one system reset operation");
+    }
+    write.map(Some)
 }
 
 fn render_driver_module(
@@ -17927,6 +18064,19 @@ fn collect_embassy_register_scope(
                 })?;
             collect_operation_target_peripherals(&mut required, scope.register_owners, operation);
         }
+        if let Some(operation_ref) = &driver.system_reset_operation_ref {
+            let operation = scope
+                .operations
+                .get(operation_ref.as_str())
+                .ok_or_else(|| {
+                    anyhow!(
+                        "system reset operation reference {} on driver {} could not be resolved",
+                        operation_ref,
+                        driver.id
+                    )
+                })?;
+            collect_operation_target_peripherals(&mut required, scope.register_owners, operation);
+        }
         for state_machine_ref in &driver.state_machine_refs {
             let state_machine = scope
                 .state_machines
@@ -18215,6 +18365,16 @@ fn collect_embassy_field_scope(
             let operation = operations.get(operation_ref.as_str()).ok_or_else(|| {
                 anyhow!(
                     "operation reference {} on driver {} could not be resolved",
+                    operation_ref,
+                    driver.id
+                )
+            })?;
+            collect_operation_field_refs(&mut required, operation);
+        }
+        if let Some(operation_ref) = &driver.system_reset_operation_ref {
+            let operation = operations.get(operation_ref.as_str()).ok_or_else(|| {
+                anyhow!(
+                    "system reset operation reference {} on driver {} could not be resolved",
                     operation_ref,
                     driver.id
                 )
@@ -20323,7 +20483,7 @@ fn render_embassy_host_metadata_rs(model: &EmbassyGenerationModel) -> Result<Str
     let gpio_models = collect_host_indexed_gpio_models(model)?;
     let esp_gpio_models = collect_host_esp_gpio_models(model)?;
     out.push_str(
-        "\nuse std::cell::RefCell;\nuse std::collections::{BTreeMap, BTreeSet, VecDeque};\nuse std::sync::{Arc, Mutex};\n\npub type SharedEmulatorState = Arc<GeneratedHostState>;\n\n#[derive(Debug, Default)]\nstruct SerialQueues {\n    tx: VecDeque<u8>,\n    rx: VecDeque<u8>,\n}\n\n#[derive(Debug, Default)]\npub struct GeneratedHostState {\n    registers: Mutex<BTreeMap<u64, u32>>,\n    serial: Mutex<BTreeMap<String, SerialQueues>>,\n    usb_stream: Mutex<BTreeMap<String, SerialQueues>>,\n    pending_irqs: Mutex<BTreeSet<i32>>,\n    dma_completions: Mutex<BTreeMap<String, usize>>,\n}\n\n#[derive(Debug, Clone, Copy)]\nstruct SerialRegisterModel {\n    driver_id: &'static str,\n    sr_address: u64,\n    dr_address: u64,\n    has_tx: bool,\n    has_rx: bool,\n    txe_mask: u32,\n    tc_mask: u32,\n    rxne_mask: u32,\n}\n\n#[derive(Debug, Clone, Copy)]\nstruct UsbStreamModel {\n    driver_id: &'static str,\n    ep1_address: u64,\n    ep1_conf_address: u64,\n    has_tx: bool,\n    has_rx: bool,\n    rdwr_byte_mask: u32,\n    rdwr_byte_lsb: u32,\n    wr_done_mask: u32,\n    serial_in_data_free_mask: u32,\n    serial_out_data_avail_mask: u32,\n}\n\n#[derive(Debug, Clone, Copy)]\nstruct IndexedGpioModel {\n    bsrr_address: u64,\n    odr_address: u64,\n}\n\n#[derive(Debug, Clone, Copy)]\nstruct EspGpioModel {\n    out_address: u64,\n    out_w1ts_address: u64,\n    out_w1tc_address: u64,\n    enable_address: u64,\n    enable_w1ts_address: u64,\n    enable_w1tc_address: u64,\n}\n\nconst SERIAL_REGISTER_MODELS: &[SerialRegisterModel] = &",
+        "\nuse std::cell::RefCell;\nuse std::collections::{BTreeMap, BTreeSet, VecDeque};\nuse std::sync::{Arc, Mutex};\n\npub type SharedEmulatorState = Arc<GeneratedHostState>;\n\n#[derive(Debug, Default)]\nstruct SerialQueues {\n    tx: VecDeque<u8>,\n    rx: VecDeque<u8>,\n}\n\n#[derive(Debug, Default)]\npub struct GeneratedHostState {\n    registers: Mutex<BTreeMap<u64, u32>>,\n    serial: Mutex<BTreeMap<String, SerialQueues>>,\n    usb_stream: Mutex<BTreeMap<String, SerialQueues>>,\n    pending_irqs: Mutex<BTreeSet<i32>>,\n            dma_completions: Mutex<BTreeMap<String, usize>>,\n    system_reset_requests: Mutex<BTreeMap<String, usize>>,\n}\n\n#[derive(Debug, Clone, Copy)]\nstruct SerialRegisterModel {\n    driver_id: &'static str,\n    sr_address: u64,\n    dr_address: u64,\n    has_tx: bool,\n    has_rx: bool,\n    txe_mask: u32,\n    tc_mask: u32,\n    rxne_mask: u32,\n}\n\n#[derive(Debug, Clone, Copy)]\nstruct UsbStreamModel {\n    driver_id: &'static str,\n    ep1_address: u64,\n    ep1_conf_address: u64,\n    has_tx: bool,\n    has_rx: bool,\n    rdwr_byte_mask: u32,\n    rdwr_byte_lsb: u32,\n    wr_done_mask: u32,\n    serial_in_data_free_mask: u32,\n    serial_out_data_avail_mask: u32,\n}\n\n#[derive(Debug, Clone, Copy)]\nstruct IndexedGpioModel {\n    bsrr_address: u64,\n    odr_address: u64,\n}\n\n#[derive(Debug, Clone, Copy)]\nstruct EspGpioModel {\n    out_address: u64,\n    out_w1ts_address: u64,\n    out_w1tc_address: u64,\n    enable_address: u64,\n    enable_w1ts_address: u64,\n    enable_w1tc_address: u64,\n}\n\nconst SERIAL_REGISTER_MODELS: &[SerialRegisterModel] = &",
     );
     out.push_str(&render_host_serial_register_model_slice(&serial_models));
     out.push_str(";\n");
@@ -20337,7 +20497,7 @@ fn render_embassy_host_metadata_rs(model: &EmbassyGenerationModel) -> Result<Str
     out.push_str(&render_host_esp_gpio_model_slice(&esp_gpio_models));
     out.push_str(";\n\n");
     out.push_str(
-        "thread_local! {\n    static CURRENT_EMULATOR: RefCell<Option<SharedEmulatorState>> = const { RefCell::new(None) };\n}\n\npub struct CurrentEmulatorGuard {\n    previous: Option<SharedEmulatorState>,\n}\n\nimpl Drop for CurrentEmulatorGuard {\n    fn drop(&mut self) {\n        CURRENT_EMULATOR.with(|slot| {\n            *slot.borrow_mut() = self.previous.take();\n        });\n    }\n}\n\nfn lock_guard<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {\n    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())\n}\n\npub fn new_emulator_state() -> SharedEmulatorState {\n    Arc::new(GeneratedHostState::default())\n}\n\npub fn install_current_emulator(state: SharedEmulatorState) {\n    CURRENT_EMULATOR.with(|slot| {\n        *slot.borrow_mut() = Some(state);\n    });\n}\n\npub fn push_current_emulator(state: SharedEmulatorState) -> CurrentEmulatorGuard {\n    let previous = CURRENT_EMULATOR.with(|slot| slot.replace(Some(state)));\n    CurrentEmulatorGuard { previous }\n}\n\npub fn clear_current_emulator() {\n    CURRENT_EMULATOR.with(|slot| {\n        slot.borrow_mut().take();\n    });\n}\n\npub fn clear_current_emulator_if_active(state: &SharedEmulatorState) {\n    CURRENT_EMULATOR.with(|slot| {\n        let mut slot = slot.borrow_mut();\n        if slot\n            .as_ref()\n            .is_some_and(|current| Arc::ptr_eq(current, state))\n        {\n            slot.take();\n        }\n    });\n}\n\npub fn initialize_emulator_state(state: &SharedEmulatorState) {\n    let mut registers = lock_guard(&state.registers);\n    for model in SERIAL_REGISTER_MODELS {\n        registers.insert(model.sr_address, model.txe_mask | model.tc_mask);\n        registers.insert(model.dr_address, 0);\n    }\n    for model in USB_STREAM_MODELS {\n        registers.insert(model.ep1_address, 0);\n        registers.insert(model.ep1_conf_address, model.serial_in_data_free_mask);\n    }\n}\n\nfn current_emulator() -> Result<SharedEmulatorState, Error> {\n    CURRENT_EMULATOR.with(|slot| {\n        slot.borrow()\n            .clone()\n            .ok_or(Error::Unsupported(\"host emulator is not active on this thread\"))\n    })\n}\n\nfn serial_model_for_driver(driver_id: &str) -> Option<&'static SerialRegisterModel> {\n    SERIAL_REGISTER_MODELS.iter().find(|model| model.driver_id == driver_id)\n}\n\nfn serial_model_for_dr_address(address: u64) -> Option<&'static SerialRegisterModel> {\n    SERIAL_REGISTER_MODELS.iter().find(|model| model.dr_address == address)\n}\n\nfn usb_stream_model_for_driver(driver_id: &str) -> Option<&'static UsbStreamModel> {\n    USB_STREAM_MODELS.iter().find(|model| model.driver_id == driver_id)\n}\n\nfn usb_stream_model_for_ep1_address(address: u64) -> Option<&'static UsbStreamModel> {\n    USB_STREAM_MODELS.iter().find(|model| model.ep1_address == address)\n}\n\nfn usb_stream_model_for_ep1_conf_address(address: u64) -> Option<&'static UsbStreamModel> {\n    USB_STREAM_MODELS.iter().find(|model| model.ep1_conf_address == address)\n}\n\nfn indexed_gpio_model_for_bsrr(address: u64) -> Option<&'static IndexedGpioModel> {\n    INDEXED_GPIO_MODELS.iter().find(|model| model.bsrr_address == address)\n}\n\nfn esp_gpio_model_for_w1_register(address: u64) -> Option<&'static EspGpioModel> {\n    ESP_GPIO_MODELS.iter().find(|model| {\n        model.out_w1ts_address == address\n            || model.out_w1tc_address == address\n            || model.enable_w1ts_address == address\n            || model.enable_w1tc_address == address\n    })\n}\n\npub fn read_u32_for(state: &SharedEmulatorState, address: u64) -> Result<u32, Error> {\n    if let Some(model) = serial_model_for_dr_address(address) {\n        let mut serial = lock_guard(&state.serial);\n        let queues = serial.entry(model.driver_id.to_string()).or_default();\n        if let Some(byte) = queues.rx.pop_front() {\n            let mut registers = lock_guard(&state.registers);\n            let entry = registers.entry(model.sr_address).or_insert(model.txe_mask | model.tc_mask);\n            if queues.rx.is_empty() {\n                *entry &= !model.rxne_mask;\n            } else {\n                *entry |= model.rxne_mask;\n            }\n            registers.insert(model.dr_address, u32::from(byte));\n            return Ok(u32::from(byte));\n        }\n    }\n    if let Some(model) = usb_stream_model_for_ep1_address(address) {\n        let mut usb_stream = lock_guard(&state.usb_stream);\n        let queues = usb_stream.entry(model.driver_id.to_string()).or_default();\n        if let Some(byte) = queues.rx.pop_front() {\n            let mut registers = lock_guard(&state.registers);\n            let entry = registers.entry(model.ep1_conf_address).or_insert(model.serial_in_data_free_mask);\n            if queues.rx.is_empty() {\n                *entry &= !model.serial_out_data_avail_mask;\n            } else {\n                *entry |= model.serial_out_data_avail_mask;\n            }\n            registers.insert(model.ep1_address, (u32::from(byte) << model.rdwr_byte_lsb) & model.rdwr_byte_mask);\n            return Ok((u32::from(byte) << model.rdwr_byte_lsb) & model.rdwr_byte_mask);\n        }\n    }\n    Ok(*lock_guard(&state.registers).get(&address).unwrap_or(&0))\n}\n\npub fn write_u32_for(state: &SharedEmulatorState, address: u64, value: u32) -> Result<(), Error> {\n    if let Some(model) = serial_model_for_dr_address(address) {\n        let mut serial = lock_guard(&state.serial);\n        let queues = serial.entry(model.driver_id.to_string()).or_default();\n        queues.tx.push_back((value & 0xFF) as u8);\n        let mut registers = lock_guard(&state.registers);\n        registers.insert(model.dr_address, value & 0xFF);\n        let entry = registers.entry(model.sr_address).or_insert(0);\n        *entry |= model.txe_mask | model.tc_mask;\n        return Ok(());\n    }\n    if let Some(model) = usb_stream_model_for_ep1_address(address) {\n        let shifted = (value & model.rdwr_byte_mask) >> model.rdwr_byte_lsb;\n        let mut usb_stream = lock_guard(&state.usb_stream);\n        let queues = usb_stream.entry(model.driver_id.to_string()).or_default();\n        queues.tx.push_back((shifted & 0xFF) as u8);\n        let mut registers = lock_guard(&state.registers);\n        registers.insert(model.ep1_address, value & model.rdwr_byte_mask);\n        return Ok(());\n    }\n    if let Some(model) = usb_stream_model_for_ep1_conf_address(address) {\n        let mut registers = lock_guard(&state.registers);\n        let mut next = value;\n        if value & model.wr_done_mask != 0 {\n            next &= !model.serial_in_data_free_mask;\n        }\n        registers.insert(address, next);\n        return Ok(());\n    }\n    if let Some(model) = indexed_gpio_model_for_bsrr(address) {\n        let mut registers = lock_guard(&state.registers);\n        let odr = registers.entry(model.odr_address).or_insert(0);\n        let set_bits = value & 0xFFFF;\n        let reset_bits = (value >> 16) & 0xFFFF;\n        *odr |= set_bits;\n        *odr &= !reset_bits;\n        registers.insert(address, value);\n        return Ok(());\n    }\n    if let Some(model) = esp_gpio_model_for_w1_register(address) {\n        let mut registers = lock_guard(&state.registers);\n        let (target_address, updated_value) = if address == model.out_w1ts_address {\n            let out = registers.entry(model.out_address).or_insert(0);\n            *out |= value;\n            (model.out_address, *out)\n        } else if address == model.out_w1tc_address {\n            let out = registers.entry(model.out_address).or_insert(0);\n            *out &= !value;\n            (model.out_address, *out)\n        } else if address == model.enable_w1ts_address {\n            let enable = registers.entry(model.enable_address).or_insert(0);\n            *enable |= value;\n            (model.enable_address, *enable)\n        } else {\n            let enable = registers.entry(model.enable_address).or_insert(0);\n            *enable &= !value;\n            (model.enable_address, *enable)\n        };\n        registers.insert(address, value);\n        registers.insert(target_address, updated_value);\n        return Ok(());\n    }\n    lock_guard(&state.registers).insert(address, value);\n    Ok(())\n}\n\npub fn modify_u8_for(state: &SharedEmulatorState, address: u64, clear_mask: u8, set_mask: u8) -> Result<(), Error> {\n    let current = read_u32_for(state, address)? as u8;\n    write_u32_for(state, address, u32::from((current & !clear_mask) | set_mask))\n}\n\npub fn modify_u16_for(state: &SharedEmulatorState, address: u64, clear_mask: u16, set_mask: u16) -> Result<(), Error> {\n    let current = read_u32_for(state, address)? as u16;\n    write_u32_for(state, address, u32::from((current & !clear_mask) | set_mask))\n}\n\npub fn modify_u32_for(state: &SharedEmulatorState, address: u64, clear_mask: u32, set_mask: u32) -> Result<(), Error> {\n    let current = read_u32_for(state, address)?;\n    write_u32_for(state, address, (current & !clear_mask) | set_mask)\n}\n\npub fn read_u8(address: u64) -> Result<u8, Error> {\n    Ok(read_u32(address)? as u8)\n}\n\npub fn read_u32(address: u64) -> Result<u32, Error> {\n    let state = current_emulator()?;\n    read_u32_for(&state, address)\n}\n\npub fn write_u16(address: u64, value: u16) -> Result<(), Error> {\n    write_u32(address, u32::from(value))\n}\n\npub fn write_u32(address: u64, value: u32) -> Result<(), Error> {\n    let state = current_emulator()?;\n    write_u32_for(&state, address, value)\n}\n\npub fn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u8_for(&state, address, clear_mask, set_mask)\n}\n\npub fn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u16_for(&state, address, clear_mask, set_mask)\n}\n\npub fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u32_for(&state, address, clear_mask, set_mask)\n}\n\npub fn push_serial_rx_for(state: &SharedEmulatorState, driver_id: &str, bytes: &[u8]) -> Result<(), Error> {\n    let model = serial_model_for_driver(driver_id)\n        .ok_or(Error::InvalidReference(\"unknown serial driver\"))?;\n    if !model.has_rx {\n        return Err(Error::InvalidReference(\"serial driver has no RX capability\"));\n    }\n    let mut serial = lock_guard(&state.serial);\n    let queues = serial.entry(driver_id.to_string()).or_default();\n    for &byte in bytes {\n        queues.rx.push_back(byte);\n    }\n    drop(serial);\n    let mut registers = lock_guard(&state.registers);\n    let entry = registers.entry(model.sr_address).or_insert(model.txe_mask | model.tc_mask);\n    if !bytes.is_empty() {\n        *entry |= model.rxne_mask;\n    }\n    Ok(())\n}\n\npub fn take_serial_tx_for(state: &SharedEmulatorState, driver_id: &str) -> Vec<u8> {\n    let mut serial = lock_guard(&state.serial);\n    let queues = serial.entry(driver_id.to_string()).or_default();\n    queues.tx.drain(..).collect()\n}\n\npub fn push_usb_rx_for(state: &SharedEmulatorState, driver_id: &str, bytes: &[u8]) -> Result<(), Error> {\n    let model = usb_stream_model_for_driver(driver_id)\n        .ok_or(Error::InvalidReference(\"unknown usb stream driver\"))?;\n    if !model.has_rx {\n        return Err(Error::InvalidReference(\"usb stream driver has no RX capability\"));\n    }\n    let mut usb_stream = lock_guard(&state.usb_stream);\n    let queues = usb_stream.entry(driver_id.to_string()).or_default();\n    for &byte in bytes {\n        queues.rx.push_back(byte);\n    }\n    drop(usb_stream);\n    let mut registers = lock_guard(&state.registers);\n    let entry = registers.entry(model.ep1_conf_address).or_insert(model.serial_in_data_free_mask);\n    if !bytes.is_empty() {\n        *entry |= model.serial_out_data_avail_mask;\n    }\n    Ok(())\n}\n\npub fn take_usb_tx_for(state: &SharedEmulatorState, driver_id: &str) -> Vec<u8> {\n    let Some(model) = usb_stream_model_for_driver(driver_id) else {\n        return Vec::new();\n    };\n    let committed = {\n        let registers = lock_guard(&state.registers);\n        let entry = registers.get(&model.ep1_conf_address).copied().unwrap_or(model.serial_in_data_free_mask);\n        entry & model.wr_done_mask != 0\n    };\n    if !committed {\n        return Vec::new();\n    }\n    let mut usb_stream = lock_guard(&state.usb_stream);\n    let queues = usb_stream.entry(driver_id.to_string()).or_default();\n    let drained = queues.tx.drain(..).collect();\n    drop(usb_stream);\n    let mut registers = lock_guard(&state.registers);\n    let entry = registers.entry(model.ep1_conf_address).or_insert(model.serial_in_data_free_mask);\n    *entry |= model.serial_in_data_free_mask;\n    *entry &= !model.wr_done_mask;\n    drained\n}\n\npub fn mark_dma_route_complete_for(state: &SharedEmulatorState, route_id: &str) {\n    let mut dma = lock_guard(&state.dma_completions);\n    *dma.entry(route_id.to_string()).or_default() += 1;\n}\n\npub fn dma_route_completion_count_for(state: &SharedEmulatorState, route_id: &str) -> usize {\n    *lock_guard(&state.dma_completions).get(route_id).unwrap_or(&0)\n}\n\npub fn set_irq_pending_for(state: &SharedEmulatorState, irq_number: i32, pending: bool) {\n    let mut irqs = lock_guard(&state.pending_irqs);\n    if pending {\n        irqs.insert(irq_number);\n    } else {\n        irqs.remove(&irq_number);\n    }\n}\n\npub fn is_irq_pending_for(state: &SharedEmulatorState, irq_number: i32) -> bool {\n    lock_guard(&state.pending_irqs).contains(&irq_number)\n}\n",
+        "thread_local! {\n    static CURRENT_EMULATOR: RefCell<Option<SharedEmulatorState>> = const { RefCell::new(None) };\n}\n\npub struct CurrentEmulatorGuard {\n    previous: Option<SharedEmulatorState>,\n}\n\nimpl Drop for CurrentEmulatorGuard {\n    fn drop(&mut self) {\n        CURRENT_EMULATOR.with(|slot| {\n            *slot.borrow_mut() = self.previous.take();\n        });\n    }\n}\n\nfn lock_guard<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {\n    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())\n}\n\npub fn new_emulator_state() -> SharedEmulatorState {\n    Arc::new(GeneratedHostState::default())\n}\n\npub fn install_current_emulator(state: SharedEmulatorState) {\n    CURRENT_EMULATOR.with(|slot| {\n        *slot.borrow_mut() = Some(state);\n    });\n}\n\npub fn push_current_emulator(state: SharedEmulatorState) -> CurrentEmulatorGuard {\n    let previous = CURRENT_EMULATOR.with(|slot| slot.replace(Some(state)));\n    CurrentEmulatorGuard { previous }\n}\n\npub fn clear_current_emulator() {\n    CURRENT_EMULATOR.with(|slot| {\n        slot.borrow_mut().take();\n    });\n}\n\npub fn clear_current_emulator_if_active(state: &SharedEmulatorState) {\n    CURRENT_EMULATOR.with(|slot| {\n        let mut slot = slot.borrow_mut();\n        if slot\n            .as_ref()\n            .is_some_and(|current| Arc::ptr_eq(current, state))\n        {\n            slot.take();\n        }\n    });\n}\n\npub fn initialize_emulator_state(state: &SharedEmulatorState) {\n    let mut registers = lock_guard(&state.registers);\n    for model in SERIAL_REGISTER_MODELS {\n        registers.insert(model.sr_address, model.txe_mask | model.tc_mask);\n        registers.insert(model.dr_address, 0);\n    }\n    for model in USB_STREAM_MODELS {\n        registers.insert(model.ep1_address, 0);\n        registers.insert(model.ep1_conf_address, model.serial_in_data_free_mask);\n    }\n}\n\nfn current_emulator() -> Result<SharedEmulatorState, Error> {\n    CURRENT_EMULATOR.with(|slot| {\n        slot.borrow()\n            .clone()\n            .ok_or(Error::Unsupported(\"host emulator is not active on this thread\"))\n    })\n}\n\nfn serial_model_for_driver(driver_id: &str) -> Option<&'static SerialRegisterModel> {\n    SERIAL_REGISTER_MODELS.iter().find(|model| model.driver_id == driver_id)\n}\n\nfn serial_model_for_dr_address(address: u64) -> Option<&'static SerialRegisterModel> {\n    SERIAL_REGISTER_MODELS.iter().find(|model| model.dr_address == address)\n}\n\nfn usb_stream_model_for_driver(driver_id: &str) -> Option<&'static UsbStreamModel> {\n    USB_STREAM_MODELS.iter().find(|model| model.driver_id == driver_id)\n}\n\nfn usb_stream_model_for_ep1_address(address: u64) -> Option<&'static UsbStreamModel> {\n    USB_STREAM_MODELS.iter().find(|model| model.ep1_address == address)\n}\n\nfn usb_stream_model_for_ep1_conf_address(address: u64) -> Option<&'static UsbStreamModel> {\n    USB_STREAM_MODELS.iter().find(|model| model.ep1_conf_address == address)\n}\n\nfn indexed_gpio_model_for_bsrr(address: u64) -> Option<&'static IndexedGpioModel> {\n    INDEXED_GPIO_MODELS.iter().find(|model| model.bsrr_address == address)\n}\n\nfn esp_gpio_model_for_w1_register(address: u64) -> Option<&'static EspGpioModel> {\n    ESP_GPIO_MODELS.iter().find(|model| {\n        model.out_w1ts_address == address\n            || model.out_w1tc_address == address\n            || model.enable_w1ts_address == address\n            || model.enable_w1tc_address == address\n    })\n}\n\npub fn read_u32_for(state: &SharedEmulatorState, address: u64) -> Result<u32, Error> {\n    if let Some(model) = serial_model_for_dr_address(address) {\n        let mut serial = lock_guard(&state.serial);\n        let queues = serial.entry(model.driver_id.to_string()).or_default();\n        if let Some(byte) = queues.rx.pop_front() {\n            let mut registers = lock_guard(&state.registers);\n            let entry = registers.entry(model.sr_address).or_insert(model.txe_mask | model.tc_mask);\n            if queues.rx.is_empty() {\n                *entry &= !model.rxne_mask;\n            } else {\n                *entry |= model.rxne_mask;\n            }\n            registers.insert(model.dr_address, u32::from(byte));\n            return Ok(u32::from(byte));\n        }\n    }\n    if let Some(model) = usb_stream_model_for_ep1_address(address) {\n        let mut usb_stream = lock_guard(&state.usb_stream);\n        let queues = usb_stream.entry(model.driver_id.to_string()).or_default();\n        if let Some(byte) = queues.rx.pop_front() {\n            let mut registers = lock_guard(&state.registers);\n            let entry = registers.entry(model.ep1_conf_address).or_insert(model.serial_in_data_free_mask);\n            if queues.rx.is_empty() {\n                *entry &= !model.serial_out_data_avail_mask;\n            } else {\n                *entry |= model.serial_out_data_avail_mask;\n            }\n            registers.insert(model.ep1_address, (u32::from(byte) << model.rdwr_byte_lsb) & model.rdwr_byte_mask);\n            return Ok((u32::from(byte) << model.rdwr_byte_lsb) & model.rdwr_byte_mask);\n        }\n    }\n    Ok(*lock_guard(&state.registers).get(&address).unwrap_or(&0))\n}\n\npub fn write_u32_for(state: &SharedEmulatorState, address: u64, value: u32) -> Result<(), Error> {\n    if let Some(model) = serial_model_for_dr_address(address) {\n        let mut serial = lock_guard(&state.serial);\n        let queues = serial.entry(model.driver_id.to_string()).or_default();\n        queues.tx.push_back((value & 0xFF) as u8);\n        let mut registers = lock_guard(&state.registers);\n        registers.insert(model.dr_address, value & 0xFF);\n        let entry = registers.entry(model.sr_address).or_insert(0);\n        *entry |= model.txe_mask | model.tc_mask;\n        return Ok(());\n    }\n    if let Some(model) = usb_stream_model_for_ep1_address(address) {\n        let shifted = (value & model.rdwr_byte_mask) >> model.rdwr_byte_lsb;\n        let mut usb_stream = lock_guard(&state.usb_stream);\n        let queues = usb_stream.entry(model.driver_id.to_string()).or_default();\n        queues.tx.push_back((shifted & 0xFF) as u8);\n        let mut registers = lock_guard(&state.registers);\n        registers.insert(model.ep1_address, value & model.rdwr_byte_mask);\n        return Ok(());\n    }\n    if let Some(model) = usb_stream_model_for_ep1_conf_address(address) {\n        let mut registers = lock_guard(&state.registers);\n        let mut next = value;\n        if value & model.wr_done_mask != 0 {\n            next &= !model.serial_in_data_free_mask;\n        }\n        registers.insert(address, next);\n        return Ok(());\n    }\n    if let Some(model) = indexed_gpio_model_for_bsrr(address) {\n        let mut registers = lock_guard(&state.registers);\n        let odr = registers.entry(model.odr_address).or_insert(0);\n        let set_bits = value & 0xFFFF;\n        let reset_bits = (value >> 16) & 0xFFFF;\n        *odr |= set_bits;\n        *odr &= !reset_bits;\n        registers.insert(address, value);\n        return Ok(());\n    }\n    if let Some(model) = esp_gpio_model_for_w1_register(address) {\n        let mut registers = lock_guard(&state.registers);\n        let (target_address, updated_value) = if address == model.out_w1ts_address {\n            let out = registers.entry(model.out_address).or_insert(0);\n            *out |= value;\n            (model.out_address, *out)\n        } else if address == model.out_w1tc_address {\n            let out = registers.entry(model.out_address).or_insert(0);\n            *out &= !value;\n            (model.out_address, *out)\n        } else if address == model.enable_w1ts_address {\n            let enable = registers.entry(model.enable_address).or_insert(0);\n            *enable |= value;\n            (model.enable_address, *enable)\n        } else {\n            let enable = registers.entry(model.enable_address).or_insert(0);\n            *enable &= !value;\n            (model.enable_address, *enable)\n        };\n        registers.insert(address, value);\n        registers.insert(target_address, updated_value);\n        return Ok(());\n    }\n    lock_guard(&state.registers).insert(address, value);\n    Ok(())\n}\n\npub fn modify_u8_for(state: &SharedEmulatorState, address: u64, clear_mask: u8, set_mask: u8) -> Result<(), Error> {\n    let current = read_u32_for(state, address)? as u8;\n    write_u32_for(state, address, u32::from((current & !clear_mask) | set_mask))\n}\n\npub fn modify_u16_for(state: &SharedEmulatorState, address: u64, clear_mask: u16, set_mask: u16) -> Result<(), Error> {\n    let current = read_u32_for(state, address)? as u16;\n    write_u32_for(state, address, u32::from((current & !clear_mask) | set_mask))\n}\n\npub fn modify_u32_for(state: &SharedEmulatorState, address: u64, clear_mask: u32, set_mask: u32) -> Result<(), Error> {\n    let current = read_u32_for(state, address)?;\n    write_u32_for(state, address, (current & !clear_mask) | set_mask)\n}\n\npub fn read_u8(address: u64) -> Result<u8, Error> {\n    Ok(read_u32(address)? as u8)\n}\n\npub fn read_u32(address: u64) -> Result<u32, Error> {\n    let state = current_emulator()?;\n    read_u32_for(&state, address)\n}\n\npub fn write_u16(address: u64, value: u16) -> Result<(), Error> {\n    write_u32(address, u32::from(value))\n}\n\npub fn write_u32(address: u64, value: u32) -> Result<(), Error> {\n    let state = current_emulator()?;\n    write_u32_for(&state, address, value)\n}\n\npub fn modify_u8(address: u64, clear_mask: u8, set_mask: u8) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u8_for(&state, address, clear_mask, set_mask)\n}\n\npub fn modify_u16(address: u64, clear_mask: u16, set_mask: u16) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u16_for(&state, address, clear_mask, set_mask)\n}\n\npub fn modify_u32(address: u64, clear_mask: u32, set_mask: u32) -> Result<(), Error> {\n    let state = current_emulator()?;\n    modify_u32_for(&state, address, clear_mask, set_mask)\n}\n\npub fn push_serial_rx_for(state: &SharedEmulatorState, driver_id: &str, bytes: &[u8]) -> Result<(), Error> {\n    let model = serial_model_for_driver(driver_id)\n        .ok_or(Error::InvalidReference(\"unknown serial driver\"))?;\n    if !model.has_rx {\n        return Err(Error::InvalidReference(\"serial driver has no RX capability\"));\n    }\n    let mut serial = lock_guard(&state.serial);\n    let queues = serial.entry(driver_id.to_string()).or_default();\n    for &byte in bytes {\n        queues.rx.push_back(byte);\n    }\n    drop(serial);\n    let mut registers = lock_guard(&state.registers);\n    let entry = registers.entry(model.sr_address).or_insert(model.txe_mask | model.tc_mask);\n    if !bytes.is_empty() {\n        *entry |= model.rxne_mask;\n    }\n    Ok(())\n}\n\npub fn take_serial_tx_for(state: &SharedEmulatorState, driver_id: &str) -> Vec<u8> {\n    let mut serial = lock_guard(&state.serial);\n    let queues = serial.entry(driver_id.to_string()).or_default();\n    queues.tx.drain(..).collect()\n}\n\npub fn push_usb_rx_for(state: &SharedEmulatorState, driver_id: &str, bytes: &[u8]) -> Result<(), Error> {\n    let model = usb_stream_model_for_driver(driver_id)\n        .ok_or(Error::InvalidReference(\"unknown usb stream driver\"))?;\n    if !model.has_rx {\n        return Err(Error::InvalidReference(\"usb stream driver has no RX capability\"));\n    }\n    let mut usb_stream = lock_guard(&state.usb_stream);\n    let queues = usb_stream.entry(driver_id.to_string()).or_default();\n    for &byte in bytes {\n        queues.rx.push_back(byte);\n    }\n    drop(usb_stream);\n    let mut registers = lock_guard(&state.registers);\n    let entry = registers.entry(model.ep1_conf_address).or_insert(model.serial_in_data_free_mask);\n    if !bytes.is_empty() {\n        *entry |= model.serial_out_data_avail_mask;\n    }\n    Ok(())\n}\n\npub fn take_usb_tx_for(state: &SharedEmulatorState, driver_id: &str) -> Vec<u8> {\n    let Some(model) = usb_stream_model_for_driver(driver_id) else {\n        return Vec::new();\n    };\n    let committed = {\n        let registers = lock_guard(&state.registers);\n        let entry = registers.get(&model.ep1_conf_address).copied().unwrap_or(model.serial_in_data_free_mask);\n        entry & model.wr_done_mask != 0\n    };\n    if !committed {\n        return Vec::new();\n    }\n    let mut usb_stream = lock_guard(&state.usb_stream);\n    let queues = usb_stream.entry(driver_id.to_string()).or_default();\n    let drained = queues.tx.drain(..).collect();\n    drop(usb_stream);\n    let mut registers = lock_guard(&state.registers);\n    let entry = registers.entry(model.ep1_conf_address).or_insert(model.serial_in_data_free_mask);\n    *entry |= model.serial_in_data_free_mask;\n    *entry &= !model.wr_done_mask;\n    drained\n}\n\npub fn mark_dma_route_complete_for(state: &SharedEmulatorState, route_id: &str) {\n    let mut dma = lock_guard(&state.dma_completions);\n    *dma.entry(route_id.to_string()).or_default() += 1;\n}\n\n        pub fn dma_route_completion_count_for(state: &SharedEmulatorState, route_id: &str) -> usize {\n    *lock_guard(&state.dma_completions).get(route_id).unwrap_or(&0)\n}\n\npub fn record_system_reset(driver_id: &str) -> Result<(), Error> {\n    let state = current_emulator()?;\n    let mut resets = lock_guard(&state.system_reset_requests);\n    *resets.entry(driver_id.to_string()).or_default() += 1;\n    Ok(())\n}\n\npub fn system_reset_count_for(state: &SharedEmulatorState, driver_id: &str) -> usize {\n    *lock_guard(&state.system_reset_requests).get(driver_id).unwrap_or(&0)\n}\n\npub fn set_irq_pending_for(state: &SharedEmulatorState, irq_number: i32, pending: bool) {\n    let mut irqs = lock_guard(&state.pending_irqs);\n    if pending {\n        irqs.insert(irq_number);\n    } else {\n        irqs.remove(&irq_number);\n    }\n}\n\npub fn is_irq_pending_for(state: &SharedEmulatorState, irq_number: i32) -> bool {\n    lock_guard(&state.pending_irqs).contains(&irq_number)\n}\n",
     );
     Ok(out)
 }
@@ -20417,7 +20577,7 @@ fn render_host_esp_gpio_model_slice(items: &[HostEspGpioModel]) -> String {
 
 fn render_embassy_host_root_rs(model: &EmbassyGenerationModel) -> String {
     let mut out = String::from(
-        "use crate::metadata;\n\n#[derive(Debug, Clone)]\npub struct HostEmulator {\n    state: metadata::SharedEmulatorState,\n}\n\nimpl Default for HostEmulator {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\nimpl Drop for HostEmulator {\n    fn drop(&mut self) {\n        metadata::clear_current_emulator_if_active(&self.state);\n    }\n}\n\nimpl HostEmulator {\n    pub fn new() -> Self {\n        let state = metadata::new_emulator_state();\n        metadata::initialize_emulator_state(&state);\n        Self { state }\n    }\n\n    pub fn activate(&self) {\n        metadata::install_current_emulator(self.state.clone());\n    }\n\n    pub fn activate_scoped(&self) -> metadata::CurrentEmulatorGuard {\n        metadata::push_current_emulator(self.state.clone())\n    }\n\n    pub fn clear_active(&self) {\n        metadata::clear_current_emulator_if_active(&self.state);\n    }\n\n    pub fn state(&self) -> metadata::SharedEmulatorState {\n        self.state.clone()\n    }\n",
+        "use crate::metadata;\n\n#[derive(Debug, Clone)]\npub struct HostEmulator {\n    state: metadata::SharedEmulatorState,\n}\n\nimpl Default for HostEmulator {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\nimpl Drop for HostEmulator {\n    fn drop(&mut self) {\n        metadata::clear_current_emulator_if_active(&self.state);\n    }\n}\n\nimpl HostEmulator {\n    pub fn new() -> Self {\n        let state = metadata::new_emulator_state();\n        metadata::initialize_emulator_state(&state);\n        Self { state }\n    }\n\n    pub fn activate(&self) {\n        metadata::install_current_emulator(self.state.clone());\n    }\n\n    pub fn activate_scoped(&self) -> metadata::CurrentEmulatorGuard {\n        metadata::push_current_emulator(self.state.clone())\n    }\n\n    pub fn clear_active(&self) {\n        metadata::clear_current_emulator_if_active(&self.state);\n    }\n\n            pub fn state(&self) -> metadata::SharedEmulatorState {\n        self.state.clone()\n    }\n\n    pub fn system_reset_count(&self, driver_id: &str) -> usize {\n        metadata::system_reset_count_for(&self.state, driver_id)\n    }\n",
     );
     for driver in &model.drivers {
         let accessor = to_rust_method_name(&driver.name);
@@ -20478,6 +20638,7 @@ fn render_embassy_host_driver_instance(
     let const_prefix = to_rust_const_name(&driver.id);
     let support_items = render_embassy_host_driver_support_items(model, driver)?;
     let emulator_items = render_embassy_host_driver_emulator(model, driver)?;
+    let system_reset_method = render_host_system_reset_method(model, driver)?;
     let mut out = String::new();
     out.push_str(&format!(
         "// Driver instance: {} ({}) from canonical block {} -> {}\n",
@@ -20533,16 +20694,55 @@ fn render_embassy_host_driver_instance(
         render_named_entity_slice(&driver.capability_tags)
     ));
     out.push_str(&format!(
-        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}RuntimeResources {{}}\n\npub const {const_prefix}_RUNTIME_RESOURCES: {type_name}RuntimeResources = {type_name}RuntimeResources {{}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name}MetadataResources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub lowering_pattern: Option<&'static str>,\n    pub time_driver_source: Option<&'static str>,\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_METADATA_RESOURCES: {type_name}MetadataResources = {type_name}MetadataResources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    lowering_pattern: {lowering_pattern},\n    time_driver_source: {time_driver_source},\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name};\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}RuntimeResources) -> Result<Self, metadata::Error> {{\n        let _ = resources;\n        Ok(Self)\n    }}\n\n    pub fn metadata_resources() -> {type_name}MetadataResources {{\n        {const_prefix}_METADATA_RESOURCES\n    }}\n{methods}\n}}\n\n{support_items}\n{emulator_items}",
+        "#[derive(Debug, Clone, Copy)]\npub struct {type_name}RuntimeResources {{}}\n\npub const {const_prefix}_RUNTIME_RESOURCES: {type_name}RuntimeResources = {type_name}RuntimeResources {{}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name}MetadataResources {{\n    pub clocks: &'static [metadata::ClockBinding],\n    pub resets: &'static [metadata::ResetBinding],\n    pub interrupt_sources: &'static [metadata::InterruptSource],\n    pub interrupts: &'static [metadata::InterruptRoute],\n    pub dma_channels: &'static [metadata::DmaChannel],\n    pub dma: &'static [metadata::DmaRoute],\n    pub pins: &'static [metadata::PinRole],\n    pub init_operations: &'static [metadata::SemanticOperation],\n    pub state_machines: &'static [metadata::SemanticStateMachine],\n    pub lowering_pattern: Option<&'static str>,\n    pub time_driver_source: Option<&'static str>,\n    pub capability_tags: &'static [&'static str],\n}}\n\npub const {const_prefix}_METADATA_RESOURCES: {type_name}MetadataResources = {type_name}MetadataResources {{\n    clocks: {const_prefix}_CLOCK_BINDINGS,\n    resets: {const_prefix}_RESET_BINDINGS,\n    interrupt_sources: {const_prefix}_INTERRUPT_SOURCES,\n    interrupts: {const_prefix}_INTERRUPT_ROUTES,\n    dma_channels: {const_prefix}_DMA_CHANNELS,\n    dma: {const_prefix}_DMA_ROUTES,\n    pins: {const_prefix}_PIN_ROLES,\n    init_operations: {const_prefix}_INIT_OPERATIONS,\n    state_machines: {const_prefix}_STATE_MACHINES,\n    lowering_pattern: {lowering_pattern},\n    time_driver_source: {time_driver_source},\n    capability_tags: {const_prefix}_CAPABILITY_TAGS,\n}};\n\n#[derive(Debug, Clone, Copy)]\npub struct {type_name};\n\nimpl {type_name} {{\n    pub fn new(resources: {type_name}RuntimeResources) -> Result<Self, metadata::Error> {{\n        let _ = resources;\n        Ok(Self)\n    }}\n\n    pub fn metadata_resources() -> {type_name}MetadataResources {{\n        {const_prefix}_METADATA_RESOURCES\n    }}\n{methods}\n{system_reset_method}\n}}\n\n{support_items}\n{emulator_items}",
         type_name = driver.type_name,
         const_prefix = const_prefix,
         lowering_pattern = render_optional_rust_string(driver.lowering_pattern.as_deref()),
         time_driver_source = render_optional_rust_string(driver.time_driver_source.as_deref()),
         methods = render_driver_methods(model, driver)?,
+        system_reset_method = system_reset_method,
         support_items = support_items,
         emulator_items = emulator_items
     ));
     Ok(out)
+}
+
+fn render_host_system_reset_method(
+    model: &EmbassyGenerationModel,
+    driver: &ResolvedDriverInstance,
+) -> Result<String> {
+    let Some(operation) = &driver.system_reset_operation else {
+        return Ok(String::new());
+    };
+    let step = operation
+        .steps
+        .last()
+        .expect("validated system reset operations have a final step");
+    let target_ref = step
+        .target_ref
+        .as_deref()
+        .expect("validated system reset operations have a final target");
+    let register = model
+        .registers
+        .get(target_ref)
+        .expect("validated system reset operations target a known register");
+    let value = step
+        .value
+        .as_ref()
+        .and_then(Value::as_u64)
+        .expect("validated system reset operations use integer values");
+    let value = u32::try_from(value).map_err(|_| {
+        anyhow!(
+            "system reset operation {} writes value {} that does not fit in u32",
+            operation.id,
+            value
+        )
+    })?;
+    Ok(format!(
+        "    pub fn system_reset(&self) -> Result<(), metadata::Error> {{\n        write_u32(0x{:X}u64, 0x{value:08X}u32)?;\n        metadata::record_system_reset({})?;\n        Ok(())\n    }}\n",
+        register.absolute_address,
+        render_rust_string(&driver.id)
+    ))
 }
 
 fn render_embassy_host_driver_support_items(
@@ -23666,6 +23866,171 @@ fn host_emulator_tracks_esp_usb_serial_jtag_streams() {
         assert!(wch_rs.contains(
             "const GENERATED_WCH_RUNTIME_DRV_DMA1_RUNTIME_RESOURCES: DMA1RuntimeResources"
         ));
+    }
+
+    #[test]
+    fn generate_embassy_emits_system_reset_for_ch32v203_variants() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        for variant in ["ch32v203c8t6", "ch32v203g6u6"] {
+            let input = repo_root
+                .join("evidence")
+                .join("wch")
+                .join(variant)
+                .join("hair.json");
+            let document = load_validated_hair_document(&input, &repo_root)
+                .expect("reference hair document should validate");
+            let output_dir = tempdir().expect("tempdir");
+
+            generate_embassy_crate(&document, output_dir.path()).expect("embassy generation");
+            let model =
+                EmbassyGenerationModel::from_document(&document).expect("embassy generation model");
+            let pfic_driver = model
+                .drivers
+                .iter()
+                .find(|driver| driver.id == "drv.pfic")
+                .expect("PFIC driver");
+            let host_method =
+                render_host_system_reset_method(&model, pfic_driver).expect("host reset method");
+
+            let interrupt_rs =
+                std::fs::read_to_string(output_dir.path().join("src").join("interrupt.rs"))
+                    .expect("interrupt.rs");
+            assert!(interrupt_rs.contains("pub fn system_reset() -> !"));
+            assert!(
+                interrupt_rs.contains("write_volatile(0xE000ED10usize as *mut u32, 0x80000000u32)")
+            );
+            assert!(host_method.contains("write_u32(0xE000ED10u64, 0x80000000u32)?;"));
+            assert!(host_method.contains("metadata::record_system_reset(\"drv.pfic\")?;"));
+        }
+    }
+
+    #[test]
+    fn generate_embassy_host_records_system_reset_events() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture = write_embassy_fixture(false);
+        let mut document = load_json_file(fixture.path()).expect("fixture json");
+        let pfic_peripheral = document["structure"]["device"]["peripherals"]
+            .as_array_mut()
+            .expect("peripherals")
+            .iter_mut()
+            .find(|peripheral| peripheral["id"] == "periph.pfic")
+            .and_then(Value::as_object_mut)
+            .expect("PFIC peripheral");
+        pfic_peripheral.insert("baseAddress".to_string(), serde_json::json!(0xE000_E000u64));
+        pfic_peripheral.insert(
+            "registers".to_string(),
+            serde_json::json!([{
+                "id": "reg.pfic.sctlr",
+                "name": "SCTLR",
+                "kind": "register",
+                "offsetBytes": 3344,
+                "widthBits": 32,
+                "fields": []
+            }]),
+        );
+        document["semantics"]["operations"]
+            .as_array_mut()
+            .expect("operations")
+            .push(serde_json::json!({
+                "id": "op.pfic.system_reset",
+                "name": "PFIC system reset",
+                "kind": "reset-sequence",
+                "targetRefs": ["periph.pfic"],
+                "steps": [{
+                    "index": 0,
+                    "action": "write",
+                    "targetRef": "reg.pfic.sctlr",
+                    "value": 2147483648u64
+                }]
+            }));
+        let pfic_driver = document["profiles"]["embassyHal"]["driverInstances"]
+            .as_array_mut()
+            .expect("driver instances")
+            .iter_mut()
+            .find(|driver| driver["id"] == "drv.pfic")
+            .and_then(Value::as_object_mut)
+            .expect("PFIC driver");
+        pfic_driver.insert(
+            "systemResetOperationRef".to_string(),
+            serde_json::json!("op.pfic.system_reset"),
+        );
+
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("system reset fixture should validate");
+        let output_dir = tempdir().expect("tempdir");
+        generate_embassy_host_crate(&validated, output_dir.path())
+            .expect("embassy-host generation");
+        let check_status = std::process::Command::new(env!("CARGO"))
+            .args(["check", "--quiet", "--manifest-path"])
+            .arg(output_dir.path().join("Cargo.toml"))
+            .status()
+            .expect("run generated host crate check");
+        assert!(
+            check_status.success(),
+            "generated host crate should compile"
+        );
+
+        let interrupt_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("interrupt.rs"))
+                .expect("interrupt.rs");
+        let metadata_rs =
+            std::fs::read_to_string(output_dir.path().join("src").join("metadata.rs"))
+                .expect("metadata.rs");
+        let host_rs = std::fs::read_to_string(output_dir.path().join("src").join("host.rs"))
+            .expect("host.rs");
+        assert!(interrupt_rs.contains("pub fn system_reset(&self) -> Result<(), metadata::Error>"));
+        assert!(interrupt_rs.contains("write_u32(0xE000ED10u64, 0x80000000u32)?;"));
+        assert!(interrupt_rs.contains("metadata::record_system_reset(\"drv.pfic\")?;"));
+        assert!(metadata_rs.contains("system_reset_requests: Mutex<BTreeMap<String, usize>>"));
+        assert!(metadata_rs.contains("pub fn record_system_reset(driver_id: &str)"));
+        assert!(metadata_rs.contains("pub fn system_reset_count_for("));
+        assert!(host_rs.contains("pub fn system_reset_count(&self, driver_id: &str) -> usize"));
+    }
+
+    #[test]
+    fn generate_embassy_rejects_system_reset_on_a_different_controller_path() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let input = repo_root
+            .join("evidence")
+            .join("wch")
+            .join("ch32v203g6u6")
+            .join("hair.json");
+        let mut document = load_json_file(&input).expect("reference hair json");
+        let pfic_driver = document
+            .as_object_mut()
+            .expect("document object")
+            .get_mut("profiles")
+            .and_then(Value::as_object_mut)
+            .expect("profiles object")
+            .get_mut("embassyHal")
+            .and_then(Value::as_object_mut)
+            .expect("embassyHal object")
+            .get_mut("driverInstances")
+            .and_then(Value::as_array_mut)
+            .expect("driver instances")
+            .iter_mut()
+            .find(|driver| driver["id"] == "drv.pfic")
+            .and_then(Value::as_object_mut)
+            .expect("PFIC driver");
+        pfic_driver.insert(
+            "systemResetOperationRef".to_string(),
+            serde_json::json!("op.tim1.enable"),
+        );
+        let file = write_temp_json(&document);
+        let validated = load_validated_hair_document(file.path(), &repo_root)
+            .expect("schema should permit a syntactically valid operation reference");
+        let output_dir = tempdir().expect("tempdir");
+
+        let error = generate_embassy_crate(&validated, output_dir.path())
+            .expect_err("generation should reject a reset operation on another path");
+        assert!(
+            error
+                .to_string()
+                .contains("must target the same interrupt-controller path periph.pfic"),
+            "unexpected error: {error:#}"
+        );
     }
 
     #[test]
